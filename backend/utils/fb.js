@@ -1,0 +1,282 @@
+/**
+ * =============================================================
+ * 🌐 Facebook API Utility (KR_POST FINAL v3)
+ * ✅ Handles upload, TikTok integration, token validation & insights
+ * =============================================================
+ */
+
+const axios = require("axios");
+const FormData = require("form-data");
+const { downloadTiktokVideo } = require("./tiktokDownloader");
+
+class FacebookAPI {
+  constructor() {
+    this.graph = "https://graph.facebook.com/v19.0";
+    this.http = axios.create({
+      timeout: 90000, // Allow longer uploads (90s)
+      maxContentLength: 100 * 1024 * 1024,
+      maxBodyLength: Infinity,
+      headers: { "User-Agent": "KR_POST_BACKEND/1.0" },
+    });
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Upload video to Facebook Page                              */
+  /* ------------------------------------------------------------ */
+  async uploadVideoToFacebook(accessToken, pageId, videoBuffer, caption, thumbnailBuffer = null) {
+    if (!videoBuffer || videoBuffer.length < 1024)
+      throw new Error("Invalid or empty video buffer");
+
+    try {
+      console.log(`📤 Uploading video to Facebook Page: ${pageId}`);
+
+      const form = new FormData();
+      form.append("access_token", accessToken);
+      form.append("description", caption || "Shared via KR POST");
+      form.append("source", videoBuffer, {
+        filename: `video_${Date.now()}.mp4`,
+        contentType: "video/mp4",
+      });
+
+      if (thumbnailBuffer) {
+        form.append("thumb", thumbnailBuffer, {
+          filename: "thumb.jpg",
+          contentType: "image/jpeg",
+        });
+      }
+
+      const res = await this.http.post(`${this.graph}/${pageId}/videos`, form, {
+        headers: form.getHeaders(),
+      });
+
+      console.log(`✅ Video uploaded successfully (Post ID: ${res.data.id})`);
+      return { success: true, postId: res.data.id, pageId };
+    } catch (error) {
+      const fbErr = error.response?.data?.error;
+      console.error("❌ Facebook video upload failed:", fbErr || error.message);
+      return {
+        success: false,
+        error: fbErr?.message || error.message,
+        code: fbErr?.code || "UPLOAD_ERROR",
+      };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Post video/link to multiple pages or groups                */
+  /* ------------------------------------------------------------ */
+  async postToFB(accessToken, accounts, videoBuffer, caption, thumbnail = null) {
+    const results = { successCount: 0, failedCount: 0, details: [] };
+
+    if (!Array.isArray(accounts) || accounts.length === 0) {
+      console.warn("⚠️ No Facebook accounts provided.");
+      return results;
+    }
+
+    for (const account of accounts) {
+      try {
+        console.log(`🚀 Posting to ${account.name} (${account.type})...`);
+        let postResult;
+
+        if (account.type === "page") {
+          postResult = await this.uploadVideoToFacebook(
+            account.access_token || accessToken,
+            account.id,
+            videoBuffer,
+            caption,
+            thumbnail?.buffer
+          );
+        } else {
+          postResult = await this.shareAsLink(accessToken, account.id, caption);
+        }
+
+        if (postResult.success) results.successCount++;
+        else results.failedCount++;
+
+        results.details.push({
+          accountId: account.id,
+          type: account.type,
+          status: postResult.success ? "success" : "failed",
+          postId: postResult.postId || null,
+          error: postResult.error || null,
+        });
+
+        await new Promise((r) => setTimeout(r, 1500)); // prevent rate limit
+      } catch (err) {
+        const parsed = this.handleFacebookError(err);
+        results.failedCount++;
+        results.details.push({
+          accountId: account.id,
+          type: account.type,
+          status: "failed",
+          error: parsed.message,
+          code: parsed.code,
+        });
+        if (parsed.retryable) await this.handleRateLimit();
+      }
+    }
+
+    console.log(`📊 Summary → ✅ ${results.successCount}, ❌ ${results.failedCount}`);
+    return results;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Fallback: Share link (for groups)                          */
+  /* ------------------------------------------------------------ */
+  async shareAsLink(accessToken, groupId, caption) {
+    try {
+      const res = await this.http.post(`${this.graph}/${groupId}/feed`, {
+        message: caption,
+        link: "https://www.tiktok.com/",
+        access_token: accessToken,
+      });
+      console.log(`✅ Shared link to Group ${groupId}`);
+      return { success: true, postId: res.data.id };
+    } catch (error) {
+      const fbErr = error.response?.data?.error;
+      console.error(`❌ Link share failed (${groupId}):`, fbErr?.message || error.message);
+      return { success: false, error: fbErr?.message || error.message };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Get Pages                                                  */
+  /* ------------------------------------------------------------ */
+  async getFacebookPages(accessToken) {
+    try {
+      const res = await this.http.get(`${this.graph}/me/accounts`, {
+        params: {
+          access_token: accessToken,
+          fields: "id,name,category,access_token,picture{url},fan_count,link",
+        },
+      });
+
+      const pages = res.data.data.map((p) => ({
+        id: p.id,
+        name: p.name,
+        type: "page",
+        category: p.category,
+        access_token: p.access_token,
+        picture: p.picture?.data?.url,
+        fan_count: p.fan_count,
+        link: p.link,
+      }));
+
+      console.log(`✅ Found ${pages.length} Facebook pages`);
+      return pages;
+    } catch (err) {
+      console.error("❌ Failed to get pages:", err.message);
+      return [];
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Get Groups                                                 */
+  /* ------------------------------------------------------------ */
+  async getFacebookGroups(accessToken) {
+    try {
+      const res = await this.http.get(`${this.graph}/me/groups`, {
+        params: {
+          access_token: accessToken,
+          fields: "id,name,privacy,icon,cover{source}",
+          admin_only: true,
+        },
+      });
+
+      const groups = res.data.data.map((g) => ({
+        id: g.id,
+        name: g.name,
+        type: "group",
+        privacy: g.privacy,
+        cover: g.cover?.source,
+      }));
+
+      console.log(`✅ Found ${groups.length} Facebook groups`);
+      return groups;
+    } catch (err) {
+      console.warn("⚠️ Could not fetch groups (missing permission)");
+      return [];
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Validate Access Token                                     */
+  /* ------------------------------------------------------------ */
+  async validateAccessToken(accessToken) {
+    try {
+      const res = await this.http.get(`${this.graph}/debug_token`, {
+        params: {
+          input_token: accessToken,
+          access_token: `${process.env.FB_APP_ID}|${process.env.FB_APP_SECRET}`,
+        },
+      });
+
+      const data = res.data.data;
+      return {
+        isValid: data.is_valid,
+        userId: data.user_id,
+        appId: data.app_id,
+        expiresAt: new Date(data.expires_at * 1000),
+        scopes: data.scopes,
+      };
+    } catch (err) {
+      console.error("❌ Token validation failed:", err.message);
+      return { isValid: false, error: err.message };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Get User Profile                                          */
+  /* ------------------------------------------------------------ */
+  async getUserProfile(accessToken) {
+    try {
+      const res = await this.http.get(`${this.graph}/me`, {
+        params: { access_token: accessToken, fields: "id,name,email,picture{url}" },
+      });
+      return {
+        id: res.data.id,
+        name: res.data.name,
+        email: res.data.email,
+        avatar: res.data.picture?.data?.url,
+      };
+    } catch (err) {
+      console.error("❌ Failed to fetch profile:", err.message);
+      return null;
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* 🧠 Handle Facebook Error Mapping                             */
+  /* ------------------------------------------------------------ */
+  handleFacebookError(error) {
+    const fbErr = error.response?.data?.error;
+    if (!fbErr) return { message: error.message, code: "UNKNOWN", retryable: false };
+
+    const retryableCodes = [4, 341];
+    const codeMap = {
+      10: "PERMISSION_DENIED",
+      100: "INVALID_PARAM",
+      190: "INVALID_TOKEN",
+      200: "ACCESS_DENIED",
+    };
+
+    return {
+      message: fbErr.message,
+      code: codeMap[fbErr.code] || `FB_${fbErr.code}`,
+      retryable: retryableCodes.includes(fbErr.code),
+    };
+  }
+
+  /* ------------------------------------------------------------ */
+  /* 🕒 Exponential Backoff Retry                                 */
+  /* ------------------------------------------------------------ */
+  async handleRateLimit(attempt = 1) {
+    const delay = Math.min(1000 * Math.pow(2, attempt), 30000);
+    console.log(`⏳ Rate limit — retrying in ${delay}ms`);
+    await new Promise((r) => setTimeout(r, delay));
+  }
+}
+
+// ✅ Singleton export
+module.exports = new FacebookAPI();
+module.exports.FacebookAPI = FacebookAPI;

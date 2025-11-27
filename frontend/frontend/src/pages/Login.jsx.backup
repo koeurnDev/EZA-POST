@@ -1,0 +1,142 @@
+// ============================================================
+// 🔐 Login.jsx (FINAL PRODUCTION VERSION – With Demo Login)
+console.error("🚨 Demo login failed:", error);
+showNotification("error", "Demo account not available right now.");
+    } finally {
+  setLoading(false);
+}
+  };
+
+// ------------------------------------------------------------
+// ✅ Navigation Helpers
+// ------------------------------------------------------------
+const handleSwitchToRegister = () => navigate("/register");
+const handleForgotPassword = () =>
+  alert("🔒 Password reset feature coming soon!");
+
+// ------------------------------------------------------------
+// ✅ UI Render
+// ------------------------------------------------------------
+return (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      height: "100vh",
+      background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
+      fontFamily: "system-ui, sans-serif",
+    }}
+  >
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "400px",
+        background: "white",
+        padding: "36px 32px",
+        borderRadius: "14px",
+        boxShadow: "0 6px 16px rgba(0,0,0,0.1)",
+        transition: "transform 0.2s ease",
+      }}
+    >
+      {/* Header */}
+      <h2
+        style={{
+          textAlign: "center",
+          marginBottom: "16px",
+          color: "#1e293b",
+          fontSize: "1.6rem",
+          fontWeight: 700,
+        }}
+      >
+        👋 Welcome Back
+      </h2>
+      <p
+        style={{
+          textAlign: "center",
+          marginBottom: "24px",
+          color: "#64748b",
+          fontSize: "0.95rem",
+        }}
+      >
+        Sign in to continue with <strong>KR_POST</strong>
+      </p>
+
+      {/* ✅ Notification Message */}
+      {notification && (
+        <div
+          style={{
+            backgroundColor:
+              notification.type === "success" ? "#10b981" : "#ef4444",
+            color: "white",
+            padding: "10px",
+            borderRadius: "8px",
+            textAlign: "center",
+            marginBottom: "14px",
+            fontWeight: 500,
+            transition: "opacity 0.3s ease",
+          }}
+        >
+          {notification.message}
+        </div>
+      )}
+
+      {/* ✅ Login Form */}
+      <LoginForm
+        onSuccess={handleManualLogin}
+        onSwitchToRegister={handleSwitchToRegister}
+        onForgotPassword={handleForgotPassword}
+        loading={loading}
+      />
+
+      {/* ✅ Demo Login Button */}
+      <button
+        onClick={handleDemoLogin}
+        disabled={loading}
+        style={{
+          width: "100%",
+          background: loading ? "#93c5fd" : "#3b82f6",
+          color: "white",
+          padding: "10px 0",
+          borderRadius: "8px",
+          border: "none",
+          cursor: loading ? "not-allowed" : "pointer",
+          fontWeight: "600",
+          fontSize: "0.95rem",
+          transition: "background 0.3s ease, transform 0.1s ease",
+          marginTop: "12px",
+        }}
+        onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
+        onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+      >
+        🚀 {loading ? "Loading..." : "Try Demo Account"}
+      </button>
+
+      {/* ✅ Footer */}
+      <p
+        style={{
+          textAlign: "center",
+          marginTop: "18px",
+          color: "#475569",
+          fontSize: "0.9rem",
+        }}
+      >
+        Don’t have an account?{" "}
+        <button
+          onClick={handleSwitchToRegister}
+          style={{
+            color: "#2563eb",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: "600",
+            textDecoration: "underline",
+          }}
+        >
+          Register
+        </button>
+      </p>
+    </div>
+  </div>
+);
+}

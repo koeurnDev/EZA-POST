@@ -1,0 +1,121 @@
+# ============================================================
+# KR_POST Frontend - .gitignore
+# ============================================================
+
+# ------------------------------
+# Node.js / Vite
+# ------------------------------
+node_modules/
+dist/
+build/
+.cache/
+vite.config.ts.timestamp*
+vite.config.js.timestamp*
+
+# ------------------------------
+# Environment Files
+# ------------------------------
+.env
+.env.*.local
+!.env.example
+
+# ------------------------------
+# Logs and Reports
+# ------------------------------
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+pnpm-lock.yaml
+lerna-debug.log*
+
+# ------------------------------
+# OS-specific files
+# ------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ------------------------------
+# IDE / Editor files
+# ------------------------------
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.code-workspace
+
+# ------------------------------
+# Testing
+# ------------------------------
+coverage/
+*.lcov
+jest-cache/
+jest-results.json
+
+# ------------------------------
+# Temporary and cache files
+# ------------------------------
+.tmp/
+temp/
+.cache/
+*.log
+*.bak
+*.tmp
+
+# ------------------------------
+# Build outputs
+# ------------------------------
+*.local
+*.lock
+*.pid
+*.seed
+*.tgz
+*.zip
+*.tar
+*.gz
+
+# ------------------------------
+# Frontend specific ignores
+# ------------------------------
+public/assets/tmp/
+src/__mocks__/
+src/**/*.local.js
+src/**/*.local.ts
+src/**/*.local.json
+
+# ------------------------------
+# Git / Security
+# ------------------------------
+*.pem
+*.key
+*.crt
+*.p12
+*.cer
+
+# ------------------------------
+# Backup & Generated Files
+# ------------------------------
+*.bak
+*.old
+*.orig
+*.rej
+
+# ------------------------------
+# KR_POST Custom Folders
+# ------------------------------
+# Frontend build exports or test assets
+/.output/
+/frontend_build/
+/temp_uploads/
+/cache/
+/logs/
+
+# ------------------------------
+# Windows specific files
+# ------------------------------
+ehthumbs.db
+Icon?
