@@ -32,4 +32,21 @@ router.get("/info", async (req, res) => {
     }
 });
 
+// ============================================================
+// ✅ GET /api/tiktok/preview (Redirect to MP4)
+// ============================================================
+router.get("/preview", async (req, res) => {
+    const { url } = req.query;
+    if (!url) return res.status(400).send("URL required");
+
+    try {
+        const videoUrl = await tiktokDownloader.getPlayableUrl(url);
+        // Redirect to the actual video file
+        res.redirect(videoUrl);
+    } catch (err) {
+        console.error("Preview error:", err.message);
+        res.status(500).send("Failed to load video preview");
+    }
+});
+
 module.exports = router;

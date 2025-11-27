@@ -4,6 +4,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { Upload, FileVideo, X, Play, Pause, AlertCircle } from "lucide-react";
+import { API_CONFIG } from "../utils/apiConstants";
 
 const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Preview", isDemo = false }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,7 +20,13 @@ const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Previe
       setVideoSrc(objectUrl);
       return () => URL.revokeObjectURL(objectUrl);
     } else if (videoUrl) {
-      setVideoSrc(videoUrl);
+      // ✅ Check for TikTok URL and use Preview Endpoint
+      if (videoUrl.includes("tiktok.com")) {
+        const previewUrl = `${API_CONFIG.BASE_URL}/tiktok/preview?url=${encodeURIComponent(videoUrl)}`;
+        setVideoSrc(previewUrl);
+      } else {
+        setVideoSrc(videoUrl);
+      }
     } else {
       setVideoSrc("");
     }
@@ -85,11 +92,11 @@ const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Previe
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`relative w-full aspect-video rounded-xl overflow-hidden bg-black transition-all duration-300 ${!videoSrc
-            ? `border-2 border-dashed cursor-pointer ${isDragging
-              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-              : "border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750"
-            }`
-            : "border-0 shadow-lg"
+          ? `border-2 border-dashed cursor-pointer ${isDragging
+            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+            : "border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750"
+          }`
+          : "border-0 shadow-lg"
           }`}
         onClick={() => !videoSrc && document.getElementById("video-upload").click()}
       >

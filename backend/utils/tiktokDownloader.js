@@ -95,6 +95,48 @@ class TikTokDownloader {
   }
 
   /* ------------------------------------------------------------ */
+  /* ✅ Get Playable Video URL (for Preview)                      */
+  /* ------------------------------------------------------------ */
+  async getPlayableUrl(videoUrl) {
+    // Method 1: API Proxy
+    const endpoints = [
+      `https://www.tikwm.com/api/?url=${encodeURIComponent(videoUrl)}`,
+      `https://api.tikmate.app/api/lookup?url=${encodeURIComponent(videoUrl)}`,
+      `https://www.tiklydown.me/api/download?url=${encodeURIComponent(videoUrl)}`,
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const res = await this.client.get(endpoint);
+        const data = res.data?.data || res.data;
+        const dl = (data.play || data.noWatermark || data.download_url) || data.wmplay;
+        if (dl) return dl;
+      } catch (err) {
+        console.warn(`Preview check failed for ${endpoint}: ${err.message}`);
+      }
+    }
+
+    // Method 2: RapidAPI
+    try {
+      const res = await this.client.get(
+        `https://tiktok-video-no-watermark2.p.rapidapi.com/?url=${encodeURIComponent(videoUrl)}`,
+        {
+          headers: {
+            "x-rapidapi-host": "tiktok-video-no-watermark2.p.rapidapi.com",
+            "x-rapidapi-key": process.env.RAPIDAPI_KEY || "",
+          },
+        }
+      );
+      const link = res.data?.data?.play || res.data?.play;
+      if (link) return link;
+    } catch (err) {
+      console.warn(`RapidAPI preview failed: ${err.message}`);
+    }
+
+    throw new Error("Could not resolve playable URL");
+  }
+
+  /* ------------------------------------------------------------ */
   /* ✅ Method 1 — TikWM / Tikmate API proxy                      */
   /* ------------------------------------------------------------ */
   async downloadViaAPIProxy(videoUrl, noWatermark = true) {
