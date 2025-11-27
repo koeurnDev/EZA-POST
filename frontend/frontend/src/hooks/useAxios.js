@@ -8,7 +8,7 @@ import useAuth from "./useAuth";
 
 // ✅ Base API configuration
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_URL || "/api",
   withCredentials: true, // allow sending cookies if backend uses sessions
   headers: { "Content-Type": "application/json" },
 });

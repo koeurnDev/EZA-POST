@@ -132,11 +132,13 @@ router.get("/callback", async (req, res) => {
         });
 
         // 🔹 Redirect to Dashboard
-        res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/dashboard`);
+        const frontendUrl = process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5173";
+        res.redirect(`${frontendUrl}/dashboard`);
 
     } catch (err) {
         console.error("Facebook Login Error:", err.response?.data || err.message);
-        res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/login?error=auth_failed`);
+        const frontendUrl = process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5173";
+        res.redirect(`${frontendUrl}/login?error=auth_failed`);
     }
 });
 

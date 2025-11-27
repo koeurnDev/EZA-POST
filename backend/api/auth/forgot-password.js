@@ -36,7 +36,8 @@ router.post("/", async (req, res) => {
 
         // 📧 In a real app, send this via email (SendGrid, Nodemailer, etc.)
         // For now, we log it to the console for testing.
-        const resetLink = `${process.env.FRONTEND_URL || "http://localhost:5173"}/reset-password?token=${token}`;
+        const frontendUrl = process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5173";
+        const resetLink = `${frontendUrl}/reset-password?token=${token}`;
 
         console.log("\n============================================================");
         console.log("🔐 PASSWORD RESET LINK (DEV MODE)");
