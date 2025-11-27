@@ -1,9 +1,9 @@
 {
-  "name": "kr_post-frontend",
+  "name": "eza_post-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "KR_POST Frontend — Schedule TikTok videos to Facebook with auto-reply bot.",
+  "description": "EZA_POST Frontend — Schedule TikTok videos to Facebook with auto-reply bot.",
   "author": "Koeurn SEAB",
   "license": "MIT",
   "scripts": {

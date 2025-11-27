@@ -34,8 +34,8 @@ function generateToken(user) {
     JWT_SECRET,
     {
       expiresIn: JWT_EXPIRATION,
-      issuer: "KR_POST",
-      audience: "krpost_users",
+      issuer: "EZA_POST",
+      audience: "ezapost_users",
     }
   );
 }

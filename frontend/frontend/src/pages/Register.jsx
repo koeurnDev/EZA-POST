@@ -52,7 +52,7 @@ export default function Register() {
         {/* Content */}
         <div className="relative z-10">
           <div className="flex items-center gap-3 text-2xl font-bold tracking-tight">
-            <span className="text-4xl">🚀</span> KR_POST
+            <span className="text-4xl">🚀</span> EZA_POST
           </div>
         </div>
 
@@ -64,7 +64,7 @@ export default function Register() {
             </span>
           </h1>
           <p className="text-lg text-slate-300 max-w-md leading-relaxed">
-            Join thousands of creators who use KR_POST to schedule, manage, and analyze their content across all platforms effortlessly.
+            Join thousands of creators who use EZA_POST to schedule, manage, and analyze their content across all platforms effortlessly.
           </p>
         </div>
 
@@ -86,7 +86,7 @@ export default function Register() {
           {/* Mobile Header (Visible only on mobile) */}
           <div className="lg:hidden text-center mb-8">
             <span className="text-4xl">🚀</span>
-            <h2 className="text-2xl font-bold text-slate-900 mt-4">KR_POST</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mt-4">EZA_POST</h2>
           </div>
 
           <div className="text-center lg:text-left">

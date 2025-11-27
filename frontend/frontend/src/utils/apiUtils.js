@@ -70,7 +70,7 @@ export const getFullUrl = (endpoint) => {
 /* ----------------------------------------------- */
 export const saveUserData = (user) => {
   try {
-    window.localStorage.setItem("kr_post_user", JSON.stringify(user));
+    window.localStorage.setItem("eza_post_user", JSON.stringify(user));
   } catch (err) {
     console.warn("⚠️ Failed to save user data:", err);
   }
@@ -78,7 +78,7 @@ export const saveUserData = (user) => {
 
 export const getUserData = () => {
   try {
-    const raw = window.localStorage.getItem("kr_post_user");
+    const raw = window.localStorage.getItem("eza_post_user");
     return raw ? JSON.parse(raw) : null;
   } catch (err) {
     console.warn("⚠️ Failed to parse user data:", err);
@@ -88,10 +88,10 @@ export const getUserData = () => {
 
 export const clearUserData = () => {
   const keys = [
-    "kr_post_user",
-    "kr_post_custom_accounts",
-    "kr_post_bot_rules",
-    "kr_post_bot_enabled",
+    "eza_post_user",
+    "eza_post_custom_accounts",
+    "eza_post_bot_rules",
+    "eza_post_bot_enabled",
   ];
   for (const key of keys) {
     try {

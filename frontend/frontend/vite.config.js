@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 // ============================================================
-// ⚙️ VITE CONFIG — FINAL PRODUCTION VERSION for KR_POST
+// ⚙️ VITE CONFIG — FINAL PRODUCTION VERSION for EZA_POST
 // ============================================================
 // Includes React plugin, path aliases, CORS proxy to backend,
 // optimized builds, and static asset settings.

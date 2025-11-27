@@ -10,7 +10,7 @@ class FacebookUploader {
     this.api = axios.create({
       baseURL: "https://graph.facebook.com/v19.0",
       timeout: 30000,
-      headers: { "User-Agent": "KR_POST_BACKEND/1.0" },
+      headers: { "User-Agent": "EZA_POST_BACKEND/1.0" },
     });
   }
 
@@ -159,10 +159,10 @@ class FacebookUploader {
             acc.type === "page"
               ? await this.uploadVideoToPage(acc.access_token, acc.id, videoData)
               : await this.postToGroup(userToken, acc.id, {
-                  message: videoData.caption,
-                  link: videoData.videoUrl,
-                  picture: videoData.thumbnail,
-                });
+                message: videoData.caption,
+                link: videoData.videoUrl,
+                picture: videoData.thumbnail,
+              });
 
           uploaded = result.success;
           break;

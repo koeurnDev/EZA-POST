@@ -46,16 +46,16 @@ router.post("/", async (req, res) => {
     // 📧 Send Welcome Email
     await sendEmail({
       to: newUser.email,
-      subject: "Welcome to KR Post! 🚀",
+      subject: "Welcome to EZA_POST! 🚀",
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-          <h1 style="color: #2563eb;">Welcome to KR Post!</h1>
+          <h1 style="color: #2563eb;">Welcome to EZA_POST!</h1>
           <p>Hi <strong>${newUser.name}</strong>,</p>
-          <p>Thank you for joining KR Post. We're excited to have you on board!</p>
+          <p>Thank you for joining EZA_POST. We're excited to have you on board!</p>
           <p>You can now log in and start scheduling your posts.</p>
           <br>
           <p>Best regards,</p>
-          <p><strong>The KR Post Team</strong></p>
+          <p><strong>The EZA_POST Team</strong></p>
         </div>
       `,
     });

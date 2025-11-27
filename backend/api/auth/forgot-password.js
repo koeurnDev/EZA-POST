@@ -47,7 +47,7 @@ router.post("/", async (req, res) => {
         // 📧 Send Reset Email
         await sendEmail({
             to: user.email,
-            subject: "Reset Your Password - KR Post",
+            subject: "Reset Your Password - EZA_POST",
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
                     <h2 style="color: #dc2626;">Reset Your Password</h2>

@@ -259,30 +259,13 @@ const apiUtils = {
         reject(new Error("Upload failed due to network error"))
       );
       xhr.open("POST", getFullUrl(url));
-      xhr.withCredentials = true;
+      xhr.withCredentials = true; // Important for cookies
       xhr.send(formData);
     }),
-
-  saveUserData: (user) =>
-    localStorage.setItem("kr_post_user", JSON.stringify(user)),
-
-  getUserData: () => {
-    const data = localStorage.getItem("kr_post_user");
-    return data ? JSON.parse(data) : null;
-  },
-
-  clearUserData: () => {
-    [
-      "kr_post_user",
-      "kr_post_custom_accounts",
-      "kr_post_bot_rules",
-      "kr_post_bot_enabled",
-    ].forEach((key) => localStorage.removeItem(key));
-  },
 };
 
 /* -------------------------------------------------------------------------- */
-/* ✅ API Modules                                                             */
+/* ✅ API Service Modules                                                     */
 /* -------------------------------------------------------------------------- */
 
 // Authentication
@@ -310,10 +293,14 @@ const authAPI = {
   logout: async () => {
     try {
       const res = await api.post(API_ENDPOINTS.AUTH.LOGOUT);
-      apiUtils.clearUserData();
+      // Clear local storage on logout
+      localStorage.removeItem("eza_post_user");
+      localStorage.removeItem("eza_post_token");
       return res.data;
     } catch (err) {
-      apiUtils.clearUserData();
+      // Even if server fails, clear local state
+      localStorage.removeItem("eza_post_user");
+      localStorage.removeItem("eza_post_token");
       throw err;
     }
   },

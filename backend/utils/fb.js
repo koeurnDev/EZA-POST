@@ -16,7 +16,7 @@ class FacebookAPI {
       timeout: 90000, // Allow longer uploads (90s)
       maxContentLength: 100 * 1024 * 1024,
       maxBodyLength: Infinity,
-      headers: { "User-Agent": "KR_POST_BACKEND/1.0" },
+      headers: { "User-Agent": "EZA_POST_BACKEND/1.0" },
     });
   }
 

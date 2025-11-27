@@ -43,7 +43,7 @@ const AccountSelector = React.memo(function AccountSelector({
   useEffect(() => {
     const id = safeRequestIdleCallback(() => {
       try {
-        const saved = localStorage.getItem("kr_post_custom_accounts");
+        const saved = localStorage.getItem("eza_post_custom_accounts");
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) setCustomAccounts(parsed);
@@ -60,7 +60,7 @@ const AccountSelector = React.memo(function AccountSelector({
     const timeout = setTimeout(() => {
       try {
         localStorage.setItem(
-          "kr_post_custom_accounts",
+          "eza_post_custom_accounts",
           JSON.stringify(customAccounts)
         );
       } catch { }

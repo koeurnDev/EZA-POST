@@ -25,7 +25,7 @@ const useAxios = () => {
     // 🧩 Request Interceptor → attach token
     const requestInterceptor = axiosInstance.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem("kr_post_token");
+        const token = localStorage.getItem("eza_post_token");
         if (token) config.headers.Authorization = `Bearer ${token}`;
         return config;
       },
@@ -47,7 +47,7 @@ const useAxios = () => {
             const newToken = refreshResponse.data?.token;
 
             if (newToken) {
-              localStorage.setItem("kr_post_token", newToken);
+              localStorage.setItem("eza_post_token", newToken);
               originalRequest.headers.Authorization = `Bearer ${newToken}`;
               return axiosInstance(originalRequest); // Retry with new token
             }

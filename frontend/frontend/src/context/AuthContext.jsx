@@ -1,5 +1,5 @@
 // ============================================================
-// 🔐 AuthContext.jsx — Final Optimized for KR_POST Frontend
+// 🔐 AuthContext.jsx — Final Optimized for EZA_POST Frontend
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";

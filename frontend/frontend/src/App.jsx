@@ -1,7 +1,7 @@
 // ============================================================
-// 🌐 App.jsx — FINAL VERSION (KR_POST Frontend)
+// 🌐 App.jsx — FINAL VERSION (EZA_POST Frontend)
 // ============================================================
-// Main entry point of the KR_POST frontend.
+// Main entry point of the EZA_POST frontend.
 // Initializes global contexts, applies theme handling, and 
 // mounts all routes with strict mode for React 18+.
 // ============================================================

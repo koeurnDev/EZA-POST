@@ -1,7 +1,7 @@
 {
-  "name": "kr-post-backend",
+  "name": "eza-post-backend",
   "version": "1.0.0",
-  "description": "Backend for KR Post - TikTok to Facebook video scheduler and automation tool.",
+  "description": "Backend for EZA Post - TikTok to Facebook video scheduler and automation tool.",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

@@ -1,12 +1,3 @@
-{
-  "name": "KR_POST - Social Media Scheduler",
-  "short_name": "KR_POST",
-  "description": "Schedule TikTok videos to Facebook with auto-reply bot",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#3b82f6",
-  "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",

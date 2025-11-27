@@ -13,7 +13,7 @@ const sendEmail = async ({ to, subject, html }) => {
         });
 
         await transporter.sendMail({
-            from: `"KR Post" <${process.env.EMAIL_FROM}>`,
+            from: `"EZA_POST" <${process.env.EMAIL_FROM}>`,
             to,
             subject,
             html,

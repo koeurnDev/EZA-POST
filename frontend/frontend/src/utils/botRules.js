@@ -1,8 +1,8 @@
 // ============================================================
-// 🤖 botRules.js — FINAL VERSION (KR_POST)
+// 🤖 botRules.js — FINAL VERSION (EZA_POST)
 // ============================================================
 // Handles bot rule creation, validation, storage, import/export,
-// and analytics for the KR_POST auto-reply system.
+// and analytics for the EZA_POST auto-reply system.
 // ============================================================
 
 /* -------------------------------------------------------------------------- */
@@ -197,7 +197,7 @@ export class RulesValidator {
 /* 🧠 RulesManager — Storage + CRUD Logic                                    */
 /* -------------------------------------------------------------------------- */
 export class RulesManager {
-  constructor(storageKey = "kr_post_bot_rules") {
+  constructor(storageKey = "eza_post_bot_rules") {
     this.storageKey = storageKey;
     this.rules = this.loadRules();
   }
@@ -286,8 +286,8 @@ export class RulesManager {
     const avgLength =
       total > 0
         ? Math.round(
-            this.rules.reduce((a, r) => a + r.reply.length, 0) / total
-          )
+          this.rules.reduce((a, r) => a + r.reply.length, 0) / total
+        )
         : 0;
 
     return {
@@ -314,7 +314,7 @@ export class RulesManager {
     a.href = url;
     a.download =
       filename ||
-      `kr_post_rules_${new Date().toISOString().split("T")[0]}.json`;
+      `eza_post_rules_${new Date().toISOString().split("T")[0]}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -6,14 +6,13 @@ import React from "react";
 import { motion } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 
-const AuthLayout = ({ children, title = "Welcome to KR POST", subtitle }) => {
+const AuthLayout = ({ children, title = "Welcome to EZA_POST", subtitle }) => {
   const { theme, toggleTheme } = useTheme();
 
   return (
     <div
-      className={`min-h-screen flex flex-col md:flex-row transition-all duration-500 ${
-        theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-800"
-      }`}
+      className={`min-h-screen flex flex-col md:flex-row transition-all duration-500 ${theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-800"
+        }`}
     >
       {/* 🔹 Left Section - Illustration / Branding */}
       <motion.div
@@ -27,10 +26,10 @@ const AuthLayout = ({ children, title = "Welcome to KR POST", subtitle }) => {
             className="text-4xl font-bold mb-3 text-blue-500"
             whileHover={{ scale: 1.05 }}
           >
-            KR POST 🚀
+            EZA_POST 🚀
           </motion.h1>
           <p className="text-gray-400 text-sm leading-relaxed">
-            Automate your Facebook posts with ease.  
+            Automate your Facebook posts with ease.
             Schedule TikTok videos, connect pages, and manage content—all in one place.
           </p>
           <div className="mt-8">
@@ -51,11 +50,10 @@ const AuthLayout = ({ children, title = "Welcome to KR POST", subtitle }) => {
         className={`flex-1 flex flex-col justify-center items-center p-6 sm:p-10`}
       >
         <div
-          className={`w-full max-w-md rounded-2xl shadow-lg border ${
-            theme === "dark"
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-200"
-          } p-8`}
+          className={`w-full max-w-md rounded-2xl shadow-lg border ${theme === "dark"
+            ? "bg-gray-800 border-gray-700"
+            : "bg-white border-gray-200"
+            } p-8`}
         >
           {/* Header */}
           <div className="mb-6 text-center">
@@ -82,7 +80,7 @@ const AuthLayout = ({ children, title = "Welcome to KR POST", subtitle }) => {
 
           {/* Footer */}
           <div className="mt-8 text-center text-xs text-gray-400">
-            © {new Date().getFullYear()} KR POST — All rights reserved.
+            © {new Date().getFullYear()} EZA_POST — All rights reserved.
           </div>
         </div>
       </motion.div>

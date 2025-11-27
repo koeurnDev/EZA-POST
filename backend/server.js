@@ -1,5 +1,5 @@
 // ============================================================
-// 🌐 KR POST BACKEND - FINAL PRODUCTION VERSION (Optimized + Modular Ready)
+// 🌐 EZA_POST BACKEND - FINAL PRODUCTION VERSION (Optimized + Modular Ready)
 // ============================================================
 
 require("dotenv").config();
@@ -104,7 +104,7 @@ app.use(
       collectionName: "sessions",
       ttl: 24 * 60 * 60, // 1 day in seconds
     }),
-    secret: process.env.SESSION_SECRET || "kr_post_secret_key_2024",
+    secret: process.env.SESSION_SECRET || "eza_post_secret_key_2024",
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -254,6 +254,6 @@ setInterval(() => {
 // ------------------------------------------------------------
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 KR POST Backend running on port ${PORT}`);
+  console.log(`🚀 EZA_POST Backend running on port ${PORT}`);
   console.log(`🌐 Mode: ${process.env.NODE_ENV || "development"}`);
 });
