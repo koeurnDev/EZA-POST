@@ -1,5 +1,5 @@
 // ============================================================
-// 🤖 botEngine.js — Auto-Reply Logic (KR_POST)
+// 🤖 botEngine.js — Auto-Reply Logic (EZA_POST)
 // ============================================================
 
 const { BotRule, BotStatus } = require("../models/BotRule");

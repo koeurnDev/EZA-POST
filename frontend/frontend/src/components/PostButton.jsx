@@ -1,5 +1,5 @@
 // ============================================================
-// 🚀 PostButton.jsx — Final Optimized Version (KR_POST Project)
+// 🚀 PostButton.jsx — Final Optimized Version (EZA_POST Project)
 // ============================================================
 
 import React, { useState, useCallback } from "react";

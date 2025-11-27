@@ -1,5 +1,5 @@
 // ============================================================
-// 🔐 PrivateRoute.jsx — Auth Protected Route for KR_POST
+// 🔐 PrivateRoute.jsx — Auth Protected Route for EZA_POST
 // ============================================================
 
 import React from "react";

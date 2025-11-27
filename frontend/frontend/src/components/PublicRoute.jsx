@@ -1,5 +1,5 @@
 // ============================================================
-// 🌐 PublicRoute.jsx — Final Version (KR_POST Frontend)
+// 🌐 PublicRoute.jsx — Final Version (EZA_POST Frontend)
 // ============================================================
 
 import React from "react";

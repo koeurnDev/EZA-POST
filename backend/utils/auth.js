@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * 🧩 auth.js — Central Authentication Utilities + Routes for KR_POST
+ * 🧩 auth.js — Central Authentication Utilities + Routes for EZA_POST
  * ============================================================
  * ✅ JWT-based session management
  * ✅ Facebook OAuth verification
@@ -178,7 +178,7 @@ router.post("/demo", async (req, res) => {
     const demoUser = {
       id: "demo_user_001",
       name: "Demo User",
-      email: "demo@krpost.app",
+      email: "demo@ezapost.app",
       role: "Demo",
     };
 

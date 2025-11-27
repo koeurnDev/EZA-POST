@@ -5,7 +5,8 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { authAPI, apiUtils } from "../utils/api";
+import { authAPI } from "../utils/api";
+import { getUserData } from "../utils/apiUtils";
 import RegisterForm from "../components/RegisterForm";
 import LoginButton from "../components/LoginButton";
 
@@ -17,7 +18,7 @@ export default function Register() {
   // ✅ Redirect to dashboard if already logged in
   // ------------------------------------------------------------
   useEffect(() => {
-    const user = apiUtils.getUserData();
+    const user = getUserData();
     if (user) navigate("/dashboard", { replace: true });
   }, [navigate]);
 

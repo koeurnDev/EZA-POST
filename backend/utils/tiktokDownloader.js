@@ -1,6 +1,6 @@
 /**
  * ==============================================================
- * 🎬 TikTok Downloader Utility (KR_POST Final v3)
+ * 🎬 TikTok Downloader Utility (EZA_POST Final v3)
  * ✅ Downloads videos (no watermark) with multi-source fallback
  * ✅ Handles short URLs, validation, retries, and caching
  * ==============================================================

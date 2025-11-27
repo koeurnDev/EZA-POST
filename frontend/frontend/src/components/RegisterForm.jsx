@@ -1,5 +1,5 @@
 // ============================================================
-// 🌐 RegisterForm.jsx — Final Enhanced Version (KR_POST Frontend)
+// 🌐 RegisterForm.jsx — Final Enhanced Version (EZA_POST Frontend)
 // ============================================================
 
 import React, { useState } from "react";
@@ -156,8 +156,8 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             onChange={handleChange}
             disabled={loading}
             className={`w-full px-4 py-3 bg-white border rounded-lg outline-none text-slate-900 placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 ${errors.confirmPassword
-                ? "border-red-500 focus:border-red-500"
-                : "border-slate-200 focus:border-blue-500"
+              ? "border-red-500 focus:border-red-500"
+              : "border-slate-200 focus:border-blue-500"
               }`}
           />
           {errors.confirmPassword && (
@@ -170,8 +170,8 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
           type="submit"
           disabled={loading}
           className={`w-full py-3.5 font-bold text-white rounded-lg shadow-sm transition-all duration-200 transform active:scale-[0.98] ${loading
-              ? "bg-slate-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700 hover:shadow-md"
+            ? "bg-slate-400 cursor-not-allowed"
+            : "bg-blue-600 hover:bg-blue-700 hover:shadow-md"
             }`}
         >
           {loading ? (

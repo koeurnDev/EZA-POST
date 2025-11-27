@@ -6,7 +6,8 @@ import React, { useState, useEffect } from "react";
 import LoginForm from "../components/LoginForm";
 import LoginButton from "../components/LoginButton";
 import { useNavigate } from "react-router-dom";
-import { authAPI, apiUtils } from "../utils/api";
+import { authAPI } from "../utils/api";
+import { saveUserData } from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
 
 export default function Login() {
@@ -37,7 +38,7 @@ export default function Login() {
   // ------------------------------------------------------------
   const handleLoginSuccess = (user) => {
     try {
-      apiUtils.saveUserData(user);
+      saveUserData(user);
       setAuthUser(user); // ✅ Update global auth state immediately
       showNotification(
         "success",

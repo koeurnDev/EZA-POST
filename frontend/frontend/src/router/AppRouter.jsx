@@ -1,5 +1,5 @@
 // ============================================================
-// 🌐 AppRouter.jsx - Main Router Configuration for KR_POST
+// 🌐 AppRouter.jsx - Main Router Configuration for EZA_POST
 // ============================================================
 
 import React from "react";

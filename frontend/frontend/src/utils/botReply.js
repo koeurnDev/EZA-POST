@@ -2,7 +2,7 @@
 // 🤖 botReply.js — Final Version (Validated & Optimized)
 // ============================================================
 // Handles auto-reply rule validation, filtering, grouping, and
-// suggestion generation for the KR_POST automation system.
+// suggestion generation for the EZA_POST automation system.
 // ============================================================
 
 /* -------------------------------------------------------------------------- */

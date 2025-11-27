@@ -1,5 +1,5 @@
 // ============================================================
-// 🧠 database.js — MongoDB Handler (KR_POST)
+// 🧠 database.js — MongoDB Handler (EZA_POST)
 // ============================================================
 
 const User = require("../models/User");

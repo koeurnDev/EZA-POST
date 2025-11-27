@@ -1,6 +1,6 @@
 /**
  * =============================================================
- * 🌐 Facebook API Utility (KR_POST FINAL v3)
+ * 🌐 Facebook API Utility (EZA_POST FINAL v3)
  * ✅ Handles upload, TikTok integration, token validation & insights
  * =============================================================
  */

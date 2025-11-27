@@ -1,5 +1,5 @@
 // ============================================================
-// ✅ Facebook Uploader Utility (KR_POST FINAL v2)
+// ✅ Facebook Uploader Utility (EZA_POST FINAL v2)
 // Handles all Facebook Graph API uploads, validations & analytics
 // ============================================================
 

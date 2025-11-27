@@ -1,5 +1,5 @@
 // ============================================================
-// 🔐 ProtectedRoute.jsx — Final Version (KR_POST Frontend)
+// 🔐 ProtectedRoute.jsx — Final Version (EZA_POST Frontend)
 // ============================================================
 
 import React from "react";
