@@ -53,6 +53,11 @@ router.get("/callback", async (req, res) => {
     }
 
     try {
+        console.log("🔹 Facebook Callback Received");
+        console.log("   👉 Code:", code ? "Received (Hidden)" : "Missing");
+        console.log("   👉 Redirect URI:", REDIRECT_URI);
+        console.log("   👉 App ID:", FB_APP_ID);
+
         // 🔹 Exchange code for access token
         const tokenRes = await axios.get("https://graph.facebook.com/v21.0/oauth/access_token", {
             params: {
