@@ -108,9 +108,9 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" || process.env.RENDER === "true", // ✅ Force Secure on Render
       httpOnly: true,
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // ✅ Required for Cross-Site (Vercel -> Render)
+      sameSite: (process.env.NODE_ENV === "production" || process.env.RENDER === "true") ? "none" : "lax", // ✅ Force None on Render
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     },
   })
@@ -129,6 +129,17 @@ app.use(
 // ------------------------------------------------------------
 // 🔐 AUTHENTICATION ROUTES
 // ------------------------------------------------------------
+
+// ✅ Debug Route for Session
+app.get('/api/debug/session', (req, res) => {
+  console.log("🔍 Debug Session Check:", req.session);
+  res.json({
+    loggedIn: !!req.session?.user,
+    user: req.session?.user || null,
+    sessionID: req.sessionID,
+    cookie: req.session?.cookie
+  });
+});
 
 // ✅ Use centralized Auth Router
 app.use("/api/auth", require("./api/auth"));
