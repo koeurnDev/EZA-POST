@@ -3,14 +3,15 @@
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { authAPI, apiUtils } from "../utils/api";
+import { authAPI } from "../utils/api";
+import { getUserData, saveUserData, clearUserData } from "../utils/apiUtils";
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     try {
-      return apiUtils.getUserData();
+      return getUserData();
     } catch {
       return null;
     }
@@ -23,7 +24,7 @@ export const AuthProvider = ({ children }) => {
   const checkAuthStatus = useCallback(async () => {
     try {
       // Check if we have a demo user in localStorage - if so, use it directly
-      const savedUser = apiUtils.getUserData();
+      const savedUser = getUserData();
       const isDemo = localStorage.getItem("isDemo") === "true";
 
       if (isDemo && savedUser) {
@@ -41,21 +42,21 @@ export const AuthProvider = ({ children }) => {
       const data = await authAPI.checkStatus();
       if (data?.authenticated && data.user) {
         setUser(data.user);
-        apiUtils.saveUserData(data.user);
+        saveUserData(data.user);
       } else {
         // ✅ Backend says NOT authenticated -> Clear everything
         setUser(null);
-        apiUtils.clearUserData();
+        clearUserData();
       }
     } catch {
       // On error (e.g. network error), keep the localStorage user if it exists
       // BUT if it's a 401, the interceptor will handle it.
       // For other errors, we might want to be careful not to log them out aggressively
       // unless we are sure.
-      const savedUser = apiUtils.getUserData();
+      const savedUser = getUserData();
       if (!savedUser) {
         setUser(null);
-        apiUtils.clearUserData();
+        clearUserData();
       }
     } finally {
       setLoading(false);
@@ -74,7 +75,7 @@ export const AuthProvider = ({ children }) => {
       const data = await authAPI.login({ email, password });
       if (data?.user) {
         setUser(data.user);
-        apiUtils.saveUserData(data.user);
+        saveUserData(data.user);
       }
       return data.user;
     } catch (err) {
@@ -90,7 +91,7 @@ export const AuthProvider = ({ children }) => {
       const data = await authAPI.register({ name, email, password });
       if (data?.user) {
         setUser(data.user);
-        apiUtils.saveUserData(data.user);
+        saveUserData(data.user);
       }
       return data.user;
     } catch (err) {
@@ -106,7 +107,7 @@ export const AuthProvider = ({ children }) => {
       const data = await authAPI.demoLogin();
       if (data?.user) {
         setUser(data.user);
-        apiUtils.saveUserData(data.user);
+        saveUserData(data.user);
         // Also set isDemo flag in localStorage for Dashboard
         localStorage.setItem("isDemo", "true");
       }
@@ -124,7 +125,7 @@ export const AuthProvider = ({ children }) => {
       await authAPI.logout();
     } catch { }
     setUser(null);
-    apiUtils.clearUserData();
+    clearUserData();
   };
 
   // ✅ Update User Profile
@@ -133,7 +134,7 @@ export const AuthProvider = ({ children }) => {
       const res = await authAPI.updateProfile(data);
       if (res.success) {
         setUser(res.user); // Update state
-        apiUtils.saveUserData(res.user);
+        saveUserData(res.user);
         return { success: true, message: res.message };
       }
     } catch (err) {
