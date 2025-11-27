@@ -65,6 +65,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:3000",
+  "https://eza-post-frontend.vercel.app", // ✅ Explicitly allow main Vercel domain
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
@@ -81,6 +82,9 @@ app.use(
 
       // Check against allowed origins
       if (allowedOrigins.includes(origin)) return callback(null, true);
+
+      // ✅ Allow all Vercel deployments (Preview & Production)
+      if (origin.endsWith(".vercel.app")) return callback(null, true);
 
       console.warn(`⚠️ CORS blocked origin: ${origin}`);
       return callback(new Error("CORS not allowed for this origin"));
