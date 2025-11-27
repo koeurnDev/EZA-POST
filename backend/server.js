@@ -140,7 +140,8 @@ app.get('/api/debug/session', (req, res) => {
     user: req.session?.user || null,
     sessionID: req.sessionID,
     cookie: req.session?.cookie,
-    fbConfigured: !!process.env.FB_APP_ID // ✅ Check if FB keys are set (Trigger Rebuild)
+    fbConfigured: !!process.env.FB_APP_ID, // ✅ Check if FB keys are set
+    baseUrl: process.env.API_BASE_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5000" // ✅ Debug URL detection
   });
 });
 
