@@ -1,57 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
-    <meta
-      name="description"
-      content="EZA_POST - Schedule TikTok videos to Facebook with auto-reply bot"
-    />
-    <meta
-      name="keywords"
-      content="EZA_POST, TikTok to Facebook, Social Media Scheduler, Auto Poster, Facebook Automation"
-    />
-    <meta name="author" content="EZA_POST Team" />
-    <meta property="og:title" content="EZA_POST - Social Media Automation" />
-    <meta
-      property="og:description"
-      content="Automate your social media workflow with EZA_POST."
-    />
-    <meta name="theme-color" content="#3b82f6" />
 
-    <!-- Title -->
-    <title>EZA_POST - Schedule TikTok Videos to Facebook</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="EZA_POST - Schedule TikTok videos to Facebook with auto-reply bot" />
+  <meta name="keywords"
+    content="EZA_POST, TikTok to Facebook, Social Media Scheduler, Auto Poster, Facebook Automation" />
+  <meta name="author" content="EZA_POST Team" />
+  <meta property="og:title" content="EZA_POST - Social Media Automation" />
+  <meta property="og:description" content="Automate your social media workflow with EZA_POST." />
+  <meta name="theme-color" content="#3b82f6" />
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <!-- Title -->
+  <title>EZA_POST - Schedule TikTok Videos to Facebook</title>
 
-    <!-- Fonts -->
-    <link
-      rel="preconnect"
-      href="https://fonts.googleapis.com"
-    />
-    <link
-      rel="preconnect"
-      href="https://fonts.gstatic.com"
-      crossorigin
-    />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
 
-    <!-- Preload main stylesheet -->
-    <link rel="preload" href="/src/App.css" as="style" />
-  </head>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
-  <body>
-    <div id="root">
-      <!-- 🚀 Fallback loading screen before React mounts -->
-      <div
-        style="
+  <!-- Preload main stylesheet -->
+  <link rel="preload" href="/src/App.css" as="style" />
+</head>
+
+<body>
+  <div id="root">
+    <!-- 🚀 Fallback loading screen before React mounts -->
+    <div style="
           display: flex;
           justify-content: center;
           align-items: center;
@@ -59,14 +38,12 @@
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        "
-      >
-        <div style="text-align: center;">
-          <div style="font-size: 48px; margin-bottom: 16px;">🚀</div>
-          <h1 style="margin-bottom: 8px; font-size: 28px;">KR_POST</h1>
-          <p style="opacity: 0.85;">Loading your social media scheduler...</p>
-          <div
-            style="
+        ">
+      <div style="text-align: center;">
+        <div style="font-size: 48px; margin-bottom: 16px;">🚀</div>
+        <h1 style="margin-bottom: 8px; font-size: 28px;">EZA_POST</h1>
+        <p style="opacity: 0.85;">Loading your social media scheduler...</p>
+        <div style="
               margin-top: 20px;
               width: 40px;
               height: 40px;
@@ -76,37 +53,38 @@
               animation: spin 1s linear infinite;
               margin-left: auto;
               margin-right: auto;
-            "
-          ></div>
-        </div>
+            "></div>
       </div>
     </div>
+  </div>
 
-    <!-- Fallback loading spinner animation -->
-    <style>
-      @keyframes spin {
-        from {
-          transform: rotate(0deg);
-        }
-        to {
-          transform: rotate(360deg);
-        }
+  <!-- Fallback loading spinner animation -->
+  <style>
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
       }
-    </style>
 
-    <!-- Vite entry point -->
-    <script type="module" src="/src/main.jsx"></script>
-
-    <!-- Unregister old service workers (for clean development builds) -->
-    <script>
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-          for (const reg of registrations) {
-            console.log("🧹 Unregistering old Service Worker:", reg);
-            reg.unregister();
-          }
-        });
+      to {
+        transform: rotate(360deg);
       }
-    </script>
-  </body>
+    }
+  </style>
+
+  <!-- Vite entry point -->
+  <script type="module" src="/src/main.jsx"></script>
+
+  <!-- Unregister old service workers (for clean development builds) -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const reg of registrations) {
+          console.log("🧹 Unregistering old Service Worker:", reg);
+          reg.unregister();
+        }
+      });
+    }
+  </script>
+</body>
+
 </html>
