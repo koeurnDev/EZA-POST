@@ -3,6 +3,7 @@
 // ============================================================
 
 import axios from "axios";
+import { getUserData, saveUserData, clearUserData } from "./apiUtils";
 
 /* -------------------------------------------------------------------------- */
 /* ✅ Default Constants                                                       */
@@ -227,6 +228,9 @@ const apiUtils = {
   getErrorMessage,
   getUserErrorMessage,
   getFullUrl,
+  getUserData,
+  saveUserData,
+  clearUserData,
 
   retry: async (fn, retries = API_CONFIG.RETRY_ATTEMPTS, delay = API_CONFIG.RETRY_DELAY) => {
     try {
