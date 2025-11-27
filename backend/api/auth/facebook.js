@@ -112,8 +112,8 @@ router.get("/callback", async (req, res) => {
         // 🔹 Set Cookie
         res.cookie("token", token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production" || process.env.RENDER === "true",
+            sameSite: (process.env.NODE_ENV === "production" || process.env.RENDER === "true") ? "none" : "lax",
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
