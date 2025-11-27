@@ -140,7 +140,7 @@ app.get('/api/debug/session', (req, res) => {
     user: req.session?.user || null,
     sessionID: req.sessionID,
     cookie: req.session?.cookie,
-    fbConfigured: !!process.env.FB_APP_ID // ✅ Check if FB keys are set
+    fbConfigured: !!process.env.FB_APP_ID // ✅ Check if FB keys are set (Trigger Rebuild)
   });
 });
 
