@@ -10,7 +10,8 @@ const User = require("../../models/User");
 
 const FB_APP_ID = process.env.FB_APP_ID;
 const FB_APP_SECRET = process.env.FB_APP_SECRET;
-const REDIRECT_URI = `${process.env.API_BASE_URL || "http://localhost:5000"}/api/auth/facebook/callback`;
+const BASE_URL = process.env.API_BASE_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5000";
+const REDIRECT_URI = `${BASE_URL}/api/auth/facebook/callback`;
 
 // ✅ 1. Redirect to Facebook Login
 router.get("/", (req, res) => {
@@ -53,7 +54,7 @@ router.get("/callback", async (req, res) => {
 
     try {
         // 🔹 Exchange code for access token
-        const tokenRes = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
+        const tokenRes = await axios.get("https://graph.facebook.com/v21.0/oauth/access_token", {
             params: {
                 client_id: FB_APP_ID,
                 client_secret: FB_APP_SECRET,
