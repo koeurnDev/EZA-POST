@@ -118,13 +118,13 @@ const ThumbnailUpload = ({ onChange, currentThumbnail = null, isDemo = false }) 
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative group w-full aspect-video rounded-xl overflow-hidden cursor-pointer transition-all duration-300 border-2 border-dashed ${error
-            ? "border-red-300 bg-red-50 dark:bg-red-900/10"
-            : isDragging
-              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-[0.99]"
-              : preview
-                ? "border-transparent"
-                : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-gray-100 dark:hover:bg-gray-750"
+        className={`relative group w-full aspect-square rounded-xl overflow-hidden cursor-pointer transition-all duration-300 border-2 border-dashed ${error
+          ? "border-red-300 bg-red-50 dark:bg-red-900/10"
+          : isDragging
+            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-[0.99]"
+            : preview
+              ? "border-transparent"
+              : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-gray-100 dark:hover:bg-gray-750"
           }`}
       >
         {/* Hidden Input */}

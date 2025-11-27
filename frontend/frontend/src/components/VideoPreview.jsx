@@ -3,7 +3,7 @@
 // ============================================================
 
 import React, { useState, useCallback, useEffect } from "react";
-import { Upload, FileVideo, X, Play, Pause, AlertCircle } from "lucide-react";
+import { Upload, FileVideo, X, Play, Pause, AlertCircle, Download } from "lucide-react";
 import { API_CONFIG } from "../utils/apiConstants";
 
 const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Preview", isDemo = false }) => {
@@ -91,7 +91,7 @@ const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Previe
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative w-full aspect-video rounded-xl overflow-hidden bg-black transition-all duration-300 ${!videoSrc
+        className={`relative w-full aspect-square rounded-xl overflow-hidden bg-black transition-all duration-300 ${!videoSrc
           ? `border-2 border-dashed cursor-pointer ${isDragging
             ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
             : "border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750"
@@ -141,6 +141,18 @@ const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Previe
                 </button>
               </div>
             )}
+            {/* Download Button Overlay */}
+            <div className="absolute top-3 right-3 opacity-0 hover:opacity-100 transition-opacity duration-200 z-10">
+              <a
+                href={videoSrc}
+                download={`video-${Date.now()}.mp4`}
+                className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full backdrop-blur-md flex items-center justify-center shadow-lg"
+                title="Download Video"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Download size={20} />
+              </a>
+            </div>
           </>
         ) : (
           /* Empty State / Drop Zone */
