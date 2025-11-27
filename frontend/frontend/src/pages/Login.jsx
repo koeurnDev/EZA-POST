@@ -11,6 +11,7 @@ import { saveUserData } from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
 
 export default function Login() {
+  console.log("🚀 Login Page Loaded: v2025-11-28-FIXED");
   const navigate = useNavigate();
   const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(false); // ✅ Added loading state
