@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { authAPI, apiUtils } from "../utils/api";
 import RegisterForm from "../components/RegisterForm";
+import LoginButton from "../components/LoginButton";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -103,8 +104,8 @@ export default function Register() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className={`p-4 rounded-lg text-sm font-medium flex items-center gap-3 ${notification.type === "error"
-                  ? "bg-red-50 text-red-700 border border-red-100"
-                  : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                ? "bg-red-50 text-red-700 border border-red-100"
+                : "bg-emerald-50 text-emerald-700 border border-emerald-100"
                 }`}
             >
               <span>{notification.type === "error" ? "⚠️" : "✅"}</span>
@@ -117,6 +118,21 @@ export default function Register() {
             onSuccess={handleRegisterSuccess}
             onSwitchToLogin={() => navigate("/login")}
           />
+
+          {/* 🔹 Facebook Signup */}
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-gray-50 text-slate-500">Or sign up with</span>
+              </div>
+            </div>
+            <div className="mt-6">
+              <LoginButton onFacebookLogin={authAPI.facebookLogin} variant="outline" />
+            </div>
+          </div>
 
           {/* ✅ Switch to Login */}
           <div className="text-center lg:text-left mt-6">

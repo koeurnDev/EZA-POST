@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from "react";
 import LoginForm from "../components/LoginForm";
+import LoginButton from "../components/LoginButton";
 import { useNavigate } from "react-router-dom";
 import { authAPI, apiUtils } from "../utils/api";
 import { useAuth } from "../hooks/useAuth";
@@ -138,6 +139,21 @@ export default function Login() {
             onSwitchToRegister={handleSwitchToRegister}
             onForgotPassword={handleForgotPassword}
           />
+
+          {/* 🔹 Facebook Login */}
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-gray-50 text-slate-500">Or continue with</span>
+              </div>
+            </div>
+            <div className="mt-6">
+              <LoginButton onFacebookLogin={authAPI.facebookLogin} />
+            </div>
+          </div>
 
           {/* ✅ Footer */}
           <div className="text-center lg:text-left mt-6">

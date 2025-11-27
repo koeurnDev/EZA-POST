@@ -297,7 +297,7 @@ const authAPI = {
       throw err;
     }
   },
-  facebookLogin: () => (window.location.href = "/auth/facebook"),
+  facebookLogin: () => (window.location.href = `${API_CONFIG.BASE_URL}/auth/facebook`),
   mockLogin: () => (window.location.href = "/auth/facebook/mock"),
   register: async (data) =>
     (await api.post(API_ENDPOINTS.AUTH.REGISTER, data)).data,
