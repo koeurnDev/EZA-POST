@@ -85,6 +85,7 @@ router.get("/callback", async (req, res) => {
 
         if (user) {
             // Update existing user
+            if (!user.id) user.id = `user_${Date.now()}`; // ✅ Backfill missing ID
             user.facebookId = id;
             user.facebookAccessToken = access_token;
             if (!user.avatar && picture?.data?.url) user.avatar = picture.data.url;
@@ -92,6 +93,7 @@ router.get("/callback", async (req, res) => {
         } else {
             // Create new user
             user = await User.create({
+                id: `user_${Date.now()}`, // ✅ Generate custom ID
                 name,
                 email: email || `${id}@facebook.com`, // Fallback email
                 password: `fb_${id}_${Date.now()}`, // Random password
@@ -104,7 +106,7 @@ router.get("/callback", async (req, res) => {
 
         // 🔹 Generate JWT
         const token = jwt.sign(
-            { id: user._id, role: user.role },
+            { id: user.id, role: user.role }, // ✅ Use user.id (String) to match login.js
             process.env.JWT_SECRET || "default_secret",
             { expiresIn: "7d" }
         );
