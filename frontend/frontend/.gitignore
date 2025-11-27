@@ -119,3 +119,5 @@ src/**/*.local.json
 # ------------------------------
 ehthumbs.db
 Icon?
+
+.vercel
