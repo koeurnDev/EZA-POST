@@ -10,7 +10,13 @@ const User = require("../../models/User");
 
 const FB_APP_ID = process.env.FB_APP_ID;
 const FB_APP_SECRET = process.env.FB_APP_SECRET;
-const BASE_URL = process.env.API_BASE_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5000";
+
+let BASE_URL = process.env.API_BASE_URL || process.env.RENDER_EXTERNAL_URL;
+if (!BASE_URL && process.env.NODE_ENV === "production") {
+    BASE_URL = "https://eza-post.onrender.com"; // ✅ Auto-fallback for Render
+}
+BASE_URL = BASE_URL || "http://localhost:5000";
+
 const REDIRECT_URI = `${BASE_URL}/api/auth/facebook/callback`;
 
 // ✅ 1. Redirect to Facebook Login
