@@ -54,7 +54,9 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       }
 
       const res = await api.get("/bot/rules");
-      setRules(res.data.rules || []);
+      // ✅ Normalize _id to id for frontend compatibility
+      const normalizedRules = (res.data.rules || []).map(r => ({ ...r, id: r._id }));
+      setRules(normalizedRules);
       setIsEnabled(res.data.enabled ?? true);
     } catch (err) {
       console.warn("⚠️ Fetch failed:", err?.message || err);
