@@ -93,6 +93,9 @@ app.use(
   })
 );
 
+// ✅ Trust Proxy (Required for Render/Heroku secure cookies)
+app.set("trust proxy", 1);
+
 // ✅ Session setup (stored in MongoDB)
 app.use(
   session({
@@ -107,7 +110,7 @@ app.use(
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // ✅ Required for Cross-Site (Vercel -> Render)
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     },
   })
