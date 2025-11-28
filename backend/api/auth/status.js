@@ -48,9 +48,27 @@ router.get("/", async (req, res) => {
             token,
             process.env.JWT_SECRET || "supersecretkey"
           );
-          console.log("✅ Token Verified. User:", decoded.email);
-          user = decoded;
-          authenticated = true;
+          console.log("✅ Token Verified. User ID:", decoded.id);
+
+          // ✅ CRITICAL FIX: Fetch fresh user data from DB instead of using stale token data
+          const foundUser = await User.findOne({ id: decoded.id }).select(
+            "id email name facebookId facebookName avatar connectedPages"
+          );
+
+          if (foundUser) {
+            user = {
+              id: foundUser.id,
+              email: foundUser.email,
+              name: foundUser.name,
+              facebookId: foundUser.facebookId,
+              facebookName: foundUser.facebookName,
+              avatar: foundUser.avatar,
+              connectedPages: foundUser.connectedPages,
+            };
+            authenticated = true;
+          } else {
+            console.warn("⚠️ User found in token but not in DB");
+          }
         } else {
           console.log("⚠️ No token found in cookie or header");
         }
