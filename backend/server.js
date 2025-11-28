@@ -108,9 +108,9 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production" || process.env.RENDER === "true", // ✅ Force Secure on Render
+      secure: process.env.RENDER === "true", // ✅ Only force Secure on Render (allows localhost to work)
       httpOnly: true,
-      sameSite: (process.env.NODE_ENV === "production" || process.env.RENDER === "true") ? "none" : "lax", // ✅ Force None on Render
+      sameSite: process.env.RENDER === "true" ? "none" : "lax", // ✅ Lax for localhost, None for Render
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     },
   })
