@@ -90,6 +90,7 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       user_id: userId,
       caption,
       video_url: videoUrl,
+      thumbnail_url: thumbFile ? `/uploads/thumbnails/${thumbFile.filename}` : null, // ✅ Save thumbnail URL
       accounts: accountsArray,
       schedule_time: scheduleTime ? new Date(scheduleTime) : new Date(),
       status: "processing",

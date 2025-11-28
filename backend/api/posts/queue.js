@@ -4,7 +4,7 @@
 
 const express = require("express");
 const router = express.Router();
-const Post = require("../../models/Post"); // ✅ MongoDB Model
+const ScheduledPost = require("../../models/ScheduledPost"); // ✅ Use correct model
 const { requireAuth } = require("../../utils/auth");
 
 /* -------------------------------------------------------------------------- */
@@ -17,15 +17,29 @@ router.get("/", requireAuth, async (req, res) => {
       return res.status(401).json({ success: false, error: "Unauthorized" });
 
     // 🔍 Fetch scheduled posts from MongoDB
-    const posts = await Post.find({
-      userId,
-      status: "scheduled",
-    }).sort({ scheduleTime: 1 }); // Ascending order
+    // Note: status might be 'scheduled' or 'processing'
+    const posts = await ScheduledPost.find({
+      user_id: userId,
+      status: { $in: ["scheduled", "processing"] },
+    }).sort({ schedule_time: 1 }); // Ascending order
+
+    // Map to frontend friendly format
+    const formattedPosts = posts.map(p => ({
+      id: p.id, // Custom ID string
+      _id: p._id, // Mongo ID
+      caption: p.caption,
+      videoUrl: p.video_url,
+      thumbnailUrl: p.thumbnail_url, // ✅ Include thumbnail
+      scheduleTime: p.schedule_time,
+      status: p.status,
+      accounts: p.accounts.map(acc => ({ name: acc.name || "Page" })), // Simplified account info
+      createdAt: p.createdAt
+    }));
 
     res.json({
       success: true,
-      total: posts.length,
-      posts,
+      total: formattedPosts.length,
+      posts: formattedPosts,
     });
   } catch (err) {
     console.error("❌ Fetch queue error:", err);
@@ -44,8 +58,11 @@ router.delete("/:id", requireAuth, async (req, res) => {
     if (!userId)
       return res.status(401).json({ success: false, error: "Unauthorized" });
 
-    // 🔍 Find and update post
-    const post = await Post.findOne({ _id: id, userId });
+    // 🔍 Find and update post (using custom 'id' field or '_id')
+    const post = await ScheduledPost.findOne({
+      $or: [{ id: id }, { _id: id }],
+      user_id: userId
+    });
 
     if (!post)
       return res.status(404).json({ success: false, error: "Post not found" });
