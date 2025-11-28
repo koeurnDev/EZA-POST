@@ -10,6 +10,7 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import VideoPreview from "../components/VideoPreview";
 import ThumbnailUpload from "../components/ThumbnailUpload";
 import AccountSelector from "../components/AccountSelector";
+import ScheduledPostList from "../components/ScheduledPostList";
 import BotReplySettings from "../components/BotReplySettings";
 import Button from "../components/ui/Button";
 import EmptyState from "../components/ui/EmptyState";
@@ -355,69 +356,11 @@ export default function Dashboard() {
           {/* 📋 QUEUE TAB */}
           {activeTab === "queue" && (
             <div className="space-y-6">
-              {queue.length === 0 ? (
-                <EmptyState
-                  icon={List}
-                  title="Queue is empty"
-                  description="Schedule your first post to see it here."
-                  actionLabel="Create Post"
-                  onAction={() => setActiveTab("schedule")}
-                />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {queue.map((q) => (
-                    <div
-                      key={q.id}
-                      className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow"
-                    >
-                      <div className="p-5">
-                        <div className="flex justify-between items-start mb-4">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-medium ${q.status === "scheduled"
-                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                              : q.status === "processing"
-                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-                                : "bg-gray-100 text-gray-700"
-                              }`}
-                          >
-                            {q.status.charAt(0).toUpperCase() + q.status.slice(1)}
-                          </span>
-                          <button
-                            onClick={() => cancelScheduledPost(q.id)}
-                            className="text-gray-400 hover:text-red-500 transition-colors"
-                            title="Cancel Post"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-
-                        <h4 className="font-medium text-gray-900 dark:text-white line-clamp-2 mb-3 min-h-[3rem]">
-                          {q.caption || "No caption"}
-                        </h4>
-
-                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
-                          <Clock size={16} />
-                          {new Date(q.scheduleTime).toLocaleString()}
-                        </div>
-
-                        <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mt-4">
-                          <div className="flex -space-x-2 overflow-hidden">
-                            {q.accounts?.map((acc, i) => (
-                              <div
-                                key={i}
-                                className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800 bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600"
-                                title={acc.name}
-                              >
-                                {acc.name?.[0]}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <ScheduledPostList
+                posts={queue}
+                onCancel={cancelScheduledPost}
+                onRetry={(id) => console.log("Retry not implemented yet", id)}
+              />
             </div>
           )}
 

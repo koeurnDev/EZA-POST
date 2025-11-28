@@ -122,19 +122,38 @@ async function processSinglePost(post) {
 }
 
 // ============================================================
-// 🧹 Cleanup Old Posts (24 hours)
+// 🧹 Cleanup Old Posts (48 hours) & Mark Expired
 // ============================================================
 exports.cleanupOldPosts = async () => {
   try {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+
+    // 1. Delete completed/failed/cancelled posts older than 48 hours
     const result = await ScheduledPost.deleteMany({
-      status: { $in: ["completed", "failed"] },
-      createdAt: { $lt: oneDayAgo },
+      status: { $in: ["completed", "failed", "cancelled", "expired"] },
+      updatedAt: { $lt: twoDaysAgo },
     });
 
     if (result.deletedCount > 0) {
       console.log(`🧹 Cleaned ${result.deletedCount} old posts`);
     }
+
+    // 2. Mark "scheduled" posts as "expired" if they are past due by 48 hours
+    // This handles cases where the scheduler might have missed them or they got stuck
+    const expiredResult = await ScheduledPost.updateMany(
+      {
+        status: "scheduled",
+        schedule_time: { $lt: twoDaysAgo },
+      },
+      {
+        $set: { status: "expired" },
+      }
+    );
+
+    if (expiredResult.modifiedCount > 0) {
+      console.log(`⚠️ Marked ${expiredResult.modifiedCount} posts as expired`);
+    }
+
   } catch (err) {
     console.error("Cleanup error:", err.message);
   }

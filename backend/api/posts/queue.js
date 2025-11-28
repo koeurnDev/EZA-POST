@@ -20,7 +20,7 @@ router.get("/", requireAuth, async (req, res) => {
     // Note: status might be 'scheduled' or 'processing'
     const posts = await ScheduledPost.find({
       user_id: userId,
-      status: { $in: ["scheduled", "processing"] },
+      status: { $in: ["scheduled", "processing", "expired"] },
     }).sort({ schedule_time: 1 }); // Ascending order
 
     // Map to frontend friendly format
