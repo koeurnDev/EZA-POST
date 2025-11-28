@@ -4,16 +4,18 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
+import toast from "react-hot-toast";
 
 import DashboardLayout from "../layouts/DashboardLayout";
 import VideoPreview from "../components/VideoPreview";
 import ThumbnailUpload from "../components/ThumbnailUpload";
 import AccountSelector from "../components/AccountSelector";
-import PostButton from "../components/PostButton";
 import BotReplySettings from "../components/BotReplySettings";
-import { List, Clock, Trash2 } from "lucide-react";
+import Button from "../components/ui/Button";
+import EmptyState from "../components/ui/EmptyState";
+import { List, Clock, Trash2, Send, Calendar } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { pagesAPI } from "../utils/api";
+import { pagesAPI, postsAPI } from "../utils/api";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -25,9 +27,9 @@ export default function Dashboard() {
   const [scheduleTime, setScheduleTime] = useState("");
   const [accounts, setAccounts] = useState([]);
   const [availablePages, setAvailablePages] = useState([]);
-  const [queue] = useState([]);
+  const [queue, setQueue] = useState([]);
   const [isDemo, setIsDemo] = useState(false);
-  const [isFormValid, setIsFormValid] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ✅ Initialize Demo Mode
   useEffect(() => {
@@ -46,35 +48,31 @@ export default function Dashboard() {
         }
       } catch (err) {
         console.error("Failed to fetch pages", err);
+        toast.error("Failed to load pages");
       }
     };
     if (user && !isDemo) fetchPages();
   }, [user, isDemo]);
 
-  // ✅ Validate Form
+  // ✅ Fetch Queue
   useEffect(() => {
-    const hasMedia = tiktokUrl || videoFile;
-    const hasAccounts = accounts.length > 0;
-    setIsFormValid(hasMedia && hasAccounts);
-  }, [tiktokUrl, videoFile, accounts]);
+    const fetchQueue = async () => {
+      if (activeTab === 'queue') {
+        try {
+          const res = await postsAPI.getQueue();
+          setQueue(res.posts || []);
+        } catch (error) {
+          console.error("Failed to fetch queue", error);
+        }
+      }
+    };
+    if (user && !isDemo) fetchQueue();
+  }, [activeTab, user, isDemo]);
+
 
   const handleVideoSelect = (file) => {
     setVideoFile(file);
     setTiktokUrl(""); // Clear URL if file is selected
-  };
-
-  const handlePostSuccess = () => {
-    setTiktokUrl("");
-    setVideoFile(null);
-    setThumbnail(null);
-    setCaption("");
-    setScheduleTime("");
-    setAccounts([]);
-    alert("Post created successfully!");
-  };
-
-  const handlePostError = (msg) => {
-    alert(msg);
   };
 
   const getMinScheduleTime = () => {
@@ -84,8 +82,63 @@ export default function Dashboard() {
   };
 
   const cancelScheduledPost = async (id) => {
-    // Implement cancel logic
-    console.log("Cancel post", id);
+    if (!window.confirm("Cancel this scheduled post?")) return;
+    const toastId = toast.loading("Cancelling post...");
+    try {
+      await postsAPI.cancel(id);
+      toast.success("Post cancelled", { id: toastId });
+      setQueue(prev => prev.filter(p => p.id !== id));
+    } catch (error) {
+      toast.error("Failed to cancel post", { id: toastId });
+    }
+  };
+
+  const handlePost = async (isSchedule = false) => {
+    if (!accounts.length) return toast.error("Please select at least one page.");
+    if (!videoFile && !tiktokUrl) return toast.error("Please provide a video.");
+    if (!caption) return toast.error("Please enter a caption.");
+    if (isSchedule && !scheduleTime) return toast.error("Please select a schedule time.");
+
+    setIsSubmitting(true);
+    const toastId = toast.loading(isSchedule ? "Scheduling..." : "Publishing...");
+
+    try {
+      const formData = new FormData();
+      if (videoFile) formData.append("video", videoFile);
+      if (tiktokUrl) formData.append("tiktokUrl", tiktokUrl);
+      if (thumbnail) formData.append("thumbnail", thumbnail);
+      formData.append("caption", caption);
+      formData.append("accounts", JSON.stringify(accounts));
+      if (isSchedule) formData.append("scheduleTime", scheduleTime);
+
+      const endpoint = "/api/posts/create";
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "")}${endpoint}`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(isSchedule ? "Post scheduled!" : "Post published!", { id: toastId });
+        // Reset form
+        setTiktokUrl("");
+        setVideoFile(null);
+        setThumbnail(null);
+        setCaption("");
+        setScheduleTime("");
+        setAccounts([]);
+      } else {
+        throw new Error(data.error || "Failed to create post");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message || "Something went wrong", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -210,18 +263,28 @@ export default function Dashboard() {
                     />
                   </div>
 
-                  {/* Submit Button */}
-                  <PostButton
-                    selectedAccounts={accounts}
-                    videoUrl={tiktokUrl}
-                    videoFile={videoFile} // 🎥 Pass video file
-                    thumbnailFile={thumbnail}
-                    caption={caption}
-                    scheduleTime={scheduleTime ? new Date(scheduleTime) : null}
-                    onPostSuccess={handlePostSuccess}
-                    onPostError={handlePostError}
-                    disabled={!isFormValid}
-                  />
+                  {/* Submit Buttons */}
+                  <div className="flex gap-4">
+                    <Button
+                      onClick={() => handlePost(false)}
+                      disabled={!!scheduleTime || isSubmitting}
+                      isLoading={isSubmitting && !scheduleTime}
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600"
+                      size="large"
+                    >
+                      <Send size={20} className="mr-2" /> Post Now
+                    </Button>
+                    <Button
+                      onClick={() => handlePost(true)}
+                      disabled={!scheduleTime || isSubmitting}
+                      isLoading={isSubmitting && !!scheduleTime}
+                      variant="secondary"
+                      className="flex-1"
+                      size="large"
+                    >
+                      <Calendar size={20} className="mr-2" /> Schedule
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -259,23 +322,13 @@ export default function Dashboard() {
           {activeTab === "queue" && (
             <div className="space-y-6">
               {queue.length === 0 ? (
-                <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
-                  <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <List className="text-gray-400" size={32} />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                    Queue is empty
-                  </h3>
-                  <p className="text-gray-500 dark:text-gray-400 mt-1">
-                    Schedule your first post to see it here.
-                  </p>
-                  <button
-                    onClick={() => setActiveTab("schedule")}
-                    className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  >
-                    Create Post
-                  </button>
-                </div>
+                <EmptyState
+                  icon={List}
+                  title="Queue is empty"
+                  description="Schedule your first post to see it here."
+                  actionLabel="Create Post"
+                  onAction={() => setActiveTab("schedule")}
+                />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {queue.map((q) => (
