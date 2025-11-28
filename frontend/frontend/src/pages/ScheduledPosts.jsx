@@ -211,59 +211,91 @@ export default function ScheduledPosts() {
                                             initial={{ opacity: 0, y: 20 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             key={q.id}
-                                            className="group bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                                            className="group bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col"
                                         >
-                                            <div className="p-5">
-                                                <div className="flex justify-between items-start mb-4">
+                                            {/* 🖼️ Thumbnail Preview */}
+                                            <div className="relative h-48 bg-gray-100 dark:bg-gray-900 overflow-hidden">
+                                                {q.thumbnailUrl ? (
+                                                    <img
+                                                        src={`${import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, "")}${q.thumbnailUrl}`}
+                                                        alt="Thumbnail"
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                        <div className="text-center">
+                                                            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-2">
+                                                                <Calendar size={20} />
+                                                            </div>
+                                                            <span className="text-xs font-medium">No Preview</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Status Badge */}
+                                                <div className="absolute top-3 left-3">
                                                     <span
-                                                        className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase ${q.status === "scheduled"
-                                                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                                        className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase backdrop-blur-md shadow-sm ${q.status === "scheduled"
+                                                            ? "bg-blue-500/90 text-white"
                                                             : q.status === "processing"
-                                                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-                                                                : "bg-gray-100 text-gray-700"
+                                                                ? "bg-yellow-500/90 text-white"
+                                                                : "bg-gray-500/90 text-white"
                                                             }`}
                                                     >
                                                         {q.status}
                                                     </span>
-                                                    <button
-                                                        onClick={() => cancelScheduledPost(q.id)}
-                                                        className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                                        title="Cancel Post"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
                                                 </div>
 
-                                                <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-2 mb-4 min-h-[3rem] leading-relaxed">
-                                                    {q.caption || "No caption"}
+                                                {/* Cancel Button */}
+                                                <button
+                                                    onClick={() => cancelScheduledPost(q.id)}
+                                                    className="absolute top-3 right-3 p-2 bg-white/90 dark:bg-black/50 text-gray-600 dark:text-gray-300 rounded-full hover:bg-red-500 hover:text-white transition-colors shadow-sm opacity-0 group-hover:opacity-100"
+                                                    title="Cancel Post"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+
+                                            <div className="p-5 flex-1 flex flex-col">
+                                                <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-2 mb-3 min-h-[3rem] leading-relaxed">
+                                                    {q.caption || "No caption provided"}
                                                 </h4>
 
-                                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-5 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl">
-                                                    <Clock size={16} className="text-blue-500" />
-                                                    <span className="font-medium">
-                                                        {new Date(q.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
-                                                    <span className="text-gray-400">|</span>
-                                                    <span>
-                                                        {new Date(q.scheduleTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                                    </span>
-                                                </div>
-
-                                                <div className="border-t border-gray-100 dark:border-gray-700 pt-4 flex items-center justify-between">
-                                                    <div className="flex -space-x-2 overflow-hidden pl-1">
-                                                        {q.accounts?.map((acc, i) => (
-                                                            <div
-                                                                key={i}
-                                                                className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white shadow-sm"
-                                                                title={acc.name}
-                                                            >
-                                                                {acc.name?.[0]}
-                                                            </div>
-                                                        ))}
+                                                <div className="mt-auto space-y-3">
+                                                    {/* Time */}
+                                                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/30 p-2.5 rounded-xl">
+                                                        <Clock size={16} className="text-blue-500" />
+                                                        <span className="font-medium">
+                                                            {new Date(q.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                        <span className="text-gray-300 dark:text-gray-600">|</span>
+                                                        <span>
+                                                            {new Date(q.scheduleTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                        </span>
                                                     </div>
-                                                    <span className="text-xs font-medium text-gray-400">
-                                                        {q.accounts?.length} account{q.accounts?.length !== 1 && 's'}
-                                                    </span>
+
+                                                    {/* Accounts */}
+                                                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                                                        <div className="flex -space-x-2 overflow-hidden pl-1">
+                                                            {q.accounts?.slice(0, 3).map((acc, i) => (
+                                                                <div
+                                                                    key={i}
+                                                                    className="h-7 w-7 rounded-full ring-2 ring-white dark:ring-gray-800 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
+                                                                    title={acc.name}
+                                                                >
+                                                                    {acc.name?.[0]}
+                                                                </div>
+                                                            ))}
+                                                            {q.accounts?.length > 3 && (
+                                                                <div className="h-7 w-7 rounded-full ring-2 ring-white dark:ring-gray-800 bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                                                                    +{q.accounts.length - 3}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-xs font-medium text-gray-400">
+                                                            To {q.accounts?.length} Page{q.accounts?.length !== 1 && 's'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </motion.div>
