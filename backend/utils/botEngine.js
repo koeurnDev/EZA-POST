@@ -1,10 +1,8 @@
-// ============================================================
-// 🤖 botEngine.js — Auto-Reply Logic (EZA_POST)
-// ============================================================
-
 const { BotRule, BotStatus } = require("../models/BotRule");
 const User = require("../models/User");
 const RepliedComment = require("../models/RepliedComment");
+const PendingReply = require("../models/PendingReply");
+const BotHistory = require("../models/BotHistory");
 const fb = require("./fb");
 const axios = require("axios");
 
@@ -24,7 +22,10 @@ const botEngine = {
                 return;
             }
 
-            // 2️⃣ Get All Users with Facebook Connected
+            // 2️⃣ Process Pending Replies (Queue)
+            await botEngine.processPendingReplies();
+
+            // 3️⃣ Get All Users with Facebook Connected
             const users = await User.find({ facebookAccessToken: { $exists: true } });
             console.log(`🤖 Bot Engine: Found ${users.length} users with FB tokens.`);
 
@@ -34,6 +35,85 @@ const botEngine = {
             console.log("🤖 Bot Engine: Run cycle complete.");
         } catch (err) {
             console.error("❌ Bot Engine Error:", err.message);
+        }
+    },
+
+    /**
+     * ⏳ Process Pending Replies (Queue)
+     */
+    processPendingReplies: async () => {
+        try {
+            const now = new Date();
+            const pendingReplies = await PendingReply.find({
+                status: "pending",
+                sendAt: { $lte: now }
+            }).limit(10); // Batch size
+
+            if (pendingReplies.length === 0) return;
+
+            console.log(`⏳ Processing ${pendingReplies.length} pending replies...`);
+
+            for (const reply of pendingReplies) {
+                try {
+                    // Mark as processing
+                    reply.status = "processing";
+                    await reply.save();
+
+                    console.log(`      💬 Sending delayed reply to ${reply.commentId}: "${reply.replyMessage}"`);
+
+                    await axios.post(`${fb.graph}/${reply.commentId}/comments`, {
+                        message: reply.replyMessage,
+                        access_token: reply.accessToken,
+                    });
+
+                    // Success
+                    reply.status = "completed";
+                    await reply.save();
+
+                    // Log History
+                    await BotHistory.create({
+                        commentId: reply.commentId,
+                        replyMessage: reply.replyMessage,
+                        pageId: reply.pageId,
+                        status: "success",
+                        timestamp: new Date()
+                    });
+
+                    // Persistent Record
+                    await RepliedComment.create({
+                        commentId: reply.commentId,
+                        postId: reply.commentId.split('_')[0],
+                        replyMessage: reply.replyMessage
+                    });
+
+                    console.log(`      ✅ Reply sent successfully!`);
+
+                } catch (err) {
+                    console.error(`      ❌ Failed to send pending reply:`, err.message);
+                    reply.status = "failed";
+                    reply.error = err.message;
+                    reply.attempts += 1;
+
+                    // Retry logic (optional: reset to pending if attempts < 3)
+                    if (reply.attempts < 3) {
+                        reply.status = "pending";
+                        reply.sendAt = new Date(Date.now() + 5 * 60 * 1000); // Retry in 5 mins
+                    }
+
+                    await reply.save();
+
+                    await BotHistory.create({
+                        commentId: reply.commentId,
+                        replyMessage: reply.replyMessage,
+                        pageId: reply.pageId,
+                        status: "failed",
+                        error: err.message,
+                        timestamp: new Date()
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("❌ Error processing pending replies:", err.message);
         }
     },
 
@@ -57,26 +137,17 @@ const botEngine = {
                 const isSelected = user.selectedPages?.includes(page.id);
                 const settings = user.pageSettings?.find(s => s.pageId === page.id);
                 const isBotEnabled = settings?.enableBot === true;
-
-                // Debug log for filtering
-                // console.log(`   Page ${page.name}: Selected=${isSelected}, BotEnabled=${isBotEnabled}`);
-
                 return isSelected && isBotEnabled;
             });
 
             if (activePages.length === 0) {
-                console.log(`🤖 User ${user.name}: No active pages for bot.`);
+                // console.log(`🤖 User ${user.name}: No active pages for bot.`);
                 return;
             }
-
-            console.log(`🤖 User ${user.name}: Processing ${activePages.length} active pages.`);
 
             // Get Rules
             const rules = await BotRule.find({ enabled: true });
-            if (rules.length === 0) {
-                console.log("🤖 No active bot rules found.");
-                return;
-            }
+            if (rules.length === 0) return;
 
             for (const page of activePages) {
                 await botEngine.processPage(page, rules);
@@ -91,8 +162,6 @@ const botEngine = {
      */
     processPage: async (page, rules) => {
         try {
-            console.log(`   📄 Processing Page: ${page.name} (${page.id})`);
-
             // Fetch recent posts (limit 5 for performance)
             const res = await axios.get(`${fb.graph}/${page.id}/feed`, {
                 params: {
@@ -103,12 +172,9 @@ const botEngine = {
             });
 
             const posts = res.data.data || [];
-            console.log(`      Found ${posts.length} recent posts.`);
 
             for (const post of posts) {
                 if (!post.comments || !post.comments.data) continue;
-
-                // console.log(`      Post ${post.id}: ${post.comments.data.length} comments.`);
 
                 for (const comment of post.comments.data) {
                     await botEngine.processComment(comment, page, rules);
@@ -130,13 +196,16 @@ const botEngine = {
         const alreadyReplied = await RepliedComment.findOne({ commentId: comment.id });
         if (alreadyReplied) return;
 
-        // 🛑 3. Anti-Spam: Ignore Links
+        // 🛑 3. Ignore Already Pending
+        const pending = await PendingReply.findOne({ commentId: comment.id });
+        if (pending) return;
+
+        // 🛑 4. Anti-Spam: Ignore Links
         if (/(https?:\/\/[^\s]+)/g.test(comment.message)) {
-            console.log(`      🚫 Spam detected (Link): ${comment.id}`);
             return;
         }
 
-        // 🎯 4. Match Rules
+        // 🎯 5. Match Rules
         let replyMessage = null;
 
         // Priority 1: ALL_POSTS Rule
@@ -157,26 +226,25 @@ const botEngine = {
             if (matchedRule) replyMessage = matchedRule.reply;
         }
 
-        // 🚀 5. Send Reply
+        // 🚀 6. Queue Reply (Delay 1-2 mins)
         if (replyMessage) {
             try {
-                console.log(`      💬 Replying to ${comment.from.name}: "${replyMessage}"`);
+                const delayMs = Math.floor(Math.random() * 60000) + 60000; // 1-2 minutes
+                const sendAt = new Date(Date.now() + delayMs);
 
-                await axios.post(`${fb.graph}/${comment.id}/comments`, {
-                    message: replyMessage,
-                    access_token: page.access_token,
-                });
+                console.log(`      ⏳ Queuing reply to ${comment.from.name} (Delay: ${Math.round(delayMs / 1000)}s)`);
 
-                console.log(`      ✅ Reply sent!`);
-
-                // Save to DB
-                await RepliedComment.create({
+                await PendingReply.create({
                     commentId: comment.id,
-                    postId: comment.id.split('_')[0], // Approximate Post ID extraction
-                    replyMessage: replyMessage
+                    replyMessage: replyMessage,
+                    pageId: page.id,
+                    accessToken: page.access_token,
+                    sendAt: sendAt,
+                    status: "pending"
                 });
+
             } catch (err) {
-                console.error("      ❌ Failed to reply:", err.response?.data?.error?.message || err.message);
+                console.error("      ❌ Failed to queue reply:", err.message);
             }
         }
     },
