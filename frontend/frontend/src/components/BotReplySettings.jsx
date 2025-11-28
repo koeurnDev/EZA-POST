@@ -21,7 +21,6 @@ import {
   Power,
   AlertCircle,
   CheckCircle2,
-  CheckCircle2,
   MoreHorizontal,
   Sparkles,
   Loader2
