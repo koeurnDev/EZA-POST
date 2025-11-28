@@ -5,6 +5,7 @@
  */
 
 import { API_ERRORS, ERROR_MESSAGES, API_CONFIG } from "./apiConstants";
+import axios from "axios";
 
 /* ----------------------------------------------- */
 /* ✅ Error Message Helpers */
@@ -167,6 +168,9 @@ const apiUtils = {
   saveUserData,
   getUserData,
   clearUserData,
+  // Facebook Pages
+  getUserPages: () => axios.get(getFullUrl("/api/user/pages")),
+  toggleUserPage: (pageId, isSelected) => axios.post(getFullUrl("/api/user/pages/toggle"), { pageId, isSelected }),
 };
 
 export default apiUtils;

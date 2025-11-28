@@ -2,17 +2,67 @@
 // ⚙️ Settings.jsx — User Preferences
 // ============================================================
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
-import { User, LogOut, Moon, Sun, Shield, Mail, Bell, CheckCircle2, Edit2 } from "lucide-react";
+import { User, LogOut, Moon, Sun, Shield, Mail, Bell, CheckCircle2, Edit2, RefreshCw, ExternalLink, AlertCircle } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
+import apiUtils from "../utils/apiUtils";
+import { motion } from "framer-motion";
 
 export default function Settings() {
     const { user, logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+    // 📘 Facebook Pages State
+    const [pages, setPages] = useState([]);
+    const [isLoadingPages, setIsLoadingPages] = useState(false);
+    const [pageError, setPageError] = useState(null);
+
+    // Fetch Pages on Mount if Connected
+    useEffect(() => {
+        if (user?.facebookId) {
+            fetchPages();
+        }
+    }, [user?.facebookId]);
+
+    const fetchPages = async () => {
+        setIsLoadingPages(true);
+        setPageError(null);
+        try {
+            const res = await apiUtils.getUserPages();
+            if (res.data.success) {
+                setPages(res.data.accounts);
+            } else {
+                setPageError("Failed to load pages.");
+            }
+        } catch (err) {
+            console.error("Failed to fetch pages:", err);
+            setPageError("Could not load pages. Please try syncing again.");
+        } finally {
+            setIsLoadingPages(false);
+        }
+    };
+
+    const handleTogglePage = async (pageId, currentStatus) => {
+        // Optimistic Update
+        setPages(prev => prev.map(p => p.id === pageId ? { ...p, isSelected: !currentStatus } : p));
+
+        try {
+            await apiUtils.toggleUserPage(pageId, !currentStatus);
+        } catch (err) {
+            console.error("Failed to toggle page:", err);
+            // Revert on error
+            setPages(prev => prev.map(p => p.id === pageId ? { ...p, isSelected: currentStatus } : p));
+        }
+    };
+
+    const handleReRequest = () => {
+        const authUrl = `${(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "")}/api/auth/facebook?auth_type=rerequest`;
+        window.location.href = authUrl;
+    };
 
     return (
         <DashboardLayout>
@@ -85,33 +135,128 @@ export default function Settings() {
                         </div>
                     </div>
 
-                    {/* 🔔 Notifications */}
+                    {/* 📘 Facebook Connection & Pages */}
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                        <h3 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+                            <div className="w-6 h-6 bg-[#1877f2] text-white rounded flex items-center justify-center text-sm font-bold">f</div>
+                            Facebook Integration
+                        </h3>
+
+                        {!user?.facebookId ? (
+                            <div className="text-center py-8 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                                <p className="text-gray-500 dark:text-gray-400 mb-4">Connect your account to manage pages and schedule posts.</p>
+                                <a
+                                    href={`${(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "")}/api/auth/facebook`}
+                                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#1877f2] hover:bg-[#166fe5] text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/20"
+                                >
+                                    Connect Facebook
+                                </a>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {/* Connected Profile Header */}
+                                <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-white rounded-full p-0.5 shadow-sm overflow-hidden">
+                                            {/* We don't have the user's FB avatar URL stored yet, so use a generic or the main avatar if available */}
+                                            <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 font-bold">
+                                                {user.facebookName?.[0] || "F"}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-gray-900 dark:text-white">
+                                                {user.facebookName || "Facebook User"}
+                                            </p>
+                                            <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                                <CheckCircle2 size={12} /> Connected
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={fetchPages}
+                                            disabled={isLoadingPages}
+                                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                            title="Sync Pages"
+                                        >
+                                            <RefreshCw size={18} className={isLoadingPages ? "animate-spin" : ""} />
+                                        </button>
+                                        {/* Disconnect could just be a link to logout or a specific disconnect endpoint if we had one. For now, maybe just show it's linked. */}
+                                    </div>
+                                </div>
+
+                                {/* Page Selection List */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="font-medium text-gray-900 dark:text-white">Select Pages to Manage</h4>
+                                        <button
+                                            onClick={handleReRequest}
+                                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                        >
+                                            Can't find a page? <ExternalLink size={10} />
+                                        </button>
+                                    </div>
+
+                                    {isLoadingPages ? (
+                                        <div className="space-y-3">
+                                            {[1, 2, 3].map(i => (
+                                                <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />
+                                            ))}
+                                        </div>
+                                    ) : pageError ? (
+                                        <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl flex items-center gap-2 text-sm">
+                                            <AlertCircle size={16} />
+                                            {pageError}
+                                        </div>
+                                    ) : pages.length === 0 ? (
+                                        <div className="text-center py-6 text-gray-500 text-sm">
+                                            No pages found. Try syncing or checking permissions.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {pages.map(page => (
+                                                <div key={page.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-xl hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
+                                                    <div className="flex items-center gap-3">
+                                                        <img
+                                                            src={page.picture || "https://via.placeholder.com/40"}
+                                                            alt={page.name}
+                                                            className="w-10 h-10 rounded-full bg-gray-200 object-cover"
+                                                        />
+                                                        <div>
+                                                            <p className="font-medium text-gray-900 dark:text-white">{page.name}</p>
+                                                            <p className="text-xs text-gray-500">ID: {page.id}</p>
+                                                        </div>
+                                                    </div>
+                                                    <label className="relative inline-flex items-center cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="sr-only peer"
+                                                            checked={page.isSelected}
+                                                            onChange={() => handleTogglePage(page.id, page.isSelected)}
+                                                        />
+                                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                                    </label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 🔔 Notifications (Existing) */}
                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                         <h3 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
                             <Bell className="text-yellow-500" size={20} />
                             Notifications
                         </h3>
-
+                        {/* ... Existing Notification Content ... */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
                                 <div>
                                     <p className="font-medium text-gray-900 dark:text-white">Email Notifications</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        Receive updates about your scheduled posts.
-                                    </p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                                </label>
-                            </div>
-
-                            <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-                                <div>
-                                    <p className="font-medium text-gray-900 dark:text-white">Push Notifications</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        Get notified when a post is published.
-                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Receive updates about your scheduled posts.</p>
                                 </div>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" className="sr-only peer" defaultChecked />
@@ -122,16 +267,14 @@ export default function Settings() {
                     </div>
                 </div>
 
-                {/* ⚙️ Preferences Column */}
+                {/* ⚙️ Preferences Column (Existing) */}
                 <div className="space-y-6">
                     {/* Theme Preferences */}
                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                         <h3 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white">
                             Preferences
                         </h3>
-
                         <div className="space-y-4">
-                            {/* Theme Toggle */}
                             <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
                                 <div className="flex items-center gap-3">
                                     <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-indigo-500 text-white" : "bg-orange-500 text-white"}`}>
@@ -146,50 +289,10 @@ export default function Settings() {
                                 </div>
                                 <button
                                     onClick={toggleTheme}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${theme === "dark" ? "bg-blue-600" : "bg-gray-300"
-                                        }`}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${theme === "dark" ? "bg-blue-600" : "bg-gray-300"}`}
                                 >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${theme === "dark" ? "translate-x-6" : "translate-x-1"
-                                            }`}
-                                    />
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${theme === "dark" ? "translate-x-6" : "translate-x-1"}`} />
                                 </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 🔗 Connected Accounts */}
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                        <h3 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white">
-                            Connected Accounts
-                        </h3>
-
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-[#1877f2] text-white rounded-lg flex items-center justify-center text-xl font-bold">
-                                        f
-                                    </div>
-                                    <div>
-                                        <p className="font-medium text-gray-900 dark:text-white">Facebook</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            {user?.facebookId ? "Connected" : "Not connected"}
-                                        </p>
-                                    </div>
-                                </div>
-                                {user?.facebookId ? (
-                                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg text-sm font-medium">
-                                        <CheckCircle2 size={16} />
-                                        <span>Linked</span>
-                                    </div>
-                                ) : (
-                                    <a
-                                        href={`${(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "")}/api/auth/facebook`}
-                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                                    >
-                                        Connect
-                                    </a>
-                                )}
                             </div>
                         </div>
                     </div>
