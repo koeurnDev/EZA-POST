@@ -12,7 +12,7 @@ import Overview from "../pages/Overview";
 import ScheduledPosts from "../pages/ScheduledPosts";
 import BotSettingsPage from "../pages/BotSettingsPage";
 import Settings from "../pages/Settings";
-import Settings from "../pages/Settings";
+
 import Profile from "../pages/Profile";
 import Welcome from "../pages/Welcome"; // 🚀 New Welcome Page
 
