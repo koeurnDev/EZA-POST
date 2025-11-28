@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
+const jwt = require("jsonwebtoken");
 const User = require("../../models/User");
 
 // ============================================================
@@ -95,11 +96,18 @@ router.get("/callback", async (req, res) => {
         const fbUser = profileRes.data;
         console.log(`✅ Facebook Connected: ${fbUser.name} (${fbUser.id})`);
 
-        // 3️⃣ Find Current User (from Session)
+        // 3️⃣ Find Current User (Session OR JWT)
         let userId = req.session?.user?.id;
 
-        if (!userId) {
-            console.warn("⚠️ No session found in callback. Attempting to find user by email if available...");
+        // 🕵️‍♂️ If no session, try to get user from JWT Cookie
+        if (!userId && req.cookies?.token) {
+            try {
+                const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET || "supersecretkey");
+                userId = decoded.id;
+                console.log(`✅ Recovered User ID from JWT: ${userId}`);
+            } catch (err) {
+                console.warn("⚠️ Invalid JWT in Facebook Callback:", err.message);
+            }
         }
 
         if (userId) {
