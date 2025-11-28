@@ -301,33 +301,48 @@ export default function PostComposer() {
 
                     {/* 👉 Right Column: Media Upload */}
                     <div className="space-y-6">
-                        {/* 🎬 Video Upload (Square 1:1) */}
+                        {/* 🎬 Video Upload (Premium & Responsive) */}
                         <div
-                            className={`relative w-full aspect-square bg-black rounded-2xl overflow-hidden border-2 border-dashed transition-all flex items-center justify-center ${file ? "border-blue-500" : "border-gray-700 hover:border-blue-500"}`}
+                            className={`relative w-full aspect-[4/5] sm:aspect-square bg-gradient-to-br from-gray-900 to-black rounded-3xl overflow-hidden border-2 border-dashed transition-all duration-300 group flex items-center justify-center ${file ? "border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.3)]" : "border-gray-700 hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)]"}`}
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={handleDrop}
                         >
                             {previewUrl ? (
-                                <div className="relative w-full h-full flex items-center justify-center">
-                                    <video src={previewUrl} controls className="max-w-full max-h-full" />
+                                <div className="relative w-full h-full flex items-center justify-center bg-black">
+                                    <video src={previewUrl} controls className="w-full h-full object-contain" />
                                     <button
                                         onClick={() => { setFile(null); setPreviewUrl(null); }}
-                                        className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-full hover:bg-red-500 transition-colors"
+                                        className="absolute top-4 right-4 p-2.5 bg-black/60 text-white rounded-full hover:bg-red-500 transition-all backdrop-blur-md border border-white/10 shadow-lg"
                                     >
                                         <X size={20} />
                                     </button>
                                 </div>
                             ) : (
-                                <div className="text-center space-y-4 p-6">
-                                    <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto text-gray-400">
-                                        <Upload size={32} />
+                                <div className="text-center space-y-6 p-8 relative z-10">
+                                    {/* Animated Icon Background */}
+                                    <div className="relative w-24 h-24 mx-auto group-hover:scale-110 transition-transform duration-500">
+                                        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl animate-pulse"></div>
+                                        <div className="relative w-full h-full bg-gray-800/80 backdrop-blur-sm rounded-full flex items-center justify-center border border-gray-700 group-hover:border-blue-500/50 transition-colors">
+                                            <Upload size={40} className="text-gray-400 group-hover:text-blue-400 transition-colors" />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-white font-medium">Drag & drop video</p>
-                                        <p className="text-gray-500 text-sm mt-1">Max duration: 60 seconds</p>
+
+                                    <div className="space-y-2">
+                                        <h3 className="text-2xl font-bold text-white tracking-tight">Upload Video</h3>
+                                        <p className="text-gray-400 text-sm max-w-[200px] mx-auto leading-relaxed">
+                                            Drag & drop your video here or browse files
+                                        </p>
+                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/50 border border-gray-700 text-xs text-gray-400 mt-2">
+                                            <Clock size={12} />
+                                            <span>Max 60 seconds</span>
+                                        </div>
                                     </div>
-                                    <label className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors">
-                                        Browse Files
+
+                                    <label className="relative inline-flex group/btn cursor-pointer">
+                                        <div className="absolute transition-all duration-200 rounded-full -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-70 blur-lg group-hover/btn:opacity-100 group-hover/btn:blur group-hover/btn:-inset-1.5"></div>
+                                        <div className="relative inline-flex items-center justify-center px-8 py-3.5 text-sm font-bold text-white transition-all duration-200 bg-gray-900 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600">
+                                            Browse Files
+                                        </div>
                                         <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" />
                                     </label>
                                 </div>
