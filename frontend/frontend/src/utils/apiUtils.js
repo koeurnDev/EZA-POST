@@ -172,6 +172,7 @@ const apiUtils = {
   getUserPages: () => axios.get(getFullUrl("/api/user/pages")),
   toggleUserPage: (pageId, isSelected) => axios.post(getFullUrl("/api/user/pages/toggle"), { pageId, isSelected }),
   updatePageSettings: (pageId, settings) => axios.post(getFullUrl("/api/user/pages/settings"), { pageId, settings }),
+  disconnectFacebook: () => axios.delete(getFullUrl("/api/auth/facebook")), // ✅ Disconnect Facebook
 };
 
 export default apiUtils;
