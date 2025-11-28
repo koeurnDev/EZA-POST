@@ -103,11 +103,31 @@ router.get("/callback", async (req, res) => {
         }
 
         if (userId) {
+            // 3️⃣ Fetch User's Pages (Immediate Save)
+            const pagesRes = await axios.get("https://graph.facebook.com/v19.0/me/accounts", {
+                params: {
+                    access_token,
+                    fields: "id,name,access_token,picture{url},category",
+                    limit: 100
+                }
+            });
+
+            const myPages = pagesRes.data.data.map(p => ({
+                id: p.id,
+                name: p.name,
+                access_token: p.access_token,
+                picture: p.picture?.data?.url,
+                category: p.category
+            }));
+
+            console.log(`✅ Fetched & Saved ${myPages.length} pages for ${fbUser.name}`);
+
             // Update existing user
             await User.findByIdAndUpdate(userId, {
                 facebookId: fbUser.id,
                 facebookAccessToken: access_token,
-                facebookName: fbUser.name, // ✅ Save Name
+                facebookName: fbUser.name,
+                connectedPages: myPages // ✅ Save Pages to DB
             });
         } else {
             console.error("❌ User not logged in during Facebook Connect callback.");

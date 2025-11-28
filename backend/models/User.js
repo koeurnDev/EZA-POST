@@ -46,6 +46,13 @@ const userSchema = new mongoose.Schema(
             type: [String], // 📋 Array of Page IDs that are "ON"
             default: [],
         },
+        connectedPages: [{
+            id: String,
+            name: String,
+            access_token: String,
+            picture: String,
+            category: String
+        }],
         pageSettings: [{
             pageId: String,
             enableBot: { type: Boolean, default: false },
