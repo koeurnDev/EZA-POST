@@ -4,7 +4,6 @@
 
 import React, { useState, useCallback } from "react";
 import { ImagePlus, Upload, Trash2, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
 const ThumbnailUpload = ({ onChange, currentThumbnail = null, isDemo = false }) => {
   const [preview, setPreview] = useState(currentThumbnail);

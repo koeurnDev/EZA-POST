@@ -9,7 +9,6 @@ import React, {
   useDeferredValue,
   Suspense,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquare,
   Plus,
@@ -220,7 +219,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           showNotify("AI generated a suggestion!");
         }
       }
-    } catch (err) {
+    } catch {
       showNotify("Failed to generate AI suggestion", "error");
     } finally {
       setGenerating(false);
@@ -242,22 +241,17 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
   return (
     <div className="space-y-6">
       {/* ✅ Notification Toast */}
-      <AnimatePresence>
-        {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, x: 20 }}
-            animate={{ opacity: 1, y: 0, x: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-24 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 ${notification.type === "error"
-              ? "bg-red-500 text-white"
-              : "bg-emerald-500 text-white"
-              }`}
-          >
-            {notification.type === "error" ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
-            <span className="font-medium">{notification.msg}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {notification && (
+        <div
+          className={`fixed top-24 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 ${notification.type === "error"
+            ? "bg-red-500 text-white"
+            : "bg-emerald-500 text-white"
+            }`}
+        >
+          {notification.type === "error" ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+          <span className="font-medium">{notification.msg}</span>
+        </div>
+      )}
 
       {/* 🔹 Header & Global Toggle */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white shadow-lg flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -280,9 +274,8 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             className={`w-12 h-6 rounded-full transition-colors relative ${isEnabled ? "bg-emerald-400" : "bg-gray-400"
               }`}
           >
-            <motion.div
-              animate={{ x: isEnabled ? 24 : 2 }}
-              className="w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-sm"
+            <div
+              className={`w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-sm transition-transform ${isEnabled ? "translate-x-6" : "translate-x-0.5"}`}
             />
           </button>
         </div>
@@ -388,155 +381,147 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       </div>
 
       {/* 🔹 Modal Dialog */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeModal}
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            />
-            {/* Modal */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-4 md:p-6 border border-gray-100 dark:border-gray-700 overflow-hidden"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {editingId ? "Edit Rule" : "Add New Rule"}
-                </h3>
-                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                  <X size={24} />
-                </button>
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            onClick={closeModal}
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          />
+          {/* Modal */}
+          <div
+            className="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-4 md:p-6 border border-gray-100 dark:border-gray-700 overflow-hidden"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                {editingId ? "Edit Rule" : "Add New Rule"}
+              </h3>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* ✨ AI Generator Banner */}
+            <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800/30 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-purple-600 dark:text-purple-400" />
+                  AI Creativity Suite
+                </h4>
+                <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
+                  Stuck? Let AI write a rule for you.
+                </p>
+              </div>
+              <button
+                onClick={generateAISuggestions}
+                disabled={generating}
+                className="px-3 py-1.5 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 text-xs font-medium rounded-lg border border-purple-200 dark:border-purple-700 shadow-sm hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors flex items-center gap-2"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={12} />
+                    Auto-Generate
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Rule Type Selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Rule Type
+                </label>
+                <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl">
+                  <button
+                    onClick={() => setNewRule({ ...newRule, type: "KEYWORD" })}
+                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${newRule.type !== "ALL_POSTS"
+                      ? "bg-white dark:bg-gray-800 text-blue-600 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                      }`}
+                  >
+                    Keyword Match
+                  </button>
+                  <button
+                    onClick={() => setNewRule({ ...newRule, type: "ALL_POSTS", keyword: "ALL_POSTS" })}
+                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${newRule.type === "ALL_POSTS"
+                      ? "bg-white dark:bg-gray-800 text-blue-600 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                      }`}
+                  >
+                    All Posts
+                  </button>
+                </div>
               </div>
 
-              {/* ✨ AI Generator Banner */}
-              <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800/30 flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100 flex items-center gap-1.5">
-                    <Sparkles size={14} className="text-purple-600 dark:text-purple-400" />
-                    AI Creativity Suite
-                  </h4>
-                  <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
-                    Stuck? Let AI write a rule for you.
-                  </p>
-                </div>
-                <button
-                  onClick={generateAISuggestions}
-                  disabled={generating}
-                  className="px-3 py-1.5 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 text-xs font-medium rounded-lg border border-purple-200 dark:border-purple-700 shadow-sm hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors flex items-center gap-2"
-                >
-                  {generating ? (
-                    <>
-                      <Loader2 size={12} className="animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={12} />
-                      Auto-Generate
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {/* Rule Type Selector */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Rule Type
-                  </label>
-                  <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl">
-                    <button
-                      onClick={() => setNewRule({ ...newRule, type: "KEYWORD" })}
-                      className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${newRule.type !== "ALL_POSTS"
-                        ? "bg-white dark:bg-gray-800 text-blue-600 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                        }`}
-                    >
-                      Keyword Match
-                    </button>
-                    <button
-                      onClick={() => setNewRule({ ...newRule, type: "ALL_POSTS", keyword: "ALL_POSTS" })}
-                      className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${newRule.type === "ALL_POSTS"
-                        ? "bg-white dark:bg-gray-800 text-blue-600 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                        }`}
-                    >
-                      All Posts
-                    </button>
-                  </div>
-                </div>
-
-                {/* Keyword Input (Only for KEYWORD type) */}
-                {newRule.type !== "ALL_POSTS" && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Keyword
-                    </label>
-                    <input
-                      value={newRule.keyword}
-                      onChange={(e) => setNewRule({ ...newRule, keyword: e.target.value })}
-                      placeholder="e.g. price"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                      autoFocus
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Trigger reply when a comment contains this word.</p>
-                  </div>
-                )}
-
-                {/* All Posts Info */}
-                {newRule.type === "ALL_POSTS" && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 p-4 rounded-xl text-sm flex gap-2 items-start">
-                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                    <div>
-                      <p className="font-medium">Reply to Everything</p>
-                      <p className="opacity-80 mt-1">
-                        This rule will reply to <strong>every new comment</strong> on your connected pages that doesn't match a specific keyword rule.
-                        <br />
-                        <span className="text-xs mt-1 block">🛡️ Anti-Spam active: Links are ignored.</span>
-                      </p>
-                    </div>
-                  </div>
-                )}
-
+              {/* Keyword Input (Only for KEYWORD type) */}
+              {newRule.type !== "ALL_POSTS" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Reply Message
+                    Keyword
                   </label>
-                  <textarea
-                    value={newRule.reply}
-                    onChange={(e) => setNewRule({ ...newRule, reply: e.target.value })}
-                    placeholder="e.g. Check your DM!"
-                    rows={4}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                  <input
+                    value={newRule.keyword}
+                    onChange={(e) => setNewRule({ ...newRule, keyword: e.target.value })}
+                    placeholder="e.g. price"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    autoFocus
                   />
+                  <p className="text-xs text-gray-500 mt-1">Trigger reply when a comment contains this word.</p>
                 </div>
+              )}
 
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={closeModal}
-                    className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={saveRule}
-                    className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-lg shadow-blue-500/30"
-                  >
-                    {editingId ? "Save Changes" : "Create Rule"}
-                  </button>
+              {/* All Posts Info */}
+              {newRule.type === "ALL_POSTS" && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 p-4 rounded-xl text-sm flex gap-2 items-start">
+                  <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium">Reply to Everything</p>
+                    <p className="opacity-80 mt-1">
+                      This rule will reply to <strong>every new comment</strong> on your connected pages that doesn't match a specific keyword rule.
+                      <br />
+                      <span className="text-xs mt-1 block">🛡️ Anti-Spam active: Links are ignored.</span>
+                    </p>
+                  </div>
                 </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Reply Message
+                </label>
+                <textarea
+                  value={newRule.reply}
+                  onChange={(e) => setNewRule({ ...newRule, reply: e.target.value })}
+                  placeholder="e.g. Check your DM!"
+                  rows={4}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                />
               </div>
-            </motion.div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={closeModal}
+                  className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveRule}
+                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-lg shadow-blue-500/30"
+                >
+                  {editingId ? "Save Changes" : "Create Rule"}
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 });

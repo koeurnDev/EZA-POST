@@ -4,8 +4,8 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ArrowRight, CheckCircle2, Zap, BarChart3, Globe } from "lucide-react";
+
+import { ArrowRight, Zap, BarChart3, Globe } from "lucide-react";
 
 export default function Welcome() {
     return (

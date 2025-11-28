@@ -1,21 +1,20 @@
 // ============================================================
-// 🚀 PostButton.jsx — Final Optimized Version (EZA_POST Project)
+// 🚀 PostButton.jsx — Smart Posting Button
 // ============================================================
 
 import React, { useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
-export default function PostButton({
+const PostButton = ({
   selectedAccounts = [],
   videoUrl = "",
-  videoFile = null, // 🎥 New Prop
-  thumbnailFile = null,
+  videoFile = null,
   caption = "",
   scheduleTime = null,
+  thumbnailFile = null,
   onPostSuccess,
   onPostError,
   disabled = false,
-}) {
+}) => {
   const [isPosting, setIsPosting] = useState(false);
   const [postProgress, setPostProgress] = useState(0);
   const [postStatus, setPostStatus] = useState("");
@@ -37,7 +36,7 @@ export default function PostButton({
   }, [selectedAccounts, videoUrl, videoFile, caption]);
 
   // 💫 Simulate progress animation for user feedback
-  const simulateProgress = useCallback(async (action) => {
+  const simulateProgress = useCallback(async () => {
     return new Promise((resolve) => {
       let progress = 0;
       const timer = setInterval(() => {
@@ -65,7 +64,7 @@ export default function PostButton({
       if (action === "schedule" && (!scheduleTime || scheduleTime <= new Date()))
         throw new Error("Please select a valid future schedule time.");
 
-      await simulateProgress(action);
+      await simulateProgress();
 
       const formData = new FormData();
 
@@ -123,7 +122,6 @@ export default function PostButton({
   const handlePost = () => handleApiCall("/api/posts/create", "post");
   const handleSchedule = () => handleApiCall("/api/posts/schedule", "schedule");
 
-  // ✅ Button logic
   // ✅ Button logic
   const isFormValid =
     selectedAccounts.length > 0 &&
@@ -184,47 +182,34 @@ export default function PostButton({
       </div>
 
       {/* 📊 Progress Bar */}
-      <AnimatePresence>
-        {isPosting && (
-          <motion.div
-            className="relative w-full h-2 bg-gray-100 rounded-full overflow-hidden"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className={`absolute left-0 top-0 h-full rounded-full ${isError ? "bg-red-500" : "bg-emerald-500"
-                }`}
-              initial={{ width: "0%" }}
-              animate={{ width: `${postProgress}%` }}
-              transition={{ ease: "easeOut", duration: 0.3 }}
-            />
-            <span className="absolute right-2 top-0 text-xs text-gray-500 font-medium">
-              {Math.round(postProgress)}%
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isPosting && (
+        <div className="relative w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className={`absolute left-0 top-0 h-full rounded-full transition-all duration-300 ${isError ? "bg-red-500" : "bg-emerald-500"
+              }`}
+            style={{ width: `${postProgress}%` }}
+          />
+          <span className="absolute right-2 top-0 text-xs text-gray-500 font-medium">
+            {Math.round(postProgress)}%
+          </span>
+        </div>
+      )}
 
       {/* 💬 Status Message */}
-      <AnimatePresence>
-        {postStatus && (
-          <motion.div
-            key={postStatus}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className={`text-center text-sm font-medium ${isSuccess
-              ? "text-emerald-600"
-              : isError
-                ? "text-red-600"
-                : "text-gray-700 dark:text-gray-300"
-              }`}
-          >
-            {postStatus}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {postStatus && (
+        <div
+          className={`text-center text-sm font-medium ${isSuccess
+            ? "text-emerald-600"
+            : isError
+              ? "text-red-600"
+              : "text-gray-700 dark:text-gray-300"
+            }`}
+        >
+          {postStatus}
+        </div>
+      )}
     </div>
   );
 }
+
+export default PostButton;

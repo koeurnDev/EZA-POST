@@ -3,12 +3,12 @@
 // ============================================================
 
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+
 import { useNavigate } from "react-router-dom";
-import { authAPI } from "../utils/api";
+// Removed unused authAPI import
 import { getUserData } from "../utils/apiUtils";
 import RegisterForm from "../components/RegisterForm";
-import LoginButton from "../components/LoginButton";
+// Removed unused LoginButton import
 
 export default function Register() {
   const navigate = useNavigate();
@@ -33,7 +33,7 @@ export default function Register() {
   // ------------------------------------------------------------
   // ✅ Success Handler
   // ------------------------------------------------------------
-  const handleRegisterSuccess = (user) => {
+  const handleRegisterSuccess = () => {
     showNotification("success", "✅ Registration successful! Redirecting...");
     setTimeout(() => navigate("/login", { replace: true }), 1500);
   };

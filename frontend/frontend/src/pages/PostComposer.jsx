@@ -8,10 +8,10 @@ import { Upload, X, Calendar, Clock, Send, Film, AlertCircle, CheckCircle2, Load
 import { Link } from "react-router-dom";
 import apiUtils from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
-import { motion, AnimatePresence } from "framer-motion";
+
 
 export default function PostComposer() {
-    const { user } = useAuth();
+    useAuth();
     const [file, setFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [thumbnail, setThumbnail] = useState(null);

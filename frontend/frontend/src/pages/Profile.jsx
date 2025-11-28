@@ -3,7 +3,7 @@
 // ============================================================
 
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useAuth } from "../context/AuthContext";
 import { authAPI, pagesAPI } from "../utils/api";

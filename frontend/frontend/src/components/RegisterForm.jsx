@@ -1,21 +1,16 @@
-// ============================================================
-// 🌐 RegisterForm.jsx — Final Enhanced Version (EZA_POST Frontend)
-// ============================================================
-
 import React, { useState } from "react";
 import { authAPI } from "../utils/api";
 
-export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
+const RegisterForm = ({ onSuccess }) => {
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
-
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [showPassword, setShowPassword] = useState(false);
 
   // ✅ Handle input change
   const handleChange = (e) => {
@@ -189,4 +184,6 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
       </form>
     </>
   );
-}
+};
+
+export default RegisterForm;

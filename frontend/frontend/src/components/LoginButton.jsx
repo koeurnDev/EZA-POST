@@ -1,19 +1,14 @@
-// ============================================================
-// 🌐 LoginButton.jsx - Final Enhanced Production Version
-// ============================================================
-
 import React, { useState, useCallback } from "react";
 
 const LoginButton = ({
-  onLogin,
   onFacebookLogin,
   loading = false,
-  size = "large", // 'small' | 'medium' | 'large'
-  variant = "default", // 'default' | 'outline' | 'minimal'
+  variant = "default",
+  size = "medium",
 }) => {
+  const [ripples, setRipples] = useState([]);
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
-  const [ripples, setRipples] = useState([]);
 
   // 🔹 Handle Click
   const handleLoginClick = useCallback(() => {
@@ -197,18 +192,18 @@ const LoginButton = ({
 
       <style>
         {`
-          @keyframes ripple {
-            to { transform: scale(4); opacity: 0; }
-          }
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-          button:focus-visible {
-            outline: 2px solid #1877f2;
-            outline-offset: 3px;
-          }
-        `}
+            @keyframes ripple {
+              to { transform: scale(4); opacity: 0; }
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            button:focus-visible {
+              outline: 2px solid #1877f2;
+              outline-offset: 3px;
+            }
+          `}
       </style>
     </div>
   );

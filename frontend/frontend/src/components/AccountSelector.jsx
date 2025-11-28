@@ -63,7 +63,9 @@ const AccountSelector = React.memo(function AccountSelector({
           "eza_post_custom_accounts",
           JSON.stringify(customAccounts)
         );
-      } catch { }
+      } catch {
+        // ignore
+      }
     }, 400);
     return () => clearTimeout(timeout);
   }, [customAccounts]);
@@ -188,14 +190,14 @@ const AccountSelector = React.memo(function AccountSelector({
             : undefined
         }
       >
-        {selectedAccounts.length ? (
+        {selectedAccounts.length > 0 ? (
           <>
             {selectedAccounts.map((id) => {
-              const acc =
-                allAccounts.find((a) => a.id === id || a.name === id) || {
-                  id,
-                  name: id,
-                };
+              const acc = allAccounts.find((a) => String(a.id || a.name) === id) || {
+                id,
+                name: id,
+                type: "unknown",
+              };
               return (
                 <span
                   key={id}
@@ -279,7 +281,7 @@ const AccountSelector = React.memo(function AccountSelector({
               </div>
             ) : (
               filteredAccounts.map((acc, i) => {
-                const selected = selectedAccounts.includes(acc.id || acc.name);
+                const selected = selectedAccounts.includes(String(acc.id || acc.name));
                 const type = getAccountType(acc);
                 return (
                   <div

@@ -5,10 +5,11 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 
 // ✅ Create Context
+// eslint-disable-next-line react-refresh/only-export-components
 export const ThemeContext = createContext({
   theme: "light",
-  toggleTheme: () => {},
-  setTheme: () => {},
+  toggleTheme: () => { },
+  setTheme: () => { },
 });
 
 export const ThemeProvider = ({ children }) => {
@@ -74,4 +75,5 @@ export const ThemeProvider = ({ children }) => {
 };
 
 // ✅ Custom Hook
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTheme = () => useContext(ThemeContext);

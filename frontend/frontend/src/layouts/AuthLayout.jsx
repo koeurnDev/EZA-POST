@@ -1,12 +1,7 @@
-// ============================================================
-// 🔐 AuthLayout.jsx - Layout for Login & Register Pages
-// ============================================================
-
 import React from "react";
-import { motion } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 
-const AuthLayout = ({ children, title = "Welcome to EZA_POST", subtitle }) => {
+const AuthLayout = ({ children, title, subtitle }) => {
   const { theme, toggleTheme } = useTheme();
 
   return (

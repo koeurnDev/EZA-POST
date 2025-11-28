@@ -9,7 +9,7 @@ import { useAuth } from "../hooks/useAuth";
 import { User, LogOut, Moon, Sun, Shield, Mail, Bell, CheckCircle2, Edit2, RefreshCw, ExternalLink, AlertCircle, Settings as SettingsIcon, MessageSquare, Calendar, Radio } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
 import apiUtils from "../utils/apiUtils";
-import { motion, AnimatePresence } from "framer-motion";
+
 
 export default function Settings() {
     const { user, logout } = useAuth();

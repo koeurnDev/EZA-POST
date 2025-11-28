@@ -6,6 +6,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { authAPI } from "../utils/api";
 import { getUserData, saveUserData, clearUserData } from "../utils/apiUtils";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -72,50 +73,38 @@ export const AuthProvider = ({ children }) => {
   // ✅ Login
   // ------------------------------------------------------------
   const login = async (email, password) => {
-    try {
-      const data = await authAPI.login({ email, password });
-      if (data?.user) {
-        setUser(data.user);
-        saveUserData(data.user);
-      }
-      return data.user;
-    } catch (err) {
-      throw err;
+    const data = await authAPI.login({ email, password });
+    if (data?.user) {
+      setUser(data.user);
+      saveUserData(data.user);
     }
+    return data.user;
   };
 
   // ------------------------------------------------------------
   // ✅ Register
   // ------------------------------------------------------------
   const register = async (name, email, password) => {
-    try {
-      const data = await authAPI.register({ name, email, password });
-      if (data?.user) {
-        setUser(data.user);
-        saveUserData(data.user);
-      }
-      return data.user;
-    } catch (err) {
-      throw err;
+    const data = await authAPI.register({ name, email, password });
+    if (data?.user) {
+      setUser(data.user);
+      saveUserData(data.user);
     }
+    return data.user;
   };
 
   // ------------------------------------------------------------
   // ✅ Demo Login
   // ------------------------------------------------------------
   const demoLogin = async () => {
-    try {
-      const data = await authAPI.demoLogin();
-      if (data?.user) {
-        setUser(data.user);
-        saveUserData(data.user);
-        // Also set isDemo flag in localStorage for Dashboard
-        localStorage.setItem("isDemo", "true");
-      }
-      return data;
-    } catch (err) {
-      throw err;
+    const data = await authAPI.demoLogin();
+    if (data?.user) {
+      setUser(data.user);
+      saveUserData(data.user);
+      // Also set isDemo flag in localStorage for Dashboard
+      localStorage.setItem("isDemo", "true");
     }
+    return data;
   };
 
   // ------------------------------------------------------------
@@ -124,7 +113,9 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await authAPI.logout();
-    } catch { }
+    } catch {
+      // ignore
+    }
     setUser(null);
     clearUserData();
   };
@@ -170,4 +161,5 @@ export const AuthProvider = ({ children }) => {
 };
 
 // ✅ Custom Hook
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);

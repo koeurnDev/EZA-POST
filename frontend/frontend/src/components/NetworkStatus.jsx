@@ -1,9 +1,8 @@
 // ============================================================
-// 🌐 NetworkStatus.jsx — Tailwind + Framer Motion Version
+// 🌐 NetworkStatus.jsx — Tailwind Version
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
 const NetworkStatus = ({
   showOfflineAlert = true,
@@ -12,15 +11,12 @@ const NetworkStatus = ({
 }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isChecking, setIsChecking] = useState(false);
-  const [lastChecked, setLastChecked] = useState(new Date());
   const [retryCount, setRetryCount] = useState(0);
-  const [showTooltip, setShowTooltip] = useState(false);
 
   // ✅ Check endpoints
   const checkNetworkStatus = useCallback(async () => {
     if (isChecking) return;
     setIsChecking(true);
-    setLastChecked(new Date());
 
     try {
       const endpoints = [
@@ -95,14 +91,6 @@ const NetworkStatus = ({
   const connectionQuality =
     !isOnline ? "offline" : retryCount > 2 ? "poor" : retryCount > 0 ? "fair" : "good";
 
-  // 🕒 Tooltip info
-  const formatLastChecked = () => {
-    const diff = (new Date() - lastChecked) / 1000;
-    if (diff < 60) return "just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    return `${Math.floor(diff / 3600)}h ago`;
-  };
-
   // 🎨 Color & Text Map
   const colorMap = {
     good: "bg-emerald-500",
@@ -120,7 +108,6 @@ const NetworkStatus = ({
   return (
     <>
       {/* 🌐 Status Indicator */}
-      {/* If inline, we render a simple dot/badge without fixed positioning */}
       <div
         className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
         onClick={checkNetworkStatus}
@@ -135,41 +122,29 @@ const NetworkStatus = ({
       </div>
 
       {/* ⚠️ Offline Banner (Global Fixed) */}
-      <AnimatePresence>
-        {showOfflineAlert && !isOnline && !isChecking && (
-          <motion.div
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -50, opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="fixed top-0 left-0 w-full text-center font-semibold text-white py-3 bg-red-600 shadow-lg flex justify-center items-center gap-3 z-[1000]"
+      {showOfflineAlert && !isOnline && !isChecking && (
+        <div
+          className="fixed top-0 left-0 w-full text-center font-semibold text-white py-3 bg-red-600 shadow-lg flex justify-center items-center gap-3 z-[1000]"
+        >
+          ⚠️ You’re offline. Some features may not work.
+          <button
+            onClick={checkNetworkStatus}
+            disabled={isChecking}
+            className="ml-2 bg-white/20 hover:bg-white/30 text-sm px-3 py-1 rounded-md"
           >
-            ⚠️ You’re offline. Some features may not work.
-            <button
-              onClick={checkNetworkStatus}
-              disabled={isChecking}
-              className="ml-2 bg-white/20 hover:bg-white/30 text-sm px-3 py-1 rounded-md"
-            >
-              {isChecking ? "..." : "Retry"}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            {isChecking ? "..." : "Retry"}
+          </button>
+        </div>
+      )}
 
       {/* ✅ Connection Restored Banner */}
-      <AnimatePresence>
-        {showOfflineAlert && isOnline && retryCount > 0 && (
-          <motion.div
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -50, opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="fixed top-0 left-0 w-full text-center font-semibold text-white py-3 bg-emerald-600 shadow-md z-[1000]"
-          >
-            ✅ Connection Restored!
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {showOfflineAlert && isOnline && retryCount > 0 && (
+        <div
+          className="fixed top-0 left-0 w-full text-center font-semibold text-white py-3 bg-emerald-600 shadow-md z-[1000]"
+        >
+          ✅ Connection Restored!
+        </div>
+      )}
     </>
   );
 };

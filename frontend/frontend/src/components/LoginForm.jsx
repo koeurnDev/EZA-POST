@@ -1,15 +1,12 @@
-// ============================================================
-// 🌐 LoginForm.jsx — FINAL PRODUCTION VERSION (Fully Fixed)
-// ============================================================
-
 import React, { useState, useId } from "react";
-import { authAPI } from "../utils/api"; // ✅ Use central axios API
+import { authAPI } from "../utils/api";
 
-const LoginForm = ({ onSuccess, onSwitchToRegister, onForgotPassword }) => {
-  const [formData, setFormData] = useState({ email: "", password: "" });
+const LoginForm = ({ onSuccess, onForgotPassword }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({ email: "", password: "" });
+
   const emailId = useId();
   const passwordId = useId();
 

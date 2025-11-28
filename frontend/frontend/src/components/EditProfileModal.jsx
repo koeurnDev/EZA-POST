@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, User, Mail, Save, Loader2 } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { X, User, Mail, Loader2, Save } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export default function EditProfileModal({ isOpen, onClose }) {

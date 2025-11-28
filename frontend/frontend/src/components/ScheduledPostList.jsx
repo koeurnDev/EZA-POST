@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { List, Clock, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { postsAPI } from "../utils/api";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "../context/AuthContext";
 
 export default function ScheduledPostList({ refreshTrigger, compact = false }) {
     const { user } = useAuth();
@@ -80,7 +79,7 @@ export default function ScheduledPostList({ refreshTrigger, compact = false }) {
             await postsAPI.cancel(postId);
             showNotification("Post cancelled successfully");
             fetchQueue();
-        } catch (err) {
+        } catch {
             showNotification("❌ Error cancelling post", "error");
         }
     };

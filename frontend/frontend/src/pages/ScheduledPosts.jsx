@@ -3,18 +3,18 @@
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { Link } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { PageLoader } from "../components/LoadingSpinner";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 import { postsAPI } from "../utils/api";
-import { List, Clock, Trash2, AlertCircle, CheckCircle2, Plus, Calendar } from "lucide-react";
+import { Clock, Trash2, AlertCircle, CheckCircle2, Plus, Calendar } from "lucide-react";
 
 export default function ScheduledPosts() {
     const { user } = useAuth();
-    const { theme } = useTheme();
+    useTheme();
 
     // State
     const [queue, setQueue] = useState([]);
@@ -61,7 +61,7 @@ export default function ScheduledPosts() {
                 setQueue(res.posts || []);
                 setLoading(false);
             }
-        } catch (err) {
+        } catch {
             showNotification("Failed to fetch queue", "error");
             setLoading(false);
         }
@@ -91,7 +91,7 @@ export default function ScheduledPosts() {
             await postsAPI.cancel(postId);
             showNotification("Post cancelled successfully");
             fetchQueue();
-        } catch (err) {
+        } catch {
             showNotification("❌ Error cancelling post", "error");
         }
     };

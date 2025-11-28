@@ -2,16 +2,16 @@
 // 🎬 VideoPreview.jsx — Drag & Drop Support
 // ============================================================
 
-import React, { useState, useCallback, useEffect } from "react";
-import { Upload, FileVideo, X, Play, Pause, AlertCircle, Download } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Upload, FileVideo, X, AlertCircle, Download } from "lucide-react";
 import { API_CONFIG } from "../utils/apiConstants";
 
-const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Preview", isDemo = false }) => {
+const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Preview" }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [videoSrc, setVideoSrc] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+
 
   // ✅ Handle Source Changes
   useEffect(() => {
@@ -117,8 +117,8 @@ const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Previe
               onLoadStart={handleVideoLoadStart}
               onLoadedData={handleVideoLoaded}
               onError={handleVideoError}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
+              onPlay={() => { }}
+              onPause={() => { }}
             />
 
             {/* Loading Overlay */}

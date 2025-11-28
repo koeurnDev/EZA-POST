@@ -2,37 +2,31 @@
 // 🚀 Dashboard.jsx (Redesigned with Tailwind CSS)
 // ============================================================
 
-import React, { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect } from "react";
+
 import DashboardLayout from "../layouts/DashboardLayout";
 import VideoPreview from "../components/VideoPreview";
 import ThumbnailUpload from "../components/ThumbnailUpload";
 import AccountSelector from "../components/AccountSelector";
-import BotReplySettings from "../components/BotReplySettings";
 import PostButton from "../components/PostButton";
-import { PageLoader } from "../components/LoadingSpinner";
-import { useTheme } from "../context/ThemeContext";
+import BotReplySettings from "../components/BotReplySettings";
+import { List, Clock, Trash2 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { pagesAPI, postsAPI } from "../utils/api";
-import { Calendar, List, MessageSquare, Clock, Trash2, AlertCircle } from "lucide-react";
+import { pagesAPI } from "../utils/api";
 
 export default function Dashboard() {
-  const { user, logout: onLogout } = useAuth();
-  const { theme } = useTheme();
-
-  // State
-  const [activeTab, setActiveTab] = useState("schedule");
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState("schedule"); // schedule, queue, bot
   const [tiktokUrl, setTiktokUrl] = useState("");
-  const [videoFile, setVideoFile] = useState(null); // 🎥 New Video File State
-  const [caption, setCaption] = useState("");
+  const [videoFile, setVideoFile] = useState(null);
   const [thumbnail, setThumbnail] = useState(null);
-  const [accounts, setAccounts] = useState([]);
+  const [caption, setCaption] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+  const [accounts, setAccounts] = useState([]);
   const [availablePages, setAvailablePages] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [queue, setQueue] = useState([]);
-  const [notification, setNotification] = useState(null);
+  const [queue] = useState([]);
   const [isDemo, setIsDemo] = useState(false);
+  const [isFormValid, setIsFormValid] = useState(false);
 
   // ✅ Initialize Demo Mode
   useEffect(() => {
@@ -41,187 +35,91 @@ export default function Dashboard() {
     }
   }, [user]);
 
-  // ✅ Notification Handler
-  const showNotification = useCallback((message, type = "success") => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3500);
-  }, []);
-
-  // ✅ Fetch Data
-  const fetchUserPages = useCallback(async () => {
-    try {
-      setLoading(true);
-      if (isDemo) {
-        setAvailablePages([
-          { id: "demo-1", name: "Demo Page 1" },
-          { id: "demo-2", name: "Demo Page 2" },
-        ]);
-      } else {
+  // ✅ Fetch Pages
+  useEffect(() => {
+    const fetchPages = async () => {
+      try {
         const res = await pagesAPI.getAccounts();
-        setAvailablePages(res.accounts || []);
+        if (res.success) {
+          setAvailablePages(res.accounts);
+        }
+      } catch (err) {
+        console.error("Failed to fetch pages", err);
       }
-    } catch (err) {
-      showNotification("Failed to load Facebook pages", "error");
-      if (err.code === "UNAUTHORIZED") onLogout();
-    } finally {
-      setLoading(false);
-    }
-  }, [isDemo, showNotification, onLogout]);
+    };
+    if (user && !isDemo) fetchPages();
+  }, [user, isDemo]);
 
-  const fetchQueue = useCallback(async () => {
-    try {
-      if (isDemo) {
-        setQueue([
-          {
-            id: "demo-1",
-            caption: "Demo post scheduled from TikTok 🎥",
-            scheduleTime: new Date().toISOString(),
-            status: "scheduled",
-            accounts: [{ name: "Demo Page" }],
-          },
-        ]);
-      } else {
-        const res = await postsAPI.getQueue();
-        setQueue(res.posts || []);
-      }
-    } catch (err) {
-      showNotification("Failed to fetch queue", "error");
-    }
-  }, [isDemo, showNotification]);
-
+  // ✅ Validate Form
   useEffect(() => {
-    if (user || isDemo) {
-      fetchUserPages();
-      fetchQueue();
-    }
-  }, [user, isDemo, fetchUserPages, fetchQueue]);
+    const hasMedia = tiktokUrl || videoFile;
+    const hasAccounts = accounts.length > 0;
+    setIsFormValid(hasMedia && hasAccounts);
+  }, [tiktokUrl, videoFile, accounts]);
 
-  // ✅ Auto-refresh queue
-  useEffect(() => {
-    const interval = setInterval(fetchQueue, 60000);
-    return () => clearInterval(interval);
-  }, [fetchQueue]);
-
-  // ✅ Form Helpers
-  const resetForm = () => {
-    setTiktokUrl("");
-    setVideoFile(null);
-    setCaption("");
-    setThumbnail(null);
-    setScheduleTime("");
-    setAccounts([]);
-  };
-
-  const handlePostSuccess = (res) => {
-    showNotification(res?.message || "✅ Post scheduled successfully!");
-    fetchQueue();
-    resetForm();
-    setActiveTab("queue");
-  };
-
-  const handlePostError = (err) => {
-    showNotification(err?.message || "❌ Failed to post video", "error");
-  };
-
-  const cancelScheduledPost = async (postId) => {
-    if (!window.confirm("Cancel this scheduled post?")) return;
-    try {
-      if (isDemo) {
-        setQueue((prev) => prev.filter((q) => q.id !== postId));
-        showNotification("Demo post cancelled");
-        return;
-      }
-      await postsAPI.cancel(postId);
-      showNotification("Post cancelled successfully");
-      fetchQueue();
-    } catch (err) {
-      showNotification("❌ Error cancelling post", "error");
-    }
-  };
-
-  // ✅ Handle Video Selection
   const handleVideoSelect = (file) => {
     setVideoFile(file);
-    if (file) setTiktokUrl(""); // Clear URL if file selected
+    setTiktokUrl(""); // Clear URL if file is selected
   };
 
-  // ✅ Validation
-  const isFormValid =
-    (videoFile || tiktokUrl.trim()) &&
-    caption.trim() &&
-    accounts.length > 0 &&
-    caption.length <= 2200;
+  const handlePostSuccess = () => {
+    setTiktokUrl("");
+    setVideoFile(null);
+    setThumbnail(null);
+    setCaption("");
+    setScheduleTime("");
+    setAccounts([]);
+    alert("Post created successfully!");
+  };
+
+  const handlePostError = (msg) => {
+    alert(msg);
+  };
 
   const getMinScheduleTime = () => {
     const now = new Date();
-    now.setMinutes(now.getMinutes() + 1);
+    now.setMinutes(now.getMinutes() + 10); // Min 10 mins in future
     return now.toISOString().slice(0, 16);
   };
 
-  // ✅ Loading State
-  if (!user && !isDemo) return <PageLoader text="Redirecting..." />;
-  if (loading && !availablePages.length && !isDemo) return <PageLoader text="Loading dashboard..." />;
-
-  // ============================================================
-  // 🎨 UI Components
-  // ============================================================
-
-  const TabButton = ({ id, label, icon: Icon }) => (
-    <button
-      onClick={() => setActiveTab(id)}
-      className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all duration-200 ${activeTab === id
-        ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
-        : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-        }`}
-    >
-      <Icon size={18} />
-      {label}
-      {id === "queue" && queue.length > 0 && (
-        <span className="ml-1 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
-          {queue.length}
-        </span>
-      )}
-    </button>
-  );
+  const cancelScheduledPost = async (id) => {
+    // Implement cancel logic
+    console.log("Cancel post", id);
+  };
 
   return (
     <DashboardLayout>
-      {/* Notification Toast */}
-      <AnimatePresence>
-        {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, x: 20 }}
-            animate={{ opacity: 1, y: 0, x: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-24 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 ${notification.type === "error"
-              ? "bg-red-500 text-white"
-              : "bg-emerald-500 text-white"
-              }`}
-          >
-            {notification.type === "error" ? <AlertCircle size={20} /> : <Clock size={20} />}
-            <span className="font-medium">{notification.message}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Page Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Welcome back, {user?.name?.split(" ")[0]}! 👋
+          Dashboard
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Manage your social media automation workflow.
+          Manage your social media presence.
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-4 mb-8">
-        <TabButton id="schedule" label="Schedule Post" icon={Calendar} />
-        <TabButton id="queue" label="Queue" icon={List} />
-        <TabButton id="bot" label="Auto-Reply" icon={MessageSquare} />
+      <div className="flex gap-4 mb-8 border-b border-gray-200 dark:border-gray-700">
+        {["schedule", "queue", "bot"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`pb-3 px-1 text-sm font-medium transition-all relative ${activeTab === tab
+              ? "text-blue-600 dark:text-blue-400"
+              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              }`}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {activeTab === tab && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"
+              />
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Content Area */}
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
@@ -237,22 +135,19 @@ export default function Dashboard() {
               <div className="lg:col-span-7 space-y-6">
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
                   <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-                    Post Details
+                    Create New Post
                   </h3>
 
-                  {/* TikTok URL (Optional / Alternative) */}
+                  {/* TikTok URL Input */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      TikTok Video URL (Optional)
+                      TikTok Video URL
                     </label>
                     <input
-                      type="url"
-                      placeholder="https://www.tiktok.com/@user/video/..."
+                      type="text"
+                      placeholder="Paste TikTok link here..."
                       value={tiktokUrl}
-                      onChange={(e) => {
-                        setTiktokUrl(e.target.value);
-                        if (e.target.value) setVideoFile(null); // Clear file if URL entered
-                      }}
+                      onChange={(e) => setTiktokUrl(e.target.value)}
                       disabled={!!videoFile}
                       className={`w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all ${videoFile ? "opacity-50 cursor-not-allowed" : ""
                         }`}

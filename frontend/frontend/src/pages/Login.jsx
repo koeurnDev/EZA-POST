@@ -1,24 +1,16 @@
-// ============================================================
-// 🔐 Login.jsx (FINAL PRODUCTION VERSION – With Demo Login)
-// ============================================================
-
 import React, { useState, useEffect } from "react";
-import LoginForm from "../components/LoginForm";
-import LoginButton from "../components/LoginButton";
 import { useNavigate } from "react-router-dom";
-import { authAPI } from "../utils/api";
-import { saveUserData } from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
+import LoginForm from "../components/LoginForm";
+import { saveUserData } from "../utils/apiUtils";
 
 export default function Login() {
-  console.log("🚀 Login Page Loaded: v2025-11-28-FIXED");
   const navigate = useNavigate();
-  const [notification, setNotification] = useState(null);
-  const [loading, setLoading] = useState(false); // ✅ Added loading state
   const { user, loading: authLoading, setAuthUser } = useAuth();
+  const [notification, setNotification] = useState(null);
 
   // ------------------------------------------------------------
-  // ✅ Auto Redirect if User Already Logged In
+  // ✅ Redirect to dashboard if already logged in
   // ------------------------------------------------------------
   useEffect(() => {
     if (!authLoading && user) {
@@ -141,8 +133,6 @@ export default function Login() {
             onSwitchToRegister={handleSwitchToRegister}
             onForgotPassword={handleForgotPassword}
           />
-
-
 
           {/* ✅ Footer */}
           <div className="text-center lg:text-left mt-6">

@@ -1,11 +1,8 @@
-// ============================================================
-// 📊 DashboardLayout.jsx - Modern Sidebar Layout (Tailwind)
-// ============================================================
-
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
+import NetworkStatus from "../components/NetworkStatus";
 import {
   LayoutDashboard,
   Video,
@@ -17,21 +14,16 @@ import {
   X,
   Sun,
   Moon,
-  User,
-  ChevronRight
+  User
 } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import NetworkStatus from "../components/NetworkStatus";
 
-const DashboardLayout = ({ children }) => {
+export default function DashboardLayout({ children }) {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(true); // Default open on desktop
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // 📱 Auto-close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
@@ -210,6 +202,4 @@ const DashboardLayout = ({ children }) => {
       </div>
     </div>
   );
-};
-
-export default DashboardLayout;
+}
