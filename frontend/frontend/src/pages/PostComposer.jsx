@@ -122,7 +122,8 @@ export default function PostComposer() {
         }
 
         try {
-            const endpoint = isScheduling ? "/api/posts/schedule" : "/api/posts/create";
+            // ✅ Unified endpoint for both immediate and scheduled posts
+            const endpoint = "/api/posts/create";
             const token = localStorage.getItem("token");
             const response = await fetch(`${(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "")}${endpoint}`, {
                 method: "POST",
