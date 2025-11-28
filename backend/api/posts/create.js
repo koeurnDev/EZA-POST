@@ -54,7 +54,7 @@ const upload = multer({
 // ============================================================
 router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
   try {
-    const { caption, accounts, scheduleTime } = req.body;
+    const { caption, accounts, scheduleTime, tiktokUrl } = req.body; // ✅ Added tiktokUrl
     const userId = req.user?.id;
 
     // Multer fields
@@ -62,10 +62,10 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
     const thumbFile = req.files?.['thumbnail']?.[0];
 
     // 🛑 Validate fields
-    if (!videoFile)
+    if (!videoFile && !tiktokUrl) // ✅ Allow tiktokUrl
       return res
         .status(400)
-        .json({ success: false, error: "No video file uploaded" });
+        .json({ success: false, error: "No video file or TikTok URL provided" });
 
     if (!caption || !accounts)
       return res
@@ -80,21 +80,53 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
     }
 
+    // 📥 Handle Video Source (File vs TikTok)
+    let videoBuffer;
+    let filename;
+    let videoUrlForDB;
+    let videoSizeMB = 0;
+
+    if (videoFile) {
+      // 📂 Local File Upload
+      videoBuffer = fs.readFileSync(videoFile.path);
+      filename = videoFile.filename;
+      videoUrlForDB = `/uploads/videos/${filename}`;
+      videoSizeMB = videoFile.size / (1024 * 1024);
+    } else if (tiktokUrl) {
+      // 🎵 TikTok Download
+      console.log(`📥 Downloading TikTok video: ${tiktokUrl}`);
+      const tiktokDownloader = require("../../utils/tiktokDownloader");
+
+      try {
+        const downloadResult = await tiktokDownloader.downloadTiktokVideo(tiktokUrl);
+        videoBuffer = downloadResult; // It returns buffer directly based on my check
+
+        // Save to disk for serving
+        filename = `tiktok_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.mp4`;
+        const savePath = path.join(uploadDir, filename);
+        fs.writeFileSync(savePath, videoBuffer);
+
+        videoUrlForDB = `/uploads/videos/${filename}`;
+        videoSizeMB = videoBuffer.length / (1024 * 1024);
+      } catch (err) {
+        console.error("❌ TikTok download failed:", err.message);
+        return res.status(400).json({ success: false, error: "Failed to download TikTok video: " + err.message });
+      }
+    }
+
     // 💾 Save post record (MongoDB)
-    const filename = videoFile.filename;
-    const videoUrl = `/uploads/videos/${filename}`;
     const postId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
     const newPost = await ScheduledPost.create({
       id: postId,
       user_id: userId,
       caption,
-      video_url: videoUrl,
-      thumbnail_url: thumbFile ? `/uploads/thumbnails/${thumbFile.filename}` : null, // ✅ Save thumbnail URL
+      video_url: videoUrlForDB,
+      thumbnail_url: thumbFile ? `/uploads/thumbnails/${thumbFile.filename}` : null,
       accounts: accountsArray,
       schedule_time: scheduleTime ? new Date(scheduleTime) : new Date(),
       status: "processing",
-      is_scheduled: !!scheduleTime, // ✅ Track if scheduled
+      is_scheduled: !!scheduleTime,
     });
 
     console.log(`✅ New post created by ${userId}: ${caption}`);
@@ -102,7 +134,6 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
     // 🚀 Trigger Immediate Upload
     const User = require("../../models/User");
     const fb = require("../../utils/fb");
-    const fs = require("fs");
 
     // Get User Token
     const user = await User.findOne({ id: userId });
@@ -110,10 +141,8 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       throw new Error("User not connected to Facebook");
     }
 
-    // Read Buffers
-    const videoBuffer = fs.readFileSync(videoFile.path);
+    // Prepare Thumbnail
     let thumbnailObj = null;
-
     if (thumbFile) {
       const thumbBuffer = fs.readFileSync(thumbFile.path);
       thumbnailObj = { buffer: thumbBuffer };
@@ -122,13 +151,13 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
     // Upload
     const results = await fb.postToFB(
       user.facebookAccessToken,
-      accountsArray.map(id => ({ id, type: 'page' })),
+      accountsArray.map(id => ({ id, type: 'page' })), // Assuming all are pages for now, or logic handles it
       videoBuffer,
       caption,
-      thumbnailObj, // ✅ Pass thumbnail
+      thumbnailObj,
       {
         isScheduled: !!scheduleTime,
-        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null // Unix timestamp
+        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
       }
     );
 
@@ -149,9 +178,9 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       message: successCount > 0 ? "Post published successfully" : "Failed to publish post",
       results: results,
       video: {
-        url: videoUrl,
+        url: videoUrlForDB,
         name: filename,
-        size: `${(videoFile.size / (1024 * 1024)).toFixed(2)} MB`,
+        size: `${videoSizeMB.toFixed(2)} MB`,
       },
       caption,
       accounts: accountsArray,
