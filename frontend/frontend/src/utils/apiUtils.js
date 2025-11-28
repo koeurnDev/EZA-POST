@@ -154,6 +154,32 @@ export const getUserErrorMessage = (error) => {
 };
 
 /* ----------------------------------------------- */
+/* ✅ Centralized Error Handling & Logging */
+/* ----------------------------------------------- */
+export const logError = (context, error) => {
+  console.error(`[${context}] Error:`, error);
+  // In a real app, you would send this to Sentry/LogRocket here
+};
+
+export const handleApiError = (error, toastId = null) => {
+  const message = getUserErrorMessage(error);
+
+  if (toastId) {
+    // Update existing loading toast
+    import("react-hot-toast").then(({ toast }) => {
+      toast.error(message, { id: toastId });
+    });
+  } else {
+    // Create new error toast
+    import("react-hot-toast").then(({ toast }) => {
+      toast.error(message);
+    });
+  }
+
+  return message;
+};
+
+/* ----------------------------------------------- */
 /* ✅ Export Everything */
 /* ----------------------------------------------- */
 const apiUtils = {
@@ -168,6 +194,8 @@ const apiUtils = {
   saveUserData,
   getUserData,
   clearUserData,
+  logError,
+  handleApiError,
   // Facebook Pages
   getUserPages: () => axios.get(getFullUrl("/user/pages")),
   toggleUserPage: (pageId, isSelected) => axios.post(getFullUrl("/user/pages/toggle"), { pageId, isSelected }),

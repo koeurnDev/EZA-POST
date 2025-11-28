@@ -212,12 +212,19 @@ if (fs.existsSync(distPath)) {
 
 // ✅ Serve Uploads Directory
 const uploadsPath = path.join(__dirname, "uploads");
-if (fs.existsSync(uploadsPath)) {
-  app.use("/uploads", express.static(uploadsPath));
-  console.log("✅ Serving uploads from:", uploadsPath);
-} else {
-  console.warn("⚠️ Uploads directory not found:", uploadsPath);
-}
+const videosPath = path.join(uploadsPath, "videos");
+const thumbnailsPath = path.join(uploadsPath, "thumbnails");
+
+// Ensure directories exist
+[uploadsPath, videosPath, thumbnailsPath].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    console.log(`📂 Creating directory: ${dir}`);
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
+app.use("/uploads", express.static(uploadsPath));
+console.log("✅ Serving uploads from:", uploadsPath);
 
 // ✅ SPA fallback
 app.get("*", (req, res) => {

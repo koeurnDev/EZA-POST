@@ -17,6 +17,7 @@ import EmptyState from "../components/ui/EmptyState";
 import { List, Clock, Trash2, Send, Calendar } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { pagesAPI, postsAPI, tiktokAPI } from "../utils/api";
+import apiUtils from "../utils/apiUtils";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const [accounts, setAccounts] = useState([]);
   const [availablePages, setAvailablePages] = useState([]);
   const [queue, setQueue] = useState([]);
+  const [queueError, setQueueError] = useState(null);
   const [isDemo, setIsDemo] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -91,11 +93,14 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchQueue = async () => {
       if (activeTab === 'queue') {
+        setQueueError(null);
         try {
-          const res = await postsAPI.getQueue();
+          // 🔄 Retry up to 3 times
+          const res = await apiUtils.retryRequest(() => postsAPI.getQueue());
           setQueue(res.posts || []);
         } catch (error) {
-          console.error("Failed to fetch queue", error);
+          apiUtils.logError("Dashboard.fetchQueue", error);
+          setQueueError(apiUtils.getUserErrorMessage(error));
         }
       }
     };
@@ -373,7 +378,27 @@ export default function Dashboard() {
               <ScheduledPostList
                 posts={queue}
                 onCancel={cancelScheduledPost}
-                onRetry={(id) => console.log("Retry not implemented yet", id)}
+                onRetry={() => {
+                  setQueueError(null);
+                  // Re-trigger fetch by toggling tab or calling a function if we extracted it.
+                  // Since fetchQueue is in useEffect [activeTab], we can just force re-fetch or call api directly.
+                  // Better: extract fetchQueue outside useEffect or just use a simple state toggle.
+                  // For now, let's just reload the tab logic by setting activeTab to something else then back? No, that's hacky.
+                  // Let's just call the API directly here or make fetchQueue available.
+                  // Actually, I'll just use the same logic as useEffect.
+                  const retryFetch = async () => {
+                    setQueueError(null);
+                    try {
+                      const res = await apiUtils.retryRequest(() => postsAPI.getQueue());
+                      setQueue(res.posts || []);
+                    } catch (error) {
+                      apiUtils.logError("Dashboard.fetchQueueRetry", error);
+                      setQueueError(apiUtils.getUserErrorMessage(error));
+                    }
+                  };
+                  retryFetch();
+                }}
+                error={queueError}
               />
             </div>
           )}

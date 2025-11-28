@@ -2,7 +2,25 @@ import React from "react";
 import { Clock, Trash2, AlertCircle, RefreshCw, Calendar, CheckCircle2 } from "lucide-react";
 import Button from "./ui/Button";
 
-const ScheduledPostList = ({ posts, onCancel, onRetry }) => {
+const ScheduledPostList = ({ posts, onCancel, onRetry, error }) => {
+    if (error) {
+        return (
+            <div className="text-center py-12 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <AlertCircle size={32} />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Failed to load scheduled posts</h3>
+                <p className="text-red-600 dark:text-red-400 mt-1 mb-4 max-w-sm mx-auto">
+                    {error}
+                </p>
+                <Button onClick={onRetry} variant="outline" className="border-red-200 text-red-600 hover:bg-red-50">
+                    <RefreshCw size={16} className="mr-2" />
+                    Retry Loading
+                </Button>
+            </div>
+        );
+    }
+
     if (!posts || posts.length === 0) {
         return (
             <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">

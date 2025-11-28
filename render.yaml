@@ -1,0 +1,50 @@
+services:
+  # --------------------------------------------------------------------------------
+  # 🟢 Backend Service (Node.js)
+  # --------------------------------------------------------------------------------
+  - type: web
+    name: eza-post-backend
+    env: node
+    plan: free
+    region: singapore
+    branch: main
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FB_APP_ID
+        sync: false
+      - key: FB_APP_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+
+  # --------------------------------------------------------------------------------
+  # 🔵 Frontend Service (Static Site)
+  # --------------------------------------------------------------------------------
+  - type: static
+    name: eza-post-frontend
+    env: static
+    plan: free
+    region: singapore
+    branch: main
+    rootDir: frontend/frontend
+    buildCommand: npm install && npm run build
+    publishDir: dist
+    routes:
+      - type: rewrite
+        source: /**
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false # User must enter: https://eza-post-backend.onrender.com/api
