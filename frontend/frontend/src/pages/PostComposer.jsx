@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { Upload, X, Calendar, Clock, Send, Film, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import apiUtils from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
@@ -303,94 +304,44 @@ export default function PostComposer() {
                             )}
                         </AnimatePresence>
                     </div>
-
-                    {/* 📢 Right Column: Publishing Options */}
-                    <div className="space-y-6">
-                        {/* Page Selection */}
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <h3 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                                <CheckCircle2 size={18} className="text-green-500" />
-                                Select Pages
-                            </h3>
-
-                            {availablePages.length === 0 ? (
-                                <div className="text-center py-4 text-gray-500 text-sm">
-                                    No active pages found. Go to Settings to enable pages.
-                                </div>
-                            ) : (
-                                <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                    {availablePages.map(page => (
-                                        <div
-                                            key={page.id}
-                                            onClick={() => handleTogglePage(page.id)}
-                                            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border ${selectedPages.includes(page.id)
-                                                ? "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800"
-                                                : "bg-gray-50 border-transparent hover:bg-gray-100 dark:bg-gray-900/50 dark:hover:bg-gray-800"
-                                                }`}
-                                        >
-                                            <img
-                                                src={page.picture || "https://via.placeholder.com/40"}
-                                                alt={page.name}
-                                                className="w-8 h-8 rounded-full bg-gray-200"
-                                            />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                                    {page.name}
-                                                </p>
-                                            </div>
-                                            <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedPages.includes(page.id)
-                                                ? "bg-blue-500 border-blue-500 text-white"
-                                                : "border-gray-300 dark:border-gray-600"
-                                                }`}>
-                                                {selectedPages.includes(page.id) && <CheckCircle2 size={12} />}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                    {status && (
+                        <div className={`p-4 rounded-xl text-sm flex items-start gap-2 ${status.type === 'success'
+                            ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                            : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                            }`}>
+                            {status.type === 'success' ? <CheckCircle2 size={16} className="mt-0.5" /> : <AlertCircle size={16} className="mt-0.5" />}
+                            {status.message}
                         </div>
+                    )}
 
-                        {/* Action Buttons */}
-                        <div className="space-y-3">
-                            {status && (
-                                <div className={`p-4 rounded-xl text-sm flex items-start gap-2 ${status.type === 'success'
-                                    ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                                    : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
-                                    }`}>
-                                    {status.type === 'success' ? <CheckCircle2 size={16} className="mt-0.5" /> : <AlertCircle size={16} className="mt-0.5" />}
-                                    {status.message}
-                                </div>
-                            )}
-
-                            <button
-                                onClick={handleSubmit}
-                                disabled={isSubmitting || (!file && !caption) || selectedPages.length === 0}
-                                className={`w-full py-4 rounded-xl font-bold text-white shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition-all ${isSubmitting
-                                    ? "bg-gray-400 cursor-not-allowed"
-                                    : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transform hover:scale-[1.02]"
-                                    }`}
-                            >
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader2 size={20} className="animate-spin" />
-                                        Processing...
-                                    </>
-                                ) : isScheduling ? (
-                                    <>
-                                        <Calendar size={20} />
-                                        Schedule Post
-                                    </>
-                                ) : (
-                                    <>
-                                        <Send size={20} />
-                                        Post Now
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isSubmitting || (!file && !caption) || selectedPages.length === 0}
+                        className={`w-full py-4 rounded-xl font-bold text-white shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition-all ${isSubmitting
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transform hover:scale-[1.02]"
+                            }`}
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <Loader2 size={20} className="animate-spin" />
+                                Processing...
+                            </>
+                        ) : isScheduling ? (
+                            <>
+                                <Calendar size={20} />
+                                Schedule Post
+                            </>
+                        ) : (
+                            <>
+                                <Send size={20} />
+                                Post Now
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
-        </DashboardLayout>
+        </div>
+        </DashboardLayout >
     );
 }
