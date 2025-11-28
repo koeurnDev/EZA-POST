@@ -181,6 +181,6 @@ const botEngine = {
         }
     },
 };
-};
+
 
 module.exports = botEngine;
