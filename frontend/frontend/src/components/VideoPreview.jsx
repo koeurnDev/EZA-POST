@@ -6,7 +6,7 @@ import React, { useState, useEffect } from "react";
 import { Upload, FileVideo, X, AlertCircle, Download } from "lucide-react";
 import { API_CONFIG } from "../utils/apiConstants";
 
-const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Preview" }) => {
+const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Preview", metadata, isLoadingMeta }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [videoSrc, setVideoSrc] = useState("");
@@ -192,6 +192,42 @@ const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Previe
           >
             <X size={18} />
           </button>
+        </div>
+      )}
+
+      {/* 📊 TikTok Metadata Display */}
+      {isLoadingMeta ? (
+        <div className="animate-pulse space-y-2 p-3 border border-gray-100 dark:border-gray-700 rounded-xl">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+        </div>
+      ) : metadata && (
+        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-xl space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h4 className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-2">
+                {metadata.title || "TikTok Video"}
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                by <span className="font-medium text-gray-700 dark:text-gray-300">@{metadata.author || "unknown"}</span>
+              </p>
+            </div>
+            <img
+              src="https://sf16-scmcdn-sg.ibytedtos.com/goofy/tiktok/web/node/_next/static/images/logo-dark-e95da587b61920d2e19df953c7eb4371.svg"
+              alt="TikTok"
+              className="h-4 opacity-50"
+            />
+          </div>
+          {metadata.stats && (
+            <div className="flex items-center gap-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+              <div className="text-xs text-gray-500">
+                <span className="font-bold text-gray-900 dark:text-white">{metadata.stats.plays || 0}</span> Views
+              </div>
+              <div className="text-xs text-gray-500">
+                <span className="font-bold text-gray-900 dark:text-white">{metadata.stats.likes || 0}</span> Likes
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

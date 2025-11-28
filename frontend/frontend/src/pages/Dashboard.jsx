@@ -15,7 +15,7 @@ import Button from "../components/ui/Button";
 import EmptyState from "../components/ui/EmptyState";
 import { List, Clock, Trash2, Send, Calendar } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { pagesAPI, postsAPI } from "../utils/api";
+import { pagesAPI, postsAPI, tiktokAPI } from "../utils/api";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -31,12 +31,44 @@ export default function Dashboard() {
   const [isDemo, setIsDemo] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [videoMetadata, setVideoMetadata] = useState(null);
+  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+
   // ✅ Initialize Demo Mode
   useEffect(() => {
     if (localStorage.getItem("isDemo") === "true" || user?.isDemo) {
       setIsDemo(true);
     }
   }, [user]);
+
+  // ✅ Fetch TikTok Metadata
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      if (!tiktokUrl || !tiktokUrl.includes("tiktok.com")) {
+        setVideoMetadata(null);
+        return;
+      }
+
+      setIsFetchingMeta(true);
+      try {
+        const res = await tiktokAPI.getVideoInfo(tiktokUrl);
+        if (res.success) {
+          setVideoMetadata(res);
+          if (res.description && !caption) {
+            setCaption(res.description); // Auto-fill caption
+            toast.success("Caption auto-filled from TikTok!");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch TikTok metadata", err);
+      } finally {
+        setIsFetchingMeta(false);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchMetadata, 1000); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [tiktokUrl]);
 
   // ✅ Fetch Pages
   useEffect(() => {
@@ -301,6 +333,8 @@ export default function Dashboard() {
                     videoFile={videoFile}
                     onFileSelect={handleVideoSelect}
                     isDemo={isDemo}
+                    metadata={videoMetadata}
+                    isLoadingMeta={isFetchingMeta}
                   />
 
                   <div className="mt-6">
