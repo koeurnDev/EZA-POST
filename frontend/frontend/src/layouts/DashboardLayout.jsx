@@ -38,8 +38,8 @@ const DashboardLayout = ({ children }) => {
 
   // 🧭 Navigation Items
   const navItems = [
-    { label: "Overview", icon: <LayoutDashboard size={20} />, path: "/dashboard" },
-    { label: "Create Post", icon: <Video size={20} />, path: "/compose" },
+    // { label: "Overview", icon: <LayoutDashboard size={20} />, path: "/dashboard" }, // ❌ Removed
+    { label: "Create Post", icon: <Video size={20} />, path: "/" }, // ✅ Home
     { label: "Scheduled Posts", icon: <Calendar size={20} />, path: "/posts" },
     { label: "Auto-Reply Bot", icon: <MessageSquare size={20} />, path: "/bot" },
     { label: "Settings", icon: <Settings size={20} />, path: "/settings" },

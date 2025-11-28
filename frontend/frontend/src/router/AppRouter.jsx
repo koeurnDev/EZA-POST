@@ -8,7 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 // --- Pages ---
 import Login from "../pages/Login";
 import Register from "../pages/Register";
-import Overview from "../pages/Overview";
+// import Overview from "../pages/Overview"; // ❌ Removed
 import ScheduledPosts from "../pages/ScheduledPosts";
 import BotSettingsPage from "../pages/BotSettingsPage";
 import Settings from "../pages/Settings";
@@ -38,21 +38,14 @@ export default function AppRouter() {
 
         {/* ==================== Protected Routes ==================== */}
         <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Overview />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/compose"
+          path="/"
           element={
             <ProtectedRoute>
               <PostComposer />
             </ProtectedRoute>
           }
         />
+        {/* Removed Overview Route */}
         <Route
           path="/posts"
           element={
