@@ -12,11 +12,16 @@ const { requireAuth } = require("../../utils/auth");
 
 // 🗂️ Ensure uploads directory exists
 const uploadDir = path.join(__dirname, "../../uploads/videos");
+const thumbDir = path.join(__dirname, "../../uploads/thumbnails");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
 
 // 📦 Multer setup (max 100MB)
 const storage = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, uploadDir),
+  destination: (req, file, cb) => {
+    if (file.fieldname === "thumbnail") cb(null, thumbDir);
+    else cb(null, uploadDir);
+  },
   filename: (_, file, cb) => {
     const ext = path.extname(file.originalname);
     const safeName = `${Date.now()}-${Math.random()
@@ -25,27 +30,39 @@ const storage = multer.diskStorage({
     cb(null, safeName);
   },
 });
+
 const upload = multer({
   storage,
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
-    const allowed = ["video/mp4", "video/webm", "video/ogg"];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Invalid file type — only MP4, WEBM, or OGG allowed."));
+    if (file.fieldname === "video") {
+      const allowed = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
+      if (allowed.includes(file.mimetype)) cb(null, true);
+      else cb(new Error("Invalid video type — only MP4, WEBM, OGG, MOV allowed."));
+    } else if (file.fieldname === "thumbnail") {
+      const allowed = ["image/jpeg", "image/png", "image/jpg"];
+      if (allowed.includes(file.mimetype)) cb(null, true);
+      else cb(new Error("Invalid thumbnail type — only JPG, PNG allowed."));
+    } else {
+      cb(new Error("Unexpected field"));
+    }
   },
 });
 
 // ============================================================
 // ✅ POST /api/posts/create
 // ============================================================
-router.post("/", requireAuth, upload.single("video"), async (req, res) => {
+router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
   try {
     const { caption, accounts } = req.body;
     const userId = req.user?.id;
-    const file = req.file;
+
+    // Multer fields
+    const videoFile = req.files?.['video']?.[0];
+    const thumbFile = req.files?.['thumbnail']?.[0];
 
     // 🛑 Validate fields
-    if (!file)
+    if (!videoFile)
       return res
         .status(400)
         .json({ success: false, error: "No video file uploaded" });
@@ -64,7 +81,7 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
     }
 
     // 💾 Save post record (MongoDB)
-    const filename = file.filename;
+    const filename = videoFile.filename;
     const videoUrl = `/uploads/videos/${filename}`;
     const postId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
@@ -91,15 +108,22 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
       throw new Error("User not connected to Facebook");
     }
 
-    // Read Video Buffer
-    const videoBuffer = fs.readFileSync(file.path);
+    // Read Buffers
+    const videoBuffer = fs.readFileSync(videoFile.path);
+    let thumbnailObj = null;
+
+    if (thumbFile) {
+      const thumbBuffer = fs.readFileSync(thumbFile.path);
+      thumbnailObj = { buffer: thumbBuffer };
+    }
 
     // Upload
     const results = await fb.postToFB(
       user.facebookAccessToken,
       accountsArray.map(id => ({ id, type: 'page' })),
       videoBuffer,
-      caption
+      caption,
+      thumbnailObj // ✅ Pass thumbnail
     );
 
     // Update Status
@@ -121,7 +145,7 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
       video: {
         url: videoUrl,
         name: filename,
-        size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        size: `${(videoFile.size / (1024 * 1024)).toFixed(2)} MB`,
       },
       caption,
       accounts: accountsArray,
@@ -131,7 +155,7 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
     console.error("❌ Create post error:", err.message);
     res.status(500).json({
       success: false,
-      error: "Failed to create post",
+      error: "Failed to create post: " + err.message,
     });
   }
 });
