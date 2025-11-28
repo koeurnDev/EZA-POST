@@ -64,7 +64,16 @@ const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Previe
 
   // ✅ Video Events
   const handleVideoLoadStart = () => setIsLoading(true);
-  const handleVideoLoaded = () => setIsLoading(false);
+  const handleVideoLoaded = (e) => {
+    setIsLoading(false);
+    // ✅ Validate Duration (Max 60s)
+    if (e.target.duration > 60) {
+      setError("Video must be under 60 seconds.");
+      setVideoSrc("");
+      onFileSelect(null); // Clear file in parent
+    }
+  };
+
   const handleVideoError = () => {
     setIsLoading(false);
     // Only show error if we actually have a source that failed

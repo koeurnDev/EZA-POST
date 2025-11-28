@@ -163,6 +163,11 @@ export default function Dashboard() {
         setCaption("");
         setScheduleTime("");
         setAccounts([]);
+
+        // ✅ Auto-switch to Queue tab if scheduled
+        if (isSchedule) {
+          setActiveTab("queue");
+        }
       } else {
         throw new Error(data.error || "Failed to create post");
       }
@@ -274,12 +279,21 @@ export default function Dashboard() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Select Pages
                     </label>
-                    <AccountSelector
-                      accounts={accounts}
-                      availablePages={availablePages}
-                      onChange={setAccounts}
-                      isDemo={isDemo}
-                    />
+                    {availablePages.length > 0 ? (
+                      <AccountSelector
+                        accounts={accounts}
+                        availablePages={availablePages}
+                        onChange={setAccounts}
+                        isDemo={isDemo}
+                      />
+                    ) : (
+                      <EmptyState
+                        title="No Pages Found"
+                        description="Connect your Facebook pages in Settings to start posting."
+                        actionLabel="Go to Settings"
+                        onAction={() => window.location.href = "/settings"}
+                      />
+                    )}
                   </div>
 
                   {/* Schedule Time */}
