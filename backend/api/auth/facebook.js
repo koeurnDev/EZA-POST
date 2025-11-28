@@ -143,4 +143,38 @@ router.get("/callback", async (req, res) => {
     }
 });
 
+/**
+ * 🔌 DELETE /api/auth/facebook
+ * Disconnects the user's Facebook account
+ */
+router.delete("/", async (req, res) => {
+    if (!req.session?.user?.id) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    try {
+        await User.findByIdAndUpdate(req.session.user.id, {
+            $unset: {
+                facebookId: "",
+                facebookAccessToken: "",
+                facebookName: "",
+                connectedPages: "",
+                pageSettings: "",
+                selectedPages: ""
+            }
+        });
+
+        // Update session
+        if (req.session.user) {
+            delete req.session.user.facebookId;
+            delete req.session.user.facebookName;
+        }
+
+        res.json({ success: true, message: "Facebook account disconnected." });
+    } catch (err) {
+        console.error("❌ Disconnect Error:", err);
+        res.status(500).json({ error: "Failed to disconnect account." });
+    }
+});
+
 module.exports = router;
