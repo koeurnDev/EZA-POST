@@ -35,6 +35,27 @@ export const API_ERRORS = {
   RATE_LIMITED: "RATE_LIMITED",
 };
 
+// ✅ Error Messages Map
+export const ERROR_MESSAGES = {
+  [API_ERRORS.NETWORK_ERROR]: "Network error. Please check your internet connection.",
+  [API_ERRORS.TIMEOUT_ERROR]: "Request timeout. Please try again.",
+  [API_ERRORS.UNAUTHORIZED]: "Please log in to continue.",
+  [API_ERRORS.FORBIDDEN]: "You do not have permission to access this resource.",
+  [API_ERRORS.NOT_FOUND]: "The requested resource was not found.",
+  [API_ERRORS.SERVER_ERROR]: "Server error. Please try again later.",
+  [API_ERRORS.SERVICE_UNAVAILABLE]: "Service temporarily unavailable. Please try again later.",
+  [API_ERRORS.VALIDATION_ERROR]: "Please check your input and try again.",
+  [API_ERRORS.RATE_LIMITED]: "Too many requests. Please wait and try again.",
+  USER_EXISTS: "User already exists with this email.",
+  INVALID_CREDENTIALS: "Invalid email or password.",
+  PASSWORD_TOO_SHORT: "Password must be at least 6 characters.",
+  INVALID_TIKTOK_URL: "Please enter a valid TikTok URL.",
+  VIDEO_TOO_LONG: "Video is too long to process.",
+  VIDEO_UNAVAILABLE: "TikTok video unavailable or private.",
+  FACEBOOK_API_ERROR: "Facebook API error. Please try again.",
+  QUOTA_EXCEEDED: "Daily posting limit reached. Try again tomorrow.",
+};
+
 // ✅ API Endpoints
 export const API_ENDPOINTS = {
   AUTH: {
@@ -84,30 +105,6 @@ export const API_UTILS = {
 
   // User-friendly error message map
   getErrorMessage: (code) => {
-    const messages = {
-      [API_ERRORS.NETWORK_ERROR]:
-        "Network error. Please check your internet connection.",
-      [API_ERRORS.TIMEOUT_ERROR]: "Request timeout. Please try again.",
-      [API_ERRORS.UNAUTHORIZED]: "Please log in to continue.",
-      [API_ERRORS.FORBIDDEN]:
-        "You do not have permission to access this resource.",
-      [API_ERRORS.NOT_FOUND]: "The requested resource was not found.",
-      [API_ERRORS.SERVER_ERROR]: "Server error. Please try again later.",
-      [API_ERRORS.SERVICE_UNAVAILABLE]:
-        "Service temporarily unavailable. Please try again later.",
-      [API_ERRORS.VALIDATION_ERROR]:
-        "Please check your input and try again.",
-      [API_ERRORS.RATE_LIMITED]:
-        "Too many requests. Please wait and try again.",
-      USER_EXISTS: "User already exists with this email.",
-      INVALID_CREDENTIALS: "Invalid email or password.",
-      PASSWORD_TOO_SHORT: "Password must be at least 6 characters.",
-      INVALID_TIKTOK_URL: "Please enter a valid TikTok URL.",
-      VIDEO_TOO_LONG: "Video is too long to process.",
-      VIDEO_UNAVAILABLE: "TikTok video unavailable or private.",
-      FACEBOOK_API_ERROR: "Facebook API error. Please try again.",
-      QUOTA_EXCEEDED: "Daily posting limit reached. Try again tomorrow.",
-    };
-    return messages[code] || "An unexpected error occurred.";
+    return ERROR_MESSAGES[code] || "An unexpected error occurred.";
   },
 };
