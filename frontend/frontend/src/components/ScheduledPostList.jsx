@@ -24,8 +24,8 @@ const ScheduledPostList = ({ posts, onCancel, onRetry }) => {
                     <thead>
                         <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Post</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pages</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Schedule</th>
+                            <th className="hidden md:table-cell px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pages</th>
+                            <th className="hidden sm:table-cell px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Schedule</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">Actions</th>
                         </tr>
@@ -54,12 +54,16 @@ const ScheduledPostList = ({ posts, onCancel, onRetry }) => {
                                                     View Video
                                                 </a>
                                             )}
+                                            {/* Mobile: Show Schedule Time if hidden column */}
+                                            <div className="sm:hidden text-xs text-gray-500 mt-1">
+                                                {new Date(post.scheduleTime).toLocaleDateString()}
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
 
-                                {/* 📄 Pages */}
-                                <td className="px-6 py-4">
+                                {/* 📄 Pages (Hidden on Mobile) */}
+                                <td className="hidden md:table-cell px-6 py-4">
                                     <div className="flex -space-x-2 overflow-hidden">
                                         {post.accounts?.map((acc, i) => (
                                             <div
@@ -78,8 +82,8 @@ const ScheduledPostList = ({ posts, onCancel, onRetry }) => {
                                     </div>
                                 </td>
 
-                                {/* ⏰ Schedule Time */}
-                                <td className="px-6 py-4">
+                                {/* ⏰ Schedule Time (Hidden on Small Mobile) */}
+                                <td className="hidden sm:table-cell px-6 py-4">
                                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                                         <Clock size={16} className="text-gray-400" />
                                         {new Date(post.scheduleTime).toLocaleString(undefined, {
@@ -92,18 +96,18 @@ const ScheduledPostList = ({ posts, onCancel, onRetry }) => {
                                 <td className="px-6 py-4">
                                     <span
                                         className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${post.status === "scheduled"
-                                                ? "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800"
-                                                : post.status === "processing"
-                                                    ? "bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800"
-                                                    : post.status === "expired"
-                                                        ? "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
-                                                        : "bg-red-50 text-red-700 border-red-100 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
+                                            ? "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800"
+                                            : post.status === "processing"
+                                                ? "bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800"
+                                                : post.status === "expired"
+                                                    ? "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
+                                                    : "bg-red-50 text-red-700 border-red-100 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
                                             }`}
                                     >
                                         {post.status === "scheduled" && <Clock size={12} />}
                                         {post.status === "processing" && <RefreshCw size={12} className="animate-spin" />}
                                         {post.status === "expired" && <AlertCircle size={12} />}
-                                        {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                                        <span className="hidden sm:inline">{post.status.charAt(0).toUpperCase() + post.status.slice(1)}</span>
                                     </span>
                                 </td>
 

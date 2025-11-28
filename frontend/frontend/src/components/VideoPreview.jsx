@@ -122,6 +122,8 @@ const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Previe
             <video
               src={videoSrc}
               controls
+              playsInline // ✅ iOS Support
+              preload="metadata" // ✅ Save bandwidth
               className="w-full h-full object-contain"
               onLoadStart={handleVideoLoadStart}
               onLoadedData={handleVideoLoaded}

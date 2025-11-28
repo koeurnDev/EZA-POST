@@ -309,7 +309,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
               <tr>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keyword</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Reply Message</th>
+                <th className="hidden sm:table-cell px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Reply Message</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-center">Status</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-right">Actions</th>
               </tr>
@@ -337,8 +337,12 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                           {r.keyword}
                         </span>
                       )}
+                      {/* Mobile: Show Reply Message here if hidden column */}
+                      <p className="sm:hidden text-xs text-gray-500 mt-1 line-clamp-2">
+                        {r.reply}
+                      </p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="hidden sm:table-cell px-6 py-4">
                       <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2 max-w-md">
                         {r.reply}
                       </p>
@@ -355,7 +359,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                       </button>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => openModal(r)}
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
