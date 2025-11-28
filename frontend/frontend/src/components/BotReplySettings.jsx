@@ -21,7 +21,10 @@ import {
   Power,
   AlertCircle,
   CheckCircle2,
-  MoreHorizontal
+  CheckCircle2,
+  MoreHorizontal,
+  Sparkles,
+  Loader2
 } from "lucide-react";
 import api from "../utils/api";
 
@@ -35,6 +38,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
   const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false); // 🆕 Modal State
+  const [generating, setGenerating] = useState(false);
 
   const deferredSearch = useDeferredValue(searchTerm);
 
@@ -190,6 +194,39 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       showNotify("Failed to update bot status", "error");
     }
   }, [showNotify, isDemo]);
+
+  // ✅ Generate AI Suggestions
+  const generateAISuggestions = async () => {
+    setGenerating(true);
+    try {
+      if (isDemo) {
+        await new Promise(r => setTimeout(r, 1500));
+        setNewRule({
+          keyword: "amazing",
+          reply: "Thanks for the kind words! We're glad you like it. ✨",
+          type: "KEYWORD",
+          enabled: true
+        });
+        showNotify("AI generated a suggestion!");
+      } else {
+        const res = await api.post("/bot/suggestions");
+        if (res.data.suggestions && res.data.suggestions.length > 0) {
+          const random = res.data.suggestions[Math.floor(Math.random() * res.data.suggestions.length)];
+          setNewRule({
+            keyword: random.keyword,
+            reply: random.reply,
+            type: "KEYWORD",
+            enabled: true
+          });
+          showNotify("AI generated a suggestion!");
+        }
+      }
+    } catch (err) {
+      showNotify("Failed to generate AI suggestion", "error");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   // ============================================================
   // 🧱 Render UI
@@ -376,6 +413,36 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                 </h3>
                 <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                   <X size={24} />
+                </button>
+              </div>
+
+              {/* ✨ AI Generator Banner */}
+              <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800/30 flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100 flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-purple-600 dark:text-purple-400" />
+                    AI Creativity Suite
+                  </h4>
+                  <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
+                    Stuck? Let AI write a rule for you.
+                  </p>
+                </div>
+                <button
+                  onClick={generateAISuggestions}
+                  disabled={generating}
+                  className="px-3 py-1.5 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 text-xs font-medium rounded-lg border border-purple-200 dark:border-purple-700 shadow-sm hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors flex items-center gap-2"
+                >
+                  {generating ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={12} />
+                      Auto-Generate
+                    </>
+                  )}
                 </button>
               </div>
 

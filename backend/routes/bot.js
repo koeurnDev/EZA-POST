@@ -5,6 +5,7 @@
 const express = require("express");
 const router = express.Router();
 const { BotRule, BotStatus } = require("../models/BotRule");
+const ai = require("../utils/ai");
 
 // ============================================================
 // 🧠 Initialize bot_status (if missing)
@@ -38,6 +39,17 @@ router.get("/rules", async (req, res) => {
   } catch (err) {
     console.error("❌ GET /rules error:", err.message);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ✅ Generate AI Suggestions
+router.post("/suggestions", async (req, res) => {
+  try {
+    const suggestions = await ai.generateSuggestions();
+    res.json({ success: true, suggestions });
+  } catch (err) {
+    console.error("❌ POST /suggestions error:", err.message);
+    res.status(500).json({ success: false, message: "Failed to generate suggestions" });
   }
 });
 
