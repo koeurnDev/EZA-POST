@@ -6,7 +6,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useAuth } from "../context/AuthContext";
-import { authAPI } from "../utils/api";
+import { authAPI, pagesAPI } from "../utils/api";
 import {
     User,
     Mail,
@@ -26,20 +26,39 @@ export default function Profile() {
     const { user, updateUser } = useAuth();
     const [isDemo, setIsDemo] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [stats, setStats] = useState([
+        { label: "Posts Created", value: "0", icon: Video, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
+        { label: "Auto-Replies", value: "0", icon: MessageSquare, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+        { label: "Pages Connected", value: "0", icon: ShieldCheck, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
+    ]);
 
-    // ✅ Initialize Demo Mode
+    // ✅ Initialize Demo Mode & Fetch Stats
     useEffect(() => {
         if (localStorage.getItem("isDemo") === "true" || user?.isDemo) {
             setIsDemo(true);
         }
-    }, [user]);
 
-    // 📊 Mock Stats (Replace with real API data later)
-    const stats = [
-        { label: "Posts Created", value: "124", icon: Video, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
-        { label: "Auto-Replies", value: "1.2k", icon: MessageSquare, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-        { label: "Pages Connected", value: "3", icon: ShieldCheck, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
-    ];
+        const fetchStats = async () => {
+            try {
+                // Fetch Pages Count
+                const pagesRes = await pagesAPI.getAccounts();
+                const pageCount = pagesRes.success ? pagesRes.accounts.length : 0;
+
+                // Update Stats
+                setStats(prev => prev.map(stat => {
+                    if (stat.label === "Pages Connected") return { ...stat, value: pageCount.toString() };
+                    // TODO: Fetch real post/reply counts
+                    if (stat.label === "Posts Created") return { ...stat, value: "12" }; // Mock for now
+                    if (stat.label === "Auto-Replies") return { ...stat, value: "45" }; // Mock for now
+                    return stat;
+                }));
+            } catch (err) {
+                console.error("Failed to fetch profile stats:", err);
+            }
+        };
+
+        if (user) fetchStats();
+    }, [user]);
 
     // 🕒 Mock Activity
     const activities = [
