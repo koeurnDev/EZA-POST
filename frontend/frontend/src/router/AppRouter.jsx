@@ -12,7 +12,9 @@ import Overview from "../pages/Overview";
 import ScheduledPosts from "../pages/ScheduledPosts";
 import BotSettingsPage from "../pages/BotSettingsPage";
 import Settings from "../pages/Settings";
-import Profile from "../pages/Profile"; // 👤 New Profile Page
+import Settings from "../pages/Settings";
+import Profile from "../pages/Profile";
+import Welcome from "../pages/Welcome"; // 🚀 New Welcome Page
 
 // --- Components ---
 import ForgotPassword from "../pages/ForgotPassword";
@@ -27,7 +29,7 @@ export default function AppRouter() {
     <BrowserRouter>
       <Routes>
         {/* ==================== Public Routes ==================== */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Welcome />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
