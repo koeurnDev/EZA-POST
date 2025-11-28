@@ -10,6 +10,8 @@ import { useAuth } from "../hooks/useAuth";
 import { User, LogOut, Moon, Sun, Shield, Mail, Bell, CheckCircle2, Edit2, RefreshCw, ExternalLink, AlertCircle, Settings as SettingsIcon, MessageSquare, Calendar, Radio } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
 import apiUtils from "../utils/apiUtils";
+import toast from "react-hot-toast";
+import EmptyState from "../components/ui/EmptyState";
 
 
 export default function Settings() {
@@ -30,8 +32,22 @@ export default function Settings() {
         }
     }, [user?.facebookId]);
 
-    import toast from "react-hot-toast";
-    import EmptyState from "../components/ui/EmptyState";
+    // ✅ Auto-Refresh on Connect Success
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("success") === "facebook_connected") {
+            toast.success("✅ Facebook Connected Successfully!");
+
+            // 1. Clear URL param
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            // 2. Refresh Auth (Fetch updated user with FB ID)
+            // This will trigger the useEffect above to fetch pages
+            window.location.reload(); // Simple reload to ensure fresh state
+        }
+    }, []);
+
+
 
     // ... (inside component)
 

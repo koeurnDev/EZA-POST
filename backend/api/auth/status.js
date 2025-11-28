@@ -14,13 +14,17 @@ router.get("/", async (req, res) => {
     // ✅ 1. Try to verify session-based login
     if (req.session?.userId) {
       const foundUser = await User.findOne({ id: req.session.userId }).select(
-        "id email name"
+        "id email name facebookId facebookName avatar connectedPages"
       );
       if (foundUser) {
         user = {
           id: foundUser.id,
           email: foundUser.email,
           name: foundUser.name,
+          facebookId: foundUser.facebookId,
+          facebookName: foundUser.facebookName,
+          avatar: foundUser.avatar,
+          connectedPages: foundUser.connectedPages,
         };
         // Add isDemo flag for demo user
         if (user.id === "demo_user_001") {
