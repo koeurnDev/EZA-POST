@@ -40,13 +40,24 @@ const botEngine = {
             if (!validation.isValid) return console.warn(`⚠️ Invalid token for user ${user.name}`);
 
             // Get Pages
-            const pages = await fb.getFacebookPages(user.facebookAccessToken);
+            const allPages = await fb.getFacebookPages(user.facebookAccessToken);
+
+            // Filter Pages: Must be Selected AND have Bot Enabled
+            const activePages = allPages.filter(page => {
+                const isSelected = user.selectedPages?.includes(page.id);
+                const settings = user.pageSettings?.find(s => s.pageId === page.id);
+                const isBotEnabled = settings?.enableBot === true;
+
+                return isSelected && isBotEnabled;
+            });
+
+            if (activePages.length === 0) return;
 
             // Get Rules
             const rules = await BotRule.find({ enabled: true });
             if (rules.length === 0) return;
 
-            for (const page of pages) {
+            for (const page of activePages) {
                 await botEngine.processPage(page, rules);
             }
         } catch (err) {

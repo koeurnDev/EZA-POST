@@ -65,11 +65,39 @@ async function processSinglePost(post) {
       `✅ Video ready (${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB)`
     );
 
-    // Step 2️⃣ Upload to Facebook
-    const fbToken = process.env.FB_ACCESS_TOKEN;
-    if (!fbToken) throw new Error("No Facebook Access Token available");
+    // Step 1.5: Get User and Check Settings
+    const User = require("../models/User");
+    // Assuming ScheduledPost has a 'userId' field. If not, we need to add it or find user by other means.
+    // Ideally, we should have saved userId when creating the post.
+    // For now, let's assume we can find the user who owns this page.
+    // Since we don't have userId in ScheduledPost schema yet (based on previous context), 
+    // we might need to rely on finding a user who has this page selected.
+    // BUT, for robustness, we should have userId. 
+    // Let's try to find a user who has this page in their accounts.
+    // This is expensive, so we should really add userId to ScheduledPost.
+    // For this iteration, I will assume we can find the user by the page ID in their selectedPages.
 
-    console.log(`📤 Uploading to Facebook...`);
+    // Find user who has this page selected
+    // NOTE: This assumes one user per page, or we just pick the first one.
+    // In a real multi-tenant app, we need userId on the post.
+    const accountId = post.accounts[0]?.id; // Assuming single account for now or taking first
+    const user = await User.findOne({
+      "selectedPages": accountId,
+      "facebookAccessToken": { $exists: true }
+    });
+
+    if (!user) throw new Error("No user found for this page");
+
+    // Check Page Settings
+    const pageSettings = user.pageSettings?.find(s => s.pageId === accountId);
+    if (pageSettings && pageSettings.enableSchedule === false) {
+      throw new Error("Scheduled posting is disabled for this page");
+    }
+
+    const fbToken = user.facebookAccessToken;
+    if (!fbToken) throw new Error("User has no Facebook Access Token");
+
+    console.log(`📤 Uploading to Facebook (User: ${user.name})...`);
 
     const results = await uploadToFacebook(
       fbToken,

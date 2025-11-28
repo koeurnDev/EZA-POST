@@ -25,13 +25,21 @@ router.get("/", requireAuth, async (req, res) => {
             }
         );
 
-        const pages = response.data.data.map((page) => ({
-            id: page.id,
-            name: page.name,
-            access_token: page.access_token,
-            picture: page.picture?.data?.url,
-            isSelected: user.selectedPages?.includes(page.id) || false, // ✅ Check if selected
-        }));
+        const pages = response.data.data.map((page) => {
+            const settings = user.pageSettings?.find(s => s.pageId === page.id) || {};
+            return {
+                id: page.id,
+                name: page.name,
+                access_token: page.access_token,
+                picture: page.picture?.data?.url,
+                isSelected: user.selectedPages?.includes(page.id) || false,
+                settings: {
+                    enableBot: settings.enableBot || false,
+                    enableSchedule: settings.enableSchedule !== false, // Default true
+                    enableInbox: settings.enableInbox || false
+                }
+            };
+        });
 
         res.json({ success: true, accounts: pages });
     } catch (err) {
@@ -63,6 +71,39 @@ router.post("/toggle", requireAuth, async (req, res) => {
     } catch (err) {
         console.error("❌ Toggle page error:", err.message);
         res.status(500).json({ success: false, error: "Failed to update page selection" });
+    }
+});
+
+});
+
+// ✅ POST /api/user/pages/settings
+// Update settings for a specific page
+router.post("/settings", requireAuth, async (req, res) => {
+    try {
+        const { pageId, settings } = req.body;
+        const userId = req.user.id;
+
+        if (!pageId || !settings) return res.status(400).json({ error: "Page ID and settings required" });
+
+        // Update specific page settings in the array
+        await User.findOneAndUpdate(
+            { id: userId },
+            {
+                $pull: { pageSettings: { pageId: pageId } } // Remove existing
+            }
+        );
+
+        await User.findOneAndUpdate(
+            { id: userId },
+            {
+                $push: { pageSettings: { pageId, ...settings } } // Add new
+            }
+        );
+
+        res.json({ success: true, message: "Settings updated" });
+    } catch (err) {
+        console.error("❌ Update settings error:", err.message);
+        res.status(500).json({ success: false, error: "Failed to update settings" });
     }
 });
 

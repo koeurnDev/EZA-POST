@@ -46,6 +46,12 @@ const userSchema = new mongoose.Schema(
             type: [String], // 📋 Array of Page IDs that are "ON"
             default: [],
         },
+        pageSettings: [{
+            pageId: String,
+            enableBot: { type: Boolean, default: false },
+            enableSchedule: { type: Boolean, default: true },
+            enableInbox: { type: Boolean, default: false }
+        }],
         avatar: {
             type: String,
         },
