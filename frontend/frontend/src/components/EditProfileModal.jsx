@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
 import { X, User, Mail, Loader2, Save } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 

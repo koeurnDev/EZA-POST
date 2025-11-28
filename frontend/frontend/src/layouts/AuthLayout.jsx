@@ -1,5 +1,6 @@
 import React from "react";
 import { useTheme } from "../context/ThemeContext";
+import { motion } from "framer-motion"; // eslint-disable-line no-unused-vars
 
 const AuthLayout = ({ children, title, subtitle }) => {
   const { theme, toggleTheme } = useTheme();

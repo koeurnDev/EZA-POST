@@ -3,6 +3,7 @@
 // ============================================================
 
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
 
 import DashboardLayout from "../layouts/DashboardLayout";
 import VideoPreview from "../components/VideoPreview";

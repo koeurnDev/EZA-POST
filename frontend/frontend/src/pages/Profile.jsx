@@ -3,6 +3,7 @@
 // ============================================================
 
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion"; // eslint-disable-line no-unused-vars
 
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useAuth } from "../context/AuthContext";

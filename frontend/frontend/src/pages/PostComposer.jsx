@@ -8,6 +8,7 @@ import { Upload, X, Calendar, Clock, Send, Film, AlertCircle, CheckCircle2, Load
 import { Link } from "react-router-dom";
 import apiUtils from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
+import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
 
 
 export default function PostComposer() {

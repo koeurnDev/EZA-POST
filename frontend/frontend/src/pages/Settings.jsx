@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
+import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 import { User, LogOut, Moon, Sun, Shield, Mail, Bell, CheckCircle2, Edit2, RefreshCw, ExternalLink, AlertCircle, Settings as SettingsIcon, MessageSquare, Calendar, Radio } from "lucide-react";

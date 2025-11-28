@@ -4,6 +4,7 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion"; // eslint-disable-line no-unused-vars
 
 import { ArrowRight, Zap, BarChart3, Globe } from "lucide-react";
 

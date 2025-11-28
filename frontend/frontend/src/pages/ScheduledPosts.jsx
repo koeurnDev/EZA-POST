@@ -3,6 +3,7 @@
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
 
 import { Link } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
