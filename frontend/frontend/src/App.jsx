@@ -9,6 +9,7 @@
 import React from "react";
 import AppRouter from "./router/AppRouter";
 import PostComposer from "./pages/PostComposer";
+import { Toaster } from "react-hot-toast"; // ✅ Toast Notifications
 
 // ✅ Global Context Providers
 import { AuthProvider } from "./context/AuthContext";
@@ -26,6 +27,7 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <AppRouter />
+          <Toaster position="top-center" reverseOrder={false} />
         </AuthProvider>
       </ThemeProvider>
     </React.StrictMode>
