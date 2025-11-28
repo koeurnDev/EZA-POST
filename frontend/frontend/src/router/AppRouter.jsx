@@ -36,6 +36,9 @@ export default function AppRouter() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
+        {/* Redirect /dashboard to / */}
+        <Route path="/dashboard" element={<Navigate to="/" replace />} />
+
         {/* ==================== Protected Routes ==================== */}
         <Route
           path="/"
