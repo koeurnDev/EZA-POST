@@ -74,7 +74,7 @@ router.post("/toggle", requireAuth, async (req, res) => {
     }
 });
 
-});
+
 
 // ✅ POST /api/user/pages/settings
 // Update settings for a specific page
