@@ -84,9 +84,16 @@ async function getUserById(userId) {
 /* -------------------------------------------------------------------------- */
 async function requireAuth(req, res, next) {
   try {
+    // 1️⃣ Check for JWT Token
     const token =
       req.cookies?.token ||
       req.headers["authorization"]?.replace("Bearer ", "");
+
+    // 2️⃣ Check for Session (Facebook Login)
+    if (!token && req.session?.user) {
+      req.user = req.session.user;
+      return next();
+    }
 
     if (!token) return res.status(401).json({ error: "Unauthorized" });
 
@@ -94,6 +101,22 @@ async function requireAuth(req, res, next) {
     const user = await getUserById(decoded.id);
 
     if (!user) return res.status(404).json({ error: "User not found" });
+
+    req.user = user;
+    next();
+  } catch (err) {
+    if (!token) {
+      console.warn("⚠️ requireAuth: No token or session found. Headers:", req.headers);
+      return res.status(401).json({ error: "Unauthorized - No token or session" });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await getUserById(decoded.id);
+
+    if (!user) {
+      console.warn("⚠️ requireAuth: User not found for token:", decoded.id);
+      return res.status(404).json({ error: "User not found" });
+    }
 
     req.user = user;
     next();
@@ -190,6 +213,9 @@ router.post("/demo", async (req, res) => {
       token,
       user: demoUser,
     });
+
+    // 🍪 Set Cookie for Demo User too!
+    setAuthCookie(res, demoUser);
   } catch (err) {
     console.error("Demo login error:", err);
     res.status(500).json({
