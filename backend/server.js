@@ -164,6 +164,7 @@ const routeModules = [
   ["tiktok", "./api/tiktok"],
   ["user/pages", "./api/user/pages"],
   ["user/update", "./api/user/update"],
+  ["user/stats", "./api/user/stats"], // ✅ Added
 ];
 
 for (const [route, file] of routeModules) {

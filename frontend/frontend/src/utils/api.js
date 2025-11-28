@@ -324,6 +324,7 @@ const authAPI = {
       headers: { "Content-Type": "multipart/form-data" },
     })).data;
   },
+  getStats: async () => (await api.get("/user/stats")).data,
 };
 
 // System

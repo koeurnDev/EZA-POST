@@ -44,12 +44,16 @@ export default function Profile() {
                 const pagesRes = await pagesAPI.getAccounts();
                 const pageCount = pagesRes.success ? pagesRes.accounts.length : 0;
 
+                // Fetch Real Stats
+                const statsRes = await authAPI.getStats();
+                const postsCount = statsRes.success ? statsRes.stats.posts : 0;
+                const repliesCount = statsRes.success ? statsRes.stats.replies : 0;
+
                 // Update Stats
                 setStats(prev => prev.map(stat => {
                     if (stat.label === "Pages Connected") return { ...stat, value: pageCount.toString() };
-                    // TODO: Fetch real post/reply counts
-                    if (stat.label === "Posts Created") return { ...stat, value: "12" }; // Mock for now
-                    if (stat.label === "Auto-Replies") return { ...stat, value: "45" }; // Mock for now
+                    if (stat.label === "Posts Created") return { ...stat, value: postsCount.toString() };
+                    if (stat.label === "Auto-Replies") return { ...stat, value: repliesCount.toString() };
                     return stat;
                 }));
             } catch (err) {
