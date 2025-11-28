@@ -122,13 +122,15 @@ router.get("/callback", async (req, res) => {
 
             console.log(`✅ Fetched & Saved ${myPages.length} pages for ${fbUser.name}`);
 
-            // Update existing user
-            await User.findByIdAndUpdate(userId, {
-                facebookId: fbUser.id,
-                facebookAccessToken: access_token,
-                facebookName: fbUser.name,
-                connectedPages: myPages // ✅ Save Pages to DB
-            });
+            // Update existing user (Use find + save to trigger pre-save hooks for encryption)
+            const user = await User.findById(userId);
+            if (user) {
+                user.facebookId = fbUser.id;
+                user.facebookAccessToken = access_token;
+                user.facebookName = fbUser.name;
+                user.connectedPages = myPages;
+                await user.save();
+            }
         } else {
             console.error("❌ User not logged in during Facebook Connect callback.");
             return res.redirect(`${process.env.FRONTEND_URL}/login?error=session_expired`);

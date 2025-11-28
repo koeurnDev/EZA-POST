@@ -114,9 +114,12 @@ async function handleAutoReply(pageId, commentId, userMessage) {
         }
 
         // 4️⃣ Send Reply via Graph API
+        const pageToken = user.getDecryptedPageToken(pageId);
+        if (!pageToken) return;
+
         await axios.post(`https://graph.facebook.com/v19.0/${commentId}/comments`, {
             message: replyMessage,
-            access_token: page.access_token
+            access_token: pageToken
         });
 
         console.log(`✅ Auto-Replied to ${commentId}: "${replyMessage}"`);

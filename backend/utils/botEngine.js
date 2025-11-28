@@ -123,14 +123,15 @@ const botEngine = {
     processUser: async (user) => {
         try {
             // Validate Token
-            const validation = await fb.validateAccessToken(user.facebookAccessToken);
+            const decryptedToken = user.getDecryptedAccessToken();
+            const validation = await fb.validateAccessToken(decryptedToken);
             if (!validation.isValid) {
                 console.warn(`⚠️ Invalid token for user ${user.name} (ID: ${user.id})`);
                 return;
             }
 
             // Get Pages
-            const allPages = await fb.getFacebookPages(user.facebookAccessToken);
+            const allPages = await fb.getFacebookPages(decryptedToken);
 
             // Filter Pages: Must be Selected AND have Bot Enabled
             const activePages = allPages.filter(page => {

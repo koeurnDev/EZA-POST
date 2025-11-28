@@ -150,7 +150,7 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
 
     // Upload
     const results = await fb.postToFB(
-      user.facebookAccessToken,
+      user.getDecryptedAccessToken(),
       accountsArray.map(id => ({ id, type: 'page' })), // Assuming all are pages for now, or logic handles it
       videoBuffer,
       caption,

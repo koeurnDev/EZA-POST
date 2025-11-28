@@ -81,7 +81,7 @@ async function processSinglePost(post) {
       throw new Error("Scheduled posting is disabled for this page");
     }
 
-    const fbToken = user.facebookAccessToken;
+    const fbToken = user.getDecryptedAccessToken();
     if (!fbToken) throw new Error("User has no Facebook Access Token");
 
     console.log(`📤 Uploading to Facebook (User: ${user.name})...`);
