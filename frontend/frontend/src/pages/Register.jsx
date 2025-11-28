@@ -2,8 +2,9 @@
 // 📝 Register.jsx (FINAL VERSION – Clean Split Layout)
 // ============================================================
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion"; // eslint-disable-line no-unused-vars
+import toast from "react-hot-toast";
 
 import { useNavigate } from "react-router-dom";
 // Removed unused authAPI import
@@ -13,7 +14,6 @@ import RegisterForm from "../components/RegisterForm";
 
 export default function Register() {
   const navigate = useNavigate();
-  const [notification, setNotification] = useState({ type: "", message: "" });
 
   // ------------------------------------------------------------
   // ✅ Redirect to dashboard if already logged in
@@ -24,18 +24,10 @@ export default function Register() {
   }, [navigate]);
 
   // ------------------------------------------------------------
-  // ✅ Show notification (success/error)
-  // ------------------------------------------------------------
-  const showNotification = (type, message, duration = 3000) => {
-    setNotification({ type, message });
-    if (duration) setTimeout(() => setNotification({ type: "", message: "" }), duration);
-  };
-
-  // ------------------------------------------------------------
   // ✅ Success Handler
   // ------------------------------------------------------------
   const handleRegisterSuccess = () => {
-    showNotification("success", "✅ Registration successful! Redirecting...");
+    toast.success("✅ Registration successful! Redirecting...");
     setTimeout(() => navigate("/login", { replace: true }), 1500);
   };
 
@@ -99,21 +91,6 @@ export default function Register() {
               Start your 14-day free trial. No credit card required.
             </p>
           </div>
-
-          {/* ✅ Notifications */}
-          {notification.message && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`p-4 rounded-lg text-sm font-medium flex items-center gap-3 ${notification.type === "error"
-                ? "bg-red-50 text-red-700 border border-red-100"
-                : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                }`}
-            >
-              <span>{notification.type === "error" ? "⚠️" : "✅"}</span>
-              {notification.message}
-            </motion.div>
-          )}
 
           {/* ✅ Form */}
           <RegisterForm
