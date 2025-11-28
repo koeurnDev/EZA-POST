@@ -154,8 +154,8 @@ function setAuthCookie(res, user) {
   const token = generateToken(user);
   res.cookie("token", token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" || process.env.RENDER === "true" ? "none" : "lax",
+    secure: process.env.NODE_ENV === "production" || process.env.RENDER === "true",
     maxAge: 24 * 60 * 60 * 1000, // 1 day
   });
   return token;
@@ -164,8 +164,8 @@ function setAuthCookie(res, user) {
 function clearAuthCookie(res) {
   res.clearCookie("token", {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" || process.env.RENDER === "true" ? "none" : "lax",
+    secure: process.env.NODE_ENV === "production" || process.env.RENDER === "true",
   });
 }
 
