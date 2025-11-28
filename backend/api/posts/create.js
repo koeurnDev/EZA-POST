@@ -7,7 +7,7 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const Post = require("../../models/Post"); // ✅ MongoDB Model
+const ScheduledPost = require("../../models/ScheduledPost"); // ✅ MongoDB Model
 const { requireAuth } = require("../../utils/auth");
 
 // 🗂️ Ensure uploads directory exists
@@ -66,21 +66,58 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
     // 💾 Save post record (MongoDB)
     const filename = file.filename;
     const videoUrl = `/uploads/videos/${filename}`;
+    const postId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
-    const newPost = await Post.create({
-      userId,
+    const newPost = await ScheduledPost.create({
+      id: postId,
+      user_id: userId,
       caption,
-      videoUrl,
+      video_url: videoUrl,
       accounts: accountsArray,
-      status: "created",
+      schedule_time: new Date(), // Now
+      status: "processing",
     });
 
-    console.log(`✅ New post by ${userId}: ${caption}`);
+    console.log(`✅ New post created by ${userId}: ${caption}`);
+
+    // 🚀 Trigger Immediate Upload
+    const User = require("../../models/User");
+    const fb = require("../../utils/fb");
+    const fs = require("fs");
+
+    // Get User Token
+    const user = await User.findOne({ id: userId });
+    if (!user || !user.facebookAccessToken) {
+      throw new Error("User not connected to Facebook");
+    }
+
+    // Read Video Buffer
+    const videoBuffer = fs.readFileSync(file.path);
+
+    // Upload
+    const results = await fb.postToFB(
+      user.facebookAccessToken,
+      accountsArray.map(id => ({ id, type: 'page' })),
+      videoBuffer,
+      caption
+    );
+
+    // Update Status
+    const successCount = results.successCount;
+    newPost.status = successCount > 0 ? "completed" : "failed";
+    newPost.posted_at = new Date();
+    if (results.details) {
+      newPost.publishedIds = results.details
+        .filter(r => r.status === 'success' && r.postId)
+        .map(r => ({ accountId: r.accountId, postId: r.postId }));
+    }
+    await newPost.save();
 
     // ✅ Respond success
     res.status(201).json({
       success: true,
-      message: "Post created successfully",
+      message: successCount > 0 ? "Post published successfully" : "Failed to publish post",
+      results: results,
       video: {
         url: videoUrl,
         name: filename,
@@ -88,7 +125,7 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
       },
       caption,
       accounts: accountsArray,
-      postId: newPost._id,
+      postId: newPost.id,
     });
   } catch (err) {
     console.error("❌ Create post error:", err.message);

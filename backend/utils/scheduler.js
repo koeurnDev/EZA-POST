@@ -5,7 +5,7 @@
 
 const ScheduledPost = require("../models/ScheduledPost");
 const { downloadTiktokVideo } = require("./tiktokDownloader");
-const { uploadToFacebook } = require("./facebookUploader");
+const fb = require("./fb");
 
 // ============================================================
 // 🧠 Main Queue Processor
@@ -67,28 +67,15 @@ async function processSinglePost(post) {
 
     // Step 1.5: Get User and Check Settings
     const User = require("../models/User");
-    // Assuming ScheduledPost has a 'userId' field. If not, we need to add it or find user by other means.
-    // Ideally, we should have saved userId when creating the post.
-    // For now, let's assume we can find the user who owns this page.
-    // Since we don't have userId in ScheduledPost schema yet (based on previous context), 
-    // we might need to rely on finding a user who has this page selected.
-    // BUT, for robustness, we should have userId. 
-    // Let's try to find a user who has this page in their accounts.
-    // This is expensive, so we should really add userId to ScheduledPost.
-    // For this iteration, I will assume we can find the user by the page ID in their selectedPages.
 
-    // Find user who has this page selected
-    // NOTE: This assumes one user per page, or we just pick the first one.
-    // In a real multi-tenant app, we need userId on the post.
-    const accountId = post.accounts[0]?.id; // Assuming single account for now or taking first
-    const user = await User.findOne({
-      "selectedPages": accountId,
-      "facebookAccessToken": { $exists: true }
-    });
+    // ✅ Fix: Use user_id from the post record
+    const user = await User.findOne({ id: post.user_id });
 
-    if (!user) throw new Error("No user found for this page");
+    if (!user) throw new Error(`User not found (ID: ${post.user_id})`);
 
-    // Check Page Settings
+    // Check Page Settings (Check first account for now)
+    const accountId = post.accounts[0];
+
     const pageSettings = user.pageSettings?.find(s => s.pageId === accountId);
     if (pageSettings && pageSettings.enableSchedule === false) {
       throw new Error("Scheduled posting is disabled for this page");
@@ -99,9 +86,12 @@ async function processSinglePost(post) {
 
     console.log(`📤 Uploading to Facebook (User: ${user.name})...`);
 
-    const results = await uploadToFacebook(
+    // Convert string IDs to objects for uploader
+    const accountObjects = post.accounts.map(id => ({ id, type: 'page' }));
+
+    const results = await fb.postToFB(
       fbToken,
-      post.accounts,
+      accountObjects,
       videoBuffer,
       post.caption
     );
@@ -113,7 +103,7 @@ async function processSinglePost(post) {
     // Save published IDs
     if (results.details && results.details.length > 0) {
       post.publishedIds = results.details
-        .filter(r => r.success && r.postId)
+        .filter(r => r.status === 'success' && r.postId)
         .map(r => ({ accountId: r.accountId, postId: r.postId }));
     }
 
@@ -149,4 +139,3 @@ exports.cleanupOldPosts = async () => {
     console.error("Cleanup error:", err.message);
   }
 };
-

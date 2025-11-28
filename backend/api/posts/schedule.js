@@ -6,7 +6,7 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const Post = require("../../models/Post"); // ✅ MongoDB Model
+const ScheduledPost = require("../../models/ScheduledPost"); // ✅ MongoDB Model
 const { requireAuth } = require("../../utils/auth");
 const router = express.Router();
 
@@ -79,12 +79,13 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
     const filename = file.filename;
     const videoUrl = `/uploads/videos/${filename}`;
 
-    const newPost = await Post.create({
-      userId,
+    const newPost = await ScheduledPost.create({
+      id: `post_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, // Generate ID
+      user_id: userId, // Match schema
       caption,
-      videoUrl,
+      video_url: videoUrl, // Match schema
       accounts: accountsList,
-      scheduleTime: scheduleDate,
+      schedule_time: scheduleDate, // Match schema
       status: "scheduled",
     });
 
@@ -98,7 +99,7 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
         videoUrl,
         accounts: accountsList,
         scheduleTime: scheduleDate,
-        postId: newPost._id,
+        postId: newPost.id,
       },
     });
   } catch (err) {
