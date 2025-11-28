@@ -66,12 +66,22 @@ const ScheduledPostList = ({ posts, onCancel, onRetry }) => {
                                 <td className="hidden md:table-cell px-6 py-4">
                                     <div className="flex -space-x-2 overflow-hidden">
                                         {post.accounts?.map((acc, i) => (
-                                            <div
-                                                key={i}
-                                                className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800 bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600"
-                                                title={acc.name}
-                                            >
-                                                {acc.name?.[0]}
+                                            <div key={i} className="relative group">
+                                                {acc.picture ? (
+                                                    <img
+                                                        src={acc.picture}
+                                                        alt={acc.name}
+                                                        className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800 object-cover bg-white"
+                                                        title={acc.name}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800 bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600"
+                                                        title={acc.name}
+                                                    >
+                                                        {acc.name?.[0]}
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                         {post.accounts?.length > 3 && (

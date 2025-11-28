@@ -16,25 +16,46 @@ router.get("/", requireAuth, async (req, res) => {
     if (!userId)
       return res.status(401).json({ success: false, error: "Unauthorized" });
 
+    // 🔍 Fetch User to get Connected Pages (for mapping IDs to Names/Avatars)
+    const User = require("../../models/User");
+    const user = await User.findOne({ id: userId }).select("connectedPages");
+    const pageMap = {};
+    if (user?.connectedPages) {
+      user.connectedPages.forEach(p => {
+        pageMap[p.id] = { name: p.name, picture: p.picture };
+      });
+    }
+
     // 🔍 Fetch scheduled posts from MongoDB
-    // Note: status might be 'scheduled' or 'processing'
     const posts = await ScheduledPost.find({
       user_id: userId,
       status: { $in: ["scheduled", "processing", "expired"] },
     }).sort({ schedule_time: 1 }); // Ascending order
 
     // Map to frontend friendly format
-    const formattedPosts = posts.map(p => ({
-      id: p.id, // Custom ID string
-      _id: p._id, // Mongo ID
-      caption: p.caption,
-      videoUrl: p.video_url,
-      thumbnailUrl: p.thumbnail_url, // ✅ Include thumbnail
-      scheduleTime: p.schedule_time,
-      status: p.status,
-      accounts: p.accounts.map(acc => ({ name: acc.name || "Page" })), // Simplified account info
-      createdAt: p.createdAt
-    }));
+    const formattedPosts = posts.map(p => {
+      // Map account IDs to Page Objects
+      const accountDetails = p.accounts.map(accId => {
+        const page = pageMap[accId];
+        return {
+          id: accId,
+          name: page?.name || "Unknown Page",
+          picture: page?.picture || null
+        };
+      });
+
+      return {
+        id: p.id, // Custom ID string
+        _id: p._id, // Mongo ID
+        caption: p.caption,
+        videoUrl: p.video_url,
+        thumbnailUrl: p.thumbnail_url,
+        scheduleTime: p.schedule_time,
+        status: p.status,
+        accounts: accountDetails, // ✅ Now contains full details
+        createdAt: p.createdAt
+      };
+    });
 
     res.json({
       success: true,

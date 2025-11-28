@@ -155,30 +155,120 @@ export default function PostComposer() {
 
     // ...
 
-                            <AnimatePresence>
-                                {isScheduling && (
-                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                                        <input
-                                            type="datetime-local"
-                                            value={scheduleTime}
-                                            onChange={(e) => setScheduleTime(e.target.value)}
-                                            className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
-                                        />
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+    <div className="space-y-6">
+        {/* 📄 Page Selection */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <CheckCircle2 className="text-blue-500" size={20} />
+                    Select Pages
+                </h3>
+                <Link to="/settings" className="text-xs text-blue-600 hover:underline">
+                    Manage Pages
+                </Link>
+            </div>
 
-                            <Button
-                                onClick={handleSubmit}
-                                disabled={(!file && !caption && !tiktokUrl) || selectedPages.length === 0}
-                                isLoading={isSubmitting}
-                                fullWidth
-                                size="large"
-                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.02] shadow-lg"
-                            >
-                                {isScheduling ? <><Calendar size={20} /> Schedule Post</> : <><Send size={20} /> Post Now</>}
-                            </Button>
-                        </div >
+            {availablePages.length === 0 ? (
+                <div className="text-center py-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                    <AlertCircle className="mx-auto text-gray-400 mb-2" size={24} />
+                    <p className="text-sm text-gray-500">No active pages found.</p>
+                    <Link to="/settings" className="text-xs text-blue-600 font-medium hover:underline mt-1 block">
+                        Connect in Settings
+                    </Link>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {availablePages.map(page => (
+                        <div
+                            key={page.id}
+                            onClick={() => {
+                                setSelectedPages(prev =>
+                                    prev.includes(page.id)
+                                        ? prev.filter(id => id !== page.id)
+                                        : [...prev, page.id]
+                                );
+                            }}
+                            className={`cursor-pointer flex items-center gap-3 p-3 rounded-xl border transition-all ${selectedPages.includes(page.id)
+                                ? "bg-blue-50 dark:bg-blue-900/20 border-blue-500 shadow-sm"
+                                : "bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-700 hover:border-blue-300"
+                                }`}
+                        >
+                            <div className="relative">
+                                <img
+                                    src={page.picture || "https://via.placeholder.com/40"}
+                                    alt={page.name}
+                                    className="w-10 h-10 rounded-full object-cover bg-white"
+                                />
+                                {selectedPages.includes(page.id) && (
+                                    <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-0.5 rounded-full border-2 border-white dark:border-gray-800">
+                                        <CheckCircle2 size={10} />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-semibold truncate ${selectedPages.includes(page.id) ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300"}`}>
+                                    {page.name}
+                                </p>
+                                <p className="text-xs text-gray-400 truncate">ID: {page.id}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+
+        {/* 🎵 TikTok URL Input */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                TikTok URL (Optional)
+            </label>
+            <input
+                type="text"
+                value={tiktokUrl}
+                onChange={(e) => setTiktokUrl(e.target.value)}
+                placeholder="Paste TikTok video URL here..."
+                className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            />
+        </div>
+
+        {/* 📝 Caption Input */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Caption
+            </label>
+            <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="What's on your mind?"
+                rows={4}
+                className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+            />
+        </div>
+
+        <AnimatePresence>
+            {isScheduling && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                    <input
+                        type="datetime-local"
+                        value={scheduleTime}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                        className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+                    />
+                </motion.div>
+            )}
+        </AnimatePresence>
+
+        <Button
+            onClick={handleSubmit}
+            disabled={(!file && !caption && !tiktokUrl) || selectedPages.length === 0}
+            isLoading={isSubmitting}
+            fullWidth
+            size="large"
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.02] shadow-lg"
+        >
+            {isScheduling ? <><Calendar size={20} /> Schedule Post</> : <><Send size={20} /> Post Now</>}
+        </Button>
+    </div >
                     </div >
 
         {/* 👉 Right Column: Media Upload */ }
