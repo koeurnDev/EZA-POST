@@ -30,6 +30,7 @@ router.get("/", requireAuth, async (req, res) => {
             name: page.name,
             access_token: page.access_token,
             picture: page.picture?.data?.url,
+            isSelected: user.selectedPages?.includes(page.id) || false, // ✅ Check if selected
         }));
 
         res.json({ success: true, accounts: pages });
@@ -40,6 +41,28 @@ router.get("/", requireAuth, async (req, res) => {
             return res.json({ success: true, accounts: [] });
         }
         res.status(500).json({ success: false, error: "Failed to fetch pages" });
+    }
+});
+
+// ✅ POST /api/user/pages/toggle
+// Toggle a page ON/OFF
+router.post("/toggle", requireAuth, async (req, res) => {
+    try {
+        const { pageId, isSelected } = req.body;
+        const userId = req.user.id;
+
+        if (!pageId) return res.status(400).json({ error: "Page ID required" });
+
+        const update = isSelected
+            ? { $addToSet: { selectedPages: pageId } } // Add if ON
+            : { $pull: { selectedPages: pageId } };    // Remove if OFF
+
+        await User.findOneAndUpdate({ id: userId }, update);
+
+        res.json({ success: true, message: isSelected ? "Page Enabled" : "Page Disabled" });
+    } catch (err) {
+        console.error("❌ Toggle page error:", err.message);
+        res.status(500).json({ success: false, error: "Failed to update page selection" });
     }
 });
 

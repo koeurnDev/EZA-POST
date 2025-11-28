@@ -39,6 +39,13 @@ const userSchema = new mongoose.Schema(
         facebookAccessToken: {
             type: String,
         },
+        facebookName: {
+            type: String, // 👤 Store Facebook User Name
+        },
+        selectedPages: {
+            type: [String], // 📋 Array of Page IDs that are "ON"
+            default: [],
+        },
         avatar: {
             type: String,
         },

@@ -107,7 +107,7 @@ router.get("/callback", async (req, res) => {
             await User.findByIdAndUpdate(userId, {
                 facebookId: fbUser.id,
                 facebookAccessToken: access_token,
-                // facebookName: fbUser.name, // Optional
+                facebookName: fbUser.name, // ✅ Save Name
             });
         } else {
             console.error("❌ User not logged in during Facebook Connect callback.");
