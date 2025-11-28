@@ -128,14 +128,50 @@ exports.cleanupOldPosts = async () => {
   try {
     const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
-    // 1. Delete completed/failed/cancelled posts older than 48 hours
-    const result = await ScheduledPost.deleteMany({
+    // 1. Find posts to delete first (to get file paths)
+    const postsToDelete = await ScheduledPost.find({
       status: { $in: ["completed", "failed", "cancelled", "expired"] },
       updatedAt: { $lt: twoDaysAgo },
     });
 
-    if (result.deletedCount > 0) {
-      console.log(`🧹 Cleaned ${result.deletedCount} old posts`);
+    if (postsToDelete.length > 0) {
+      const fs = require('fs');
+      const path = require('path');
+
+      for (const post of postsToDelete) {
+        // Delete Video File
+        if (post.video_url && post.video_url.startsWith("/uploads")) {
+          const videoPath = path.join(__dirname, "..", post.video_url);
+          if (fs.existsSync(videoPath)) {
+            try {
+              fs.unlinkSync(videoPath);
+              console.log(`🗑️ Deleted video file: ${post.video_url}`);
+            } catch (e) {
+              console.error(`❌ Failed to delete video: ${post.video_url}`, e.message);
+            }
+          }
+        }
+
+        // Delete Thumbnail File
+        if (post.thumbnail_url && post.thumbnail_url.startsWith("/uploads")) {
+          const thumbPath = path.join(__dirname, "..", post.thumbnail_url);
+          if (fs.existsSync(thumbPath)) {
+            try {
+              fs.unlinkSync(thumbPath);
+              console.log(`🗑️ Deleted thumbnail file: ${post.thumbnail_url}`);
+            } catch (e) {
+              console.error(`❌ Failed to delete thumbnail: ${post.thumbnail_url}`, e.message);
+            }
+          }
+        }
+      }
+
+      // Now delete from DB
+      const result = await ScheduledPost.deleteMany({
+        _id: { $in: postsToDelete.map(p => p._id) }
+      });
+
+      console.log(`🧹 Cleaned ${result.deletedCount} old posts & files`);
     }
 
     // 2. Mark "scheduled" posts as "expired" if they are past due by 48 hours
