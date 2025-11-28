@@ -24,25 +24,6 @@ const CALLBACK_URL = `${BASE_URL.replace(/\/$/, "")}/api/auth/facebook/callback`
  * Redirects user to Facebook Login dialog
  */
 router.get("/", (req, res) => {
-    if (!FB_APP_ID || !FB_APP_SECRET) {
-        return res.status(500).json({ error: "Facebook App ID/Secret not configured." });
-    }
-
-    // Define permissions needed for Page management
-    const scopes = [
-        "public_profile",
-        "email",
-        "pages_show_list",
-        "pages_read_engagement",
-        "pages_manage_posts",
-        "pages_manage_metadata",
-    ];
-
-    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(
-        CALLBACK_URL
-    )}&scope=${scopes.join(",")}&state=connect_account`;
-
-    console.log(`🔄 Redirecting to Facebook: ${authUrl}`);
     res.redirect(authUrl);
 });
 
