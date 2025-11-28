@@ -304,44 +304,117 @@ export default function PostComposer() {
                             )}
                         </AnimatePresence>
                     </div>
-                    {status && (
-                        <div className={`p-4 rounded-xl text-sm flex items-start gap-2 ${status.type === 'success'
-                            ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                            : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
-                            }`}>
-                            {status.type === 'success' ? <CheckCircle2 size={16} className="mt-0.5" /> : <AlertCircle size={16} className="mt-0.5" />}
-                            {status.message}
-                        </div>
-                    )}
+                    {/* 📢 Right Column: Publishing Options */}
+                    <div className="space-y-6">
+                        {/* Page Selection */}
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <CheckCircle2 size={18} className="text-green-500" />
+                                    Select Pages
+                                </h3>
+                                {availablePages.length > 0 && (
+                                    <button
+                                        onClick={() => {
+                                            if (selectedPages.length === availablePages.length) {
+                                                setSelectedPages([]);
+                                            } else {
+                                                setSelectedPages(availablePages.map(p => p.id));
+                                            }
+                                        }}
+                                        className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                                    >
+                                        {selectedPages.length === availablePages.length ? "Deselect All" : "Select All"}
+                                    </button>
+                                )}
+                            </div>
 
-                    <button
-                        onClick={handleSubmit}
-                        disabled={isSubmitting || (!file && !caption) || selectedPages.length === 0}
-                        className={`w-full py-4 rounded-xl font-bold text-white shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition-all ${isSubmitting
-                            ? "bg-gray-400 cursor-not-allowed"
-                            : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transform hover:scale-[1.02]"
-                            }`}
-                    >
-                        {isSubmitting ? (
-                            <>
-                                <Loader2 size={20} className="animate-spin" />
-                                Processing...
-                            </>
-                        ) : isScheduling ? (
-                            <>
-                                <Calendar size={20} />
-                                Schedule Post
-                            </>
-                        ) : (
-                            <>
-                                <Send size={20} />
-                                Post Now
-                            </>
-                        )}
-                    </button>
+                            {availablePages.length === 0 ? (
+                                <div className="text-center py-8 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                                    <p className="text-gray-500 text-sm">No active pages found.</p>
+                                    <Link to="/settings" className="text-blue-600 text-xs font-medium hover:underline mt-1 inline-block">
+                                        Enable pages in Settings
+                                    </Link>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                                    {availablePages.map(page => {
+                                        const isSelected = selectedPages.includes(page.id);
+                                        return (
+                                            <div
+                                                key={page.id}
+                                                onClick={() => handleTogglePage(page.id)}
+                                                className={`relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${isSelected
+                                                    ? "bg-blue-50 border-blue-500 dark:bg-blue-900/20 dark:border-blue-500"
+                                                    : "bg-gray-50 border-transparent hover:border-gray-200 dark:bg-gray-900/50 dark:hover:border-gray-700"
+                                                    }`}
+                                            >
+                                                <div className="relative">
+                                                    <img
+                                                        src={page.picture || "https://via.placeholder.com/40"}
+                                                        alt={page.name}
+                                                        className={`w-10 h-10 rounded-full object-cover border-2 ${isSelected ? "border-blue-500" : "border-white dark:border-gray-700"}`}
+                                                    />
+                                                    {isSelected && (
+                                                        <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 border-2 border-white dark:border-gray-900">
+                                                            <CheckCircle2 size={10} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-sm font-semibold truncate ${isSelected ? "text-blue-700 dark:text-blue-300" : "text-gray-900 dark:text-white"}`}>
+                                                        {page.name}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-500 truncate">Facebook Page</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="space-y-3">
+                            {status && (
+                                <div className={`p-4 rounded-xl text-sm flex items-start gap-2 ${status.type === 'success'
+                                    ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                                    : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                                    }`}>
+                                    {status.type === 'success' ? <CheckCircle2 size={16} className="mt-0.5" /> : <AlertCircle size={16} className="mt-0.5" />}
+                                    {status.message}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleSubmit}
+                                disabled={isSubmitting || (!file && !caption) || selectedPages.length === 0}
+                                className={`w-full py-4 rounded-xl font-bold text-white shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition-all ${isSubmitting
+                                    ? "bg-gray-400 cursor-not-allowed"
+                                    : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transform hover:scale-[1.02]"
+                                    }`}
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 size={20} className="animate-spin" />
+                                        Processing...
+                                    </>
+                                ) : isScheduling ? (
+                                    <>
+                                        <Calendar size={20} />
+                                        Schedule Post
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send size={20} />
+                                        Post Now
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-        </DashboardLayout >
+        </DashboardLayout>
     );
 }
