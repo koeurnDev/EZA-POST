@@ -146,6 +146,7 @@ app.get('/api/debug/session', (req, res) => {
 });
 
 // ✅ Use centralized Auth Router
+// ✅ Use centralized Auth Router
 app.use("/api/auth", require("./api/auth"));
 
 // ------------------------------------------------------------
@@ -158,13 +159,14 @@ const routeModules = [
   ["upload/video", "./api/upload/videoUpload"],
   ["upload/thumbnail", "./api/upload/uploadThumbnail"],
   ["upload/cover", "./api/upload/cover"],
-  ["upload/avatar", "./api/upload/avatar"], // ✅ Added
+  ["upload/avatar", "./api/upload/avatar"],
   ["error-log", "./api/upload/error-log"],
   ["bot", "./routes/bot"],
   ["tiktok", "./api/tiktok"],
   ["user/pages", "./api/user/pages"],
   ["user/update", "./api/user/update"],
-  ["user/stats", "./api/user/stats"], // ✅ Added
+  ["user/stats", "./api/user/stats"],
+  ["webhooks/facebook", "./api/webhooks/facebook"], // ✅ Added Webhook
 ];
 
 for (const [route, file] of routeModules) {

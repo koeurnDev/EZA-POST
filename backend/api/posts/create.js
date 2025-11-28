@@ -54,7 +54,7 @@ const upload = multer({
 // ============================================================
 router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
   try {
-    const { caption, accounts } = req.body;
+    const { caption, accounts, scheduleTime } = req.body;
     const userId = req.user?.id;
 
     // Multer fields
@@ -91,8 +91,9 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       caption,
       video_url: videoUrl,
       accounts: accountsArray,
-      schedule_time: new Date(), // Now
+      schedule_time: scheduleTime ? new Date(scheduleTime) : new Date(),
       status: "processing",
+      is_scheduled: !!scheduleTime, // ✅ Track if scheduled
     });
 
     console.log(`✅ New post created by ${userId}: ${caption}`);
@@ -123,7 +124,11 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       accountsArray.map(id => ({ id, type: 'page' })),
       videoBuffer,
       caption,
-      thumbnailObj // ✅ Pass thumbnail
+      thumbnailObj, // ✅ Pass thumbnail
+      {
+        isScheduled: !!scheduleTime,
+        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null // Unix timestamp
+      }
     );
 
     // Update Status

@@ -23,7 +23,10 @@ class FacebookAPI {
   /* ------------------------------------------------------------ */
   /* ✅ Upload video to Facebook Page                              */
   /* ------------------------------------------------------------ */
-  async uploadVideoToFacebook(accessToken, pageId, videoBuffer, caption, thumbnailBuffer = null) {
+  /* ------------------------------------------------------------ */
+  /* ✅ Upload video to Facebook Page                              */
+  /* ------------------------------------------------------------ */
+  async uploadVideoToFacebook(accessToken, pageId, videoBuffer, caption, thumbnailBuffer = null, options = {}) {
     if (!videoBuffer || videoBuffer.length < 1024)
       throw new Error("Invalid or empty video buffer");
 
@@ -43,6 +46,13 @@ class FacebookAPI {
           filename: "thumb.jpg",
           contentType: "image/jpeg",
         });
+      }
+
+      // 🕒 Scheduling Logic
+      if (options.isScheduled && options.scheduleTime) {
+        console.log(`📅 Scheduling for: ${new Date(options.scheduleTime * 1000).toISOString()}`);
+        form.append("published", "false");
+        form.append("scheduled_publish_time", options.scheduleTime);
       }
 
       const res = await this.http.post(`${this.graph}/${pageId}/videos`, form, {
@@ -65,7 +75,10 @@ class FacebookAPI {
   /* ------------------------------------------------------------ */
   /* ✅ Post video/link to multiple pages or groups                */
   /* ------------------------------------------------------------ */
-  async postToFB(accessToken, accounts, videoBuffer, caption, thumbnail = null) {
+  /* ------------------------------------------------------------ */
+  /* ✅ Post video/link to multiple pages or groups                */
+  /* ------------------------------------------------------------ */
+  async postToFB(accessToken, accounts, videoBuffer, caption, thumbnail = null, options = {}) {
     const results = { successCount: 0, failedCount: 0, details: [] };
 
     if (!Array.isArray(accounts) || accounts.length === 0) {
@@ -84,10 +97,17 @@ class FacebookAPI {
             account.id,
             videoBuffer,
             caption,
-            thumbnail?.buffer
+            thumbnail?.buffer,
+            options // ✅ Pass options
           );
         } else {
-          postResult = await this.shareAsLink(accessToken, account.id, caption);
+          // Groups don't support scheduling via API easily in this flow
+          if (options.isScheduled) {
+            console.warn(`⚠️ Scheduling not supported for Groups (${account.name}). Skipping.`);
+            postResult = { success: false, error: "Scheduling not supported for groups" };
+          } else {
+            postResult = await this.shareAsLink(accessToken, account.id, caption);
+          }
         }
 
         if (postResult.success) results.successCount++;
