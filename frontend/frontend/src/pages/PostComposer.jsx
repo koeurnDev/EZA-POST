@@ -9,6 +9,8 @@ import { Link } from "react-router-dom";
 import apiUtils from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
+import toast from "react-hot-toast";
+import Button from "../components/ui/Button";
 
 
 export default function PostComposer() {
@@ -44,10 +46,16 @@ export default function PostComposer() {
     }, []);
 
     // ✅ Validate Video Duration (Max 60s)
-    import toast from "react-hot-toast";
-    import Button from "../components/ui/Button";
+    const handleFileChange = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile) validateAndSetVideo(selectedFile);
+    };
 
-    // ... (inside component)
+    const handleDrop = (e) => {
+        e.preventDefault();
+        const selectedFile = e.dataTransfer.files[0];
+        if (selectedFile) validateAndSetVideo(selectedFile);
+    };
 
     const validateAndSetVideo = (selectedFile) => {
         if (!selectedFile.type.startsWith("video/")) {
