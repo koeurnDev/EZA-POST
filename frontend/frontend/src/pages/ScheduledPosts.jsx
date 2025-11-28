@@ -13,6 +13,11 @@ import { useAuth } from "../hooks/useAuth";
 import { postsAPI } from "../utils/api";
 import { Clock, Trash2, AlertCircle, CheckCircle2, Plus, Calendar } from "lucide-react";
 
+import toast from "react-hot-toast";
+import EmptyState from "../components/ui/EmptyState";
+
+// ... (inside component)
+
 export default function ScheduledPosts() {
     const { user } = useAuth();
     useTheme();
@@ -20,7 +25,6 @@ export default function ScheduledPosts() {
     // State
     const [queue, setQueue] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [notification, setNotification] = useState(null);
     const [isDemo, setIsDemo] = useState(false);
 
     // ✅ Initialize Demo Mode
@@ -29,12 +33,6 @@ export default function ScheduledPosts() {
             setIsDemo(true);
         }
     }, [user]);
-
-    // ✅ Notification Handler
-    const showNotification = useCallback((message, type = "success") => {
-        setNotification({ message, type });
-        setTimeout(() => setNotification(null), 3500);
-    }, []);
 
     // ✅ Fetch Queue
     const fetchQueue = useCallback(async () => {
@@ -63,10 +61,10 @@ export default function ScheduledPosts() {
                 setLoading(false);
             }
         } catch {
-            showNotification("Failed to fetch queue", "error");
+            toast.error("Failed to fetch queue");
             setLoading(false);
         }
-    }, [isDemo, showNotification]);
+    }, [isDemo]);
 
     useEffect(() => {
         if (user || isDemo) {
@@ -83,17 +81,19 @@ export default function ScheduledPosts() {
     // ✅ Cancel Post
     const cancelScheduledPost = async (postId) => {
         if (!window.confirm("Cancel this scheduled post?")) return;
+
+        const toastId = toast.loading("Cancelling post...");
         try {
             if (isDemo) {
                 setQueue((prev) => prev.filter((q) => q.id !== postId));
-                showNotification("Demo post cancelled");
+                toast.success("Demo post cancelled", { id: toastId });
                 return;
             }
             await postsAPI.cancel(postId);
-            showNotification("Post cancelled successfully");
+            toast.success("Post cancelled successfully", { id: toastId });
             fetchQueue();
         } catch {
-            showNotification("❌ Error cancelling post", "error");
+            toast.error("Error cancelling post", { id: toastId });
         }
     };
 
@@ -125,24 +125,6 @@ export default function ScheduledPosts() {
 
     return (
         <DashboardLayout>
-            {/* Notification Toast */}
-            <AnimatePresence>
-                {notification && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20, x: 20 }}
-                        animate={{ opacity: 1, y: 0, x: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className={`fixed top-24 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 ${notification.type === "error"
-                            ? "bg-red-500 text-white"
-                            : "bg-emerald-500 text-white"
-                            }`}
-                    >
-                        {notification.type === "error" ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
-                        <span className="font-medium">{notification.message}</span>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
             {/* Page Header */}
             <div className="mb-8 flex justify-between items-center">
                 <div>
@@ -164,24 +146,13 @@ export default function ScheduledPosts() {
 
             {/* Queue Grid */}
             {queue.length === 0 ? (
-                <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
-                    <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Calendar className="text-blue-500" size={40} />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                        No posts scheduled
-                    </h3>
-                    <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-8">
-                        Your queue is empty. Start creating content to keep your audience engaged!
-                    </p>
-                    <Link
-                        to="/dashboard"
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all hover:scale-105 shadow-lg shadow-blue-500/20"
-                    >
-                        <Plus size={20} />
-                        Create First Post
-                    </Link>
-                </div>
+                <EmptyState
+                    icon={Calendar}
+                    title="No posts scheduled"
+                    description="Your queue is empty. Start creating content to keep your audience engaged!"
+                    actionLabel="Create First Post"
+                    onAction={() => window.location.href = "/dashboard"}
+                />
             ) : (
                 <div className="space-y-10">
                     {["today", "tomorrow", "later"].map((groupKey) => {
