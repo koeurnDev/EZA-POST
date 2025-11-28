@@ -95,19 +95,9 @@ async function requireAuth(req, res, next) {
       return next();
     }
 
-    if (!token) return res.status(401).json({ error: "Unauthorized" });
-
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await getUserById(decoded.id);
-
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    req.user = user;
-    next();
-  } catch (err) {
     if (!token) {
-      console.warn("⚠️ requireAuth: No token or session found. Headers:", req.headers);
-      return res.status(401).json({ error: "Unauthorized - No token or session" });
+      console.warn("⚠️ requireAuth: No token or session found.");
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
