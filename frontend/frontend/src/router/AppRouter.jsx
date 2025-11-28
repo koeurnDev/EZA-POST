@@ -12,6 +12,7 @@ import Overview from "../pages/Overview";
 import ScheduledPosts from "../pages/ScheduledPosts";
 import BotSettingsPage from "../pages/BotSettingsPage";
 import Settings from "../pages/Settings";
+import PostComposer from "../pages/PostComposer";
 
 import Profile from "../pages/Profile";
 import Welcome from "../pages/Welcome"; // 🚀 New Welcome Page
@@ -41,6 +42,14 @@ export default function AppRouter() {
           element={
             <ProtectedRoute>
               <Overview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/compose"
+          element={
+            <ProtectedRoute>
+              <PostComposer />
             </ProtectedRoute>
           }
         />

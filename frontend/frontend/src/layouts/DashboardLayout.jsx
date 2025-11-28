@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   LayoutDashboard,
   Video,
+  Calendar,
   MessageSquare,
   Settings,
   LogOut,
@@ -38,7 +39,8 @@ const DashboardLayout = ({ children }) => {
   // 🧭 Navigation Items
   const navItems = [
     { label: "Overview", icon: <LayoutDashboard size={20} />, path: "/dashboard" },
-    { label: "Scheduled Posts", icon: <Video size={20} />, path: "/posts" },
+    { label: "Create Post", icon: <Video size={20} />, path: "/compose" },
+    { label: "Scheduled Posts", icon: <Calendar size={20} />, path: "/posts" },
     { label: "Auto-Reply Bot", icon: <MessageSquare size={20} />, path: "/bot" },
     { label: "Settings", icon: <Settings size={20} />, path: "/settings" },
   ];

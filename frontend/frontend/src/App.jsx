@@ -8,6 +8,7 @@
 
 import React from "react";
 import AppRouter from "./router/AppRouter";
+import PostComposer from "./pages/PostComposer";
 
 // ✅ Global Context Providers
 import { AuthProvider } from "./context/AuthContext";
