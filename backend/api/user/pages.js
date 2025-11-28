@@ -15,39 +15,48 @@ router.get("/", requireAuth, async (req, res) => {
         }
 
         // Fetch pages from Facebook
-        const response = await axios.get(
-            `https://graph.facebook.com/v21.0/me/accounts`,
-            {
-                params: {
-                    access_token: user.facebookAccessToken,
-                    fields: "id,name,access_token,picture{url}",
-                },
-            }
-        );
+        console.log(`🔍 Fetching pages for user ${user.name} (FB ID: ${user.facebookId})...`);
 
-        const pages = response.data.data.map((page) => {
-            const settings = user.pageSettings?.find(s => s.pageId === page.id) || {};
-            return {
-                id: page.id,
-                name: page.name,
-                access_token: page.access_token,
-                picture: page.picture?.data?.url,
-                isSelected: user.selectedPages?.includes(page.id) || false,
-                settings: {
-                    enableBot: settings.enableBot || false,
-                    enableSchedule: settings.enableSchedule !== false, // Default true
-                    enableInbox: settings.enableInbox || false
+        try {
+            const response = await axios.get(
+                `https://graph.facebook.com/v21.0/me/accounts`,
+                {
+                    params: {
+                        access_token: user.facebookAccessToken,
+                        fields: "id,name,access_token,picture{url}",
+                    },
                 }
-            };
-        });
+            );
 
-        res.json({ success: true, accounts: pages });
+            console.log(`✅ Facebook API Response: Found ${response.data.data.length} pages.`);
+
+            const pages = response.data.data.map((page) => {
+                const settings = user.pageSettings?.find(s => s.pageId === page.id) || {};
+                return {
+                    id: page.id,
+                    name: page.name,
+                    access_token: page.access_token,
+                    picture: page.picture?.data?.url,
+                    isSelected: user.selectedPages?.includes(page.id) || false,
+                    settings: {
+                        enableBot: settings.enableBot || false,
+                        enableSchedule: settings.enableSchedule !== false, // Default true
+                        enableInbox: settings.enableInbox || false
+                    }
+                };
+            });
+
+            res.json({ success: true, accounts: pages });
+        } catch (fbError) {
+            console.error("❌ Facebook Graph API Error:", fbError.response?.data || fbError.message);
+            if (fbError.response?.status === 401 || fbError.response?.status === 400) {
+                // Token might be expired or invalid
+                return res.json({ success: true, accounts: [], error: "Facebook session expired. Please reconnect." });
+            }
+            throw fbError;
+        }
     } catch (err) {
         console.error("❌ Fetch pages error:", err.message);
-        // If token is invalid, return empty list instead of 500
-        if (err.response?.status === 401 || err.response?.status === 400) {
-            return res.json({ success: true, accounts: [] });
-        }
         res.status(500).json({ success: false, error: "Failed to fetch pages" });
     }
 });
