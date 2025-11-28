@@ -20,7 +20,7 @@ router.use("/register", register);
 router.use("/status", status);
 router.use("/demo", demo);
 router.use("/logout", logout);
-router.use("/facebook", require("./facebook"));
+
 router.use("/forgot-password", require("./forgot-password"));
 router.use("/reset-password", require("./reset-password"));
 
