@@ -83,15 +83,25 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
 
     // 📥 Handle Video Source (File vs TikTok)
     let videoUrlForDB;
+    let thumbnailUrlForDB; // ✅ Declared
     let videoSizeMB = 0;
     let videoPublicId;
 
     if (videoFile) {
       // 📂 Local File Upload -> Cloudinary
       console.log(`📤 Uploading local video to Cloudinary: ${videoFile.filename}`);
-      console.log(`📤 Uploading thumbnail to Cloudinary...`);
-      const result = await uploadFile(thumbFile.path, "kr_post/thumbnails", "image");
-      thumbnailUrlForDB = result.url;
+      const videoResult = await uploadFile(videoFile.path, "kr_post/videos", "video"); // ✅ Upload Video
+      videoUrlForDB = videoResult.url;
+      videoPublicId = videoResult.public_id;
+      videoSizeMB = videoFile.size / (1024 * 1024);
+
+      if (thumbFile) {
+        console.log(`📤 Uploading thumbnail to Cloudinary...`);
+        const result = await uploadFile(thumbFile.path, "kr_post/thumbnails", "image");
+        thumbnailUrlForDB = result.url;
+      }
+    } else if (tiktokUrl) {
+      videoUrlForDB = tiktokUrl; // ✅ Use TikTok URL
     }
 
     // 💾 Save post record (MongoDB)
