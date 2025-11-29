@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const User = require("../../models/User");
+const FacebookPage = require("../../models/FacebookPage");
 const { requireAuth } = require("../../utils/auth");
 
 // ✅ GET /api/user/pages
@@ -15,21 +16,44 @@ router.get("/", requireAuth, async (req, res) => {
         }
 
         // ✅ Return Saved Pages from DB (Fast & Reliable)
-        const pages = user.connectedPages?.map(page => {
-            const settings = user.pageSettings?.find(s => s.pageId === page.id) || {};
-            return {
-                id: page.id,
-                name: page.name,
-                access_token: page.access_token,
-                picture: page.picture,
-                isSelected: user.selectedPages?.includes(page.id) || false,
-                settings: {
-                    enableBot: settings.enableBot || false,
-                    enableSchedule: settings.enableSchedule !== false, // Default true
-                    enableInbox: settings.enableInbox || false
-                }
-            };
-        }) || [];
+        // 1. Try fetching from new FacebookPage model
+        let dbPages = await FacebookPage.find({ userId: userId });
+        let pages = [];
+
+        if (dbPages.length > 0) {
+            pages = dbPages.map(page => {
+                const settings = user.pageSettings?.find(s => s.pageId === page.pageId) || {};
+                return {
+                    id: page.pageId,
+                    name: page.pageName,
+                    access_token: page.pageAccessToken, // Encrypted
+                    picture: page.pictureUrl,
+                    isSelected: user.selectedPages?.includes(page.pageId) || false,
+                    settings: {
+                        enableBot: settings.enableBot || false,
+                        enableSchedule: settings.enableSchedule !== false, // Default true
+                        enableInbox: settings.enableInbox || false
+                    }
+                };
+            });
+        } else if (user.connectedPages?.length > 0) {
+            // 2. Fallback to Legacy User.connectedPages
+            pages = user.connectedPages.map(page => {
+                const settings = user.pageSettings?.find(s => s.pageId === page.id) || {};
+                return {
+                    id: page.id,
+                    name: page.name,
+                    access_token: page.access_token,
+                    picture: page.picture,
+                    isSelected: user.selectedPages?.includes(page.id) || false,
+                    settings: {
+                        enableBot: settings.enableBot || false,
+                        enableSchedule: settings.enableSchedule !== false, // Default true
+                        enableInbox: settings.enableInbox || false
+                    }
+                };
+            });
+        }
 
         res.json({ success: true, accounts: pages });
     } catch (err) {

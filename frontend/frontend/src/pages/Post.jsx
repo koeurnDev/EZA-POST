@@ -177,7 +177,7 @@ export default function Post() {
             const headers = {};
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
-            const response = await fetch(`${API_BASE}/api/posts/create`, {
+            const response = await fetch(`${API_BASE}/api/posts`, {
                 method: "POST",
                 headers,
                 credentials: "include", // ✅ Send cookies
@@ -313,13 +313,19 @@ export default function Post() {
                                         </Button>
                                     </div>
 
-                                    {/* TikTok Preview */}
+                                    {/* TikTok Preview (Optimized) */}
                                     {previewUrl && !file && (
-                                        <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden shadow-inner group animate-in fade-in zoom-in duration-300">
-                                            <video src={previewUrl} controls className="w-full h-full object-contain" />
+                                        <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden shadow-inner group animate-in fade-in zoom-in duration-150">
+                                            <video
+                                                src={previewUrl}
+                                                controls
+                                                className="w-full h-full object-contain"
+                                                preload="metadata"
+                                                poster={previewUrl.includes('cloudinary.com') ? previewUrl.replace('/upload/', '/upload/so_0,w_400,h_400,c_fill,q_auto,f_auto/').replace(/\.[^/.]+$/, ".jpg") : undefined}
+                                            />
                                             <button
                                                 onClick={() => { setPreviewUrl(null); setTiktokUrl(""); }}
-                                                className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-full hover:bg-red-500 hover:scale-110 transition-all backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100"
+                                                className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-full hover:bg-red-500 hover:scale-105 transition-all duration-150 backdrop-blur-md border border-white/10 opacity-100 md:opacity-0 group-hover:opacity-100"
                                             >
                                                 <X size={18} />
                                             </button>
@@ -380,18 +386,23 @@ export default function Post() {
                             {/* Right Column: Thumbnail */}
                             <div className="md:col-span-1">
                                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Cover Image</label>
-                                <label className="block w-full aspect-[3/4] md:aspect-square relative group cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
+                                <label className="block w-full aspect-[3/4] md:aspect-square relative group cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-150">
                                     {thumbnailPreview ? (
                                         <>
-                                            <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
-                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center text-white">
+                                            <img
+                                                src={thumbnailPreview}
+                                                alt="Thumbnail"
+                                                loading="lazy"
+                                                className="w-full h-full object-cover"
+                                            />
+                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-150 flex flex-col items-center justify-center text-white">
                                                 <ImageIcon size={24} className="mb-2" />
                                                 <span className="text-sm font-bold">Change Cover</span>
                                             </div>
                                         </>
                                     ) : (
-                                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors">
-                                            <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors duration-150">
+                                            <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full mb-3 group-hover:scale-105 transition-transform duration-150">
                                                 <ImageIcon size={24} />
                                             </div>
                                             <span className="text-sm font-bold">Upload</span>
@@ -488,11 +499,11 @@ export default function Post() {
                     </div >
 
                     {/* Footer Actions */}
-                    < div className="p-6 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-4" >
+                    <div className="p-6 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-end gap-4">
                         <Button
                             variant="secondary"
                             onClick={() => window.location.reload()}
-                            className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+                            className="w-full sm:w-auto text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors duration-200"
                         >
                             Cancel
                         </Button>
@@ -500,11 +511,11 @@ export default function Post() {
                             onClick={handleSubmit}
                             disabled={(!file && !previewUrl) || selectedPages.length === 0}
                             isLoading={isSubmitting}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-3 rounded-xl shadow-lg shadow-blue-600/20 font-bold text-base transform hover:-translate-y-0.5 transition-all"
+                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-10 py-3 rounded-xl shadow-lg shadow-blue-600/20 font-bold text-base transform hover:-translate-y-0.5 transition-all duration-200"
                         >
                             {isSubmitting ? 'Processing...' : (scheduleTime ? 'Schedule Post' : 'Post Now')}
                         </Button>
-                    </div >
+                    </div>
                 </div >
             </div >
         </DashboardLayout >

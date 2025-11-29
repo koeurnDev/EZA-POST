@@ -15,6 +15,13 @@ EZA-POST is a comprehensive social media management tool designed to automate po
 - **Database**: MongoDB stores user data, page tokens, and scheduled posts.
 - **Security**: Temp files are auto-deleted after processing.
 
+### ☁️ Cloudinary Integration Advantages
+- **Scalability**: No server disk limitations; media is hosted in the cloud.
+- **Transformations**: On-the-fly video/image processing (1:1 padding) without heavy backend FFmpeg.
+- **Performance**: Fast preview delivery via global CDN.
+- **Lifecycle Management**: Easy to manage deletes, updates, and auto-comments via `public_id`.
+- **Concurrency**: Supports multiple concurrent post uploads without server strain.
+
 ### 3️⃣ Posting Workflow
 - **Immediate Posting**: Instant publishing to selected Facebook Pages.
 - **Scheduling**: Background scheduler runs every minute to process due posts.

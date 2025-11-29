@@ -2,11 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { Upload, X, Image as ImageIcon, Video, Calendar, Send, CheckCircle, Loader2, ArrowRight, Plus } from "lucide-react";
+import { Upload, X, Image as ImageIcon, Video, Calendar, Send, CheckCircle, Loader2, ArrowRight, Plus, Trash2 } from "lucide-react";
 
 const CarouselPost = () => {
     const [videoFile, setVideoFile] = useState(null);
-    const [imageFile, setImageFile] = useState(null);
+    const [imageFiles, setImageFiles] = useState([]); // Array of images
     const [caption, setCaption] = useState("");
     const [scheduleTime, setScheduleTime] = useState("");
     const [accounts, setAccounts] = useState([]);
@@ -18,7 +18,10 @@ const CarouselPost = () => {
     const [tiktokUrl, setTiktokUrl] = useState("");
     const [loadingTiktok, setLoadingTiktok] = useState(false);
     const [videoUrl, setVideoUrl] = useState(null); // Cloudinary URL
-    const [imageUrl, setImageUrl] = useState(null); // Cloudinary URL
+
+    // CTA Preferences (UI Only for now)
+    const [ctaLike, setCtaLike] = useState(false);
+    const [ctaFollow, setCtaFollow] = useState(false);
 
     // Fetch Pages
     useEffect(() => {
@@ -87,33 +90,26 @@ const CarouselPost = () => {
         maxFiles: 1,
     });
 
-    // Image Dropzone
-    const onDropImage = (acceptedFiles) => {
-        const file = acceptedFiles[0];
-        if (!file) return;
-
-        const img = new Image();
-        img.onload = () => {
-            if (img.width !== img.height) {
-                toast("⚠️ Image will be auto-padded to 1:1", {
-                    icon: "ℹ️",
-                    style: { borderRadius: '10px', background: '#333', color: '#fff' },
-                });
-            }
-            setImageFile(Object.assign(file, { preview: URL.createObjectURL(file) }));
-        };
-        img.src = URL.createObjectURL(file);
+    // Image Dropzone (Multiple)
+    const onDropImages = (acceptedFiles) => {
+        const newImages = acceptedFiles.map(file => Object.assign(file, { preview: URL.createObjectURL(file) }));
+        setImageFiles(prev => [...prev, ...newImages]);
+        toast.success(`${newImages.length} image(s) added!`);
     };
 
     const { getRootProps: getImageRootProps, getInputProps: getImageInputProps, isDragActive: isImageDragActive } = useDropzone({
-        onDrop: onDropImage,
+        onDrop: onDropImages,
         accept: { "image/*": [] },
-        maxFiles: 1,
+        multiple: true, // ✅ Enable multiple files
     });
+
+    const removeImage = (index) => {
+        setImageFiles(prev => prev.filter((_, i) => i !== index));
+    };
 
     // Handle Submit
     const handleSubmit = async () => {
-        if ((!videoFile && !videoUrl) || !imageFile) return toast.error("Please upload both video and image!");
+        if ((!videoFile && !videoUrl) || imageFiles.length === 0) return toast.error("Please upload a video and at least one image!");
         if (selectedAccounts.length === 0) return toast.error("Please select at least one page!");
 
         setUploading(true);
@@ -123,10 +119,17 @@ const CarouselPost = () => {
         if (videoFile) formData.append("video", videoFile);
         if (videoUrl) formData.append("videoUrl", videoUrl);
 
-        // Handle Image
-        formData.append("image", imageFile);
+        // Handle Images (Multiple)
+        imageFiles.forEach(file => {
+            formData.append("images", file);
+        });
 
-        formData.append("caption", caption);
+        // Append CTA to caption
+        let finalCaption = caption;
+        if (ctaLike) finalCaption += "\n\n👉 Like our Page for more!";
+        if (ctaFollow) finalCaption += "\n\n👉 Follow us for updates!";
+
+        formData.append("caption", finalCaption);
         formData.append("accounts", JSON.stringify(selectedAccounts));
         if (scheduleTime) formData.append("scheduleTime", scheduleTime);
 
@@ -140,11 +143,13 @@ const CarouselPost = () => {
                 toast.success("Mixed Carousel Published! 🚀");
                 setVideoFile(null);
                 setVideoUrl(null);
-                setImageFile(null);
+                setImageFiles([]);
                 setCaption("");
                 setScheduleTime("");
                 setTiktokUrl("");
                 setSelectedAccounts([]);
+                setCtaLike(false);
+                setCtaFollow(false);
             } else {
                 toast.error("Failed to publish post");
             }
@@ -163,28 +168,77 @@ const CarouselPost = () => {
     };
 
     return (
-        <div className="max-w-6xl mx-auto pb-20">
+        <div className="max-w-7xl mx-auto pb-20 px-4">
             {/* Header */}
             <div className="mb-8 text-center">
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-pink-600 bg-clip-text text-transparent">
                     Mixed Media Carousel
                 </h1>
                 <p className="text-gray-500 dark:text-gray-400 mt-2">
-                    Combine Video & Image into a seamless carousel experience.
+                    Create engaging carousels with 1 Video + Multiple Images.
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start relative">
+            {/* 2.1 Top Section — Page Selection & Caption */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 p-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Page Selection */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Select Pages</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                            {accounts.map((page) => (
+                                <div
+                                    key={page.id}
+                                    onClick={() => toggleAccount(page.id)}
+                                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selectedAccounts.includes(page.id)
+                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                                        : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
+                                        }`}
+                                >
+                                    <img src={page.picture} alt={page.name} className="w-10 h-10 rounded-full" />
+                                    <span className="font-medium text-sm text-gray-700 dark:text-gray-200 truncate">{page.name}</span>
+                                    {selectedAccounts.includes(page.id) && <CheckCircle size={18} className="text-blue-500 ml-auto" />}
+                                </div>
+                            ))}
+                        </div>
 
-                {/* 🔵 Step 1: Video Card */}
-                <div className="relative group">
+                        {/* CTA Preferences */}
+                        <div className="mt-4 flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={ctaLike} onChange={(e) => setCtaLike(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500" />
+                                <span className="text-sm text-gray-600 dark:text-gray-400">Like Page</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={ctaFollow} onChange={(e) => setCtaFollow(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500" />
+                                <span className="text-sm text-gray-600 dark:text-gray-400">Follow Page</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Caption Box */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Caption</label>
+                        <textarea
+                            value={caption}
+                            onChange={(e) => setCaption(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none h-full min-h-[150px]"
+                            placeholder="Write something engaging... #hashtags 🚀"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* 2.2 Main Body — Split Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start relative mb-8">
+
+                {/* LEFT (Video Zone) */}
+                <div className="relative group h-full">
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400 to-blue-600 rounded-2xl opacity-75 group-hover:opacity-100 transition duration-200 blur"></div>
-                    <div className="relative bg-white dark:bg-gray-800 rounded-2xl p-6 h-full flex flex-col">
+                    <div className="relative bg-white dark:bg-gray-800 rounded-2xl p-6 h-full flex flex-col min-h-[400px]">
                         <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-lg">1</div>
-                                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Video Part</h2>
-                            </div>
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <Video className="text-blue-500" /> Video Zone
+                            </h2>
                             {/* Tabs */}
                             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                                 <button
@@ -203,7 +257,7 @@ const CarouselPost = () => {
                         </div>
 
                         {/* Content Area */}
-                        <div className="flex-1 min-h-[300px] flex flex-col">
+                        <div className="flex-1 flex flex-col">
                             {activeTab === "upload" ? (
                                 <div {...getVideoRootProps()} className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all
                                     ${isVideoDragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/10' : 'border-gray-300 dark:border-gray-700 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
@@ -271,127 +325,35 @@ const CarouselPost = () => {
                     </div>
                 </div>
 
-                {/* ➕ Visual Connector (Desktop) */}
-                <div className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                    <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-full shadow-xl border border-gray-100 dark:border-gray-700 flex items-center justify-center text-gray-400">
-                        <Plus size={24} />
-                    </div>
-                </div>
-
-                {/* 🌸 Step 2: Image Card */}
-                <div className="relative group">
+                {/* RIGHT (Image Gallery) */}
+                <div className="relative group h-full">
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-400 to-pink-600 rounded-2xl opacity-75 group-hover:opacity-100 transition duration-200 blur"></div>
-                    <div className="relative bg-white dark:bg-gray-800 rounded-2xl p-6 h-full flex flex-col">
+                    <div className="relative bg-white dark:bg-gray-800 rounded-2xl p-6 h-full flex flex-col min-h-[400px]">
                         <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-pink-600 dark:text-pink-400 font-bold text-lg">2</div>
-                                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Image Part</h2>
-                            </div>
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <ImageIcon className="text-pink-500" /> Image Gallery
+                            </h2>
                             <span className="px-3 py-1 bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 text-xs font-semibold rounded-full border border-pink-100 dark:border-pink-800">
-                                Right Side
+                                {imageFiles.length} Images
                             </span>
                         </div>
 
-                        <div {...getImageRootProps()} className={`flex-1 min-h-[300px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all
-                            ${isImageDragActive ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10' : 'border-gray-300 dark:border-gray-700 hover:border-pink-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
-                            ${imageFile ? 'border-none p-0' : 'p-8'}`}>
+                        {/* Image Dropzone */}
+                        <div {...getImageRootProps()} className={`min-h-[150px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all mb-4
+                            ${isImageDragActive ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10' : 'border-gray-300 dark:border-gray-700 hover:border-pink-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
                             <input {...getImageInputProps()} />
-                            {imageFile ? (
-                                <div className="relative w-full h-full rounded-xl overflow-hidden shadow-lg">
-                                    <img src={imageFile.preview} className="w-full h-full object-cover" alt="Preview" />
-                                    <button onClick={(e) => { e.stopPropagation(); setImageFile(null); }} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-md transition-colors">
-                                        <X size={16} />
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="text-center">
-                                    <div className="w-16 h-16 bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <ImageIcon size={32} />
-                                    </div>
-                                    <p className="text-gray-600 dark:text-gray-300 font-medium">Drag & drop image here</p>
-                                    <p className="text-xs text-gray-400 mt-2">JPG, PNG (Auto-padded to 1:1)</p>
-                                </div>
-                            )}
+                            <div className="text-center p-4">
+                                <Plus className="w-8 h-8 text-pink-400 mx-auto mb-2" />
+                                <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">Add Images</p>
+                                ) : (
+                                <>
+                                    <Send size={20} /> {scheduleTime ? "Schedule Post" : "Post Now"}
+                                </>
+                    )}
+                            </button>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            {/* 📝 Step 3: Details & Publish */}
-            <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 p-6">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 font-bold text-lg">3</div>
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-white">Finalize & Publish</h2>
-                </div>
-
-                <div className="space-y-6">
-                    {/* Caption */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Caption</label>
-                        <textarea
-                            value={caption}
-                            onChange={(e) => setCaption(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none h-32"
-                            placeholder="Write something engaging..."
-                        />
-                    </div>
-
-                    {/* Schedule */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Schedule (Optional)</label>
-                        <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                            <input
-                                type="datetime-local"
-                                value={scheduleTime}
-                                onChange={(e) => setScheduleTime(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Page Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Select Pages</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {accounts.map((page) => (
-                                <div
-                                    key={page.id}
-                                    onClick={() => toggleAccount(page.id)}
-                                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selectedAccounts.includes(page.id)
-                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                        : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
-                                        }`}
-                                >
-                                    <img src={page.picture} alt={page.name} className="w-10 h-10 rounded-full" />
-                                    <span className="font-medium text-sm text-gray-700 dark:text-gray-200 truncate">{page.name}</span>
-                                    {selectedAccounts.includes(page.id) && <CheckCircle size={18} className="text-blue-500 ml-auto" />}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Submit Button */}
-                    <button
-                        onClick={handleSubmit}
-                        disabled={uploading}
-                        className={`w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all transform hover:scale-[1.01] active:scale-[0.99]
-                            ${uploading ? "bg-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-blue-600 to-pink-600 hover:shadow-xl"}`}
-                    >
-                        {uploading ? (
-                            <span className="flex items-center justify-center gap-2">
-                                <Loader2 className="animate-spin" /> Processing...
-                            </span>
-                        ) : (
-                            <span className="flex items-center justify-center gap-2">
-                                <Send size={20} /> Publish Mixed Carousel
-                            </span>
-                        )}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
+                    );
 };
 
-export default CarouselPost;
+                    export default CarouselPost;

@@ -156,7 +156,7 @@ app.use("/api/auth", require("./api/auth"));
 // ✅ Modular Routes (Posts, Uploads, etc.)
 // ------------------------------------------------------------
 const routeModules = [
-  ["posts/create", "./routes/postRoutes"],
+  ["posts", "./routes/postRoutes"],
   ["posts/schedule", "./api/posts/schedule"],
   ["posts/queue", "./api/posts/queue"],
   ["upload/video", "./api/upload/videoUpload"],

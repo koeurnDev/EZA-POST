@@ -297,6 +297,24 @@ class FacebookAPI {
   }
 
   /* ------------------------------------------------------------ */
+  /* ✅ Post Comment                                               */
+  /* ------------------------------------------------------------ */
+  async postComment(accessToken, postId, message) {
+    try {
+      console.log(`💬 Posting comment to ${postId}...`);
+      const res = await this.http.post(`${this.graph}/${postId}/comments`, {
+        message: message,
+        access_token: accessToken,
+      });
+      console.log(`✅ Comment posted (ID: ${res.data.id})`);
+      return { success: true, commentId: res.data.id };
+    } catch (error) {
+      console.error(`❌ Comment failed for ${postId}:`, error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
   /* ✅ Get Pages                                                  */
   /* ------------------------------------------------------------ */
   async getFacebookPages(accessToken) {

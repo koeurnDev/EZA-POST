@@ -23,7 +23,7 @@ cloudinary.config({
  * @param {boolean} deleteAfterUpload - Whether to delete the local file after upload (default: true)
  * @returns {Promise<object>} - Cloudinary response
  */
-const uploadFile = async (filePath, folder = "kr_post", resourceType = "auto", deleteAfterUpload = true, transform = false) => {
+const uploadFile = async (filePath, folder = "eza-post", resourceType = "auto", deleteAfterUpload = true, transform = false) => {
     try {
         if (!filePath) throw new Error("File path is required");
 

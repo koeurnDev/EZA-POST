@@ -28,6 +28,11 @@ const userSchema = new mongoose.Schema(
             type: String,
             default: "User",
         },
+        plan: {
+            type: String,
+            enum: ["free", "pro"],
+            default: "free"
+        },
         last_login: {
             type: Date,
         },

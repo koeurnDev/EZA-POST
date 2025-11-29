@@ -62,7 +62,7 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
     console.log(`📤 Uploading video to Cloudinary: ${req.file.filename}`);
 
     // ☁️ Upload to Cloudinary
-    const result = await uploadFile(req.file.path, "kr_post/videos", "video");
+    const result = await uploadFile(req.file.path, "eza-post/videos", "video");
 
     const response = {
       success: true,
@@ -97,7 +97,7 @@ router.get("/", requireAuth, async (req, res) => {
     const result = await cloudinary.api.resources({
       type: "upload",
       resource_type: "video",
-      prefix: "kr_post/videos", // Only get our folder
+      prefix: "eza-post/videos", // Only get our folder
       max_results: 50,
     });
 

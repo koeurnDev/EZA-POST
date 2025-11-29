@@ -3,6 +3,7 @@ const router = express.Router();
 const axios = require("axios");
 const jwt = require("jsonwebtoken");
 const User = require("../../models/User");
+const FacebookPage = require("../../models/FacebookPage");
 
 // ============================================================
 // 📘 Facebook OAuth (Connect Account)
@@ -184,9 +185,31 @@ router.get("/callback", async (req, res) => {
             user.facebookAccessToken = access_token;
             user.facebookTokenExpiresAt = expiresAt;
             user.facebookName = fbUser.name;
-            user.connectedPages = myPages;
+            user.connectedPages = myPages; // ⚠️ Legacy Support (Keep for now)
 
             await user.save();
+
+            // ✅ Save to FacebookPage Model (New Architecture)
+            console.log("🔄 Syncing pages to FacebookPage collection...");
+            for (const p of myPages) {
+                try {
+                    let fbPage = await FacebookPage.findOne({ userId: userId, pageId: p.id });
+                    if (!fbPage) {
+                        fbPage = new FacebookPage({
+                            userId: userId,
+                            pageId: p.id
+                        });
+                    }
+                    fbPage.pageName = p.name;
+                    fbPage.pageAccessToken = p.access_token; // 🔒 Will be encrypted by pre-save hook
+                    fbPage.pictureUrl = p.picture;
+                    fbPage.updatedAt = new Date();
+
+                    await fbPage.save();
+                } catch (pageErr) {
+                    console.error(`❌ Failed to save page ${p.name}:`, pageErr.message);
+                }
+            }
             console.log("✅ Database update successful");
         } else {
             console.error(`❌ User ID ${userId} not found in DB`);
@@ -194,8 +217,6 @@ router.get("/callback", async (req, res) => {
         }
 
         const { setAuthCookie } = require("../../utils/auth"); // Import helper
-
-        // ... inside the callback route ...
 
         // 6️⃣ Refresh JWT
         currentStep = "RefreshJWT";
@@ -216,10 +237,10 @@ router.get("/callback", async (req, res) => {
         console.error(`🚨 Error occurred at Step: ${currentStep}`);
 
         if (currentStep === "FetchPages" && err.response?.status === 400) {
-            console.error("� Likely Cause: Missing `pages_show_list` permission (user declined in the dialog).");
+            console.error(" Likely Cause: Missing `pages_show_list` permission (user declined in the dialog).");
         } else if (currentStep === "UpdateDB" && err.name === 'ValidationError') {
             console.error("🛑 Likely Cause: Mongoose Validation Error. Check User model schema for 'connectedPages'.");
-            console.error("�👉 Validation Errors:", err.errors);
+            console.error("👉 Validation Errors:", err.errors);
         }
 
         if (err.response) {
@@ -272,6 +293,9 @@ router.delete("/", async (req, res) => {
                 selectedPages: ""
             }
         });
+
+        // ✅ Also remove FacebookPage entries
+        await FacebookPage.deleteMany({ userId: req.session.user.id });
 
         // Update session
         if (req.session.user) {

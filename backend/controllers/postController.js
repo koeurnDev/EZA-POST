@@ -3,10 +3,11 @@
  */
 
 const fs = require("fs");
-const ScheduledPost = require("../models/ScheduledPost");
+const PostLog = require("../models/PostLog");
+const FacebookPage = require("../models/FacebookPage");
+const User = require("../models/User");
 const { uploadFile } = require("../utils/cloudinary");
 const fb = require("../utils/fb");
-const User = require("../models/User");
 
 exports.createPost = async (req, res) => {
     // ✅ Increase timeout for this route to 10 minutes
@@ -22,7 +23,7 @@ exports.createPost = async (req, res) => {
         } else {
             // Single Post Validation
             const videoFile = req.files?.find(f => f.fieldname === 'video');
-            if (!videoFile && !directMediaUrl && !tiktokUrl && !caption)
+            if (!videoFile && !directMediaUrl && !tiktokUrl && !caption && !videoUrl)
                 return res
                     .status(400)
                     .json({ success: false, error: "No media, link, or caption provided" });
@@ -41,34 +42,14 @@ exports.createPost = async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
         }
 
-        // 💾 Save post record (MongoDB)
-        const postId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        let newPostData = {
-            id: postId,
-            user_id: userId,
-            title, // ✅ Save Title
-            caption,
-            accounts: accountsArray,
-            schedule_time: scheduleTime ? new Date(scheduleTime) : new Date(),
-            status: "processing",
-            is_scheduled: !!scheduleTime,
-            type: postType === 'carousel' ? 'carousel' : (directMediaUrl || req.files?.find(f => f.fieldname === 'video') ? "media" : "link")
-        };
-
-        // Get User Token
-        const user = await User.findOne({ id: userId });
-        if (!user || !user.facebookAccessToken) {
-            throw new Error("User not connected to Facebook");
-        }
-
-        let results;
+        let results = { successCount: 0, failedCount: 0, details: [] };
         let videoUrlForDB = null;
         let thumbnailUrlForDB = null;
         let videoSizeMB = 0;
-        let videoPublicId;
+        let videoPublicId = null;
 
         if (postType === 'carousel') {
-            // 🎠 Handle Carousel (Existing Logic)
+            // 🎠 Handle Carousel (Existing Logic - Adapted for PostLog)
             let parsedCards = [];
             try {
                 parsedCards = JSON.parse(carouselCards);
@@ -85,7 +66,7 @@ exports.createPost = async (req, res) => {
 
                 if (cardFile) {
                     console.log(`📤 Uploading carousel card media: ${cardFile.filename}`);
-                    const result = await uploadFile(cardFile.path, "kr_post/carousel", card.type === 'video' ? 'video' : 'image');
+                    const result = await uploadFile(cardFile.path, "eza-post/carousel", card.type === 'video' ? 'video' : 'image', true, true);
                     mediaUrl = result.url;
                 } else if (card.previewUrl) {
                     mediaUrl = card.previewUrl;
@@ -93,7 +74,7 @@ exports.createPost = async (req, res) => {
 
                 if (cardThumbnail) {
                     console.log(`📤 Uploading carousel card thumbnail: ${cardThumbnail.filename}`);
-                    const thumbResult = await uploadFile(cardThumbnail.path, "kr_post/thumbnails", "image");
+                    const thumbResult = await uploadFile(cardThumbnail.path, "eza-post/thumbnails", "image");
                     thumbnailUrl = thumbResult.url;
                 }
 
@@ -104,18 +85,61 @@ exports.createPost = async (req, res) => {
                 };
             }));
 
-            newPostData.carousel_cards = processedCards;
+            // Post to each account
+            for (const accountId of accountsArray) {
+                try {
+                    // Fetch Page
+                    const page = await FacebookPage.findOne({ pageId: accountId, userId: userId });
+                    let pageToken = page ? page.getDecryptedAccessToken() : null;
+                    if (!pageToken) {
+                        const user = await User.findOne({ id: userId });
+                        const connectedPage = user?.connectedPages?.find(p => p.id === accountId);
+                        if (connectedPage) pageToken = user.getDecryptedPageToken(accountId);
+                    }
+                    if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
 
-            results = await fb.postCarousel(
-                user.getDecryptedAccessToken(),
-                accountsArray.map(id => ({ id, type: 'page' })),
-                caption,
-                processedCards,
-                {
-                    isScheduled: !!scheduleTime,
-                    scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
+                    // Post Carousel
+                    const fbRes = await fb.postCarousel(
+                        pageToken,
+                        [{ id: accountId, type: 'page' }], // fb.postCarousel expects array but we loop here for PostLog
+                        caption,
+                        processedCards,
+                        {
+                            isScheduled: !!scheduleTime,
+                            scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
+                        }
+                    );
+
+                    if (fbRes.successCount > 0) {
+                        const fbPostId = fbRes.details[0].postId;
+                        await PostLog.create({
+                            userId,
+                            pageId: accountId,
+                            fbPostId: fbPostId,
+                            type: "carousel",
+                            status: scheduleTime ? "scheduled" : "published",
+                            scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
+                            cloudinaryImageIds: processedCards.map(c => c.url) // Storing URLs as IDs for now, or extract public_id if available
+                        });
+                        results.successCount++;
+                        results.details.push({ accountId, status: "success", postId: fbPostId });
+                    } else {
+                        throw new Error(fbRes.details[0].error || "Failed to post carousel");
+                    }
+
+                } catch (err) {
+                    console.error(`❌ Failed for ${accountId}:`, err.message);
+                    await PostLog.create({
+                        userId,
+                        pageId: accountId,
+                        type: "carousel",
+                        status: "failed",
+                        error: err.message
+                    });
+                    results.failedCount++;
+                    results.details.push({ accountId, status: "failed", error: err.message });
                 }
-            );
+            }
 
         } else {
             // 🎥 Handle Single Post
@@ -123,105 +147,167 @@ exports.createPost = async (req, res) => {
             const thumbFile = req.files?.find(f => f.fieldname === 'thumbnail');
 
             if (videoFile) {
-                // ✅ Direct Stream Upload to Facebook (Bypass Cloudinary for main video)
-                console.log(`📤 Streaming local video to Facebook: ${videoFile.filename}`);
-
-                // Create streams
-                const videoStream = fs.createReadStream(videoFile.path);
-                const thumbStream = thumbFile ? fs.createReadStream(thumbFile.path) : null;
+                // ✅ Upload to Cloudinary First (Transformation 1:1)
+                console.log(`☁️ Uploading video to Cloudinary: ${videoFile.filename}`);
 
                 videoSizeMB = videoFile.size / (1024 * 1024);
 
-                // 1. Upload to Cloudinary for DB Record (Async/Optional but good for history)
-                // ⚠️ Pass false to keep file for Facebook Stream
-                const videoResult = await uploadFile(videoFile.path, "kr_post/videos", "video", false);
+                // Upload with transform=true (1:1 padding)
+                const videoResult = await uploadFile(videoFile.path, "eza-post/videos", "video", true, true);
                 videoUrlForDB = videoResult.url;
                 videoPublicId = videoResult.public_id;
 
                 if (thumbFile) {
-                    const thumbResult = await uploadFile(thumbFile.path, "kr_post/thumbnails", "image", false);
+                    const thumbResult = await uploadFile(thumbFile.path, "eza-post/thumbnails", "image", true);
                     thumbnailUrlForDB = thumbResult.url;
                 }
 
-                // 2. Post to Facebook using Stream
-                const fbVideoStream = fs.createReadStream(videoFile.path);
-                const fbThumbStream = thumbFile ? fs.createReadStream(thumbFile.path) : null;
+                // 2. Post to Facebook using Cloudinary URL
+                for (const accountId of accountsArray) {
+                    try {
+                        const page = await FacebookPage.findOne({ pageId: accountId, userId: userId });
+                        let pageToken = page ? page.getDecryptedAccessToken() : null;
+                        let pageName = page ? page.pageName : 'Unknown Page';
 
-                // 🔍 Find Page Access Tokens
-                const targetAccounts = accountsArray.map(id => {
-                    const page = user.connectedPages.find(p => p.id === id);
-                    return {
-                        id,
-                        type: 'page',
-                        name: page?.name || 'Unknown Page',
-                        access_token: user.getDecryptedPageToken(id) // ✅ Decrypt Page Token
-                    };
-                });
+                        if (!pageToken) {
+                            const user = await User.findOne({ id: userId });
+                            const connectedPage = user?.connectedPages?.find(p => p.id === accountId);
+                            if (connectedPage) {
+                                pageToken = user.getDecryptedPageToken(accountId);
+                                pageName = connectedPage.name;
+                            }
+                        }
+                        if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
 
-                results = await fb.postToFB(
-                    user.getDecryptedAccessToken(),
-                    targetAccounts, // ✅ Pass Full Account Objects
-                    fbVideoStream,
-                    caption,
-                    fbThumbStream,
-                    {
-                        title,
-                        isScheduled: !!scheduleTime,
-                        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null,
-                        link: tiktokUrl
+                        const fbRes = await fb.postToFB(
+                            null, // User token not needed if we pass targetAccounts with tokens
+                            [{ id: accountId, type: 'page', access_token: pageToken, name: pageName }],
+                            videoUrlForDB, // ✅ Use Cloudinary URL
+                            caption,
+                            null, // Thumbnail handled by FB or Cloudinary URL if needed
+                            {
+                                title,
+                                isScheduled: !!scheduleTime,
+                                scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null,
+                                link: tiktokUrl
+                            }
+                        );
+
+                        if (fbRes.successCount > 0) {
+                            const fbPostId = fbRes.details[0].postId;
+
+                            // 💬 Auto Comment
+                            if (req.body.autoComment) {
+                                await fb.postComment(pageToken, fbPostId, req.body.autoComment);
+                            }
+
+                            await PostLog.create({
+                                userId,
+                                pageId: accountId,
+                                fbPostId: fbPostId,
+                                type: tiktokUrl ? "tiktok" : "video",
+                                status: scheduleTime ? "scheduled" : "published",
+                                scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
+                                cloudinaryVideoId: videoPublicId
+                            });
+                            results.successCount++;
+                            results.details.push({ accountId, status: "success", postId: fbPostId });
+                        } else {
+                            throw new Error(fbRes.details[0].error || "Failed to post video");
+                        }
+
+                    } catch (err) {
+                        console.error(`❌ Failed for ${accountId}:`, err.message);
+                        await PostLog.create({
+                            userId,
+                            pageId: accountId,
+                            type: tiktokUrl ? "tiktok" : "video",
+                            status: "failed",
+                            error: err.message,
+                            cloudinaryVideoId: videoPublicId
+                        });
+                        results.failedCount++;
+                        results.details.push({ accountId, status: "failed", error: err.message });
                     }
-                );
+                }
 
             } else if (videoUrl || directMediaUrl) {
                 videoUrlForDB = videoUrl || directMediaUrl;
 
-                // 🔍 Find Page Access Tokens
-                const targetAccounts = accountsArray.map(id => {
-                    const page = user.connectedPages.find(p => p.id === id);
-                    return {
-                        id,
-                        type: 'page',
-                        name: page?.name || 'Unknown Page',
-                        access_token: user.getDecryptedPageToken(id) // ✅ Decrypt Page Token
-                    };
-                });
+                for (const accountId of accountsArray) {
+                    try {
+                        const page = await FacebookPage.findOne({ pageId: accountId, userId: userId });
+                        let pageToken = page ? page.getDecryptedAccessToken() : null;
+                        let pageName = page ? page.pageName : 'Unknown Page';
 
-                results = await fb.postToFB(
-                    user.getDecryptedAccessToken(),
-                    targetAccounts, // ✅ Pass Full Account Objects
-                    videoUrlForDB,
-                    caption,
-                    null,
-                    {
-                        title,
-                        isScheduled: !!scheduleTime,
-                        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null,
-                        link: tiktokUrl
+                        if (!pageToken) {
+                            const user = await User.findOne({ id: userId });
+                            const connectedPage = user?.connectedPages?.find(p => p.id === accountId);
+                            if (connectedPage) {
+                                pageToken = user.getDecryptedPageToken(accountId);
+                                pageName = connectedPage.name;
+                            }
+                        }
+                        if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
+
+                        const fbRes = await fb.postToFB(
+                            null,
+                            [{ id: accountId, type: 'page', access_token: pageToken, name: pageName }],
+                            videoUrlForDB,
+                            caption,
+                            null,
+                            {
+                                title,
+                                isScheduled: !!scheduleTime,
+                                scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null,
+                                link: tiktokUrl
+                            }
+                        );
+
+                        if (fbRes.successCount > 0) {
+                            const fbPostId = fbRes.details[0].postId;
+
+                            // 💬 Auto Comment
+                            if (req.body.autoComment) {
+                                await fb.postComment(pageToken, fbPostId, req.body.autoComment);
+                            }
+
+                            await PostLog.create({
+                                userId,
+                                pageId: accountId,
+                                fbPostId: fbPostId,
+                                type: tiktokUrl ? "tiktok" : "video",
+                                status: scheduleTime ? "scheduled" : "published",
+                                scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
+                                cloudinaryVideoId: videoPublicId
+                            });
+                            results.successCount++;
+                            results.details.push({ accountId, status: "success", postId: fbPostId });
+                        } else {
+                            throw new Error(fbRes.details[0].error || "Failed to post video");
+                        }
+
+                    } catch (err) {
+                        console.error(`❌ Failed for ${accountId}:`, err.message);
+                        await PostLog.create({
+                            userId,
+                            pageId: accountId,
+                            type: tiktokUrl ? "tiktok" : "video",
+                            status: "failed",
+                            error: err.message,
+                            cloudinaryVideoId: videoPublicId
+                        });
+                        results.failedCount++;
+                        results.details.push({ accountId, status: "failed", error: err.message });
                     }
-                );
+                }
             }
-
-            newPostData.video_url = videoUrlForDB || tiktokUrl;
-            newPostData.thumbnail_url = thumbnailUrlForDB;
         }
-
-        const newPost = await ScheduledPost.create(newPostData);
-
-        // Update Status
-        const successCount = results.successCount;
-        newPost.status = successCount > 0 ? "completed" : "failed";
-        newPost.posted_at = new Date();
-        if (results.details) {
-            newPost.publishedIds = results.details
-                .filter(r => r.status === 'success' && r.postId)
-                .map(r => ({ accountId: r.accountId, postId: r.postId }));
-        }
-        await newPost.save();
 
         // ✅ Respond success
         res.status(201).json({
             success: true,
-            message: successCount > 0 ? "Post published successfully" : "Failed to publish post",
+            message: results.successCount > 0 ? "Post published successfully" : "Failed to publish post",
             results: results,
             video: {
                 url: videoUrlForDB,
@@ -229,8 +315,7 @@ exports.createPost = async (req, res) => {
                 size: videoSizeMB ? `${videoSizeMB.toFixed(2)} MB` : "0 MB",
             },
             caption,
-            accounts: accountsArray,
-            postId: newPost.id,
+            accounts: accountsArray
         });
     } catch (err) {
         console.error("❌ Create post error:", err.message);

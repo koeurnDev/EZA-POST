@@ -4,31 +4,32 @@
 
 const fs = require("fs");
 const path = require("path");
-const ScheduledPost = require("../models/ScheduledPost");
+const PostLog = require("../models/PostLog");
+const FacebookPage = require("../models/FacebookPage");
 const User = require("../models/User");
 const fb = require("../utils/fb");
 const { uploadFile } = require("../utils/cloudinary");
-const { processMediaToSquare } = require("../utils/videoProcessor");
 
 exports.createMixedCarousel = async (req, res) => {
     req.setTimeout(600000); // 10 minutes timeout
 
     try {
-        const { caption, accounts, scheduleTime, videoUrl, imageUrl } = req.body;
+        const { caption, accounts, scheduleTime, videoUrl } = req.body;
         const userId = req.user?.id;
 
         // 🛑 Validation
         if (!accounts) return res.status(400).json({ success: false, error: "Missing accounts" });
 
         const videoFile = req.files?.find(f => f.fieldname === 'video');
-        const imageFile = req.files?.find(f => f.fieldname === 'image');
+        // ✅ Support Multiple Images
+        const imageFiles = req.files?.filter(f => f.fieldname === 'images');
 
         // Check if we have either Files OR URLs
         const hasVideo = videoFile || videoUrl;
-        const hasImage = imageFile || imageUrl;
+        const hasImages = imageFiles && imageFiles.length > 0;
 
-        if (!hasVideo || !hasImage) {
-            return res.status(400).json({ success: false, error: "Both video and image are required for mixed carousel" });
+        if (!hasVideo || !hasImages) {
+            return res.status(400).json({ success: false, error: "Video and at least one image are required for mixed carousel" });
         }
 
         let accountsArray = [];
@@ -38,61 +39,56 @@ exports.createMixedCarousel = async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
         }
 
-        // Get User
-        const user = await User.findOne({ id: userId });
-        if (!user || !user.facebookAccessToken) {
-            throw new Error("User not connected to Facebook");
-        }
-
         // ☁️ Step 1: Prepare Media (Upload to Cloudinary if needed)
         let finalVideoUrl = videoUrl;
-        let finalImageUrl = imageUrl;
+        let finalVideoPublicId = null;
+        let finalImageUrls = [];
+        let finalImagePublicIds = [];
 
         // Upload Video if file provided
         if (videoFile) {
             console.log("☁️ Uploading video to Cloudinary...");
-            const vRes = await uploadFile(videoFile.path, "kr_post/carousel_videos", "video", true, true); // true = transform 1:1
+            const vRes = await uploadFile(videoFile.path, "eza-post/carousel_videos", "video", true, true); // true = transform 1:1
             finalVideoUrl = vRes.url;
+            finalVideoPublicId = vRes.public_id;
         }
 
-        // Upload Image if file provided
-        if (imageFile) {
-            console.log("☁️ Uploading image to Cloudinary...");
-            const iRes = await uploadFile(imageFile.path, "kr_post/carousel_images", "image", true, true); // true = transform 1:1
-            finalImageUrl = iRes.url;
+        // Upload Images
+        if (imageFiles && imageFiles.length > 0) {
+            console.log(`☁️ Uploading ${imageFiles.length} images to Cloudinary...`);
+            for (const img of imageFiles) {
+                const iRes = await uploadFile(img.path, "eza-post/carousel_images", "image", true, true); // true = transform 1:1
+                finalImageUrls.push(iRes.url);
+                finalImagePublicIds.push(iRes.public_id);
+            }
         }
-
-        // 💾 Save to DB
-        const postId = `carousel_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        const newPost = await ScheduledPost.create({
-            id: postId,
-            user_id: userId,
-            caption,
-            accounts: accountsArray,
-            schedule_time: scheduleTime ? new Date(scheduleTime) : new Date(),
-            status: "processing",
-            is_scheduled: !!scheduleTime,
-            type: 'mixed_carousel',
-            carousel_cards: [
-                { type: 'video', url: finalVideoUrl },
-                { type: 'image', url: finalImageUrl }
-            ]
-        });
 
         // 🚀 Step 2: Post to Facebook
         const results = { successCount: 0, failedCount: 0, details: [] };
 
         for (const accountId of accountsArray) {
             try {
-                const page = user.connectedPages.find(p => p.id === accountId);
-                const pageToken = user.getDecryptedPageToken(accountId);
+                // Fetch Page from DB
+                const page = await FacebookPage.findOne({ pageId: accountId, userId: userId });
 
-                if (!page || !pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
+                // Fallback to User.connectedPages if not found in FacebookPage (migration support)
+                let pageToken = page ? page.getDecryptedAccessToken() : null;
+                let pageName = page ? page.pageName : null;
 
-                console.log(`🚀 Starting Mixed Carousel for ${page.name}...`);
+                if (!pageToken) {
+                    const user = await User.findOne({ id: userId });
+                    const connectedPage = user?.connectedPages?.find(p => p.id === accountId);
+                    if (connectedPage) {
+                        pageToken = user.getDecryptedPageToken(accountId);
+                        pageName = connectedPage.name;
+                    }
+                }
+
+                if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
+
+                console.log(`🚀 Starting Mixed Carousel for ${pageName} (${accountId})...`);
 
                 // 2.1 Upload Video (Unpublished) - Using Cloudinary URL
-                // fb.uploadVideoToFacebook supports URL input
                 const videoUpload = await fb.uploadVideoToFacebook(pageToken, accountId, finalVideoUrl, "Video Part", null, {
                     isScheduled: false,
                     published: false
@@ -101,27 +97,32 @@ exports.createMixedCarousel = async (req, res) => {
                 if (!videoUpload.success) throw new Error("Failed to upload video part: " + videoUpload.error);
                 const videoId = videoUpload.postId;
 
-                // 2.2 Upload Image (Unpublished) - Using Cloudinary URL
-                const photoForm = new (require("form-data"))();
-                photoForm.append("access_token", pageToken);
-                photoForm.append("url", finalImageUrl); // ✅ Use 'url' for remote upload
-                photoForm.append("published", "false");
+                // 2.2 Upload Images (Unpublished) - Using Cloudinary URLs
+                const photoIds = [];
+                for (const imgUrl of finalImageUrls) {
+                    const photoForm = new (require("form-data"))();
+                    photoForm.append("access_token", pageToken);
+                    photoForm.append("url", imgUrl); // ✅ Use 'url' for remote upload
+                    photoForm.append("published", "false");
 
-                const photoRes = await require("axios").post(`https://graph.facebook.com/v19.0/${accountId}/photos`, photoForm, {
-                    headers: photoForm.getHeaders()
-                });
-                const photoId = photoRes.data.id;
+                    const photoRes = await require("axios").post(`https://graph.facebook.com/v19.0/${accountId}/photos`, photoForm, {
+                        headers: photoForm.getHeaders()
+                    });
+                    photoIds.push(photoRes.data.id);
+                }
 
-                console.log(`✅ Media Uploaded: Video ${videoId}, Photo ${photoId}`);
+                console.log(`✅ Media Uploaded: Video ${videoId}, Photos ${photoIds.join(", ")}`);
 
                 // 2.3 Publish Carousel Feed
+                const attachedMedia = [
+                    { media_fbid: videoId },
+                    ...photoIds.map(id => ({ media_fbid: id }))
+                ];
+
                 const feedPayload = {
                     access_token: pageToken,
                     message: caption,
-                    attached_media: [
-                        { media_fbid: videoId },
-                        { media_fbid: photoId }
-                    ]
+                    attached_media: attachedMedia
                 };
 
                 if (scheduleTime) {
@@ -131,26 +132,49 @@ exports.createMixedCarousel = async (req, res) => {
 
                 const feedRes = await require("axios").post(`https://graph.facebook.com/v19.0/${accountId}/feed`, feedPayload);
 
+                // 💬 Auto Comment
+                if (req.body.autoComment) {
+                    await fb.postComment(pageToken, feedRes.data.id, req.body.autoComment);
+                }
+
+                // 📝 Create PostLog
+                await PostLog.create({
+                    userId,
+                    pageId: accountId,
+                    fbPostId: feedRes.data.id,
+                    type: "carousel",
+                    status: scheduleTime ? "scheduled" : "published",
+                    scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
+                    cloudinaryVideoId: finalVideoPublicId,
+                    cloudinaryImageIds: finalImagePublicIds
+                });
+
                 results.successCount++;
                 results.details.push({ accountId, status: "success", postId: feedRes.data.id });
                 console.log(`✅ Mixed Carousel Published: ${feedRes.data.id}`);
 
             } catch (err) {
                 console.error(`❌ Failed for ${accountId}:`, err.message);
+
+                // 📝 Log Failure
+                await PostLog.create({
+                    userId,
+                    pageId: accountId,
+                    type: "carousel",
+                    status: "failed",
+                    error: err.message,
+                    cloudinaryVideoId: finalVideoPublicId,
+                    cloudinaryImageIds: finalImagePublicIds
+                });
+
                 results.failedCount++;
                 results.details.push({ accountId, status: "failed", error: err.message });
             }
         }
 
-        // Update DB
-        newPost.status = results.successCount > 0 ? "completed" : "failed";
-        newPost.posted_at = new Date();
-        await newPost.save();
-
         res.status(201).json({
             success: true,
-            results,
-            postId: newPost.id
+            results
         });
 
     } catch (err) {
