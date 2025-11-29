@@ -25,6 +25,7 @@ export default function PostComposer() {
     const [isScheduling, setIsScheduling] = useState(false);
     const [scheduleTime, setScheduleTime] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isLoadingVideo, setIsLoadingVideo] = useState(false); // ⏳ Loading state for TikTok
 
     // Fetch Pages
     useEffect(() => {
@@ -79,6 +80,7 @@ export default function PostComposer() {
             // Valid video
             setFile(selectedFile);
             setPreviewUrl(URL.createObjectURL(selectedFile));
+            setTiktokUrl(""); // Clear TikTok URL if file uploaded
             toast.success("Video uploaded successfully!");
         };
         video.src = URL.createObjectURL(selectedFile);
@@ -97,9 +99,48 @@ export default function PostComposer() {
         }
     };
 
+    // 🎵 Handle TikTok Load
+    const handleLoadTiktok = async () => {
+        if (!tiktokUrl) return;
+        setIsLoadingVideo(true);
+        const toastId = toast.loading("Loading TikTok video...");
+
+        try {
+            const token = localStorage.getItem("token");
+            const response = await fetch(`${(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "")}/api/tiktok/process`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ url: tiktokUrl })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setPreviewUrl(data.url); // Use Cloudinary URL for preview
+                setFile(null); // Clear local file if any
+                toast.success("Video loaded successfully!", { id: toastId });
+            } else {
+                throw new Error(data.error || "Failed to load video");
+            }
+        } catch (err) {
+            console.error("TikTok load error:", err);
+            toast.error(err.message || "Failed to load TikTok video", { id: toastId });
+        } finally {
+            setIsLoadingVideo(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!file && !caption && !tiktokUrl) {
+        // If we have a previewUrl but no file, it means it's a loaded TikTok video (Cloudinary URL)
+        // We should pass that URL as tiktokUrl (or a new field, but tiktokUrl works with our backend logic)
+
+        const effectiveTiktokUrl = !file && previewUrl && previewUrl.startsWith("http") ? previewUrl : tiktokUrl;
+
+        if (!file && !effectiveTiktokUrl && !caption) {
             toast.error("Please add a video, caption, or TikTok URL.");
             return;
         }
@@ -115,7 +156,7 @@ export default function PostComposer() {
         if (file) formData.append("video", file);
         if (thumbnail) formData.append("thumbnail", thumbnail);
         formData.append("caption", caption);
-        formData.append("tiktokUrl", tiktokUrl); // 🎵 Add TikTok URL
+        formData.append("tiktokUrl", effectiveTiktokUrl); // 🎵 Add TikTok URL (or Cloudinary URL)
         formData.append("accounts", JSON.stringify(selectedPages));
         if (isScheduling && scheduleTime) {
             formData.append("scheduleTime", scheduleTime);
@@ -235,13 +276,23 @@ export default function PostComposer() {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 TikTok URL (Optional)
                             </label>
-                            <input
-                                type="text"
-                                value={tiktokUrl}
-                                onChange={(e) => setTiktokUrl(e.target.value)}
-                                placeholder="Paste TikTok video URL here..."
-                                className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                            />
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={tiktokUrl}
+                                    onChange={(e) => setTiktokUrl(e.target.value)}
+                                    placeholder="Paste TikTok video URL here..."
+                                    className="flex-1 p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                />
+                                <Button
+                                    onClick={handleLoadTiktok}
+                                    disabled={!tiktokUrl || isLoadingVideo}
+                                    isLoading={isLoadingVideo}
+                                    className="whitespace-nowrap"
+                                >
+                                    Load
+                                </Button>
+                            </div>
                         </div>
 
                         {/* 📝 Caption Input */}
@@ -297,7 +348,7 @@ export default function PostComposer() {
 
                         <Button
                             onClick={handleSubmit}
-                            disabled={(!file && !caption && !tiktokUrl) || selectedPages.length === 0}
+                            disabled={(!file && !previewUrl && !tiktokUrl && !caption) || selectedPages.length === 0}
                             isLoading={isSubmitting}
                             fullWidth
                             size="large"

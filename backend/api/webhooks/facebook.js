@@ -7,6 +7,8 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const User = require("../../models/User");
+const botEngine = require("../../utils/botEngine");
+const { BotRule } = require("../../models/BotRule");
 
 // ============================================================
 // ✅ GET /api/webhooks/facebook
@@ -68,8 +70,8 @@ router.post("/", async (req, res) => {
 
                         console.log(`💬 New Comment on Page ${pageId}: "${message}" from ${senderName}`);
 
-                        // 🤖 Trigger Auto-Reply
-                        await handleAutoReply(pageId, commentId, message);
+                        // 🤖 Trigger Auto-Reply via Bot Engine
+                        await handleWebhookComment(pageId, commentId, message, senderId, senderName);
                     }
                 }
             }
@@ -80,52 +82,42 @@ router.post("/", async (req, res) => {
 });
 
 /**
- * 🤖 Auto-Reply Logic
+ * 🤖 Handle Webhook Comment -> Pass to Bot Engine
  */
-async function handleAutoReply(pageId, commentId, userMessage) {
+async function handleWebhookComment(pageId, commentId, message, senderId, senderName) {
     try {
-        // 1️⃣ Find User who owns this Page
-        // We need to search all users to find who has this page connected
-        // This is inefficient for millions of users but fine for MVP
+        // 1️⃣ Find User & Page
         const user = await User.findOne({
             "connectedPages.id": pageId,
             "pageSettings.pageId": pageId,
-            "pageSettings.enableBot": true // ✅ Check if bot is enabled
+            "pageSettings.enableBot": true
         });
 
-        if (!user) {
-            console.log(`⚠️ No bot enabled for Page ${pageId}`);
-            return;
-        }
+        if (!user) return;
 
-        // 2️⃣ Get Page Access Token
         const page = user.connectedPages.find(p => p.id === pageId);
         if (!page || !page.access_token) return;
 
-        // 3️⃣ Determine Reply
-        // Simple keyword matching for now
-        let replyMessage = "Thanks for your comment! We'll get back to you soon.";
-        const lowerMsg = userMessage.toLowerCase();
+        // 2️⃣ Get Rules
+        const rules = await BotRule.find({ enabled: true });
+        if (rules.length === 0) return;
 
-        if (lowerMsg.includes("price") || lowerMsg.includes("cost")) {
-            replyMessage = "Please send us a message for pricing details! 💰";
-        } else if (lowerMsg.includes("location") || lowerMsg.includes("where")) {
-            replyMessage = "We are located in Phnom Penh! 📍";
-        }
+        // 3️⃣ Construct Comment Object (Mocking FB API structure expected by botEngine)
+        const commentObj = {
+            id: commentId,
+            message: message,
+            from: {
+                id: senderId,
+                name: senderName
+            }
+        };
 
-        // 4️⃣ Send Reply via Graph API
-        const pageToken = user.getDecryptedPageToken(pageId);
-        if (!pageToken) return;
-
-        await axios.post(`https://graph.facebook.com/v19.0/${commentId}/comments`, {
-            message: replyMessage,
-            access_token: pageToken
-        });
-
-        console.log(`✅ Auto-Replied to ${commentId}: "${replyMessage}"`);
+        // 4️⃣ Process via Engine (Queues reply if matched)
+        await botEngine.processComment(commentObj, page, rules);
+        console.log(`🔄 Webhook comment processed by Bot Engine: ${commentId}`);
 
     } catch (err) {
-        console.error("❌ Auto-Reply Failed:", err.response?.data || err.message);
+        console.error("❌ Webhook Handler Error:", err.message);
     }
 }
 

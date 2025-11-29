@@ -204,6 +204,13 @@ const AccountSelector = React.memo(function AccountSelector({
                   className="bg-blue-50 border border-blue-100 text-sm font-medium rounded-full px-3 py-1 flex items-center gap-1 max-w-[200px] truncate"
                   title={acc.name}
                 >
+                  {acc.picture && (
+                    <img
+                      src={acc.picture}
+                      alt=""
+                      className="w-4 h-4 rounded-full object-cover"
+                    />
+                  )}
                   {acc.name}
                   <button
                     onClick={(e) => {
@@ -296,14 +303,22 @@ const AccountSelector = React.memo(function AccountSelector({
                     onClick={() => toggleAccount(acc.id, acc.name)}
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div
-                        className={`w-4 h-4 border-2 rounded ${selected
-                          ? "border-blue-500 bg-blue-500"
-                          : "border-gray-300"
-                          } flex items-center justify-center text-white text-xs`}
-                      >
-                        {selected && "✓"}
-                      </div>
+                      {acc.picture ? (
+                        <img
+                          src={acc.picture}
+                          alt={acc.name}
+                          className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                        />
+                      ) : (
+                        <div
+                          className={`w-8 h-8 border-2 rounded-full ${selected
+                            ? "border-blue-500 bg-blue-500 text-white"
+                            : "border-gray-300 bg-gray-100 text-gray-500"
+                            } flex items-center justify-center text-xs font-bold`}
+                        >
+                          {acc.name?.[0]}
+                        </div>
+                      )}
                       <div className="flex-1 truncate">
                         <div className="font-medium text-sm truncate">
                           {acc.name}

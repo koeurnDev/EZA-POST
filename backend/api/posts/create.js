@@ -89,39 +89,6 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
     if (videoFile) {
       // 📂 Local File Upload -> Cloudinary
       console.log(`📤 Uploading local video to Cloudinary: ${videoFile.filename}`);
-      const result = await uploadFile(videoFile.path, "kr_post/videos", "video");
-      videoUrlForDB = result.url;
-      videoPublicId = result.publicId;
-      videoSizeMB = result.size / (1024 * 1024);
-      // Local file is deleted by uploadFile utility
-    } else if (tiktokUrl) {
-      // 🎵 TikTok Download -> Cloudinary
-      console.log(`📥 Downloading TikTok video: ${tiktokUrl}`);
-      const tiktokDownloader = require("../../utils/tiktokDownloader");
-
-      try {
-        const videoBuffer = await tiktokDownloader.downloadTiktokVideo(tiktokUrl);
-
-        // Save to temp file first (Cloudinary uploader needs path)
-        const tempFilename = `tiktok_${Date.now()}.mp4`;
-        const tempFilePath = path.join(tempVideoDir, tempFilename);
-        fs.writeFileSync(tempFilePath, videoBuffer);
-
-        console.log(`📤 Uploading TikTok video to Cloudinary...`);
-        const result = await uploadFile(tempFilePath, "kr_post/videos", "video");
-        videoUrlForDB = result.url;
-        videoPublicId = result.publicId;
-        videoSizeMB = result.size / (1024 * 1024);
-        // uploadFile deletes the temp file
-      } catch (err) {
-        console.error("❌ TikTok processing failed:", err.message);
-        return res.status(400).json({ success: false, error: "Failed to process TikTok video: " + err.message });
-      }
-    }
-
-    // 🖼️ Handle Thumbnail
-    let thumbnailUrlForDB = null;
-    if (thumbFile) {
       console.log(`📤 Uploading thumbnail to Cloudinary...`);
       const result = await uploadFile(thumbFile.path, "kr_post/thumbnails", "image");
       thumbnailUrlForDB = result.url;

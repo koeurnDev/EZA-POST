@@ -89,8 +89,10 @@ export default function Dashboard() {
     if (user && !isDemo) fetchPages();
   }, [user, isDemo]);
 
-  // ✅ Fetch Queue
+  // ✅ Fetch Queue (with Auto-Refresh)
   useEffect(() => {
+    let intervalId;
+
     const fetchQueue = async () => {
       if (activeTab === 'queue') {
         setQueueError(null);
@@ -104,7 +106,15 @@ export default function Dashboard() {
         }
       }
     };
-    if (user && !isDemo) fetchQueue();
+
+    if (user && !isDemo && activeTab === 'queue') {
+      fetchQueue(); // Initial fetch
+      intervalId = setInterval(fetchQueue, 10000); // Poll every 10 seconds
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [activeTab, user, isDemo]);
 
 
