@@ -197,10 +197,10 @@ const apiUtils = {
   logError,
   handleApiError,
   // Facebook Pages
-  getUserPages: () => axios.get(getFullUrl("/user/pages")),
-  toggleUserPage: (pageId, isSelected) => axios.post(getFullUrl("/user/pages/toggle"), { pageId, isSelected }),
-  updatePageSettings: (pageId, settings) => axios.post(getFullUrl("/user/pages/settings"), { pageId, settings }),
-  disconnectFacebook: () => axios.delete(getFullUrl("/auth/facebook")), // ✅ Disconnect Facebook
+  getUserPages: () => axios.get(getFullUrl("/user/pages"), { withCredentials: true }),
+  toggleUserPage: (pageId, isSelected) => axios.post(getFullUrl("/user/pages/toggle"), { pageId, isSelected }, { withCredentials: true }),
+  updatePageSettings: (pageId, settings) => axios.post(getFullUrl("/user/pages/settings"), { pageId, settings }, { withCredentials: true }),
+  disconnectFacebook: () => axios.delete(getFullUrl("/auth/facebook"), { withCredentials: true }), // ✅ Disconnect Facebook
 };
 
 export default apiUtils;
