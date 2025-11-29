@@ -12,7 +12,7 @@ const Register = lazy(() => import("../pages/Register"));
 const ScheduledPosts = lazy(() => import("../pages/ScheduledPosts"));
 const BotSettingsPage = lazy(() => import("../pages/BotSettingsPage"));
 const Settings = lazy(() => import("../pages/Settings"));
-const PostComposer = lazy(() => import("../pages/PostComposer"));
+const Post = lazy(() => import("../pages/Post"));
 const Profile = lazy(() => import("../pages/Profile"));
 const Welcome = lazy(() => import("../pages/Welcome"));
 const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
@@ -46,7 +46,7 @@ export default function AppRouter() {
             path="/"
             element={
               <ProtectedRoute redirectPath="/welcome">
-                <PostComposer />
+                <Post />
               </ProtectedRoute>
             }
           />
