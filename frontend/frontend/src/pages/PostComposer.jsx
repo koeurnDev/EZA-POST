@@ -350,7 +350,7 @@ export default function PostComposer() {
                         {/* 🎬 Video Upload (Premium) */}
                         <div className="bg-white dark:bg-gray-800 rounded-3xl p-2 shadow-sm border border-gray-100 dark:border-gray-700">
                             <div
-                                className={`relative w-full aspect-[4/5] bg-gray-900 rounded-2xl overflow-hidden border-2 border-dashed transition-all duration-300 group flex items-center justify-center ${file ? "border-blue-500 shadow-lg" : "border-gray-700 hover:border-blue-500"}`}
+                                className={`relative w-full aspect-square bg-gradient-to-br from-gray-900 to-black rounded-3xl overflow-hidden border-2 border-dashed transition-all duration-300 group flex items-center justify-center ${file ? "border-blue-500 shadow-lg" : "border-gray-700 hover:border-blue-500"}`}
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={handleDrop}
                             >
@@ -420,7 +420,7 @@ export default function PostComposer() {
                         <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                             <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Custom Thumbnail</h3>
                             {thumbnailPreview ? (
-                                <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 group">
+                                <div className="relative w-full aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 group">
                                     <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                         <button
