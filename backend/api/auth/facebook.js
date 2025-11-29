@@ -175,7 +175,8 @@ router.get("/callback", async (req, res) => {
         // 5️⃣ Update Database
         currentStep = "UpdateDB";
         console.log(`🔄 Step 5: Updating User ${userId} in DB...`);
-        const user = await User.findById(userId);
+        // FIX: Use findOne({ id: userId }) instead of findById(userId) because userId is a custom string, not an ObjectId
+        const user = await User.findOne({ id: userId });
         if (user) {
             user.facebookId = fbUser.id;
             user.facebookAccessToken = access_token;
