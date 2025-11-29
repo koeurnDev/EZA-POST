@@ -12,7 +12,9 @@ const Register = lazy(() => import("../pages/Register"));
 const ScheduledPosts = lazy(() => import("../pages/ScheduledPosts"));
 const BotSettingsPage = lazy(() => import("../pages/BotSettingsPage"));
 const Settings = lazy(() => import("../pages/Settings"));
+const Post = lazy(() => import("../pages/Post"));
 const CarouselPost = lazy(() => import("../pages/CarouselPost"));
+const TikTokPost = lazy(() => import("../pages/TikTokPost"));
 const Profile = lazy(() => import("../pages/Profile"));
 const Welcome = lazy(() => import("../pages/Welcome"));
 const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
@@ -38,15 +40,32 @@ export default function AppRouter() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* Redirect /dashboard to / */}
-          <Route path="/dashboard" element={<Navigate to="/" replace />} />
+          {/* Redirect /dashboard to /post */}
+          <Route path="/dashboard" element={<Navigate to="/post" replace />} />
+          <Route path="/" element={<Navigate to="/post" replace />} />
 
           {/* ==================== Protected Routes ==================== */}
           <Route
-            path="/"
+            path="/post"
             element={
               <ProtectedRoute redirectPath="/welcome">
+                <Post />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/carousel"
+            element={
+              <ProtectedRoute>
                 <CarouselPost />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tiktok"
+            element={
+              <ProtectedRoute>
+                <TikTokPost />
               </ProtectedRoute>
             }
           />

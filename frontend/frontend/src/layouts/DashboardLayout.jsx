@@ -15,7 +15,9 @@ import {
   X,
   Sun,
   Moon,
-  User
+  User,
+  Images,
+  Link as LinkIcon
 } from "lucide-react";
 
 export default function DashboardLayout({ children }) {
@@ -31,8 +33,9 @@ export default function DashboardLayout({ children }) {
 
   // 🧭 Navigation Items
   const navItems = [
-    // { label: "Overview", icon: <LayoutDashboard size={20} />, path: "/dashboard" }, // ❌ Removed
-    { label: "Create Post", icon: <Video size={20} />, path: "/" }, // ✅ Home
+    { label: "Single Video", icon: <Video size={20} />, path: "/post" },
+    { label: "Mixed Carousel", icon: <Images size={20} />, path: "/carousel" },
+    { label: "TikTok Link", icon: <LinkIcon size={20} />, path: "/tiktok" },
     { label: "Scheduled Posts", icon: <Calendar size={20} />, path: "/posts" },
     { label: "Auto-Reply Bot", icon: <MessageSquare size={20} />, path: "/bot" },
     { label: "Settings", icon: <Settings size={20} />, path: "/settings" },
