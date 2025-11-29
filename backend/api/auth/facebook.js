@@ -86,7 +86,24 @@ router.get("/callback", async (req, res) => {
             }
         );
 
-        const { access_token } = tokenRes.data;
+        const { access_token: shortLivedToken } = tokenRes.data;
+
+        // 1.5️⃣ Exchange for Long-Lived Token (Valid ~60 days)
+        console.log("🔄 Exchanging for Long-Lived Token...");
+        const longLivedTokenRes = await axios.get(
+            "https://graph.facebook.com/v19.0/oauth/access_token",
+            {
+                params: {
+                    grant_type: "fb_exchange_token",
+                    client_id: FB_APP_ID,
+                    client_secret: FB_APP_SECRET,
+                    fb_exchange_token: shortLivedToken,
+                },
+            }
+        );
+
+        const { access_token } = longLivedTokenRes.data;
+        console.log("✅ Obtained Long-Lived Token");
 
         // 2️⃣ Get User Profile (to get ID)
         const profileRes = await axios.get("https://graph.facebook.com/me", {
