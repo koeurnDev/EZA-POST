@@ -150,25 +150,6 @@ export default function PostComposer() {
         }
 
         setIsSubmitting(true);
-        const toastId = toast.loading(isScheduling ? "Scheduling post..." : "Publishing post...");
-
-        const formData = new FormData();
-        if (file) formData.append("video", file);
-        if (thumbnail) formData.append("thumbnail", thumbnail);
-        formData.append("caption", caption);
-
-        // ✅ Logic Update: If we have a direct media URL (from Cloudinary/TikTok load), send it as directMediaUrl
-        if (!file && effectiveTiktokUrl && effectiveTiktokUrl.startsWith("http")) {
-            formData.append("directMediaUrl", effectiveTiktokUrl);
-        } else {
-            formData.append("tiktokUrl", effectiveTiktokUrl); // Fallback or raw link
-        }
-
-        formData.append("accounts", JSON.stringify(selectedPages));
-        if (isScheduling && scheduleTime) {
-            formData.append("scheduleTime", scheduleTime);
-        }
-
         try {
             // ✅ Unified endpoint for both immediate and scheduled posts
             const endpoint = "/api/posts/create";
