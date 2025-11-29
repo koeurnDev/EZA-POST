@@ -306,7 +306,7 @@ export default function Post() {
 
                                     {/* TikTok Preview */}
                                     {previewUrl && !file && (
-                                        <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-inner group animate-in fade-in zoom-in duration-300">
+                                        <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden shadow-inner group animate-in fade-in zoom-in duration-300">
                                             <video src={previewUrl} controls className="w-full h-full object-contain" />
                                             <button
                                                 onClick={() => { setPreviewUrl(null); setTiktokUrl(""); }}
