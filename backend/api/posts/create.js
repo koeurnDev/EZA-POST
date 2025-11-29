@@ -55,7 +55,7 @@ const upload = multer({
 // ============================================================
 router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
   try {
-    const { caption, accounts, scheduleTime, tiktokUrl } = req.body;
+    const { caption, accounts, scheduleTime, tiktokUrl, directMediaUrl } = req.body;
     const userId = req.user?.id;
 
     // Multer fields
@@ -63,10 +63,10 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
     const thumbFile = req.files?.['thumbnail']?.[0];
 
     // 🛑 Validate fields
-    if (!videoFile && !tiktokUrl)
+    if (!videoFile && !directMediaUrl && !tiktokUrl)
       return res
         .status(400)
-        .json({ success: false, error: "No video file or TikTok URL provided" });
+        .json({ success: false, error: "No media (video/direct URL) or link (TikTok) provided" });
 
     if (!caption || !accounts)
       return res
@@ -81,9 +81,9 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
     }
 
-    // 📥 Handle Video Source (File vs TikTok)
-    let videoUrlForDB;
-    let thumbnailUrlForDB; // ✅ Declared
+    // 📥 Handle Video Source (File vs Direct URL vs Link)
+    let videoUrlForDB = null;
+    let thumbnailUrlForDB = null;
     let videoSizeMB = 0;
     let videoPublicId;
 
@@ -100,9 +100,10 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
         const result = await uploadFile(thumbFile.path, "kr_post/thumbnails", "image");
         thumbnailUrlForDB = result.url;
       }
-    } else if (tiktokUrl) {
-      videoUrlForDB = tiktokUrl; // ✅ Use TikTok URL
+    } else if (directMediaUrl) {
+      videoUrlForDB = directMediaUrl; // ✅ Use Direct Media URL (treated as video source)
     }
+    // Note: If only tiktokUrl is present, videoUrlForDB remains null, triggering Link Post fallback.
 
     // 💾 Save post record (MongoDB)
     const postId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -111,12 +112,13 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       id: postId,
       user_id: userId,
       caption,
-      video_url: videoUrlForDB,
+      video_url: videoUrlForDB || tiktokUrl, // Save link if no video
       thumbnail_url: thumbnailUrlForDB,
       accounts: accountsArray,
       schedule_time: scheduleTime ? new Date(scheduleTime) : new Date(),
       status: "processing",
       is_scheduled: !!scheduleTime,
+      type: videoUrlForDB ? "media" : "link" // ✅ Track post type
     });
 
     console.log(`✅ New post created by ${userId}: ${caption}`);
@@ -131,16 +133,17 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       throw new Error("User not connected to Facebook");
     }
 
-    // Upload to Facebook using Cloudinary URL
+    // Upload to Facebook
     const results = await fb.postToFB(
       user.getDecryptedAccessToken(),
       accountsArray.map(id => ({ id, type: 'page' })), // Assuming all are pages for now
-      videoUrlForDB, // ✅ Pass URL instead of buffer
+      videoUrlForDB, // ✅ Pass URL (or null for link post)
       caption,
-      null, // Thumbnail buffer not needed if we rely on FB to pick it up or if we pass url (FB API usually takes video url)
+      null,
       {
         isScheduled: !!scheduleTime,
-        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
+        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null,
+        link: tiktokUrl // ✅ Pass link for fallback
       }
     );
 

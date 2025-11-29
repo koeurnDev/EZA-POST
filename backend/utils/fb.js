@@ -95,23 +95,35 @@ class FacebookAPI {
         let postResult;
 
         if (account.type === "page") {
-          postResult = await this.uploadVideoToFacebook(
-            account.access_token || accessToken,
-            account.id,
-            videoInput,
-            caption,
-            thumbnail?.buffer,
-            options // ✅ Pass options
-          );
+          if (videoInput) {
+            // 🎥 Video/Image Post
+            postResult = await this.uploadVideoToFacebook(
+              account.access_token || accessToken,
+              account.id,
+              videoInput,
+              caption,
+              thumbnail?.buffer,
+              options
+            );
+          } else if (options.link) {
+            // 🔗 Link Post Fallback
+            console.log(`🔗 Fallback: Posting link to Page ${account.name}...`);
+            postResult = await this.shareAsLink(
+              account.access_token || accessToken,
+              account.id,
+              caption,
+              options.link
+            );
+          } else {
+            postResult = { success: false, error: "No media or link provided for Page post" };
+          }
         } else {
-          // Groups don't support scheduling via API easily in this flow
+          // Groups
           if (options.isScheduled) {
             console.warn(`⚠️ Scheduling not supported for Groups (${account.name}). Skipping.`);
             postResult = { success: false, error: "Scheduling not supported for groups" };
           } else {
-            // For groups, if we have a URL, we can share it. If it's a buffer, we might need to upload it somewhere first or skip.
-            // Assuming videoInput is a URL for now if it's a string.
-            const linkToShare = typeof videoInput === 'string' ? videoInput : "https://www.tiktok.com/"; // Fallback if buffer
+            const linkToShare = videoInput && typeof videoInput === 'string' ? videoInput : (options.link || "https://www.tiktok.com/");
             postResult = await this.shareAsLink(accessToken, account.id, caption, linkToShare);
           }
         }
@@ -147,20 +159,20 @@ class FacebookAPI {
   }
 
   /* ------------------------------------------------------------ */
-  /* ✅ Fallback: Share link (for groups)                          */
+  /* ✅ Fallback: Share link (Pages & Groups)                      */
   /* ------------------------------------------------------------ */
-  async shareAsLink(accessToken, groupId, caption) {
+  async shareAsLink(accessToken, targetId, caption, link) {
     try {
-      const res = await this.http.post(`${this.graph}/${groupId}/feed`, {
+      const res = await this.http.post(`${this.graph}/${targetId}/feed`, {
         message: caption,
-        link: "https://www.tiktok.com/",
+        link: link,
         access_token: accessToken,
       });
-      console.log(`✅ Shared link to Group ${groupId}`);
+      console.log(`✅ Shared link to ${targetId}`);
       return { success: true, postId: res.data.id };
     } catch (error) {
       const fbErr = error.response?.data?.error;
-      console.error(`❌ Link share failed (${groupId}):`, fbErr?.message || error.message);
+      console.error(`❌ Link share failed (${targetId}):`, fbErr?.message || error.message);
       return { success: false, error: fbErr?.message || error.message };
     }
   }
