@@ -284,22 +284,6 @@ export default function PostComposer() {
                     {/* 👈 Left Column: Inputs (Span 7) */}
                     <div className="lg:col-span-7 space-y-6">
 
-                        {/* 🎛️ Post Type Toggle */}
-                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-2 shadow-sm border border-gray-100 dark:border-gray-700 flex">
-                            <button
-                                onClick={() => setPostType("single")}
-                                className={`flex-1 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${postType === "single" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 shadow-sm" : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
-                            >
-                                <ImageIcon size={18} /> Single Post
-                            </button>
-                            <button
-                                onClick={() => setPostType("carousel")}
-                                className={`flex-1 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${postType === "carousel" ? "bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 shadow-sm" : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
-                            >
-                                <Layers size={18} /> Carousel
-                            </button>
-                        </div>
-
                         {/* 📄 Page Selection */}
                         <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                             <div className="flex items-center justify-between mb-6">
@@ -432,6 +416,22 @@ export default function PostComposer() {
                     {/* 👉 Right Column: Media (Span 5) - Sticky */}
                     <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-8">
 
+                        {/* 🎛️ Post Type Toggle (Moved to Right) */}
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-2 shadow-sm border border-gray-100 dark:border-gray-700 flex">
+                            <button
+                                onClick={() => setPostType("single")}
+                                className={`flex-1 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${postType === "single" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 shadow-sm" : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
+                            >
+                                <ImageIcon size={18} /> Single Post
+                            </button>
+                            <button
+                                onClick={() => setPostType("carousel")}
+                                className={`flex-1 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${postType === "carousel" ? "bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 shadow-sm" : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
+                            >
+                                <Layers size={18} /> Carousel
+                            </button>
+                        </div>
+
                         {postType === 'carousel' ? (
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
@@ -441,7 +441,7 @@ export default function PostComposer() {
                                     </button>
                                 </div>
 
-                                <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto pr-2 custom-scrollbar">
+                                <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto pr-2 custom-scrollbar">
                                     {carouselCards.map((card, index) => (
                                         <div key={card.id} className="bg-white dark:bg-gray-800 rounded-3xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 relative group">
                                             <div className="absolute top-4 right-4 z-10">
@@ -606,22 +606,23 @@ export default function PostComposer() {
                                         </label>
                                     )}
                                 </div>
-
-                                {/* Action Button (Desktop Only) */}
-                                <div className="hidden lg:block pt-4">
-                                    <Button
-                                        onClick={handleSubmit}
-                                        disabled={(!file && !previewUrl && !tiktokUrl && !caption) || selectedPages.length === 0}
-                                        isLoading={isSubmitting}
-                                        fullWidth
-                                        size="large"
-                                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.02] shadow-lg shadow-blue-500/25 rounded-2xl py-4 text-lg font-bold"
-                                    >
-                                        {isScheduling ? <><Calendar size={22} /> Schedule Post</> : <><Send size={22} /> Post Now</>}
-                                    </Button>
-                                </div>
                             </>
-                        )}</div>
+                        )}
+
+                        {/* Action Button (Desktop Only) - Shared for both modes */}
+                        <div className="hidden lg:block pt-4">
+                            <Button
+                                onClick={handleSubmit}
+                                disabled={(!file && !previewUrl && !tiktokUrl && !caption && postType === 'single') || (postType === 'carousel' && carouselCards.length < 2) || selectedPages.length === 0}
+                                isLoading={isSubmitting}
+                                fullWidth
+                                size="large"
+                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.02] shadow-lg shadow-blue-500/25 rounded-2xl py-4 text-lg font-bold"
+                            >
+                                {isScheduling ? <><Calendar size={22} /> Schedule Post</> : <><Send size={22} /> Post Now</>}
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </DashboardLayout>
