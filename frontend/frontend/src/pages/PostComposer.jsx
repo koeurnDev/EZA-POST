@@ -150,7 +150,26 @@ export default function PostComposer() {
         }
 
         setIsSubmitting(true);
+        const toastId = toast.loading(isScheduling ? "Scheduling post..." : "Publishing post...");
+
         try {
+            const formData = new FormData();
+            if (file) formData.append("video", file);
+            if (thumbnail) formData.append("thumbnail", thumbnail);
+            formData.append("caption", caption);
+            formData.append("accounts", JSON.stringify(selectedPages));
+
+            if (isScheduling && scheduleTime) {
+                formData.append("scheduleTime", scheduleTime);
+            }
+
+            // Handle Direct Media URL (from TikTok load) vs Raw TikTok URL
+            if (!file && previewUrl && previewUrl.startsWith("http")) {
+                formData.append("directMediaUrl", previewUrl);
+            } else if (tiktokUrl) {
+                formData.append("tiktokUrl", tiktokUrl);
+            }
+
             // ✅ Unified endpoint for both immediate and scheduled posts
             const endpoint = "/api/posts/create";
             const token = localStorage.getItem("token");
