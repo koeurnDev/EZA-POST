@@ -60,6 +60,12 @@ Ensure the following Environment Variables are set on Render:
 - `CLOUDINARY_API_SECRET`: Your API Secret.
 - `FB_VERIFY_TOKEN`: Token for Facebook Webhooks.
 
+## ⚠️ Considerations & Best Practices
+- **Rate Limits**: The Auto-Reply bot uses random delays (1-2 mins) to avoid Facebook spam filters. Monitor logs for 429 errors.
+- **Error Handling**: All API failures (Cloudinary, Facebook) trigger UI toasts. Check browser console for detailed logs.
+- **Mobile**: Dashboard is responsive, but ensure video playback works on older mobile browsers.
+- **Monitoring**: Regularly check Render logs for `[Scheduler]` and `[Bot]` activity to ensure background jobs are running.
+
 ## 🔮 Future Roadmap
 - **Analytics Dashboard**: Engagement tracking for posts and auto-replies.
 - **Multi-Page Posting**: Post to multiple pages simultaneously.
