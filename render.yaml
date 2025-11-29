@@ -34,6 +34,8 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+      - key: FFMPEG_PATH
+        sync: false # Optional: If needed for custom FFmpeg paths
 
   # --------------------------------------------------------------------------------
   # 🔵 Frontend Service (Static Site)
