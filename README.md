@@ -66,6 +66,19 @@ Ensure the following Environment Variables are set on Render:
 - **Mobile**: Dashboard is responsive, but ensure video playback works on older mobile browsers.
 - **Monitoring**: Regularly check Render logs for `[Scheduler]` and `[Bot]` activity to ensure background jobs are running.
 
+## ❓ Troubleshooting
+### 1️⃣ Pages Not Saving / Updating
+- **Stale JWT**: If you reconnected Facebook but still see old data, **log out and clear cookies**. The browser might be holding an old session.
+- **Permissions**: Ensure your Facebook App is in **Live Mode** and has `pages_manage_metadata` and `pages_read_engagement`.
+
+### 2️⃣ Auto-Reply Not Working
+- **Webhooks**: Verify `FB_VERIFY_TOKEN` matches in Render and Facebook Developer Dashboard.
+- **Rate Limits**: If the bot stops replying, check logs for `429 Too Many Requests`.
+
+### 3️⃣ Deployment Issues
+- **Database**: Ensure your MongoDB user has **read/write** permissions.
+- **Environment**: Double-check `CLOUDINARY_API_SECRET` and `JWT_SECRET` in Render.
+
 ## 🔮 Future Roadmap
 - **Analytics Dashboard**: Engagement tracking for posts and auto-replies.
 - **Multi-Page Posting**: Post to multiple pages simultaneously.
