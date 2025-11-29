@@ -61,6 +61,9 @@ class FacebookAPI {
         form.append("scheduled_publish_time", options.scheduleTime);
       }
 
+      // ✅ Critical for fast processing
+      form.append("upload_phase", "finish");
+
       const res = await this.http.post(`${this.graph}/${pageId}/videos`, form, {
         headers: form.getHeaders(),
       });
@@ -112,7 +115,8 @@ class FacebookAPI {
               account.access_token || accessToken,
               account.id,
               caption,
-              options.link
+              options.link,
+              options // ✅ Pass options for scheduling
             );
           } else {
             postResult = { success: false, error: "No media or link provided for Page post" };
@@ -161,13 +165,22 @@ class FacebookAPI {
   /* ------------------------------------------------------------ */
   /* ✅ Fallback: Share link (Pages & Groups)                      */
   /* ------------------------------------------------------------ */
-  async shareAsLink(accessToken, targetId, caption, link) {
+  async shareAsLink(accessToken, targetId, caption, link, options = {}) {
     try {
-      const res = await this.http.post(`${this.graph}/${targetId}/feed`, {
+      const payload = {
         message: caption,
         link: link,
         access_token: accessToken,
-      });
+      };
+
+      // 🕒 Scheduling Logic for Links
+      if (options.isScheduled && options.scheduleTime) {
+        console.log(`📅 Scheduling Link Post for: ${new Date(options.scheduleTime * 1000).toISOString()}`);
+        payload.published = false;
+        payload.scheduled_publish_time = options.scheduleTime;
+      }
+
+      const res = await this.http.post(`${this.graph}/${targetId}/feed`, payload);
       console.log(`✅ Shared link to ${targetId}`);
       return { success: true, postId: res.data.id };
     } catch (error) {
