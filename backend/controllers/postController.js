@@ -147,14 +147,25 @@ exports.createPost = async (req, res) => {
                 const fbVideoStream = fs.createReadStream(videoFile.path);
                 const fbThumbStream = thumbFile ? fs.createReadStream(thumbFile.path) : null;
 
+                // 🔍 Find Page Access Tokens
+                const targetAccounts = accountsArray.map(id => {
+                    const page = user.connectedPages.find(p => p.id === id);
+                    return {
+                        id,
+                        type: 'page',
+                        name: page?.name || 'Unknown Page',
+                        access_token: page?.access_token // ✅ Pass Page Token
+                    };
+                });
+
                 results = await fb.postToFB(
                     user.getDecryptedAccessToken(),
-                    accountsArray.map(id => ({ id, type: 'page' })),
-                    fbVideoStream, // ✅ Pass Stream
+                    targetAccounts, // ✅ Pass Full Account Objects
+                    fbVideoStream,
                     caption,
-                    fbThumbStream, // ✅ Pass Stream
+                    fbThumbStream,
                     {
-                        title, // ✅ Pass Title
+                        title,
                         isScheduled: !!scheduleTime,
                         scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null,
                         link: tiktokUrl
@@ -164,9 +175,20 @@ exports.createPost = async (req, res) => {
             } else if (directMediaUrl) {
                 videoUrlForDB = directMediaUrl;
 
+                // 🔍 Find Page Access Tokens
+                const targetAccounts = accountsArray.map(id => {
+                    const page = user.connectedPages.find(p => p.id === id);
+                    return {
+                        id,
+                        type: 'page',
+                        name: page?.name || 'Unknown Page',
+                        access_token: page?.access_token // ✅ Pass Page Token
+                    };
+                });
+
                 results = await fb.postToFB(
                     user.getDecryptedAccessToken(),
-                    accountsArray.map(id => ({ id, type: 'page' })),
+                    targetAccounts, // ✅ Pass Full Account Objects
                     videoUrlForDB,
                     caption,
                     null,
