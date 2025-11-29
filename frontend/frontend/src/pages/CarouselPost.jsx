@@ -62,6 +62,37 @@ const CarouselPost = () => {
         maxFiles: 1
     });
 
+    // Image Dropzone (Right Box)
+    const onDropImage = (acceptedFiles) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+
+        // Check Image Dimensions (Warn if not 1:1)
+        const img = new Image();
+        img.onload = () => {
+            if (img.width !== img.height) {
+                toast("⚠️ Image is not 1:1. Black padding will be added automatically.", {
+                    icon: "ℹ️",
+                    style: {
+                        borderRadius: '10px',
+                        background: '#333',
+                        color: '#fff',
+                    },
+                });
+            }
+            setImageFile(Object.assign(file, {
+                preview: URL.createObjectURL(file)
+            }));
+        };
+        img.src = URL.createObjectURL(file);
+    };
+
+    const { getRootProps: getImageRootProps, getInputProps: getImageInputProps } = useDropzone({
+        onDrop: onDropImage,
+        accept: { 'image/*': ['.jpg', '.jpeg', '.png'] },
+        maxFiles: 1
+    });
+
     const handleSubmit = async () => {
         if (!videoFile || !imageFile) return toast.error("Please upload both video and image");
         if (selectedAccounts.length === 0) return toast.error("Please select at least one page");
