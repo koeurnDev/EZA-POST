@@ -84,7 +84,7 @@ class FacebookAPI {
       }
 
       // ✅ Critical for fast processing
-      form.append("upload_phase", "finish");
+      // form.append("upload_phase", "finish"); // ❌ Removed: Causes (#194) error for non-resumable uploads
 
       const res = await this.http.post(`${this.graph}/${pageId}/videos`, form, {
         headers: form.getHeaders(),
