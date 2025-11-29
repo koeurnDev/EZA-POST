@@ -66,6 +66,7 @@ const allowedOrigins = [
   "http://127.0.0.1:5173",
   "http://127.0.0.1:3000",
   "https://eza-post-frontend.vercel.app", // ✅ Explicitly allow main Vercel domain
+  "https://eza-post.vercel.app", // ✅ Added user's specific Vercel domain
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
