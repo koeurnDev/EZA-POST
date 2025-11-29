@@ -154,7 +154,7 @@ exports.createPost = async (req, res) => {
                         id,
                         type: 'page',
                         name: page?.name || 'Unknown Page',
-                        access_token: page?.access_token // ✅ Pass Page Token
+                        access_token: user.getDecryptedPageToken(id) // ✅ Decrypt Page Token
                     };
                 });
 
@@ -182,7 +182,7 @@ exports.createPost = async (req, res) => {
                         id,
                         type: 'page',
                         name: page?.name || 'Unknown Page',
-                        access_token: page?.access_token // ✅ Pass Page Token
+                        access_token: user.getDecryptedPageToken(id) // ✅ Decrypt Page Token
                     };
                 });
 
