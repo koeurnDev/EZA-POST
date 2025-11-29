@@ -9,18 +9,19 @@ const path = require("path");
 const fs = require("fs");
 const ScheduledPost = require("../../models/ScheduledPost"); // ✅ MongoDB Model
 const { requireAuth } = require("../../utils/auth");
+const { uploadFile } = require("../../utils/cloudinary"); // ✅ Cloudinary
 
-// 🗂️ Ensure uploads directory exists
-const uploadDir = path.join(__dirname, "../../uploads/videos");
-const thumbDir = path.join(__dirname, "../../uploads/thumbnails");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+// 🗂️ Ensure temp directories exist
+const tempVideoDir = path.join(__dirname, "../../temp/videos");
+const tempThumbDir = path.join(__dirname, "../../temp/thumbnails");
+if (!fs.existsSync(tempVideoDir)) fs.mkdirSync(tempVideoDir, { recursive: true });
+if (!fs.existsSync(tempThumbDir)) fs.mkdirSync(tempThumbDir, { recursive: true });
 
-// 📦 Multer setup (max 100MB)
+// 📦 Multer setup (max 100MB) - Save to TEMP
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    if (file.fieldname === "thumbnail") cb(null, thumbDir);
-    else cb(null, uploadDir);
+    if (file.fieldname === "thumbnail") cb(null, tempThumbDir);
+    else cb(null, tempVideoDir);
   },
   filename: (_, file, cb) => {
     const ext = path.extname(file.originalname);
@@ -54,7 +55,7 @@ const upload = multer({
 // ============================================================
 router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
   try {
-    const { caption, accounts, scheduleTime, tiktokUrl } = req.body; // ✅ Added tiktokUrl
+    const { caption, accounts, scheduleTime, tiktokUrl } = req.body;
     const userId = req.user?.id;
 
     // Multer fields
@@ -62,7 +63,7 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
     const thumbFile = req.files?.['thumbnail']?.[0];
 
     // 🛑 Validate fields
-    if (!videoFile && !tiktokUrl) // ✅ Allow tiktokUrl
+    if (!videoFile && !tiktokUrl)
       return res
         .status(400)
         .json({ success: false, error: "No video file or TikTok URL provided" });
@@ -81,37 +82,49 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
     }
 
     // 📥 Handle Video Source (File vs TikTok)
-    let videoBuffer;
-    let filename;
     let videoUrlForDB;
     let videoSizeMB = 0;
+    let videoPublicId;
 
     if (videoFile) {
-      // 📂 Local File Upload
-      videoBuffer = fs.readFileSync(videoFile.path);
-      filename = videoFile.filename;
-      videoUrlForDB = `/uploads/videos/${filename}`;
-      videoSizeMB = videoFile.size / (1024 * 1024);
+      // 📂 Local File Upload -> Cloudinary
+      console.log(`📤 Uploading local video to Cloudinary: ${videoFile.filename}`);
+      const result = await uploadFile(videoFile.path, "kr_post/videos", "video");
+      videoUrlForDB = result.url;
+      videoPublicId = result.publicId;
+      videoSizeMB = result.size / (1024 * 1024);
+      // Local file is deleted by uploadFile utility
     } else if (tiktokUrl) {
-      // 🎵 TikTok Download
+      // 🎵 TikTok Download -> Cloudinary
       console.log(`📥 Downloading TikTok video: ${tiktokUrl}`);
       const tiktokDownloader = require("../../utils/tiktokDownloader");
 
       try {
-        const downloadResult = await tiktokDownloader.downloadTiktokVideo(tiktokUrl);
-        videoBuffer = downloadResult; // It returns buffer directly based on my check
+        const videoBuffer = await tiktokDownloader.downloadTiktokVideo(tiktokUrl);
 
-        // Save to disk for serving
-        filename = `tiktok_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.mp4`;
-        const savePath = path.join(uploadDir, filename);
-        fs.writeFileSync(savePath, videoBuffer);
+        // Save to temp file first (Cloudinary uploader needs path)
+        const tempFilename = `tiktok_${Date.now()}.mp4`;
+        const tempFilePath = path.join(tempVideoDir, tempFilename);
+        fs.writeFileSync(tempFilePath, videoBuffer);
 
-        videoUrlForDB = `/uploads/videos/${filename}`;
-        videoSizeMB = videoBuffer.length / (1024 * 1024);
+        console.log(`📤 Uploading TikTok video to Cloudinary...`);
+        const result = await uploadFile(tempFilePath, "kr_post/videos", "video");
+        videoUrlForDB = result.url;
+        videoPublicId = result.publicId;
+        videoSizeMB = result.size / (1024 * 1024);
+        // uploadFile deletes the temp file
       } catch (err) {
-        console.error("❌ TikTok download failed:", err.message);
-        return res.status(400).json({ success: false, error: "Failed to download TikTok video: " + err.message });
+        console.error("❌ TikTok processing failed:", err.message);
+        return res.status(400).json({ success: false, error: "Failed to process TikTok video: " + err.message });
       }
+    }
+
+    // 🖼️ Handle Thumbnail
+    let thumbnailUrlForDB = null;
+    if (thumbFile) {
+      console.log(`📤 Uploading thumbnail to Cloudinary...`);
+      const result = await uploadFile(thumbFile.path, "kr_post/thumbnails", "image");
+      thumbnailUrlForDB = result.url;
     }
 
     // 💾 Save post record (MongoDB)
@@ -122,7 +135,7 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       user_id: userId,
       caption,
       video_url: videoUrlForDB,
-      thumbnail_url: thumbFile ? `/uploads/thumbnails/${thumbFile.filename}` : null,
+      thumbnail_url: thumbnailUrlForDB,
       accounts: accountsArray,
       schedule_time: scheduleTime ? new Date(scheduleTime) : new Date(),
       status: "processing",
@@ -141,20 +154,13 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       throw new Error("User not connected to Facebook");
     }
 
-    // Prepare Thumbnail
-    let thumbnailObj = null;
-    if (thumbFile) {
-      const thumbBuffer = fs.readFileSync(thumbFile.path);
-      thumbnailObj = { buffer: thumbBuffer };
-    }
-
-    // Upload
+    // Upload to Facebook using Cloudinary URL
     const results = await fb.postToFB(
       user.getDecryptedAccessToken(),
-      accountsArray.map(id => ({ id, type: 'page' })), // Assuming all are pages for now, or logic handles it
-      videoBuffer,
+      accountsArray.map(id => ({ id, type: 'page' })), // Assuming all are pages for now
+      videoUrlForDB, // ✅ Pass URL instead of buffer
       caption,
-      thumbnailObj,
+      null, // Thumbnail buffer not needed if we rely on FB to pick it up or if we pass url (FB API usually takes video url)
       {
         isScheduled: !!scheduleTime,
         scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
@@ -179,7 +185,7 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       results: results,
       video: {
         url: videoUrlForDB,
-        name: filename,
+        name: videoPublicId,
         size: `${videoSizeMB.toFixed(2)} MB`,
       },
       caption,

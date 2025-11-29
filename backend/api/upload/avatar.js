@@ -3,19 +3,20 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
+const { uploadFile } = require("../../utils/cloudinary");
 
 const router = express.Router();
 
-// 🗂️ Ensure upload directory exists
-const uploadDir = path.join(__dirname, "../../uploads/avatars");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// 🗂️ Ensure temp directory exists
+const tempDir = path.join(__dirname, "../../temp/avatars");
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
 // 🎨 Allowed MIME types
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
-// 💾 Configure multer disk storage
+// 💾 Configure multer disk storage (Temporary)
 const storage = multer.diskStorage({
-    destination: (_, __, cb) => cb(null, uploadDir),
+    destination: (_, __, cb) => cb(null, tempDir),
     filename: (_, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
         const safeName = `${Date.now()}-${Math.random()
@@ -47,35 +48,29 @@ router.post("/", requireAuth, upload.single("avatar"), async (req, res) => {
             });
         }
 
-        const { filename, size, mimetype } = req.file;
-        const relativePath = `/uploads/avatars/${filename}`;
-        const fullUrl = `${req.protocol}://${req.get("host")}${relativePath}`;
+        console.log(`📤 Uploading avatar to Cloudinary: ${req.file.filename}`);
+
+        // ☁️ Upload to Cloudinary
+        const result = await uploadFile(req.file.path, "kr_post/avatars", "image");
 
         const fileData = {
             success: true,
             message: "✅ Avatar uploaded successfully",
             file: {
-                name: filename,
-                url: fullUrl,
-                path: relativePath,
-                sizeKB: `${(size / 1024).toFixed(2)} KB`,
-                type: mimetype,
+                name: result.publicId,
+                url: result.url,
+                path: result.url,
+                sizeKB: `${(result.size / 1024).toFixed(2)} KB`,
+                type: req.file.mimetype,
                 uploadedAt: new Date().toISOString(),
+                publicId: result.publicId,
             },
         };
 
-        console.log(`🖼️ Uploaded avatar: ${filename} (${fileData.file.sizeKB})`);
+        console.log(`🖼️ Upload complete: ${result.publicId}`);
         return res.status(201).json(fileData);
     } catch (err) {
         console.error("❌ Avatar upload failed:", err.message);
-
-        // 🧹 Clean up partial upload
-        if (req.file?.path && fs.existsSync(req.file.path)) {
-            fs.unlink(req.file.path, () =>
-                console.log(`🧹 Deleted failed upload: ${req.file.filename}`)
-            );
-        }
-
         return res.status(500).json({
             success: false,
             error: "Avatar upload failed.",
@@ -84,3 +79,4 @@ router.post("/", requireAuth, upload.single("avatar"), async (req, res) => {
 });
 
 module.exports = router;
+

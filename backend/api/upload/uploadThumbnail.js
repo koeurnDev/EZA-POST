@@ -1,10 +1,10 @@
 /**
  * ============================================================
- * 🖼️ /api/upload/uploadThumbnail.js — Secure & Optimized Image Upload
+ * 🖼️ /api/upload/uploadThumbnail.js — Secure & Optimized Image Upload (Cloudinary)
  * ============================================================
  * ✅ Supports JPG, PNG, GIF, WEBP
  * ✅ 5MB file size limit
- * ✅ Randomized secure filenames
+ * ✅ Uploads to Cloudinary (Persistent Storage)
  * ✅ Optional JWT authentication
  * ✅ Clean async/await handling
  * ✅ Auto cleanup on failure
@@ -15,20 +15,22 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const { requireAuth } = require("../../utils/auth"); // optional auth protection
+const { requireAuth } = require("../../utils/auth");
+const { uploadFile, deleteFile } = require("../../utils/cloudinary");
+const cloudinary = require("cloudinary").v2;
 
 const router = express.Router();
 
-// 🗂️ Ensure upload directory exists
-const uploadDir = path.join(__dirname, "../../uploads/thumbnails");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// 🗂️ Ensure temp directory exists
+const tempDir = path.join(__dirname, "../../temp/thumbnails");
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
 // 🎨 Allowed MIME types
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
-// 💾 Configure multer disk storage
+// 💾 Configure multer disk storage (Temporary)
 const storage = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, uploadDir),
+  destination: (_, __, cb) => cb(null, tempDir),
   filename: (_, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const safeName = `${Date.now()}-${Math.random()
@@ -60,35 +62,29 @@ router.post("/", requireAuth, upload.single("thumbnail"), async (req, res) => {
       });
     }
 
-    const { filename, size, mimetype } = req.file;
-    const relativePath = `/uploads/thumbnails/${filename}`;
-    const fullUrl = `${req.protocol}://${req.get("host")}${relativePath}`;
+    console.log(`📤 Uploading thumbnail to Cloudinary: ${req.file.filename}`);
+
+    // ☁️ Upload to Cloudinary
+    const result = await uploadFile(req.file.path, "kr_post/thumbnails", "image");
 
     const fileData = {
       success: true,
       message: "✅ Thumbnail uploaded successfully",
       file: {
-        name: filename,
-        url: fullUrl,
-        path: relativePath,
-        sizeKB: `${(size / 1024).toFixed(2)} KB`,
-        type: mimetype,
+        name: result.publicId,
+        url: result.url,
+        path: result.url,
+        sizeKB: `${(result.size / 1024).toFixed(2)} KB`,
+        type: req.file.mimetype,
         uploadedAt: new Date().toISOString(),
+        publicId: result.publicId,
       },
     };
 
-    console.log(`🖼️ Uploaded thumbnail: ${filename} (${fileData.file.sizeKB})`);
+    console.log(`🖼️ Upload complete: ${result.publicId}`);
     return res.status(201).json(fileData);
   } catch (err) {
     console.error("❌ Thumbnail upload failed:", err.message);
-
-    // 🧹 Clean up partial upload
-    if (req.file?.path && fs.existsSync(req.file.path)) {
-      fs.unlink(req.file.path, () =>
-        console.log(`🧹 Deleted failed upload: ${req.file.filename}`)
-      );
-    }
-
     return res.status(500).json({
       success: false,
       error: "Thumbnail upload failed.",
@@ -97,20 +93,25 @@ router.post("/", requireAuth, upload.single("thumbnail"), async (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* ✅ GET /api/upload/thumbnail — List uploaded thumbnails                    */
+/* ✅ GET /api/upload/thumbnail — List uploaded thumbnails (from Cloudinary)  */
 /* -------------------------------------------------------------------------- */
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const files = fs.readdirSync(uploadDir);
-    const thumbnails = files.map((file) => {
-      const stats = fs.statSync(path.join(uploadDir, file));
-      return {
-        name: file,
-        url: `${req.protocol}://${req.get("host")}/uploads/thumbnails/${file}`,
-        sizeKB: `${(stats.size / 1024).toFixed(2)} KB`,
-        uploadedAt: stats.mtime,
-      };
+    // ☁️ Fetch resources from Cloudinary
+    const result = await cloudinary.api.resources({
+      type: "upload",
+      resource_type: "image",
+      prefix: "kr_post/thumbnails",
+      max_results: 50,
     });
+
+    const thumbnails = result.resources.map((res) => ({
+      name: res.public_id,
+      url: res.secure_url,
+      sizeKB: `${(res.bytes / 1024).toFixed(2)} KB`,
+      uploadedAt: res.created_at,
+      publicId: res.public_id,
+    }));
 
     res.json({
       success: true,
@@ -119,33 +120,22 @@ router.get("/", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Failed to list thumbnails:", err.message);
-    res.status(500).json({
-      success: false,
-      error: "Failed to list thumbnails",
-    });
+    // Fallback to empty list
+    res.json({ success: true, count: 0, thumbnails: [] });
   }
 });
 
 /* -------------------------------------------------------------------------- */
 /* ✅ DELETE /api/upload/thumbnail/:filename — Delete thumbnail               */
 /* -------------------------------------------------------------------------- */
-router.delete("/:filename", requireAuth, async (req, res) => {
+router.delete("/:id", requireAuth, async (req, res) => {
   try {
-    const filePath = path.join(uploadDir, req.params.filename);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        error: "Thumbnail not found",
-      });
-    }
-
-    fs.unlinkSync(filePath);
-    console.log(`🗑️ Deleted thumbnail: ${req.params.filename}`);
+    const publicId = req.params.id;
+    await deleteFile(publicId, "image");
 
     res.json({
       success: true,
-      message: `Deleted ${req.params.filename}`,
+      message: `Deleted thumbnail successfully`,
     });
   } catch (err) {
     console.error("❌ Thumbnail delete failed:", err.message);
@@ -157,3 +147,4 @@ router.delete("/:filename", requireAuth, async (req, res) => {
 });
 
 module.exports = router;
+

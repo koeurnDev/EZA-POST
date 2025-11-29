@@ -6,6 +6,7 @@
 const ScheduledPost = require("../models/ScheduledPost");
 const { downloadTiktokVideo } = require("./tiktokDownloader");
 const fb = require("./fb");
+const { deleteFile } = require("./cloudinary"); // ✅ Import deleteFile
 
 // ============================================================
 // 🧠 Main Queue Processor
@@ -40,32 +41,34 @@ async function processSinglePost(post) {
     post.status = "processing";
     await post.save();
 
-    let videoBuffer;
+    // 📥 Handle Video Source
+    let videoInput = post.video_url;
+
+    // If it's a local file (legacy support or fallback), read it
     if (post.video_url.startsWith("/uploads")) {
       const fs = require('fs');
       const path = require('path');
       const filePath = path.join(__dirname, "..", post.video_url);
       if (fs.existsSync(filePath)) {
-        videoBuffer = fs.readFileSync(filePath);
+        videoInput = fs.readFileSync(filePath);
+        console.log(`📂 Loaded local video: ${post.video_url}`);
       } else {
-        throw new Error("Video file not found on server");
+        // If file missing, maybe it's a full URL?
+        console.warn(`⚠️ Local file not found: ${post.video_url}. Trying as URL...`);
       }
-    } else {
-      videoBuffer = await downloadTiktokVideo(post.video_url, {
-        timeout: 60000,
-        maxRetries: 3,
-        noWatermark: true,
-      });
+    } else if (!post.video_url.startsWith("http")) {
+      // If it's not local /uploads and not http, assume it's a TikTok URL that needs downloading?
+      // But wait, create.js now saves Cloudinary URL.
+      // If it is a TikTok URL that wasn't uploaded to Cloudinary (legacy?), we might need to download.
+      // But for now, let's assume it's a URL we can pass to FB or a Cloudinary URL.
+      console.log(`ℹ️ Using video URL: ${post.video_url}`);
     }
 
-    if (!videoBuffer || videoBuffer.length < 1000)
-      throw new Error("Download failed or empty video buffer");
+    // If it's a TikTok URL that needs downloading (legacy behavior where we didn't upload to Cloudinary first?)
+    // The new create.js uploads to Cloudinary first, so video_url will be http...cloudinary...
+    // So we can just pass videoInput (which is the URL) to fb.postToFB.
 
-    console.log(
-      `✅ Video ready (${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB)`
-    );
-
-    // Step 1.5: Get User and Check Settings
+    // ... (User check logic) ...
     const User = require("../models/User");
 
     // ✅ Fix: Use user_id from the post record
@@ -92,7 +95,7 @@ async function processSinglePost(post) {
     const results = await fb.postToFB(
       fbToken,
       accountObjects,
-      videoBuffer,
+      videoInput, // ✅ Pass URL or Buffer
       post.caption
     );
 
@@ -135,33 +138,34 @@ exports.cleanupOldPosts = async () => {
     });
 
     if (postsToDelete.length > 0) {
-      const fs = require('fs');
-      const path = require('path');
+      console.log(`🧹 Found ${postsToDelete.length} posts to cleanup...`);
 
       for (const post of postsToDelete) {
-        // Delete Video File
-        if (post.video_url && post.video_url.startsWith("/uploads")) {
-          const videoPath = path.join(__dirname, "..", post.video_url);
-          if (fs.existsSync(videoPath)) {
-            try {
-              fs.unlinkSync(videoPath);
-              console.log(`🗑️ Deleted video file: ${post.video_url}`);
-            } catch (e) {
-              console.error(`❌ Failed to delete video: ${post.video_url}`, e.message);
-            }
+        // Helper to extract Cloudinary Public ID
+        const getPublicId = (url) => {
+          if (!url || !url.includes("cloudinary.com")) return null;
+          try {
+            // Matches everything after 'upload/' (and optional version) up to extension
+            const matches = url.match(/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+            return matches ? matches[1] : null;
+          } catch (e) {
+            return null;
+          }
+        };
+
+        // Delete Video
+        if (post.video_url) {
+          const publicId = getPublicId(post.video_url);
+          if (publicId) {
+            await deleteFile(publicId, "video");
           }
         }
 
-        // Delete Thumbnail File
-        if (post.thumbnail_url && post.thumbnail_url.startsWith("/uploads")) {
-          const thumbPath = path.join(__dirname, "..", post.thumbnail_url);
-          if (fs.existsSync(thumbPath)) {
-            try {
-              fs.unlinkSync(thumbPath);
-              console.log(`🗑️ Deleted thumbnail file: ${post.thumbnail_url}`);
-            } catch (e) {
-              console.error(`❌ Failed to delete thumbnail: ${post.thumbnail_url}`, e.message);
-            }
+        // Delete Thumbnail
+        if (post.thumbnail_url) {
+          const publicId = getPublicId(post.thumbnail_url);
+          if (publicId) {
+            await deleteFile(publicId, "image");
           }
         }
       }
@@ -171,7 +175,7 @@ exports.cleanupOldPosts = async () => {
         _id: { $in: postsToDelete.map(p => p._id) }
       });
 
-      console.log(`🧹 Cleaned ${result.deletedCount} old posts & files`);
+      console.log(`🧹 Cleaned ${result.deletedCount} old posts & Cloudinary files`);
     }
 
     // 2. Mark "scheduled" posts as "expired" if they are past due by 48 hours

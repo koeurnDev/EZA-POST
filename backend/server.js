@@ -210,21 +210,9 @@ if (fs.existsSync(distPath)) {
   console.log("✅ Serving frontend from dist folder");
 }
 
-// ✅ Serve Uploads Directory
-const uploadsPath = path.join(__dirname, "uploads");
-const videosPath = path.join(uploadsPath, "videos");
-const thumbnailsPath = path.join(uploadsPath, "thumbnails");
-
-// Ensure directories exist
-[uploadsPath, videosPath, thumbnailsPath].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    console.log(`📂 Creating directory: ${dir}`);
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
-
-app.use("/uploads", express.static(uploadsPath));
-console.log("✅ Serving uploads from:", uploadsPath);
+// ✅ Uploads are now handled by Cloudinary (no local serving needed)
+// const uploadsPath = path.join(__dirname, "uploads");
+// app.use("/uploads", express.static(uploadsPath));
 
 // ✅ SPA fallback
 app.get("*", (req, res) => {

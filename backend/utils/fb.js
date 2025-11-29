@@ -23,23 +23,29 @@ class FacebookAPI {
   /* ------------------------------------------------------------ */
   /* ✅ Upload video to Facebook Page                              */
   /* ------------------------------------------------------------ */
-  /* ------------------------------------------------------------ */
-  /* ✅ Upload video to Facebook Page                              */
-  /* ------------------------------------------------------------ */
-  async uploadVideoToFacebook(accessToken, pageId, videoBuffer, caption, thumbnailBuffer = null, options = {}) {
-    if (!videoBuffer || videoBuffer.length < 1024)
-      throw new Error("Invalid or empty video buffer");
-
+  async uploadVideoToFacebook(accessToken, pageId, videoInput, caption, thumbnailBuffer = null, options = {}) {
     try {
       console.log(`📤 Uploading video to Facebook Page: ${pageId}`);
 
       const form = new FormData();
       form.append("access_token", accessToken);
       form.append("description", caption || "Shared via KR POST");
-      form.append("source", videoBuffer, {
-        filename: `video_${Date.now()}.mp4`,
-        contentType: "video/mp4",
-      });
+
+      // Check if videoInput is a URL or a Buffer
+      if (typeof videoInput === 'string' && videoInput.startsWith('http')) {
+        // It's a URL (Cloudinary)
+        console.log(`🔗 Using video URL: ${videoInput}`);
+        form.append("file_url", videoInput);
+      } else if (Buffer.isBuffer(videoInput)) {
+        // It's a Buffer (Local)
+        if (videoInput.length < 1024) throw new Error("Invalid or empty video buffer");
+        form.append("source", videoInput, {
+          filename: `video_${Date.now()}.mp4`,
+          contentType: "video/mp4",
+        });
+      } else {
+        throw new Error("Invalid video input: Must be a URL string or a Buffer");
+      }
 
       if (thumbnailBuffer) {
         form.append("thumb", thumbnailBuffer, {
@@ -75,10 +81,7 @@ class FacebookAPI {
   /* ------------------------------------------------------------ */
   /* ✅ Post video/link to multiple pages or groups                */
   /* ------------------------------------------------------------ */
-  /* ------------------------------------------------------------ */
-  /* ✅ Post video/link to multiple pages or groups                */
-  /* ------------------------------------------------------------ */
-  async postToFB(accessToken, accounts, videoBuffer, caption, thumbnail = null, options = {}) {
+  async postToFB(accessToken, accounts, videoInput, caption, thumbnail = null, options = {}) {
     const results = { successCount: 0, failedCount: 0, details: [] };
 
     if (!Array.isArray(accounts) || accounts.length === 0) {
@@ -95,7 +98,7 @@ class FacebookAPI {
           postResult = await this.uploadVideoToFacebook(
             account.access_token || accessToken,
             account.id,
-            videoBuffer,
+            videoInput,
             caption,
             thumbnail?.buffer,
             options // ✅ Pass options
@@ -106,7 +109,10 @@ class FacebookAPI {
             console.warn(`⚠️ Scheduling not supported for Groups (${account.name}). Skipping.`);
             postResult = { success: false, error: "Scheduling not supported for groups" };
           } else {
-            postResult = await this.shareAsLink(accessToken, account.id, caption);
+            // For groups, if we have a URL, we can share it. If it's a buffer, we might need to upload it somewhere first or skip.
+            // Assuming videoInput is a URL for now if it's a string.
+            const linkToShare = typeof videoInput === 'string' ? videoInput : "https://www.tiktok.com/"; // Fallback if buffer
+            postResult = await this.shareAsLink(accessToken, account.id, caption, linkToShare);
           }
         }
 

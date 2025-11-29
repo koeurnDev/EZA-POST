@@ -8,15 +8,16 @@ const path = require("path");
 const fs = require("fs");
 const ScheduledPost = require("../../models/ScheduledPost"); // ✅ MongoDB Model
 const { requireAuth } = require("../../utils/auth");
+const { uploadFile } = require("../../utils/cloudinary"); // ✅ Cloudinary
 const router = express.Router();
 
-// 🗂️ Ensure uploads directory exists
-const uploadDir = path.join(__dirname, "../../uploads/videos");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// 🗂️ Ensure temp directory exists
+const tempDir = path.join(__dirname, "../../temp/videos");
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-// 📦 Multer setup (max 100MB)
+// 📦 Multer setup (max 100MB) - Save to TEMP
 const storage = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, uploadDir),
+  destination: (_, __, cb) => cb(null, tempDir),
   filename: (_, file, cb) => {
     const ext = path.extname(file.originalname);
     const safeName = `${Date.now()}-${Math.random()
@@ -75,10 +76,13 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
         .json({ success: false, error: "Invalid accounts format" });
     }
 
-    // 💾 Store scheduled post (MongoDB)
-    const filename = file.filename;
-    const videoUrl = `/uploads/videos/${filename}`;
+    // 📤 Upload to Cloudinary
+    console.log(`📤 Uploading scheduled video to Cloudinary: ${file.filename}`);
+    const result = await uploadFile(file.path, "kr_post/videos", "video");
+    const videoUrl = result.url;
+    // Local file is deleted by uploadFile utility
 
+    // 💾 Store scheduled post (MongoDB)
     const newPost = await ScheduledPost.create({
       id: `post_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, // Generate ID
       user_id: userId, // Match schema
@@ -106,7 +110,7 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
     console.error("❌ Schedule post error:", err.message);
     return res
       .status(500)
-      .json({ success: false, error: "Failed to schedule post" });
+      .json({ success: false, error: "Failed to schedule post: " + err.message });
   }
 });
 
