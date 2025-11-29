@@ -205,36 +205,35 @@ export default function PostComposer() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-                        Create New Post
-                    </h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-2 text-lg">
-                        Share your content across multiple pages instantly.
-                    </p>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Create Post</h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2">Share your content across multiple pages instantly.</p>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* 👈 Left Column: Inputs */}
-                    <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    {/* 👈 Left Column: Inputs (Span 7) */}
+                    <div className="lg:col-span-7 space-y-6">
+
                         {/* 📄 Page Selection */}
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <CheckCircle2 className="text-blue-500" size={20} />
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <div className="p-1.5 bg-blue-100 text-blue-600 rounded-lg dark:bg-blue-900/30 dark:text-blue-400">
+                                        <CheckCircle2 size={18} />
+                                    </div>
                                     Select Pages
                                 </h3>
-                                <Link to="/settings" className="text-xs text-blue-600 hover:underline">
+                                <Link to="/settings" className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline">
                                     Manage Pages
                                 </Link>
                             </div>
 
                             {availablePages.length === 0 ? (
-                                <div className="text-center py-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
-                                    <AlertCircle className="mx-auto text-gray-400 mb-2" size={24} />
-                                    <p className="text-sm text-gray-500">No active pages found.</p>
-                                    <Link to="/settings" className="text-xs text-blue-600 font-medium hover:underline mt-1 block">
+                                <div className="text-center py-8 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                                    <AlertCircle className="mx-auto text-gray-400 mb-3" size={32} />
+                                    <p className="text-gray-500 dark:text-gray-400 font-medium">No active pages found.</p>
+                                    <Link to="/settings" className="text-sm text-blue-600 font-bold hover:underline mt-2 block">
                                         Connect in Settings
                                     </Link>
                                 </div>
@@ -250,28 +249,28 @@ export default function PostComposer() {
                                                         : [...prev, page.id]
                                                 );
                                             }}
-                                            className={`cursor-pointer flex items-center gap-3 p-3 rounded-xl border transition-all ${selectedPages.includes(page.id)
-                                                ? "bg-blue-50 dark:bg-blue-900/20 border-blue-500 shadow-sm"
-                                                : "bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-700 hover:border-blue-300"
+                                            className={`cursor-pointer flex items-center gap-4 p-4 rounded-2xl border transition-all duration-200 ${selectedPages.includes(page.id)
+                                                ? "bg-blue-50/50 dark:bg-blue-900/20 border-blue-500 shadow-sm ring-1 ring-blue-500"
+                                                : "bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-white dark:hover:bg-gray-800"
                                                 }`}
                                         >
                                             <div className="relative">
                                                 <img
                                                     src={page.picture || "https://via.placeholder.com/40"}
                                                     alt={page.name}
-                                                    className="w-10 h-10 rounded-full object-cover bg-white"
+                                                    className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm"
                                                 />
                                                 {selectedPages.includes(page.id) && (
                                                     <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-0.5 rounded-full border-2 border-white dark:border-gray-800">
-                                                        <CheckCircle2 size={10} />
+                                                        <CheckCircle2 size={12} />
                                                     </div>
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className={`text-sm font-semibold truncate ${selectedPages.includes(page.id) ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300"}`}>
+                                                <p className={`font-bold truncate ${selectedPages.includes(page.id) ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-400"}`}>
                                                     {page.name}
                                                 </p>
-                                                <p className="text-xs text-gray-400 truncate">ID: {page.id}</p>
+                                                <p className="text-xs text-gray-400 truncate font-mono">ID: {page.id}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -279,54 +278,30 @@ export default function PostComposer() {
                             )}
                         </div>
 
-                        {/* 🎵 TikTok URL Input */}
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                TikTok URL (Optional)
-                            </label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={tiktokUrl}
-                                    onChange={(e) => setTiktokUrl(e.target.value)}
-                                    placeholder="Paste TikTok video URL here..."
-                                    className="flex-1 p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                />
-                                <Button
-                                    onClick={handleLoadTiktok}
-                                    disabled={!tiktokUrl || isLoadingVideo}
-                                    isLoading={isLoadingVideo}
-                                    className="whitespace-nowrap"
-                                >
-                                    Load
-                                </Button>
-                            </div>
-                        </div>
-
                         {/* 📝 Caption Input */}
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3">
                                 Caption
                             </label>
                             <textarea
                                 value={caption}
                                 onChange={(e) => setCaption(e.target.value)}
                                 placeholder="What's on your mind?"
-                                rows={4}
-                                className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                                rows={5}
+                                className="w-full p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none text-gray-900 dark:text-white placeholder-gray-400"
                             />
                         </div>
 
                         {/* 📅 Scheduling Toggle */}
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${isScheduling ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-500"}`}>
+                                    <div className={`p-2 rounded-xl ${isScheduling ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"}`}>
                                         <Calendar size={20} />
                                     </div>
                                     <div>
-                                        <h3 className="font-medium text-gray-900 dark:text-white">Schedule Post</h3>
-                                        <p className="text-xs text-gray-500">Publish at a later time</p>
+                                        <h3 className="font-bold text-gray-900 dark:text-white">Schedule Post</h3>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Publish at a later time</p>
                                     </div>
                                 </div>
                                 <label className="relative inline-flex items-center cursor-pointer">
@@ -336,7 +311,7 @@ export default function PostComposer() {
                                         onChange={(e) => setIsScheduling(e.target.checked)}
                                         className="sr-only peer"
                                     />
-                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-orange-500"></div>
                                 </label>
                             </div>
 
@@ -347,100 +322,138 @@ export default function PostComposer() {
                                             type="datetime-local"
                                             value={scheduleTime}
                                             onChange={(e) => setScheduleTime(e.target.value)}
-                                            className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+                                            className="w-full p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
                                         />
                                     </motion.div>
                                 )}
                             </AnimatePresence>
                         </div>
 
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={(!file && !previewUrl && !tiktokUrl && !caption) || selectedPages.length === 0}
-                            isLoading={isSubmitting}
-                            fullWidth
-                            size="large"
-                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.02] shadow-lg"
-                        >
-                            {isScheduling ? <><Calendar size={20} /> Schedule Post</> : <><Send size={20} /> Post Now</>}
-                        </Button>
+                        {/* Action Button (Mobile Only - Bottom) */}
+                        <div className="lg:hidden">
+                            <Button
+                                onClick={handleSubmit}
+                                disabled={(!file && !previewUrl && !tiktokUrl && !caption) || selectedPages.length === 0}
+                                isLoading={isSubmitting}
+                                fullWidth
+                                size="large"
+                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.02] shadow-lg rounded-2xl py-4"
+                            >
+                                {isScheduling ? <><Calendar size={20} /> Schedule Post</> : <><Send size={20} /> Post Now</>}
+                            </Button>
+                        </div>
                     </div>
 
-                    {/* 👉 Right Column: Media Upload */}
-                    <div className="space-y-6">
-                        {/* 🎬 Video Upload (Premium & Responsive) */}
-                        <div
-                            className={`relative w-full aspect-[4/5] sm:aspect-square bg-gradient-to-br from-gray-900 to-black rounded-3xl overflow-hidden border-2 border-dashed transition-all duration-300 group flex items-center justify-center ${file ? "border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.3)]" : "border-gray-700 hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)]"}`}
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={handleDrop}
-                        >
-                            {previewUrl ? (
-                                <div className="relative w-full h-full flex items-center justify-center bg-black">
-                                    <video src={previewUrl} controls className="w-full h-full object-contain" />
-                                    <button
-                                        onClick={() => { setFile(null); setPreviewUrl(null); }}
-                                        className="absolute top-4 right-4 p-2.5 bg-black/60 text-white rounded-full hover:bg-red-500 transition-all backdrop-blur-md border border-white/10 shadow-lg"
-                                    >
-                                        <X size={20} />
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="text-center space-y-6 p-8 relative z-10">
-                                    {/* Animated Icon Background */}
-                                    <div className="relative w-24 h-24 mx-auto group-hover:scale-110 transition-transform duration-500">
-                                        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl animate-pulse"></div>
-                                        <div className="relative w-full h-full bg-gray-800/80 backdrop-blur-sm rounded-full flex items-center justify-center border border-gray-700 group-hover:border-blue-500/50 transition-colors">
-                                            <Upload size={40} className="text-gray-400 group-hover:text-blue-400 transition-colors" />
-                                        </div>
-                                    </div>
+                    {/* 👉 Right Column: Media (Span 5) - Sticky */}
+                    <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-8">
 
-                                    <div className="space-y-2">
-                                        <h3 className="text-2xl font-bold text-white tracking-tight">Upload Video</h3>
-                                        <p className="text-gray-400 text-sm max-w-[200px] mx-auto leading-relaxed">
-                                            Drag & drop your video here or browse files
-                                        </p>
-                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/50 border border-gray-700 text-xs text-gray-400 mt-2">
-                                            <Clock size={12} />
-                                            <span>Max 60 seconds</span>
-                                        </div>
+                        {/* 🎬 Video Upload (Premium) */}
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-2 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <div
+                                className={`relative w-full aspect-[4/5] bg-gray-900 rounded-2xl overflow-hidden border-2 border-dashed transition-all duration-300 group flex items-center justify-center ${file ? "border-blue-500 shadow-lg" : "border-gray-700 hover:border-blue-500"}`}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={handleDrop}
+                            >
+                                {previewUrl ? (
+                                    <div className="relative w-full h-full flex items-center justify-center bg-black">
+                                        <video src={previewUrl} controls className="w-full h-full object-contain" />
+                                        <button
+                                            onClick={() => { setFile(null); setPreviewUrl(null); }}
+                                            className="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-red-500 transition-all backdrop-blur-md border border-white/10"
+                                        >
+                                            <X size={18} />
+                                        </button>
                                     </div>
-
-                                    <label className="relative inline-flex group/btn cursor-pointer">
-                                        <div className="absolute transition-all duration-200 rounded-full -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-70 blur-lg group-hover/btn:opacity-100 group-hover/btn:blur group-hover/btn:-inset-1.5"></div>
-                                        <div className="relative inline-flex items-center justify-center px-8 py-3.5 text-sm font-bold text-white transition-all duration-200 bg-gray-900 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600">
-                                            Browse Files
+                                ) : (
+                                    <div className="text-center space-y-4 p-8 relative z-10">
+                                        <div className="relative w-20 h-20 mx-auto group-hover:scale-110 transition-transform duration-500">
+                                            <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl animate-pulse"></div>
+                                            <div className="relative w-full h-full bg-gray-800/80 backdrop-blur-sm rounded-full flex items-center justify-center border border-gray-700 group-hover:border-blue-500/50 transition-colors">
+                                                <Upload size={32} className="text-gray-400 group-hover:text-blue-400 transition-colors" />
+                                            </div>
                                         </div>
-                                        <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" />
-                                    </label>
+
+                                        <div className="space-y-1">
+                                            <h3 className="text-xl font-bold text-white">Upload Video</h3>
+                                            <p className="text-gray-400 text-xs">Drag & drop or browse</p>
+                                        </div>
+
+                                        <label className="relative inline-flex group/btn cursor-pointer">
+                                            <div className="absolute transition-all duration-200 rounded-full -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-70 blur-lg group-hover/btn:opacity-100 group-hover/btn:blur group-hover/btn:-inset-1.5"></div>
+                                            <div className="relative inline-flex items-center justify-center px-6 py-2.5 text-sm font-bold text-white transition-all duration-200 bg-gray-900 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600">
+                                                Browse Files
+                                            </div>
+                                            <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" />
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 🎵 TikTok URL Input */}
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3">
+                                Import from TikTok
+                            </label>
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <input
+                                        type="text"
+                                        value={tiktokUrl}
+                                        onChange={(e) => setTiktokUrl(e.target.value)}
+                                        placeholder="Paste TikTok URL..."
+                                        className="w-full pl-4 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none transition-all"
+                                    />
                                 </div>
-                            )}
+                                <Button
+                                    onClick={handleLoadTiktok}
+                                    disabled={!tiktokUrl || isLoadingVideo}
+                                    isLoading={isLoadingVideo}
+                                    className="bg-pink-500 hover:bg-pink-600 text-white rounded-xl px-6"
+                                >
+                                    Load
+                                </Button>
+                            </div>
                         </div>
 
                         {/* 🖼️ Thumbnail Upload */}
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Custom Thumbnail</h3>
-
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Custom Thumbnail</h3>
                             {thumbnailPreview ? (
-                                <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 group">
+                                <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 group">
                                     <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                         <button
                                             onClick={() => { setThumbnail(null); setThumbnailPreview(null); }}
                                             className="px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
                                         >
-                                            Remove Thumbnail
+                                            Remove
                                         </button>
                                     </div>
                                 </div>
                             ) : (
-                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
-                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                        <Upload size={24} className="text-gray-400 mb-2" />
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Upload Thumbnail</p>
+                                <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                                    <div className="flex flex-col items-center justify-center">
+                                        <Upload size={20} className="text-gray-400 mb-1" />
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Upload Image</p>
                                     </div>
                                     <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
                                 </label>
                             )}
+                        </div>
+
+                        {/* Action Button (Desktop Only) */}
+                        <div className="hidden lg:block pt-4">
+                            <Button
+                                onClick={handleSubmit}
+                                disabled={(!file && !previewUrl && !tiktokUrl && !caption) || selectedPages.length === 0}
+                                isLoading={isSubmitting}
+                                fullWidth
+                                size="large"
+                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.02] shadow-lg shadow-blue-500/25 rounded-2xl py-4 text-lg font-bold"
+                            >
+                                {isScheduling ? <><Calendar size={22} /> Schedule Post</> : <><Send size={22} /> Post Now</>}
+                            </Button>
                         </div>
                     </div>
                 </div>
