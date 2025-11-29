@@ -125,138 +125,111 @@ export default function Settings() {
 
     return (
         <DashboardLayout>
-            <div className="p-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Settings</h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2">Manage your connected accounts and application preferences.</p>
+                </div>
+
                 {!user?.facebookId ? (
-                    <div className="text-center py-10 bg-gray-50 dark:bg-gray-900/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
-                        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <ExternalLink size={24} />
+                    <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700 shadow-sm">
+                        <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <ExternalLink size={32} />
                         </div>
-                        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Connect Your Account</h4>
-                        <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-                            Link your Facebook account to manage pages, schedule posts, and view analytics.
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Connect Your Account</h2>
+                        <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-md mx-auto text-lg leading-relaxed">
+                            Link your Facebook account to unlock page management, auto-scheduling, and powerful analytics.
                         </p>
                         <a
                             href={`${(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "")}/api/auth/facebook`}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-[#1877f2] hover:bg-[#166fe5] text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:-translate-y-0.5"
+                            className="inline-flex items-center gap-3 px-8 py-4 bg-[#1877f2] hover:bg-[#166fe5] text-white font-semibold rounded-2xl transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-1"
                         >
+                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
                             Connect Facebook
                         </a>
                     </div>
                 ) : (
-                    <div className="space-y-6">
-                        {/* Connected Profile */}
-                        <div className="flex items-center gap-4 p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800 rounded-xl">
-                            <div className="w-12 h-12 bg-white p-0.5 rounded-full shadow-sm">
-                                <div className="w-full h-full bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold text-lg">
-                                    {user.facebookName?.[0] || "F"}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* 👈 Left Column: Main Content (Pages) */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {/* Connected Profile Card */}
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                                <div className="flex items-center gap-5">
+                                    <div className="relative">
+                                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-2xl font-bold text-gray-500 dark:text-gray-400 border-4 border-white dark:border-gray-800 shadow-md">
+                                            {user.facebookName?.[0] || "F"}
+                                        </div>
+                                        <div className="absolute -bottom-1 -right-1 bg-green-500 text-white p-1 rounded-full border-4 border-white dark:border-gray-800">
+                                            <CheckCircle2 size={14} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                            {user.facebookName || "Facebook User"}
+                                        </h3>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Connected via Facebook</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div>
-                                <p className="font-bold text-gray-900 dark:text-white text-lg">
-                                    {user.facebookName || "Facebook User"}
-                                </p>
-                                <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1 font-medium">
-                                    <CheckCircle2 size={12} /> Account Connected
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Page Selection List */}
-                        <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                    Select Pages to Manage
-                                    <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded-full">
-                                        {pages.length}
-                                    </span>
-                                </h4>
                                 <button
                                     onClick={handleReRequest}
-                                    className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium"
+                                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-medium transition-colors"
                                 >
-                                    Missing pages? Click here to reconnect
+                                    Reconnect
                                 </button>
                             </div>
 
-                            {isLoadingPages ? (
-                                <div className="space-y-3">
-                                    {[1, 2, 3].map(i => (
-                                        <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />
-                                    ))}
+                            {/* Pages List */}
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                                <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                        Your Pages
+                                        <span className="px-2.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-full font-bold">
+                                            {pages.length}
+                                        </span>
+                                    </h3>
+                                    <button onClick={fetchPages} className="p-2 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                        <RefreshCw size={18} />
+                                    </button>
                                 </div>
-                            ) : pageError ? (
-                                <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm border border-red-100 dark:border-red-900/30">
-                                    <div className="flex items-center gap-2">
-                                        <AlertCircle size={16} />
-                                        <span>{pageError}</span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {pageError.includes("session") || pageError.includes("token") ? (
-                                            <button
-                                                onClick={handleReRequest}
-                                                className="px-3 py-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-800 dark:hover:bg-red-700 text-red-700 dark:text-red-200 rounded-lg text-xs font-medium transition-colors"
-                                            >
-                                                Reconnect Facebook
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={fetchPages}
-                                                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-red-600 dark:text-red-400 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                                            >
-                                                <RefreshCw size={12} /> Retry
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : pages.length === 0 ? (
-                                <EmptyState
-                                    title="No Pages Found"
-                                    description="We couldn't find any Facebook Pages linked to your account."
-                                    actionLabel="Check Permissions"
-                                    onAction={handleReRequest}
-                                />
-                            ) : (
-                                <div className="space-y-3">
-                                    {pages.map(page => (
-                                        <div key={page.id} className={`group border rounded-xl overflow-hidden transition-all ${page.isSelected ? "bg-white dark:bg-gray-800 border-blue-200 dark:border-blue-900 shadow-sm" : "bg-gray-50 dark:bg-gray-900/30 border-gray-100 dark:border-gray-800 opacity-70 hover:opacity-100"}`}>
-                                            {/* ... Page Item Content ... */}
-                                            <div className="flex items-center justify-between p-4">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="relative">
-                                                        <img
-                                                            src={page.picture || "https://via.placeholder.com/40"}
-                                                            alt={page.name}
-                                                            className={`w-12 h-12 rounded-full object-cover border-2 ${page.isSelected ? "border-blue-500" : "border-gray-200 dark:border-gray-700"}`}
-                                                        />
-                                                        {page.isSelected && (
-                                                            <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-0.5 rounded-full border-2 border-white dark:border-gray-800">
-                                                                <CheckCircle2 size={10} />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <p className={`font-bold ${page.isSelected ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}>
-                                                            {page.name}
-                                                        </p>
-                                                        <p className="text-xs text-gray-400 font-mono">ID: {page.id}</p>
-                                                    </div>
-                                                </div>
 
-                                                <div className="flex items-center gap-4">
-                                                    {page.isSelected && (
-                                                        <button
-                                                            onClick={() => setExpandedPageId(expandedPageId === page.id ? null : page.id)}
-                                                            className={`p-2 rounded-lg transition-colors ${expandedPageId === page.id ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                                                            title="Page Settings"
-                                                        >
-                                                            <SettingsIcon size={20} />
-                                                        </button>
-                                                    )}
+                                <div className="p-6 space-y-4">
+                                    {isLoadingPages ? (
+                                        [1, 2].map(i => <div key={i} className="h-24 bg-gray-50 dark:bg-gray-700/50 rounded-2xl animate-pulse" />)
+                                    ) : pages.length === 0 ? (
+                                        <EmptyState title="No Pages Found" description="We couldn't find any pages." actionLabel="Refresh" onAction={fetchPages} />
+                                    ) : (
+                                        pages.map(page => (
+                                            <div key={page.id} className={`group border rounded-2xl transition-all duration-300 ${page.isSelected ? "bg-blue-50/30 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800" : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700"}`}>
+                                                <div className="p-5 flex items-center justify-between">
+                                                    <div className="flex items-center gap-4">
+                                                        <img
+                                                            src={page.picture || "https://via.placeholder.com/50"}
+                                                            alt={page.name}
+                                                            className="w-14 h-14 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm"
+                                                        />
+                                                        <div>
+                                                            <h4 className={`font-bold text-lg ${page.isSelected ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-400"}`}>
+                                                                {page.name}
+                                                            </h4>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${page.isSelected ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"}`}>
+                                                                    <div className={`w-1.5 h-1.5 rounded-full ${page.isSelected ? "bg-green-500" : "bg-gray-400"}`} />
+                                                                    {page.isSelected ? "Active" : "Inactive"}
+                                                                </span>
+                                                                <span className="text-xs text-gray-400 font-mono">ID: {page.id}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
 
                                                     <div className="flex items-center gap-3">
-                                                        <span className={`text-xs font-medium ${page.isSelected ? "text-blue-600 dark:text-blue-400" : "text-gray-400"}`}>
-                                                            {page.isSelected ? "Active" : "Inactive"}
-                                                        </span>
+                                                        {page.isSelected && (
+                                                            <button
+                                                                onClick={() => setExpandedPageId(expandedPageId === page.id ? null : page.id)}
+                                                                className={`p-2.5 rounded-xl transition-all ${expandedPageId === page.id ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400" : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600"}`}
+                                                            >
+                                                                <SettingsIcon size={20} />
+                                                            </button>
+                                                        )}
                                                         <label className="relative inline-flex items-center cursor-pointer">
                                                             <input
                                                                 type="checkbox"
@@ -264,161 +237,119 @@ export default function Settings() {
                                                                 checked={page.isSelected}
                                                                 onChange={() => handleTogglePage(page.id, page.isSelected)}
                                                             />
-                                                            <div className="w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 shadow-inner"></div>
+                                                            <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                                                         </label>
                                                     </div>
                                                 </div>
+
+                                                <AnimatePresence>
+                                                    {expandedPageId === page.id && page.isSelected && (
+                                                        <motion.div
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: "auto", opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            className="border-t border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-900/30 px-5 py-5"
+                                                        >
+                                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                                                {[
+                                                                    { key: "enableBot", label: "Auto-Reply", icon: MessageSquare, color: "purple" },
+                                                                    { key: "enableSchedule", label: "Scheduling", icon: Calendar, color: "orange" },
+                                                                    { key: "enableInbox", label: "Inbox Sync", icon: Radio, color: "blue" }
+                                                                ].map((setting) => (
+                                                                    <div key={setting.key} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col justify-between gap-3 hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className={`p-2 rounded-xl bg-${setting.color}-100 text-${setting.color}-600 dark:bg-${setting.color}-900/30 dark:text-${setting.color}-400`}>
+                                                                                <setting.icon size={18} />
+                                                                            </div>
+                                                                            <span className="font-semibold text-gray-700 dark:text-gray-200 text-sm">{setting.label}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-end">
+                                                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    className="sr-only peer"
+                                                                                    checked={setting.key === "enableSchedule" ? page.settings?.enableSchedule !== false : page.settings?.[setting.key]}
+                                                                                    onChange={(e) => handleUpdateSetting(page.id, setting.key, e.target.checked)}
+                                                                                />
+                                                                                <div className={`w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-${setting.color}-500`}></div>
+                                                                            </label>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
-
-                                            {/* ⚙️ Page Settings Dropdown */}
-                                            <AnimatePresence>
-                                                {expandedPageId === page.id && page.isSelected && (
-                                                    <motion.div
-                                                        initial={{ height: 0, opacity: 0 }}
-                                                        animate={{ height: "auto", opacity: 1 }}
-                                                        exit={{ height: 0, opacity: 0 }}
-                                                        className="border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 px-4 py-4 space-y-4"
-                                                    >
-                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                            {/* Auto-Reply Bot */}
-                                                            <div className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                                                                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                                    <div className="p-1.5 bg-purple-100 text-purple-600 rounded-lg">
-                                                                        <MessageSquare size={16} />
-                                                                    </div>
-                                                                    Auto-Reply
-                                                                </div>
-                                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="sr-only peer"
-                                                                        checked={page.settings?.enableBot}
-                                                                        onChange={(e) => handleUpdateSetting(page.id, "enableBot", e.target.checked)}
-                                                                    />
-                                                                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-                                                                </label>
-                                                            </div>
-
-                                                            {/* Scheduled Posts */}
-                                                            <div className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                                                                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                                    <div className="p-1.5 bg-orange-100 text-orange-600 rounded-lg">
-                                                                        <Calendar size={16} />
-                                                                    </div>
-                                                                    Scheduling
-                                                                </div>
-                                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="sr-only peer"
-                                                                        checked={page.settings?.enableSchedule !== false}
-                                                                        onChange={(e) => handleUpdateSetting(page.id, "enableSchedule", e.target.checked)}
-                                                                    />
-                                                                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-orange-600"></div>
-                                                                </label>
-                                                            </div>
-
-                                                            {/* Inbox Listener */}
-                                                            <div className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                                                                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                                    <div className="p-1.5 bg-blue-100 text-blue-600 rounded-lg">
-                                                                        <Radio size={16} />
-                                                                    </div>
-                                                                    Inbox Sync
-                                                                </div>
-                                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="sr-only peer"
-                                                                        checked={page.settings?.enableInbox}
-                                                                        onChange={(e) => handleUpdateSetting(page.id, "enableInbox", e.target.checked)}
-                                                                    />
-                                                                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
-                                        </div>
-                                    ))}
+                                        ))
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* 🔔 Notifications (Existing) */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mt-6">
-                    <h3 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
-                        <Bell className="text-yellow-500" size={20} />
-                        Notifications
-                    </h3>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-                            <div>
-                                <p className="font-medium text-gray-900 dark:text-white">Email Notifications</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Receive updates about your scheduled posts.</p>
                             </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" className="sr-only peer" defaultChecked />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                            </label>
                         </div>
-                    </div>
-                </div>
 
-                {/* ⚙️ Preferences Column (Existing) */}
-                <div className="space-y-6 mt-6">
-                    {/* Theme Preferences */}
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                        <h3 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white">
-                            Preferences
-                        </h3>
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-indigo-500 text-white" : "bg-orange-500 text-white"}`}>
-                                        {theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
+                        {/* 👉 Right Column: Sidebar (Preferences) */}
+                        <div className="space-y-6">
+                            {/* Theme & Appearance */}
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Appearance</h3>
+                                <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2.5 rounded-xl ${theme === "dark" ? "bg-indigo-500 text-white" : "bg-orange-500 text-white"}`}>
+                                            {theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-900 dark:text-white">Dark Mode</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">{theme === "dark" ? "On" : "Off"}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-medium text-gray-900 dark:text-white">Appearance</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            {theme === "dark" ? "Dark Mode" : "Light Mode"}
-                                        </p>
+                                    <button
+                                        onClick={toggleTheme}
+                                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${theme === "dark" ? "bg-indigo-600" : "bg-gray-300"}`}
+                                    >
+                                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${theme === "dark" ? "translate-x-6" : "translate-x-1"}`} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Notifications */}
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Notifications</h3>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-yellow-100 text-yellow-600 rounded-lg dark:bg-yellow-900/30 dark:text-yellow-400">
+                                                <Bell size={18} />
+                                            </div>
+                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Email Alerts</span>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" className="sr-only peer" defaultChecked />
+                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                        </label>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Danger Zone */}
+                            <div className="bg-red-50 dark:bg-red-900/10 rounded-3xl p-6 border border-red-100 dark:border-red-900/30">
+                                <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-4">Danger Zone</h3>
                                 <button
-                                    onClick={toggleTheme}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${theme === "dark" ? "bg-blue-600" : "bg-gray-300"}`}
+                                    onClick={logout}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl font-semibold border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shadow-sm"
                                 >
-                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${theme === "dark" ? "translate-x-6" : "translate-x-1"}`} />
+                                    <LogOut size={18} />
+                                    Sign Out
                                 </button>
                             </div>
                         </div>
                     </div>
+                )}
 
-                    {/* 🚪 Danger Zone */}
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                        <h3 className="text-lg font-semibold mb-4 text-red-600 dark:text-red-400">
-                            Danger Zone
-                        </h3>
-                        <button
-                            onClick={logout}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl font-medium transition-colors"
-                        >
-                            <LogOut size={18} />
-                            Sign Out
-                        </button>
-                    </div>
-                </div>
+                <EditProfileModal
+                    isOpen={isEditModalOpen}
+                    onClose={() => setIsEditModalOpen(false)}
+                />
             </div>
-
-            {/* Edit Profile Modal */}
-            <EditProfileModal
-                isOpen={isEditModalOpen}
-                onClose={() => setIsEditModalOpen(false)}
-            />
         </DashboardLayout>
     );
 }
