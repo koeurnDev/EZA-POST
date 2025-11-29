@@ -262,4 +262,11 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 EZA_POST Backend running on port ${PORT}`);
   console.log(`🌐 Mode: ${process.env.NODE_ENV || "development"}`);
+
+  // 🔍 Debug Env Vars (Safe Log)
+  console.log("🔍 Environment Check:");
+  console.log("   👉 CLOUDINARY_CLOUD_NAME:", process.env.CLOUDINARY_CLOUD_NAME ? "Set" : "Missing");
+  console.log("   👉 CLOUDINARY_API_KEY:", process.env.CLOUDINARY_API_KEY ? "Set" : "Missing");
+  console.log("   👉 CLOUDINARY_API_SECRET:", process.env.CLOUDINARY_API_SECRET ? `Set (Starts with ${process.env.CLOUDINARY_API_SECRET.substring(0, 4)}...)` : "Missing");
+  console.log("   👉 JWT_SECRET:", process.env.JWT_SECRET ? "Set" : "Using Default");
 });
