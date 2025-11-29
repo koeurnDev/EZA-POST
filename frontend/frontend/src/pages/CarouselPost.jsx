@@ -146,7 +146,7 @@ const CarouselPost = () => {
                             <div className="text-gray-500">
                                 <p className="text-4xl mb-2">📹</p>
                                 <p>Drag & drop video here</p>
-                                <p className="text-xs mt-2 text-gray-400">MP4, MOV (Max 500MB)</p>
+                                <p className="text-xs mt-2 text-gray-400">MP4, MOV (Auto-padded to 1:1)</p>
                             </div>
                         )}
                     </div>
