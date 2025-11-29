@@ -345,15 +345,90 @@ const CarouselPost = () => {
                             <div className="text-center p-4">
                                 <Plus className="w-8 h-8 text-pink-400 mx-auto mb-2" />
                                 <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">Add Images</p>
-                                ) : (
-                                <>
-                                    <Send size={20} /> {scheduleTime ? "Schedule Post" : "Post Now"}
-                                </>
-                    )}
-                            </button>
+                                <p className="text-xs text-gray-400">JPG, PNG (Auto-padded to 1:1)</p>
+                            </div>
+                        </div>
+
+                        {/* Horizontal Scroll Gallery (Optimized for Mobile) */}
+                        <div className="flex-1 overflow-x-auto custom-scrollbar pb-2 snap-x snap-mandatory">
+                            <div className="flex gap-3 md:gap-4">
+                                {imageFiles.length === 0 && (
+                                    <div className="w-full h-32 flex items-center justify-center text-gray-400 text-sm italic border border-gray-100 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900/50">
+                                        No images selected
+                                    </div>
+                                )}
+                                {imageFiles.map((file, index) => (
+                                    <div
+                                        key={index}
+                                        className={`relative flex-shrink-0 w-24 h-24 md:w-40 md:h-40 rounded-lg md:rounded-xl overflow-hidden shadow-md group/img transition-transform duration-200 hover:scale-105 snap-center
+                                            ${index > 3 ? 'hidden md:block' : ''} /* Limit to 4 on mobile */
+                                        `}
+                                    >
+                                        <img
+                                            src={file.preview}
+                                            alt={`Upload ${index}`}
+                                            loading="lazy"
+                                            className="w-full h-full object-cover"
+                                        />
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); removeImage(index); }}
+                                            className="absolute top-1 right-1 md:top-2 md:right-2 p-1 md:p-1.5 bg-red-500/80 text-white rounded-full hover:bg-red-600 opacity-100 md:opacity-0 group-hover/img:opacity-100 transition-all duration-200"
+                                        >
+                                            <Trash2 size={12} className="md:w-3.5 md:h-3.5" />
+                                        </button>
+                                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] md:text-xs py-0.5 md:py-1 px-2 text-center truncate">
+                                            {file.name}
+                                        </div>
+                                    </div>
+                                ))}
+                                {imageFiles.length > 4 && (
+                                    <div className="md:hidden flex-shrink-0 w-24 h-24 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 text-xs font-bold border border-gray-200 dark:border-gray-700 snap-center">
+                                        +{imageFiles.length - 4} more
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
-                    );
+                </div>
+            </div>
+
+            {/* 2.3 Bottom Section — Action Bar */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+
+                {/* Schedule Picker */}
+                <div className="w-full sm:w-auto flex-1 max-w-md">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Schedule Post (Optional)</label>
+                    <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                            type="datetime-local"
+                            value={scheduleTime}
+                            onChange={(e) => setScheduleTime(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all duration-200"
+                        />
+                    </div>
+                </div>
+
+                {/* Post Button */}
+                <button
+                    onClick={handleSubmit}
+                    disabled={uploading}
+                    className={`w-full sm:w-auto px-8 py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3
+                        ${uploading ? "bg-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-blue-600 to-pink-600 hover:shadow-xl"}`}
+                >
+                    {uploading ? (
+                        <>
+                            <Loader2 className="animate-spin" /> Processing...
+                        </>
+                    ) : (
+                        <>
+                            <Send size={20} /> {scheduleTime ? "Schedule Post" : "Post Now"}
+                        </>
+                    )}
+                </button>
+            </div>
+        </div>
+    );
 };
 
-                    export default CarouselPost;
+export default CarouselPost;
