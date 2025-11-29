@@ -124,17 +124,31 @@ router.post("/", requireAuth, upload.any(), async (req, res) => {
       // Upload Card Media to Cloudinary
       const processedCards = await Promise.all(parsedCards.map(async (card) => {
         const cardFile = req.files?.find(f => f.fieldname === `file_${card.id}`);
+        const cardThumbnail = req.files?.find(f => f.fieldname === `thumbnail_${card.id}`);
         let mediaUrl = null;
+        let thumbnailUrl = null;
 
+        // 1. Handle Main Media (File vs Remote URL)
         if (cardFile) {
           console.log(`📤 Uploading carousel card media: ${cardFile.filename}`);
           const result = await uploadFile(cardFile.path, "kr_post/carousel", card.type === 'video' ? 'video' : 'image');
           mediaUrl = result.url;
+        } else if (card.previewUrl) {
+          // Use remote URL (e.g. from TikTok import)
+          mediaUrl = card.previewUrl;
+        }
+
+        // 2. Handle Custom Thumbnail
+        if (cardThumbnail) {
+          console.log(`📤 Uploading carousel card thumbnail: ${cardThumbnail.filename}`);
+          const thumbResult = await uploadFile(cardThumbnail.path, "kr_post/thumbnails", "image");
+          thumbnailUrl = thumbResult.url;
         }
 
         return {
           ...card,
-          url: mediaUrl // Add Cloudinary URL to card
+          url: mediaUrl, // Add Cloudinary URL (or remote URL) to card
+          thumbnailUrl: thumbnailUrl // Add custom thumbnail URL
         };
       }));
 

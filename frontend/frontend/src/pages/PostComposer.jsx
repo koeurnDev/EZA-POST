@@ -30,8 +30,8 @@ export default function PostComposer() {
     // 🎠 Carousel State
     const [postType, setPostType] = useState("single"); // 'single' | 'carousel'
     const [carouselCards, setCarouselCards] = useState([
-        { id: 1, type: "image", file: null, previewUrl: null, headline: "", description: "", cta: "LEARN_MORE", link: "" },
-        { id: 2, type: "image", file: null, previewUrl: null, headline: "", description: "", cta: "LEARN_MORE", link: "" }
+        { id: 1, type: "image", mediaSource: "upload", file: null, previewUrl: null, tiktokUrl: "", thumbnail: null, thumbnailPreview: null, isLoading: false, headline: "", description: "", cta: "LEARN_MORE", link: "" },
+        { id: 2, type: "image", mediaSource: "upload", file: null, previewUrl: null, tiktokUrl: "", thumbnail: null, thumbnailPreview: null, isLoading: false, headline: "", description: "", cta: "LEARN_MORE", link: "" }
     ]);
 
     // Fetch Pages
@@ -146,8 +146,13 @@ export default function PostComposer() {
         setCarouselCards([...carouselCards, {
             id: Date.now(),
             type: "image",
+            mediaSource: "upload",
             file: null,
             previewUrl: null,
+            tiktokUrl: "",
+            thumbnail: null,
+            thumbnailPreview: null,
+            isLoading: false,
             headline: "",
             description: "",
             cta: "LEARN_MORE",
@@ -167,7 +172,52 @@ export default function PostComposer() {
     const handleCardMediaChange = (id, file) => {
         if (!file) return;
         const url = URL.createObjectURL(file);
-        setCarouselCards(cards => cards.map(c => c.id === id ? { ...c, file, previewUrl: url, type: file.type.startsWith('video/') ? 'video' : 'image' } : c));
+        setCarouselCards(cards => cards.map(c => c.id === id ? { ...c, file, previewUrl: url, type: file.type.startsWith('video/') ? 'video' : 'image', mediaSource: 'upload' } : c));
+    };
+
+    const handleCardThumbnailChange = (id, file) => {
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        setCarouselCards(cards => cards.map(c => c.id === id ? { ...c, thumbnail: file, thumbnailPreview: url } : c));
+    };
+
+    const handleCardTiktokLoad = async (id) => {
+        const card = carouselCards.find(c => c.id === id);
+        if (!card || !card.tiktokUrl) return;
+
+        updateCard(id, 'isLoading', true);
+        const toastId = toast.loading("Loading TikTok video for card...");
+
+        try {
+            const token = localStorage.getItem("token");
+            const response = await fetch(`${(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "")}/api/tiktok/process`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ url: card.tiktokUrl })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setCarouselCards(cards => cards.map(c => c.id === id ? {
+                    ...c,
+                    previewUrl: data.url,
+                    file: null,
+                    type: 'video',
+                    isLoading: false
+                } : c));
+                toast.success("Video loaded!", { id: toastId });
+            } else {
+                throw new Error(data.error || "Failed to load video");
+            }
+        } catch (err) {
+            console.error("Card TikTok load error:", err);
+            toast.error(err.message || "Failed to load TikTok video", { id: toastId });
+            updateCard(id, 'isLoading', false);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -210,13 +260,17 @@ export default function PostComposer() {
                     headline: c.headline,
                     description: c.description,
                     cta: c.cta,
-                    link: c.link
+                    link: c.link,
+                    previewUrl: c.previewUrl // Important for remote URLs (TikTok)
                 }))));
 
                 // Append files
                 carouselCards.forEach((card) => {
                     if (card.file) {
                         formData.append(`file_${card.id}`, card.file);
+                    }
+                    if (card.thumbnail) {
+                        formData.append(`thumbnail_${card.id}`, card.thumbnail);
                     }
                 });
             } else {
@@ -258,8 +312,8 @@ export default function PostComposer() {
                 setIsScheduling(false);
                 // Reset Carousel
                 setCarouselCards([
-                    { id: 1, type: "image", file: null, previewUrl: null, headline: "", description: "", cta: "LEARN_MORE", link: "" },
-                    { id: 2, type: "image", file: null, previewUrl: null, headline: "", description: "", cta: "LEARN_MORE", link: "" }
+                    { id: 1, type: "image", mediaSource: "upload", file: null, previewUrl: null, tiktokUrl: "", thumbnail: null, thumbnailPreview: null, isLoading: false, headline: "", description: "", cta: "LEARN_MORE", link: "" },
+                    { id: 2, type: "image", mediaSource: "upload", file: null, previewUrl: null, tiktokUrl: "", thumbnail: null, thumbnailPreview: null, isLoading: false, headline: "", description: "", cta: "LEARN_MORE", link: "" }
                 ]);
             } else {
                 throw new Error(data.error || "Failed to create post.");
@@ -450,60 +504,137 @@ export default function PostComposer() {
                                                 </button>
                                             </div>
 
-                                            <div className="flex gap-4 items-start">
-                                                {/* Media Upload */}
-                                                <div className="w-24 h-24 flex-shrink-0">
-                                                    <label className="w-full h-full block cursor-pointer relative group/upload">
-                                                        {card.previewUrl ? (
-                                                            card.type === 'video' ? (
-                                                                <video src={card.previewUrl} className="w-full h-full object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
-                                                            ) : (
-                                                                <img src={card.previewUrl} alt="Preview" className="w-full h-full object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
-                                                            )
-                                                        ) : (
-                                                            <div className="w-full h-full bg-gray-50 dark:bg-gray-900 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center hover:border-blue-500 transition-colors">
-                                                                <Upload size={20} className="text-gray-400" />
-                                                            </div>
-                                                        )}
-                                                        <input
-                                                            type="file"
-                                                            accept="image/*,video/*"
-                                                            className="hidden"
-                                                            onChange={(e) => handleCardMediaChange(card.id, e.target.files[0])}
-                                                        />
-                                                    </label>
+                                            <div className="space-y-4">
+                                                {/* 🏷️ Card Header */}
+                                                <div className="flex items-center gap-2">
+                                                    <span className="bg-gray-100 dark:bg-gray-700 text-gray-500 text-xs font-bold px-2 py-1 rounded-lg">#{index + 1}</span>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Headline"
+                                                        value={card.headline}
+                                                        onChange={(e) => updateCard(card.id, 'headline', e.target.value)}
+                                                        className="flex-1 bg-transparent border-none p-0 text-sm font-bold text-gray-900 dark:text-white placeholder-gray-400 focus:ring-0"
+                                                    />
                                                 </div>
 
-                                                {/* Inputs */}
-                                                <div className="flex-1 space-y-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="bg-gray-100 dark:bg-gray-700 text-gray-500 text-xs font-bold px-2 py-1 rounded-lg">#{index + 1}</span>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Headline"
-                                                            value={card.headline}
-                                                            onChange={(e) => updateCard(card.id, 'headline', e.target.value)}
-                                                            className="flex-1 bg-transparent border-none p-0 text-sm font-bold text-gray-900 dark:text-white placeholder-gray-400 focus:ring-0"
-                                                        />
-                                                    </div>
-                                                    <textarea
-                                                        placeholder="Description..."
-                                                        rows={2}
-                                                        value={card.description}
-                                                        onChange={(e) => updateCard(card.id, 'description', e.target.value)}
-                                                        className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-xl p-2 text-xs text-gray-600 dark:text-gray-300 resize-none focus:ring-1 focus:ring-blue-500"
-                                                    />
-                                                    <select
-                                                        value={card.cta}
-                                                        onChange={(e) => updateCard(card.id, 'cta', e.target.value)}
-                                                        className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-xl p-2 text-xs font-bold text-blue-600 focus:ring-1 focus:ring-blue-500"
+                                                {/* 🎛️ Media Source Tabs */}
+                                                <div className="flex bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl">
+                                                    <button
+                                                        onClick={() => updateCard(card.id, 'mediaSource', 'upload')}
+                                                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${card.mediaSource === 'upload' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-500'}`}
                                                     >
-                                                        <option value="LEARN_MORE">Learn More</option>
-                                                        <option value="SHOP_NOW">Shop Now</option>
-                                                        <option value="SIGN_UP">Sign Up</option>
-                                                        <option value="BOOK_NOW">Book Now</option>
-                                                        <option value="CONTACT_US">Contact Us</option>
-                                                    </select>
+                                                        Upload File
+                                                    </button>
+                                                    <button
+                                                        onClick={() => updateCard(card.id, 'mediaSource', 'tiktok')}
+                                                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${card.mediaSource === 'tiktok' ? 'bg-white dark:bg-gray-800 text-pink-500 shadow-sm' : 'text-gray-500'}`}
+                                                    >
+                                                        Import TikTok
+                                                    </button>
+                                                </div>
+
+                                                <div className="flex gap-4 items-start">
+                                                    {/* 🖼️ Media Area */}
+                                                    <div className="w-32 h-32 flex-shrink-0 relative group/media">
+                                                        {card.mediaSource === 'upload' ? (
+                                                            <label className="w-full h-full block cursor-pointer relative">
+                                                                {card.previewUrl ? (
+                                                                    card.type === 'video' ? (
+                                                                        <video src={card.previewUrl} className="w-full h-full object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
+                                                                    ) : (
+                                                                        <img src={card.previewUrl} alt="Preview" className="w-full h-full object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
+                                                                    )
+                                                                ) : (
+                                                                    <div className="w-full h-full bg-gray-50 dark:bg-gray-900 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center hover:border-blue-500 transition-colors">
+                                                                        <Upload size={20} className="text-gray-400 mb-1" />
+                                                                        <span className="text-[10px] text-gray-400">Upload</span>
+                                                                    </div>
+                                                                )}
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*,video/*"
+                                                                    className="hidden"
+                                                                    onChange={(e) => handleCardMediaChange(card.id, e.target.files[0])}
+                                                                />
+                                                            </label>
+                                                        ) : (
+                                                            // TikTok Import Mode
+                                                            <div className="w-full h-full relative">
+                                                                {card.previewUrl ? (
+                                                                    card.type === 'video' ? (
+                                                                        <video src={card.previewUrl} className="w-full h-full object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
+                                                                    ) : (
+                                                                        <img src={card.previewUrl} alt="Preview" className="w-full h-full object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
+                                                                    )
+                                                                ) : (
+                                                                    <div className="w-full h-full bg-pink-50 dark:bg-pink-900/10 rounded-xl border-2 border-dashed border-pink-200 dark:border-pink-900/30 flex flex-col items-center justify-center">
+                                                                        <div className="p-2 bg-white dark:bg-gray-800 rounded-full mb-1">
+                                                                            <span className="text-lg">🎵</span>
+                                                                        </div>
+                                                                        <span className="text-[10px] text-pink-500 font-bold">TikTok</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {/* 🖼️ Custom Thumbnail Overlay (Only for Videos) */}
+                                                        {card.type === 'video' && card.previewUrl && (
+                                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                                                                <label className="cursor-pointer px-3 py-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg text-xs text-white font-bold hover:bg-white/20 transition-colors">
+                                                                    {card.thumbnail ? "Change Cover" : "Add Cover"}
+                                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleCardThumbnailChange(card.id, e.target.files[0])} />
+                                                                </label>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Thumbnail Indicator */}
+                                                        {card.thumbnail && (
+                                                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center shadow-sm z-20" title="Custom thumbnail added">
+                                                                <ImageIcon size={12} className="text-white" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Inputs */}
+                                                    <div className="flex-1 space-y-3">
+                                                        {card.mediaSource === 'tiktok' && !card.previewUrl && (
+                                                            <div className="flex gap-2 mb-2">
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Paste TikTok URL..."
+                                                                    value={card.tiktokUrl}
+                                                                    onChange={(e) => updateCard(card.id, 'tiktokUrl', e.target.value)}
+                                                                    className="flex-1 bg-gray-50 dark:bg-gray-900 border-none rounded-xl py-2 px-3 text-xs focus:ring-1 focus:ring-pink-500"
+                                                                />
+                                                                <button
+                                                                    onClick={() => handleCardTiktokLoad(card.id)}
+                                                                    disabled={!card.tiktokUrl || card.isLoading}
+                                                                    className="bg-pink-500 text-white px-3 py-2 rounded-xl text-xs font-bold hover:bg-pink-600 disabled:opacity-50"
+                                                                >
+                                                                    {card.isLoading ? "..." : "Load"}
+                                                                </button>
+                                                            </div>
+                                                        )}
+
+                                                        <textarea
+                                                            placeholder="Description..."
+                                                            rows={3}
+                                                            value={card.description}
+                                                            onChange={(e) => updateCard(card.id, 'description', e.target.value)}
+                                                            className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-xl p-3 text-xs text-gray-600 dark:text-gray-300 resize-none focus:ring-1 focus:ring-blue-500"
+                                                        />
+                                                        <select
+                                                            value={card.cta}
+                                                            onChange={(e) => updateCard(card.id, 'cta', e.target.value)}
+                                                            className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-xl p-2 text-xs font-bold text-blue-600 focus:ring-1 focus:ring-blue-500"
+                                                        >
+                                                            <option value="LEARN_MORE">Learn More</option>
+                                                            <option value="SHOP_NOW">Shop Now</option>
+                                                            <option value="SIGN_UP">Sign Up</option>
+                                                            <option value="BOOK_NOW">Book Now</option>
+                                                            <option value="CONTACT_US">Contact Us</option>
+                                                        </select>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

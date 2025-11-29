@@ -174,18 +174,29 @@ class FacebookAPI {
 
     // Construct Child Attachments
     const childAttachments = cards.map(card => {
-      // If video, try to use JPG thumbnail from Cloudinary (replace extension)
-      // Otherwise use the image URL
       let pictureUrl = card.url;
-      if (card.type === 'video' && card.url && card.url.includes('cloudinary')) {
-        pictureUrl = card.url.replace(/\.[^/.]+$/, ".jpg");
+
+      if (card.thumbnailUrl) {
+        pictureUrl = card.thumbnailUrl;
+      } else if (card.type === 'video') {
+        // 🛑 Facebook Link Carousel requires an IMAGE for 'picture'.
+        // If we don't have a custom thumbnail, try to use the Cloudinary JPG thumbnail convention.
+        if (card.url.includes('cloudinary.com')) {
+          pictureUrl = card.url.replace(/\.[^/.]+$/, ".jpg");
+        }
       }
 
       return {
         link: card.link || "https://facebook.com", // Required
         name: card.headline || " ",
         description: card.description || " ",
-        picture: pictureUrl
+        picture: pictureUrl,
+        call_to_action: {
+          type: card.cta || "LEARN_MORE",
+          value: {
+            link: card.link || "https://facebook.com"
+          }
+        }
       };
     });
 
