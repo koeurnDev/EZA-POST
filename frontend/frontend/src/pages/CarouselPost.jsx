@@ -20,7 +20,7 @@ const CarouselPost = () => {
                 const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/user/pages`, {
                     withCredentials: true,
                 });
-                setAccounts(res.data);
+                setAccounts(res.data.accounts || []);
             } catch (err) {
                 console.error("Failed to fetch pages", err);
                 toast.error("Failed to load Facebook pages");
@@ -195,8 +195,8 @@ const CarouselPost = () => {
                                     );
                                 }}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all ${selectedAccounts.includes(page.id)
-                                        ? "bg-blue-600 text-white border-blue-600"
-                                        : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600"
+                                    ? "bg-blue-600 text-white border-blue-600"
+                                    : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600"
                                     }`}
                             >
                                 <img src={page.picture} alt={page.name} className="w-6 h-6 rounded-full" />
@@ -222,8 +222,8 @@ const CarouselPost = () => {
                     onClick={handleSubmit}
                     disabled={uploading || !videoFile || !imageFile || selectedAccounts.length === 0}
                     className={`w-full py-4 rounded-xl text-lg font-bold text-white transition-all transform hover:scale-[1.01] ${uploading
-                            ? "bg-gray-400 cursor-not-allowed"
-                            : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
                         }`}
                 >
                     {uploading ? "Processing & Uploading..." : "🚀 Publish Carousel"}
