@@ -37,7 +37,6 @@ router.get("/", (req, res) => {
     }
 
     // Define permissions needed for Page management
-    // Reduced to minimum to avoid "Invalid Scopes" error for Consumer apps
     const scopes = [
         "public_profile",
         "email",
@@ -75,8 +74,12 @@ router.get("/callback", async (req, res) => {
         return res.redirect(`${process.env.FRONTEND_URL}/settings?error=no_code`);
     }
 
+    // Helper variable to track failure step for better logging
+    let currentStep = "Start";
+
     try {
         // 1️⃣ Exchange Code for Access Token
+        currentStep = "ExchangeCode";
         console.log("🔄 Step 1: Exchanging code for short-lived token...");
         const tokenRes = await axios.get(
             "https://graph.facebook.com/v19.0/oauth/access_token",
@@ -90,9 +93,11 @@ router.get("/callback", async (req, res) => {
             }
         );
         const { access_token: shortLivedToken } = tokenRes.data;
+        if (!shortLivedToken) throw new Error("FB did not return a short-lived token.");
         console.log("✅ Short-lived token obtained");
 
         // 1.5️⃣ Exchange for Long-Lived Token
+        currentStep = "ExchangeLongLived";
         console.log("🔄 Step 1.5: Exchanging for long-lived token...");
         const longLivedTokenRes = await axios.get(
             "https://graph.facebook.com/v19.0/oauth/access_token",
@@ -106,6 +111,7 @@ router.get("/callback", async (req, res) => {
             }
         );
         const { access_token, expires_in } = longLivedTokenRes.data;
+        if (!access_token) throw new Error("FB did not return a long-lived token.");
         console.log("✅ Long-lived token obtained");
 
         // Calculate Expiration
@@ -113,6 +119,7 @@ router.get("/callback", async (req, res) => {
         const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
 
         // 2️⃣ Get User Profile
+        currentStep = "FetchProfile";
         console.log("🔄 Step 2: Fetching user profile...");
         const profileRes = await axios.get("https://graph.facebook.com/me", {
             params: {
@@ -124,25 +131,29 @@ router.get("/callback", async (req, res) => {
         console.log(`✅ Facebook Profile: ${fbUser.name} (${fbUser.id})`);
 
         // 3️⃣ Find Current User
+        currentStep = "FindLocalUser";
         console.log("🔄 Step 3: Identifying local user...");
         let userId = req.session?.user?.id;
 
         if (!userId && req.cookies?.token) {
             try {
+                // NOTE: Using the fallback key here is a potential source of error if JWT_SECRET is inconsistent
                 const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET || "supersecretkey");
                 userId = decoded.id;
                 console.log(`✅ User identified via JWT: ${userId}`);
             } catch (err) {
-                console.warn("⚠️ Invalid JWT:", err.message);
+                console.warn("⚠️ Invalid JWT (Session may have expired or JWT_SECRET mismatch):", err.message);
             }
         }
 
         if (!userId) {
             console.error("❌ No authenticated user found (Session or JWT missing)");
+            // Redirect to login, not server_error
             return res.redirect(`${process.env.FRONTEND_URL}/login?error=session_expired`);
         }
 
         // 4️⃣ Fetch Pages
+        currentStep = "FetchPages";
         console.log("🔄 Step 4: Fetching Facebook Pages...");
         const pagesRes = await axios.get("https://graph.facebook.com/v19.0/me/accounts", {
             params: {
@@ -162,6 +173,7 @@ router.get("/callback", async (req, res) => {
         console.log(`✅ Fetched ${myPages.length} pages`);
 
         // 5️⃣ Update Database
+        currentStep = "UpdateDB";
         console.log(`🔄 Step 5: Updating User ${userId} in DB...`);
         const user = await User.findById(userId);
         if (user) {
@@ -179,6 +191,7 @@ router.get("/callback", async (req, res) => {
         }
 
         // 6️⃣ Refresh JWT
+        currentStep = "RefreshJWT";
         console.log("🔄 Step 6: Refreshing JWT...");
         const token = jwt.sign(
             {
@@ -202,11 +215,21 @@ router.get("/callback", async (req, res) => {
 
     } catch (err) {
         console.error("❌ CRITICAL FAILURE IN FB CALLBACK ❌");
+        console.error(`🚨 Error occurred at Step: ${currentStep}`);
+
+        if (currentStep === "FetchPages" && err.response?.status === 400) {
+            console.error("� Likely Cause: Missing `pages_show_list` permission (user declined in the dialog).");
+        } else if (currentStep === "UpdateDB" && err.name === 'ValidationError') {
+            console.error("🛑 Likely Cause: Mongoose Validation Error. Check User model schema for 'connectedPages'.");
+            console.error("�👉 Validation Errors:", err.errors);
+        }
+
         if (err.response) {
             console.error("👉 API Error Status:", err.response.status);
             console.error("👉 API Error Data:", JSON.stringify(err.response.data, null, 2));
         } else {
             console.error("👉 Error Message:", err.message);
+            // Log stack trace for non-API errors (like Mongoose or coding errors)
             console.error("👉 Stack:", err.stack);
         }
         res.redirect(`${process.env.FRONTEND_URL}/settings?error=server_error`);
@@ -218,9 +241,27 @@ router.get("/callback", async (req, res) => {
  * Disconnects the user's Facebook account
  */
 router.delete("/", async (req, res) => {
+    // NOTE: This delete route relies on req.session.user.id, which might be stale.
+    // You should rely on JWT data (req.user.id, if using an auth middleware) or req.cookies.token.
+    // Assuming you have middleware that puts user on req.session for consistency:
     if (!req.session?.user?.id) {
-        return res.status(401).json({ error: "Unauthorized" });
+        // Fallback check using JWT from cookies (similar to step 3 in callback)
+        let userId = null;
+        if (req.cookies?.token) {
+            try {
+                const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET || "supersecretkey");
+                userId = decoded.id;
+            } catch (err) {
+                console.warn("⚠️ Invalid JWT on Disconnect:", err.message);
+            }
+        }
+        if (!userId) {
+            return res.status(401).json({ error: "Unauthorized or session expired." });
+        }
+        req.session = req.session || {};
+        req.session.user = { id: userId };
     }
+
 
     try {
         await User.findByIdAndUpdate(req.session.user.id, {
