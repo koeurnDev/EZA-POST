@@ -1,4 +1,4 @@
-```javascript
+
 import React, { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import axios from "axios";
@@ -18,7 +18,7 @@ const CarouselPost = () => {
     useEffect(() => {
         const fetchPages = async () => {
             try {
-                const res = await axios.get(`${ import.meta.env.VITE_API_BASE_URL } /user/pages`, {
+                const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL} /user/pages`, {
                     withCredentials: true,
                 });
                 setAccounts(res.data.accounts || []);
@@ -93,7 +93,7 @@ const CarouselPost = () => {
         if (scheduleTime) formData.append("scheduleTime", scheduleTime);
 
         try {
-            await axios.post(`${ import.meta.env.VITE_API_BASE_URL } /posts/mixed - carousel`, formData, {
+            await axios.post(`${import.meta.env.VITE_API_BASE_URL} /posts/mixed - carousel`, formData, {
                 withCredentials: true,
                 headers: { "Content-Type": "multipart/form-data" },
             });
@@ -137,7 +137,7 @@ const CarouselPost = () => {
                                     <span className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-700 rounded-full">Auto-Pad 1:1</span>
                                 </div>
                                 <div {...getVideoRootProps()} className={`relative h - 64 m - 4 rounded - xl border - 2 border - dashed transition - all cursor - pointer flex flex - col justify - center items - center
-                                    ${ isVideoDragActive ? 'border-blue-500 bg-blue-50 dark:bg-gray-700' : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700' } `}>
+                                    ${isVideoDragActive ? 'border-blue-500 bg-blue-50 dark:bg-gray-700' : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700'} `}>
                                     <input {...getVideoInputProps()} />
                                     {videoFile ? (
                                         <div className="relative w-full h-full group">
@@ -167,7 +167,7 @@ const CarouselPost = () => {
                                     <span className="text-xs font-medium px-2 py-1 bg-purple-100 text-purple-700 rounded-full">Auto-Pad 1:1</span>
                                 </div>
                                 <div {...getImageRootProps()} className={`relative h - 64 m - 4 rounded - xl border - 2 border - dashed transition - all cursor - pointer flex flex - col justify - center items - center
-                                    ${ isImageDragActive ? 'border-purple-500 bg-purple-50 dark:bg-gray-700' : 'border-gray-300 dark:border-gray-600 hover:border-purple-400 hover:bg-gray-50 dark:hover:bg-gray-700' } `}>
+                                    ${isImageDragActive ? 'border-purple-500 bg-purple-50 dark:bg-gray-700' : 'border-gray-300 dark:border-gray-600 hover:border-purple-400 hover:bg-gray-50 dark:hover:bg-gray-700'} `}>
                                     <input {...getImageInputProps()} />
                                     {imageFile ? (
                                         <div className="relative w-full h-full group">
@@ -220,13 +220,12 @@ const CarouselPost = () => {
                                                 prev.includes(page.id) ? prev.filter(id => id !== page.id) : [...prev, page.id]
                                             );
                                         }}
-                                        className={`flex items - center gap - 3 p - 3 rounded - xl cursor - pointer border transition - all ${
-    selectedAccounts.includes(page.id)
-    ? "bg-blue-50 border-blue-500 dark:bg-blue-900/20 dark:border-blue-500"
-    : "bg-gray-50 border-transparent hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600"
-} `}
+                                        className={`flex items - center gap - 3 p - 3 rounded - xl cursor - pointer border transition - all ${selectedAccounts.includes(page.id)
+                                            ? "bg-blue-50 border-blue-500 dark:bg-blue-900/20 dark:border-blue-500"
+                                            : "bg-gray-50 border-transparent hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600"
+                                            } `}
                                     >
-                                        <div className={`w - 5 h - 5 rounded - full border - 2 flex items - center justify - center ${ selectedAccounts.includes(page.id) ? 'border-blue-500 bg-blue-500' : 'border-gray-300' } `}>
+                                        <div className={`w - 5 h - 5 rounded - full border - 2 flex items - center justify - center ${selectedAccounts.includes(page.id) ? 'border-blue-500 bg-blue-500' : 'border-gray-300'} `}>
                                             {selectedAccounts.includes(page.id) && <CheckCircle className="w-3 h-3 text-white" />}
                                         </div>
                                         <img src={page.picture} alt={page.name} className="w-10 h-10 rounded-full border border-gray-200" />
@@ -254,11 +253,10 @@ const CarouselPost = () => {
                             onClick={handleSubmit}
                             disabled={uploading || !videoFile || !imageFile || selectedAccounts.length === 0}
                             className={`w - full py - 4 rounded - xl text - lg font - bold text - white shadow - lg transition - all transform hover: scale - [1.02] active: scale - [0.98] flex items - center justify - center gap - 2
-                                ${
-    uploading
-        ? "bg-gray-400 cursor-not-allowed"
-        : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-blue-500/30"
-} `}
+                                ${uploading
+                                    ? "bg-gray-400 cursor-not-allowed"
+                                    : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-blue-500/30"
+                                } `}
                         >
                             {uploading ? (
                                 <>
@@ -278,4 +276,4 @@ const CarouselPost = () => {
 };
 
 export default CarouselPost;
-```
+
