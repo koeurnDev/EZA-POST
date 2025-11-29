@@ -76,10 +76,14 @@ class FacebookAPI {
         }
       }
 
-      // 🕒 Scheduling Logic
+      // 🕒 Scheduling & Publishing Logic
+      if (options.hasOwnProperty('published')) {
+        form.append("published", options.published.toString());
+      }
+
       if (options.isScheduled && options.scheduleTime) {
         console.log(`📅 Scheduling for: ${new Date(options.scheduleTime * 1000).toISOString()}`);
-        form.append("published", "false");
+        if (!options.hasOwnProperty('published')) form.append("published", "false");
         form.append("scheduled_publish_time", options.scheduleTime);
       }
 

@@ -94,7 +94,8 @@ exports.createMixedCarousel = async (req, res) => {
                 // 3.1 Upload Video (Unpublished)
                 const videoStream = fs.createReadStream(finalVideoPath);
                 const videoUpload = await fb.uploadVideoToFacebook(pageToken, accountId, videoStream, "Video Part", null, {
-                    isScheduled: false // Must be unpublished first
+                    isScheduled: false,
+                    published: false // ✅ Explicitly set to unpublished
                 });
 
                 if (!videoUpload.success) throw new Error("Failed to upload video part: " + videoUpload.error);
