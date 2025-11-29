@@ -45,6 +45,8 @@ router.get("/", (req, res) => {
         "pages_read_engagement",
         "pages_messaging",
         "pages_manage_metadata",
+        "pages_read_user_content",
+        "publish_video",
     ];
 
     const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(
