@@ -13,13 +13,16 @@ class FacebookAPI {
   constructor() {
     this.graph = "https://graph.facebook.com/v19.0";
     this.http = axios.create({
-      timeout: 90000, // Allow longer uploads (90s)
-      maxContentLength: 100 * 1024 * 1024,
+      timeout: 600000, // ✅ Increased to 10 minutes for large files
+      maxContentLength: 500 * 1024 * 1024, // 500MB
       maxBodyLength: Infinity,
       headers: { "User-Agent": "EZA_POST_BACKEND/1.0" },
     });
   }
 
+  /* ------------------------------------------------------------ */
+  /* ✅ Upload video to Facebook Page                              */
+  /* ------------------------------------------------------------ */
   /* ------------------------------------------------------------ */
   /* ✅ Upload video to Facebook Page                              */
   /* ------------------------------------------------------------ */
@@ -31,7 +34,11 @@ class FacebookAPI {
       form.append("access_token", accessToken);
       form.append("description", caption || "Shared via KR POST");
 
-      // Check if videoInput is a URL or a Buffer
+      if (options.title) {
+        form.append("title", options.title); // ✅ Add Title
+      }
+
+      // Check if videoInput is a URL, Buffer, or Stream
       if (typeof videoInput === 'string' && videoInput.startsWith('http')) {
         // It's a URL (Cloudinary)
         console.log(`🔗 Using video URL: ${videoInput}`);
@@ -43,15 +50,30 @@ class FacebookAPI {
           filename: `video_${Date.now()}.mp4`,
           contentType: "video/mp4",
         });
+      } else if (videoInput && typeof videoInput.pipe === 'function') {
+        // ✅ It's a Stream (fs.createReadStream)
+        console.log(`🌊 Using video Stream`);
+        form.append("source", videoInput, {
+          filename: `video_${Date.now()}.mp4`,
+          contentType: "video/mp4",
+        });
       } else {
-        throw new Error("Invalid video input: Must be a URL string or a Buffer");
+        throw new Error("Invalid video input: Must be a URL string, Buffer, or Stream");
       }
 
       if (thumbnailBuffer) {
-        form.append("thumb", thumbnailBuffer, {
-          filename: "thumb.jpg",
-          contentType: "image/jpeg",
-        });
+        // Handle Thumbnail (Buffer or Stream)
+        if (Buffer.isBuffer(thumbnailBuffer)) {
+          form.append("thumb", thumbnailBuffer, {
+            filename: "thumb.jpg",
+            contentType: "image/jpeg",
+          });
+        } else if (thumbnailBuffer && typeof thumbnailBuffer.pipe === 'function') {
+          form.append("thumb", thumbnailBuffer, {
+            filename: "thumb.jpg",
+            contentType: "image/jpeg",
+          });
+        }
       }
 
       // 🕒 Scheduling Logic

@@ -23,6 +23,7 @@ export default function Post() {
     const [tiktokUrl, setTiktokUrl] = useState("");
     const [thumbnail, setThumbnail] = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
+    const [headline, setHeadline] = useState(""); // ✅ Added Headline State
     const [caption, setCaption] = useState("");
     const [selectedPages, setSelectedPages] = useState([]);
     const [availablePages, setAvailablePages] = useState([]);
@@ -88,7 +89,7 @@ export default function Post() {
 
     const validateAndSetVideo = (selectedFile) => {
         if (!selectedFile.type.startsWith("video/")) return toast.error("Please upload a video file (MP4, MOV).");
-        if (selectedFile.size > 100 * 1024 * 1024) return toast.error("File is too large. Maximum size is 100MB.");
+        if (selectedFile.size > 500 * 1024 * 1024) return toast.error("File is too large. Maximum size is 500MB.");
 
         const video = document.createElement("video");
         video.preload = "metadata";
@@ -121,9 +122,13 @@ export default function Post() {
         const toastId = toast.loading("Fetching TikTok video...");
         try {
             const token = localStorage.getItem("token");
+            const headers = { "Content-Type": "application/json" };
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+
             const response = await fetch(`${API_BASE}/api/tiktok/process`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                headers,
+                credentials: "include", // ✅ Send cookies
                 body: JSON.stringify({ url: tiktokUrl })
             });
             const data = await response.json();
@@ -151,6 +156,7 @@ export default function Post() {
 
         try {
             const formData = new FormData();
+            formData.append("title", headline); // ✅ Append Headline
             formData.append("caption", caption);
             formData.append("accounts", JSON.stringify(selectedPages));
             formData.append("postType", "single");
@@ -170,9 +176,13 @@ export default function Post() {
             if (scheduleTime) formData.append("scheduleTime", scheduleTime);
 
             const token = localStorage.getItem("token");
+            const headers = {};
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+
             const response = await fetch(`${API_BASE}/api/posts/create`, {
                 method: "POST",
-                headers: { "Authorization": `Bearer ${token}` },
+                headers,
+                credentials: "include", // ✅ Send cookies
                 body: formData
             });
 
@@ -185,6 +195,7 @@ export default function Post() {
                 setTiktokUrl("");
                 setThumbnail(null);
                 setThumbnailPreview(null);
+                setHeadline(""); // ✅ Reset Headline
                 setCaption("");
                 setScheduleTime("");
             } else {
@@ -258,7 +269,7 @@ export default function Post() {
                                     />
 
                                     {file ? (
-                                        <div className="relative w-full aspect-video max-h-[400px] bg-black rounded-2xl overflow-hidden shadow-inner" onClick={(e) => e.stopPropagation()}>
+                                        <div className="relative w-full aspect-square max-h-[400px] bg-black rounded-2xl overflow-hidden shadow-inner" onClick={(e) => e.stopPropagation()}>
                                             <video src={previewUrl} controls className="w-full h-full object-contain" />
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); setFile(null); setPreviewUrl(null); }}
@@ -324,6 +335,17 @@ export default function Post() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             {/* Left Column: Inputs */}
                             <div className="md:col-span-2 space-y-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Video Title (Headline)</label>
+                                    <input
+                                        type="text"
+                                        value={headline}
+                                        onChange={(e) => setHeadline(e.target.value)}
+                                        placeholder="Enter a bold headline..."
+                                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all"
+                                    />
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Caption</label>
                                     <div className="relative">
