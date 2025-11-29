@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check } from "lucide-react";
+import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check, AlertCircle } from "lucide-react";
 import apiUtils from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
