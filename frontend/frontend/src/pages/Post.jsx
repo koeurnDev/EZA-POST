@@ -228,13 +228,17 @@ export default function Post() {
                                     onDrop={handleDrop}
                                 >
                                     {file ? (
-                                        <div className="flex flex-col items-center">
-                                            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-full flex items-center justify-center mb-4">
-                                                <CheckCircle2 size={32} />
+                                        <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden group">
+                                            <video src={previewUrl} controls className="w-full h-full object-contain" />
+                                            <button
+                                                onClick={() => { setFile(null); setPreviewUrl(null); }}
+                                                className="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-red-500 transition-all backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100"
+                                            >
+                                                <X size={18} />
+                                            </button>
+                                            <div className="absolute bottom-4 left-4 px-3 py-1 bg-black/50 backdrop-blur-md rounded-lg text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
                                             </div>
-                                            <p className="font-bold text-gray-900 dark:text-white">{file.name}</p>
-                                            <p className="text-sm text-gray-500 mb-4">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-                                            <button onClick={() => { setFile(null); setPreviewUrl(null); }} className="text-red-500 text-sm font-bold hover:underline">Remove Video</button>
                                         </div>
                                     ) : (
                                         <label className="cursor-pointer block">
