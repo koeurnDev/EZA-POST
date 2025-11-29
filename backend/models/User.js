@@ -42,6 +42,9 @@ const userSchema = new mongoose.Schema(
         facebookName: {
             type: String, // 👤 Store Facebook User Name
         },
+        facebookTokenExpiresAt: {
+            type: Date, // ⏳ Token Expiration Date
+        },
         selectedPages: {
             type: [String], // 📋 Array of Page IDs that are "ON"
             default: [],

@@ -247,6 +247,14 @@ setInterval(() => {
   if (Math.random() < 0.05) cleanupOldPosts();
 }, 60 * 1000);
 
+// 🔄 Daily Token Refresh Check (Runs every 24 hours)
+const { checkAndRefreshTokens } = require("./utils/tokenRefresher");
+setInterval(() => {
+  checkAndRefreshTokens();
+}, 24 * 60 * 60 * 1000); // 24 hours
+// Run once on startup to catch up
+setTimeout(checkAndRefreshTokens, 10000);
+
 // ------------------------------------------------------------
 // ✅ Start Server
 // ------------------------------------------------------------

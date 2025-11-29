@@ -102,8 +102,12 @@ router.get("/callback", async (req, res) => {
             }
         );
 
-        const { access_token } = longLivedTokenRes.data;
+        const { access_token, expires_in } = longLivedTokenRes.data;
         console.log("✅ Obtained Long-Lived Token");
+
+        // Calculate Expiration Date (Default to 60 days if not provided)
+        const expiresInSeconds = expires_in || 5184000; // 60 days
+        const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
 
         // 2️⃣ Get User Profile (to get ID)
         const profileRes = await axios.get("https://graph.facebook.com/me", {
@@ -155,6 +159,7 @@ router.get("/callback", async (req, res) => {
             if (user) {
                 user.facebookId = fbUser.id;
                 user.facebookAccessToken = access_token;
+                user.facebookTokenExpiresAt = expiresAt;
                 user.facebookName = fbUser.name;
                 user.connectedPages = myPages;
                 await user.save();
