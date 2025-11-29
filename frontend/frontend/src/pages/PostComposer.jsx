@@ -169,7 +169,8 @@ export default function PostComposer() {
             const response = await fetch(`${(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "")}${endpoint}`, {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${token}` },
-                body: formData
+                body: formData,
+                credentials: "include" // ✅ CRITICAL: Send cookies with request
             });
 
             const data = await response.json();
