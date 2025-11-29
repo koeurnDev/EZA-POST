@@ -23,16 +23,25 @@ cloudinary.config({
  * @param {boolean} deleteAfterUpload - Whether to delete the local file after upload (default: true)
  * @returns {Promise<object>} - Cloudinary response
  */
-const uploadFile = async (filePath, folder = "kr_post", resourceType = "auto", deleteAfterUpload = true) => {
+const uploadFile = async (filePath, folder = "kr_post", resourceType = "auto", deleteAfterUpload = true, transform = false) => {
     try {
         if (!filePath) throw new Error("File path is required");
 
-        const result = await cloudinary.uploader.upload(filePath, {
+        const options = {
             folder: folder,
             resource_type: resourceType,
             use_filename: true,
             unique_filename: true,
-        });
+        };
+
+        // ✅ Apply 1:1 Padding Transformation if requested
+        if (transform) {
+            options.transformation = [
+                { width: 1080, height: 1080, crop: "pad", background: "black", gravity: "center" }
+            ];
+        }
+
+        const result = await cloudinary.uploader.upload(filePath, options);
 
         // 🧹 Delete local file after successful upload (if requested)
         if (deleteAfterUpload) {

@@ -125,15 +125,16 @@ export default function Post() {
             const headers = { "Content-Type": "application/json" };
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
-            const response = await fetch(`${API_BASE}/api/tiktok/process`, {
+            // ✅ Use the new endpoint
+            const response = await fetch(`${API_BASE}/api/posts/tiktok/fetch`, {
                 method: "POST",
                 headers,
-                credentials: "include", // ✅ Send cookies
+                credentials: "include",
                 body: JSON.stringify({ url: tiktokUrl })
             });
             const data = await response.json();
             if (data.success) {
-                setPreviewUrl(data.url);
+                setPreviewUrl(data.video.url); // Cloudinary URL
                 setFile(null);
                 toast.success("Video loaded!", { id: toastId });
             } else {
@@ -164,12 +165,9 @@ export default function Post() {
 
             if (postType === 'upload' && file) {
                 formData.append("video", file);
-            } else if (postType === 'tiktok') {
-                if (previewUrl && previewUrl.startsWith("http")) {
-                    formData.append("directMediaUrl", previewUrl);
-                } else {
-                    formData.append("tiktokUrl", tiktokUrl);
-                }
+            } else if (postType === 'tiktok' || (previewUrl && previewUrl.startsWith("http"))) {
+                // ✅ Send Cloudinary URL
+                formData.append("videoUrl", previewUrl);
             }
 
             if (thumbnail) formData.append("thumbnail", thumbnail);

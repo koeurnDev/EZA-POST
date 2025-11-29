@@ -14,7 +14,7 @@ exports.createMixedCarousel = async (req, res) => {
     req.setTimeout(600000); // 10 minutes timeout
 
     try {
-        const { caption, accounts, scheduleTime } = req.body;
+        const { caption, accounts, scheduleTime, videoUrl, imageUrl } = req.body;
         const userId = req.user?.id;
 
         // 🛑 Validation
@@ -23,7 +23,11 @@ exports.createMixedCarousel = async (req, res) => {
         const videoFile = req.files?.find(f => f.fieldname === 'video');
         const imageFile = req.files?.find(f => f.fieldname === 'image');
 
-        if (!videoFile || !imageFile) {
+        // Check if we have either Files OR URLs
+        const hasVideo = videoFile || videoUrl;
+        const hasImage = imageFile || imageUrl;
+
+        if (!hasVideo || !hasImage) {
             return res.status(400).json({ success: false, error: "Both video and image are required for mixed carousel" });
         }
 
@@ -40,27 +44,23 @@ exports.createMixedCarousel = async (req, res) => {
             throw new Error("User not connected to Facebook");
         }
 
-        // 🎬 Step 1: Process Media (Pad to 1:1)
-        let finalVideoPath = videoFile.path;
-        let finalImagePath = imageFile.path;
+        // ☁️ Step 1: Prepare Media (Upload to Cloudinary if needed)
+        let finalVideoUrl = videoUrl;
+        let finalImageUrl = imageUrl;
 
-        try {
-            console.log("🔄 Processing video...");
-            finalVideoPath = await processMediaToSquare(videoFile.path);
-        } catch (err) {
-            console.error("⚠️ FFmpeg processing failed for video, using original:", err.message);
+        // Upload Video if file provided
+        if (videoFile) {
+            console.log("☁️ Uploading video to Cloudinary...");
+            const vRes = await uploadFile(videoFile.path, "kr_post/carousel_videos", "video", true, true); // true = transform 1:1
+            finalVideoUrl = vRes.url;
         }
 
-        try {
-            console.log("🔄 Processing image...");
-            finalImagePath = await processMediaToSquare(imageFile.path);
-        } catch (err) {
-            console.error("⚠️ FFmpeg processing failed for image, using original:", err.message);
+        // Upload Image if file provided
+        if (imageFile) {
+            console.log("☁️ Uploading image to Cloudinary...");
+            const iRes = await uploadFile(imageFile.path, "kr_post/carousel_images", "image", true, true); // true = transform 1:1
+            finalImageUrl = iRes.url;
         }
-
-        // ☁️ Step 2: Upload to Cloudinary (for DB Record)
-        const videoResult = await uploadFile(finalVideoPath, "kr_post/carousel_videos", "video", false);
-        const imageResult = await uploadFile(finalImagePath, "kr_post/carousel_images", "image", false);
 
         // 💾 Save to DB
         const postId = `carousel_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -74,12 +74,12 @@ exports.createMixedCarousel = async (req, res) => {
             is_scheduled: !!scheduleTime,
             type: 'mixed_carousel',
             carousel_cards: [
-                { type: 'video', url: videoResult.url },
-                { type: 'image', url: imageResult.url }
+                { type: 'video', url: finalVideoUrl },
+                { type: 'image', url: finalImageUrl }
             ]
         });
 
-        // 🚀 Step 3: Post to Facebook
+        // 🚀 Step 2: Post to Facebook
         const results = { successCount: 0, failedCount: 0, details: [] };
 
         for (const accountId of accountsArray) {
@@ -91,20 +91,20 @@ exports.createMixedCarousel = async (req, res) => {
 
                 console.log(`🚀 Starting Mixed Carousel for ${page.name}...`);
 
-                // 3.1 Upload Video (Unpublished)
-                const videoStream = fs.createReadStream(finalVideoPath);
-                const videoUpload = await fb.uploadVideoToFacebook(pageToken, accountId, videoStream, "Video Part", null, {
+                // 2.1 Upload Video (Unpublished) - Using Cloudinary URL
+                // fb.uploadVideoToFacebook supports URL input
+                const videoUpload = await fb.uploadVideoToFacebook(pageToken, accountId, finalVideoUrl, "Video Part", null, {
                     isScheduled: false,
-                    published: false // ✅ Explicitly set to unpublished
+                    published: false
                 });
 
                 if (!videoUpload.success) throw new Error("Failed to upload video part: " + videoUpload.error);
                 const videoId = videoUpload.postId;
 
-                // 3.2 Upload Image (Unpublished)
+                // 2.2 Upload Image (Unpublished) - Using Cloudinary URL
                 const photoForm = new (require("form-data"))();
                 photoForm.append("access_token", pageToken);
-                photoForm.append("source", fs.createReadStream(finalImagePath));
+                photoForm.append("url", finalImageUrl); // ✅ Use 'url' for remote upload
                 photoForm.append("published", "false");
 
                 const photoRes = await require("axios").post(`https://graph.facebook.com/v19.0/${accountId}/photos`, photoForm, {
@@ -114,7 +114,7 @@ exports.createMixedCarousel = async (req, res) => {
 
                 console.log(`✅ Media Uploaded: Video ${videoId}, Photo ${photoId}`);
 
-                // 3.3 Publish Carousel Feed
+                // 2.3 Publish Carousel Feed
                 const feedPayload = {
                     access_token: pageToken,
                     message: caption,
@@ -156,23 +156,5 @@ exports.createMixedCarousel = async (req, res) => {
     } catch (err) {
         console.error("❌ Mixed Carousel Error:", err.message);
         res.status(500).json({ success: false, error: err.message });
-    } finally {
-        // 🧹 Cleanup
-        const filesToDelete = [
-            req.files?.find(f => f.fieldname === 'video')?.path,
-            req.files?.find(f => f.fieldname === 'image')?.path,
-            path.join(path.dirname(req.files?.[0]?.path || ""), `processed_${path.basename(req.files?.find(f => f.fieldname === 'video')?.path || "")}`),
-            path.join(path.dirname(req.files?.[0]?.path || ""), `processed_${path.basename(req.files?.find(f => f.fieldname === 'image')?.path || "")}`)
-        ];
-
-        filesToDelete.forEach(p => {
-            if (p && fs.existsSync(p)) {
-                try {
-                    fs.unlinkSync(p);
-                } catch (e) {
-                    console.error("Failed to delete temp file:", p);
-                }
-            }
-        });
     }
 };

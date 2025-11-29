@@ -213,9 +213,11 @@ if (fs.existsSync(distPath)) {
   console.log("✅ Serving frontend from dist folder");
 }
 
-// ✅ Uploads are now handled by Cloudinary (no local serving needed)
-// const uploadsPath = path.join(__dirname, "uploads");
-// app.use("/uploads", express.static(uploadsPath));
+// ✅ Serve Temp Files (Required for TikTok Previews)
+const tempPath = path.join(__dirname, "temp");
+if (!fs.existsSync(tempPath)) fs.mkdirSync(tempPath, { recursive: true });
+app.use("/uploads/temp", express.static(tempPath));
+console.log("✅ Serving temp files from:", tempPath);
 
 // ✅ SPA fallback
 app.get("*", (req, res) => {

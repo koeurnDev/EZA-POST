@@ -13,7 +13,7 @@ exports.createPost = async (req, res) => {
     req.setTimeout(600000);
 
     try {
-        const { title, caption, accounts, scheduleTime, tiktokUrl, directMediaUrl, postType, carouselCards } = req.body;
+        const { title, caption, accounts, scheduleTime, tiktokUrl, directMediaUrl, videoUrl, postType, carouselCards } = req.body;
         const userId = req.user?.id;
 
         // 🛑 Validate fields
@@ -172,8 +172,8 @@ exports.createPost = async (req, res) => {
                     }
                 );
 
-            } else if (directMediaUrl) {
-                videoUrlForDB = directMediaUrl;
+            } else if (videoUrl || directMediaUrl) {
+                videoUrlForDB = videoUrl || directMediaUrl;
 
                 // 🔍 Find Page Access Tokens
                 const targetAccounts = accountsArray.map(id => {

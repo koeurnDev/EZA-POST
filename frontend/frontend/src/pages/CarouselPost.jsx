@@ -13,6 +13,13 @@ const CarouselPost = () => {
     const [selectedAccounts, setSelectedAccounts] = useState([]);
     const [uploading, setUploading] = useState(false);
 
+    // New State for TikTok & Cloudinary
+    const [activeTab, setActiveTab] = useState("upload"); // 'upload' | 'tiktok'
+    const [tiktokUrl, setTiktokUrl] = useState("");
+    const [loadingTiktok, setLoadingTiktok] = useState(false);
+    const [videoUrl, setVideoUrl] = useState(null); // Cloudinary URL
+    const [imageUrl, setImageUrl] = useState(null); // Cloudinary URL
+
     // Fetch Pages
     useEffect(() => {
         const fetchPages = async () => {
@@ -28,6 +35,30 @@ const CarouselPost = () => {
         };
         fetchPages();
     }, []);
+
+    // Handle TikTok Fetch
+    const handleTikTokFetch = async (e) => {
+        e.preventDefault();
+        if (!tiktokUrl) return;
+
+        setLoadingTiktok(true);
+        try {
+            const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/posts/tiktok/fetch`, { url: tiktokUrl }, {
+                withCredentials: true
+            });
+
+            if (res.data.success) {
+                setVideoUrl(res.data.video.url); // Cloudinary URL
+                setVideoFile(null); // Clear manual file
+                toast.success("TikTok Video Loaded! 🎵");
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error(err.response?.data?.error || "Failed to fetch TikTok");
+        } finally {
+            setLoadingTiktok(false);
+        }
+    };
 
     // Video Dropzone
     const onDropVideo = (acceptedFiles) => {
@@ -45,6 +76,7 @@ const CarouselPost = () => {
                 });
             }
             setVideoFile(Object.assign(file, { preview: URL.createObjectURL(file) }));
+            setVideoUrl(null); // Clear TikTok URL
         };
         video.src = URL.createObjectURL(file);
     };
@@ -81,13 +113,19 @@ const CarouselPost = () => {
 
     // Handle Submit
     const handleSubmit = async () => {
-        if (!videoFile || !imageFile) return toast.error("Please upload both video and image!");
+        if ((!videoFile && !videoUrl) || !imageFile) return toast.error("Please upload both video and image!");
         if (selectedAccounts.length === 0) return toast.error("Please select at least one page!");
 
         setUploading(true);
         const formData = new FormData();
-        formData.append("video", videoFile);
+
+        // Handle Video (File or URL)
+        if (videoFile) formData.append("video", videoFile);
+        if (videoUrl) formData.append("videoUrl", videoUrl);
+
+        // Handle Image
         formData.append("image", imageFile);
+
         formData.append("caption", caption);
         formData.append("accounts", JSON.stringify(selectedAccounts));
         if (scheduleTime) formData.append("scheduleTime", scheduleTime);
@@ -101,9 +139,11 @@ const CarouselPost = () => {
             if (res.data.success) {
                 toast.success("Mixed Carousel Published! 🚀");
                 setVideoFile(null);
+                setVideoUrl(null);
                 setImageFile(null);
                 setCaption("");
                 setScheduleTime("");
+                setTiktokUrl("");
                 setSelectedAccounts([]);
             } else {
                 toast.error("Failed to publish post");
@@ -145,29 +185,86 @@ const CarouselPost = () => {
                                 <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-lg">1</div>
                                 <h2 className="text-xl font-bold text-gray-800 dark:text-white">Video Part</h2>
                             </div>
-                            <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-semibold rounded-full border border-blue-100 dark:border-blue-800">
-                                Left Side
-                            </span>
+                            {/* Tabs */}
+                            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                                <button
+                                    onClick={() => setActiveTab("upload")}
+                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${activeTab === "upload" ? "bg-white dark:bg-gray-600 shadow text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
+                                >
+                                    Upload
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("tiktok")}
+                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${activeTab === "tiktok" ? "bg-white dark:bg-gray-600 shadow text-pink-500" : "text-gray-500 hover:text-gray-700"}`}
+                                >
+                                    TikTok
+                                </button>
+                            </div>
                         </div>
 
-                        <div {...getVideoRootProps()} className={`flex-1 min-h-[300px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all
-                            ${isVideoDragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/10' : 'border-gray-300 dark:border-gray-700 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
-                            ${videoFile ? 'border-none p-0' : 'p-8'}`}>
-                            <input {...getVideoInputProps()} />
-                            {videoFile ? (
-                                <div className="relative w-full h-full rounded-xl overflow-hidden shadow-lg">
-                                    <video src={videoFile.preview} className="w-full h-full object-cover" controls />
-                                    <button onClick={(e) => { e.stopPropagation(); setVideoFile(null); }} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-md transition-colors">
-                                        <X size={16} />
-                                    </button>
+                        {/* Content Area */}
+                        <div className="flex-1 min-h-[300px] flex flex-col">
+                            {activeTab === "upload" ? (
+                                <div {...getVideoRootProps()} className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all
+                                    ${isVideoDragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/10' : 'border-gray-300 dark:border-gray-700 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
+                                    ${videoFile || videoUrl ? 'border-none p-0' : 'p-8'}`}>
+                                    <input {...getVideoInputProps()} />
+                                    {videoFile ? (
+                                        <div className="relative w-full h-full rounded-xl overflow-hidden shadow-lg">
+                                            <video src={videoFile.preview} className="w-full h-full object-cover" controls />
+                                            <button onClick={(e) => { e.stopPropagation(); setVideoFile(null); }} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-md transition-colors">
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ) : videoUrl ? (
+                                        <div className="relative w-full h-full rounded-xl overflow-hidden shadow-lg">
+                                            <video src={videoUrl} className="w-full h-full object-cover" controls />
+                                            <button onClick={(e) => { e.stopPropagation(); setVideoUrl(null); }} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-md transition-colors">
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center">
+                                            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <Video size={32} />
+                                            </div>
+                                            <p className="text-gray-600 dark:text-gray-300 font-medium">Drag & drop video here</p>
+                                            <p className="text-xs text-gray-400 mt-2">MP4, MOV (Auto-padded to 1:1)</p>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
-                                <div className="text-center">
-                                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <Video size={32} />
+                                <div className="flex-1 flex flex-col gap-4">
+                                    <div className="relative">
+                                        <input
+                                            type="url"
+                                            value={tiktokUrl}
+                                            onChange={(e) => setTiktokUrl(e.target.value)}
+                                            placeholder="Paste TikTok URL..."
+                                            className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 outline-none"
+                                        />
+                                        <button
+                                            onClick={handleTikTokFetch}
+                                            disabled={loadingTiktok || !tiktokUrl}
+                                            className="absolute right-2 top-2 bottom-2 px-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:opacity-50 transition-colors flex items-center justify-center"
+                                        >
+                                            {loadingTiktok ? <Loader2 className="animate-spin w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
+                                        </button>
                                     </div>
-                                    <p className="text-gray-600 dark:text-gray-300 font-medium">Drag & drop video here</p>
-                                    <p className="text-xs text-gray-400 mt-2">MP4, MOV (Auto-padded to 1:1)</p>
+
+                                    {/* Preview Area for TikTok */}
+                                    <div className="flex-1 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden relative">
+                                        {videoUrl ? (
+                                            <div className="relative w-full h-full">
+                                                <video src={videoUrl} className="w-full h-full object-contain" controls />
+                                                <button onClick={() => setVideoUrl(null)} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-md">
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-400 text-sm">Preview will appear here</p>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
