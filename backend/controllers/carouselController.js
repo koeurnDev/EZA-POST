@@ -8,7 +8,7 @@ const ScheduledPost = require("../models/ScheduledPost");
 const User = require("../models/User");
 const fb = require("../utils/fb");
 const { uploadFile } = require("../utils/cloudinary");
-const { processVideoToSquare } = require("../utils/videoProcessor");
+const { processMediaToSquare } = require("../utils/videoProcessor");
 
 exports.createMixedCarousel = async (req, res) => {
     req.setTimeout(600000); // 10 minutes timeout
@@ -40,17 +40,27 @@ exports.createMixedCarousel = async (req, res) => {
             throw new Error("User not connected to Facebook");
         }
 
-        // 🎬 Step 1: Process Video (Pad to 1:1)
+        // 🎬 Step 1: Process Media (Pad to 1:1)
         let finalVideoPath = videoFile.path;
+        let finalImagePath = imageFile.path;
+
         try {
-            finalVideoPath = await processVideoToSquare(videoFile.path);
+            console.log("🔄 Processing video...");
+            finalVideoPath = await processMediaToSquare(videoFile.path);
         } catch (err) {
-            console.error("⚠️ FFmpeg processing failed, using original:", err.message);
+            console.error("⚠️ FFmpeg processing failed for video, using original:", err.message);
+        }
+
+        try {
+            console.log("🔄 Processing image...");
+            finalImagePath = await processMediaToSquare(imageFile.path);
+        } catch (err) {
+            console.error("⚠️ FFmpeg processing failed for image, using original:", err.message);
         }
 
         // ☁️ Step 2: Upload to Cloudinary (for DB Record)
         const videoResult = await uploadFile(finalVideoPath, "kr_post/carousel_videos", "video", false);
-        const imageResult = await uploadFile(imageFile.path, "kr_post/carousel_images", "image", false);
+        const imageResult = await uploadFile(finalImagePath, "kr_post/carousel_images", "image", false);
 
         // 💾 Save to DB
         const postId = `carousel_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -91,12 +101,9 @@ exports.createMixedCarousel = async (req, res) => {
                 const videoId = videoUpload.postId;
 
                 // 3.2 Upload Image (Unpublished)
-                // We use a helper or direct axios call here since fb.js might not have a dedicated "upload unpublished photo" method exposed easily
-                // But let's assume we can use a similar approach or extend fb.js. 
-                // For now, let's use the graph API directly for the photo to ensure "published: false"
                 const photoForm = new (require("form-data"))();
                 photoForm.append("access_token", pageToken);
-                photoForm.append("source", fs.createReadStream(imageFile.path));
+                photoForm.append("source", fs.createReadStream(finalImagePath));
                 photoForm.append("published", "false");
 
                 const photoRes = await require("axios").post(`https://graph.facebook.com/v19.0/${accountId}/photos`, photoForm, {
@@ -150,11 +157,21 @@ exports.createMixedCarousel = async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     } finally {
         // 🧹 Cleanup
-        [req.files?.find(f => f.fieldname === 'video')?.path,
-        req.files?.find(f => f.fieldname === 'image')?.path,
-        path.join(path.dirname(req.files?.[0]?.path || ""), `processed_${path.basename(req.files?.find(f => f.fieldname === 'video')?.path || "")}`)
-        ].forEach(p => {
-            if (p && fs.existsSync(p)) fs.unlinkSync(p);
+        const filesToDelete = [
+            req.files?.find(f => f.fieldname === 'video')?.path,
+            req.files?.find(f => f.fieldname === 'image')?.path,
+            path.join(path.dirname(req.files?.[0]?.path || ""), `processed_${path.basename(req.files?.find(f => f.fieldname === 'video')?.path || "")}`),
+            path.join(path.dirname(req.files?.[0]?.path || ""), `processed_${path.basename(req.files?.find(f => f.fieldname === 'image')?.path || "")}`)
+        ];
+
+        filesToDelete.forEach(p => {
+            if (p && fs.existsSync(p)) {
+                try {
+                    fs.unlinkSync(p);
+                } catch (e) {
+                    console.error("Failed to delete temp file:", p);
+                }
+            }
         });
     }
 };

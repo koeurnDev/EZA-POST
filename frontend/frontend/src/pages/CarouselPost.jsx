@@ -62,31 +62,6 @@ const CarouselPost = () => {
         maxFiles: 1
     });
 
-    // Image Dropzone (Right Box)
-    const onDropImage = (acceptedFiles) => {
-        const file = acceptedFiles[0];
-        if (!file) return;
-
-        // Strict 1:1 Check
-        const img = new Image();
-        img.onload = () => {
-            if (img.width !== img.height) {
-                toast.error("❌ Image MUST be 1:1 (Square). Please resize and try again.");
-                return;
-            }
-            setImageFile(Object.assign(file, {
-                preview: URL.createObjectURL(file)
-            }));
-        };
-        img.src = URL.createObjectURL(file);
-    };
-
-    const { getRootProps: getImageRootProps, getInputProps: getImageInputProps } = useDropzone({
-        onDrop: onDropImage,
-        accept: { 'image/*': ['.jpg', '.jpeg', '.png'] },
-        maxFiles: 1
-    });
-
     const handleSubmit = async () => {
         if (!videoFile || !imageFile) return toast.error("Please upload both video and image");
         if (selectedAccounts.length === 0) return toast.error("Please select at least one page");
@@ -144,28 +119,27 @@ const CarouselPost = () => {
                             </div>
                         )}
                     </div>
-                </div>
-
-                {/* Right Box: Image */}
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        🖼️ Image (Right)
-                        <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Strict 1:1</span>
-                    </h2>
-                    <div {...getImageRootProps()} className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors h-64 flex flex-col justify-center items-center bg-gray-50 dark:bg-gray-900">
-                        <input {...getImageInputProps()} />
-                        {imageFile ? (
-                            <div className="relative w-full h-full">
-                                <img src={imageFile.preview} alt="Preview" className="w-full h-full object-contain rounded" />
-                                <button onClick={(e) => { e.stopPropagation(); setImageFile(null); }} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600">✕</button>
-                            </div>
-                        ) : (
-                            <div className="text-gray-500">
-                                <p className="text-4xl mb-2">🖼️</p>
-                                <p>Drag & drop image here</p>
-                                <p className="text-xs mt-2 text-gray-400">JPG, PNG (Must be Square)</p>
-                            </div>
-                        )}
+                    {/* Right Box: Image */}
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            🖼️ Image (Right)
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-Pad Supported</span>
+                        </h2>
+                        <div {...getImageRootProps()} className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors h-64 flex flex-col justify-center items-center bg-gray-50 dark:bg-gray-900">
+                            <input {...getImageInputProps()} />
+                            {imageFile ? (
+                                <div className="relative w-full h-full">
+                                    <img src={imageFile.preview} alt="Preview" className="w-full h-full object-contain rounded" />
+                                    <button onClick={(e) => { e.stopPropagation(); setImageFile(null); }} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600">✕</button>
+                                </div>
+                            ) : (
+                                <div className="text-gray-500">
+                                    <p className="text-4xl mb-2">🖼️</p>
+                                    <p>Drag & drop image here</p>
+                                    <p className="text-xs mt-2 text-gray-400">JPG, PNG (Auto-padded to 1:1)</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -229,7 +203,7 @@ const CarouselPost = () => {
                     {uploading ? "Processing & Uploading..." : "🚀 Publish Carousel"}
                 </button>
             </div>
-        </div>
+        </div >
     );
 };
 
