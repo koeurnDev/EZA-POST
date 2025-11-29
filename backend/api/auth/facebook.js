@@ -191,24 +191,19 @@ router.get("/callback", async (req, res) => {
             throw new Error("User not found in database");
         }
 
+        const { setAuthCookie } = require("../../utils/auth"); // Import helper
+
+        // ... inside the callback route ...
+
         // 6️⃣ Refresh JWT
         currentStep = "RefreshJWT";
         console.log("🔄 Step 6: Refreshing JWT...");
-        const token = jwt.sign(
-            {
-                id: user.id,
-                email: user.email,
-                name: user.name
-            },
-            process.env.JWT_SECRET || "supersecretkey",
-            { expiresIn: "1d" }
-        );
 
-        res.cookie("token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production" || process.env.RENDER === "true",
-            sameSite: process.env.NODE_ENV === "production" || process.env.RENDER === "true" ? "none" : "lax",
-            maxAge: 24 * 60 * 60 * 1000
+        // Use the centralized helper to ensure consistent cookie attributes
+        setAuthCookie(res, {
+            id: user.id,
+            email: user.email,
+            name: user.name
         });
 
         console.log("✅ Callback complete. Redirecting...");
