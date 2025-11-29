@@ -164,12 +164,31 @@ router.get("/callback", async (req, res) => {
                 user.connectedPages = myPages;
                 await user.save();
             }
+            // 4️⃣ Generate New JWT & Set Cookie
+            const token = jwt.sign(
+                {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name
+                },
+                process.env.JWT_SECRET || "supersecretkey",
+                { expiresIn: "1d" }
+            );
+
+            res.cookie("token", token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production" || process.env.RENDER === "true",
+                sameSite: process.env.NODE_ENV === "production" || process.env.RENDER === "true" ? "none" : "lax",
+                maxAge: 24 * 60 * 60 * 1000 // 1 day
+            });
+
+            console.log(`✅ Refreshed JWT for ${user.name}`);
         } else {
             console.error("❌ User not logged in during Facebook Connect callback.");
             return res.redirect(`${process.env.FRONTEND_URL}/login?error=session_expired`);
         }
 
-        // 4️⃣ Redirect back to Settings
+        // 5️⃣ Redirect back to Settings
         res.redirect(`${process.env.FRONTEND_URL}/settings?success=facebook_connected`);
 
     } catch (err) {
