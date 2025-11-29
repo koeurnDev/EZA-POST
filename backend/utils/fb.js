@@ -163,6 +163,75 @@ class FacebookAPI {
   }
 
   /* ------------------------------------------------------------ */
+  /* ✅ Post Carousel (Link Carousel)                              */
+  /* ------------------------------------------------------------ */
+  async postCarousel(accessToken, accounts, caption, cards, options = {}) {
+    const results = { successCount: 0, failedCount: 0, details: [] };
+
+    if (!Array.isArray(accounts) || accounts.length === 0) {
+      return results;
+    }
+
+    // Construct Child Attachments
+    const childAttachments = cards.map(card => {
+      // If video, try to use JPG thumbnail from Cloudinary (replace extension)
+      // Otherwise use the image URL
+      let pictureUrl = card.url;
+      if (card.type === 'video' && card.url && card.url.includes('cloudinary')) {
+        pictureUrl = card.url.replace(/\.[^/.]+$/, ".jpg");
+      }
+
+      return {
+        link: card.link || "https://facebook.com", // Required
+        name: card.headline || " ",
+        description: card.description || " ",
+        picture: pictureUrl
+      };
+    });
+
+    for (const account of accounts) {
+      try {
+        console.log(`🚀 Posting Carousel to ${account.name}...`);
+
+        const payload = {
+          message: caption,
+          link: cards[0]?.link || "https://facebook.com", // Main link required for carousel
+          child_attachments: childAttachments,
+          access_token: account.access_token || accessToken
+        };
+
+        if (options.isScheduled && options.scheduleTime) {
+          payload.published = false;
+          payload.scheduled_publish_time = options.scheduleTime;
+        }
+
+        const res = await this.http.post(`${this.graph}/${account.id}/feed`, payload);
+
+        results.successCount++;
+        results.details.push({
+          accountId: account.id,
+          type: account.type,
+          status: "success",
+          postId: res.data.id
+        });
+        console.log(`✅ Carousel posted to ${account.name} (ID: ${res.data.id})`);
+
+      } catch (err) {
+        const parsed = this.handleFacebookError(err);
+        results.failedCount++;
+        results.details.push({
+          accountId: account.id,
+          type: account.type,
+          status: "failed",
+          error: parsed.message
+        });
+        console.error(`❌ Carousel failed for ${account.name}:`, parsed.message);
+      }
+    }
+    return results;
+  }
+
+  /* ------------------------------------------------------------ */
   /* ✅ Fallback: Share link (Pages & Groups)                      */
   /* ------------------------------------------------------------ */
   async shareAsLink(accessToken, targetId, caption, link, options = {}) {

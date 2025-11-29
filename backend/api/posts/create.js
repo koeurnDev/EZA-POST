@@ -53,22 +53,24 @@ const upload = multer({
 // ============================================================
 // ✅ POST /api/posts/create
 // ============================================================
-router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
+router.post("/", requireAuth, upload.any(), async (req, res) => {
   try {
-    const { caption, accounts, scheduleTime, tiktokUrl, directMediaUrl } = req.body;
+    const { caption, accounts, scheduleTime, tiktokUrl, directMediaUrl, postType, carouselCards } = req.body;
     const userId = req.user?.id;
 
-    // Multer fields
-    const videoFile = req.files?.['video']?.[0];
-    const thumbFile = req.files?.['thumbnail']?.[0];
-
     // 🛑 Validate fields
-    if (!videoFile && !directMediaUrl && !tiktokUrl)
-      return res
-        .status(400)
-        .json({ success: false, error: "No media (video/direct URL) or link (TikTok) provided" });
+    if (postType === 'carousel') {
+      if (!carouselCards || !accounts) return res.status(400).json({ success: false, error: "Missing carousel cards or accounts" });
+    } else {
+      // Single Post Validation
+      const videoFile = req.files?.find(f => f.fieldname === 'video');
+      if (!videoFile && !directMediaUrl && !tiktokUrl && !caption)
+        return res
+          .status(400)
+          .json({ success: false, error: "No media, link, or caption provided" });
+    }
 
-    if (!caption || !accounts)
+    if (!accounts)
       return res
         .status(400)
         .json({ success: false, error: "Missing required fields" });
@@ -81,47 +83,18 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
     }
 
-    // 📥 Handle Video Source (File vs Direct URL vs Link)
-    let videoUrlForDB = null;
-    let thumbnailUrlForDB = null;
-    let videoSizeMB = 0;
-    let videoPublicId;
-
-    if (videoFile) {
-      // 📂 Local File Upload -> Cloudinary
-      console.log(`📤 Uploading local video to Cloudinary: ${videoFile.filename}`);
-      const videoResult = await uploadFile(videoFile.path, "kr_post/videos", "video"); // ✅ Upload Video
-      videoUrlForDB = videoResult.url;
-      videoPublicId = videoResult.public_id;
-      videoSizeMB = videoFile.size / (1024 * 1024);
-
-      if (thumbFile) {
-        console.log(`📤 Uploading thumbnail to Cloudinary...`);
-        const result = await uploadFile(thumbFile.path, "kr_post/thumbnails", "image");
-        thumbnailUrlForDB = result.url;
-      }
-    } else if (directMediaUrl) {
-      videoUrlForDB = directMediaUrl; // ✅ Use Direct Media URL (treated as video source)
-    }
-    // Note: If only tiktokUrl is present, videoUrlForDB remains null, triggering Link Post fallback.
-
     // 💾 Save post record (MongoDB)
     const postId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-
-    const newPost = await ScheduledPost.create({
+    let newPostData = {
       id: postId,
       user_id: userId,
       caption,
-      video_url: videoUrlForDB || tiktokUrl, // Save link if no video
-      thumbnail_url: thumbnailUrlForDB,
       accounts: accountsArray,
       schedule_time: scheduleTime ? new Date(scheduleTime) : new Date(),
       status: "processing",
       is_scheduled: !!scheduleTime,
-      type: videoUrlForDB ? "media" : "link" // ✅ Track post type
-    });
-
-    console.log(`✅ New post created by ${userId}: ${caption}`);
+      type: postType === 'carousel' ? 'carousel' : (directMediaUrl || req.files?.find(f => f.fieldname === 'video') ? "media" : "link")
+    };
 
     // 🚀 Trigger Immediate Upload
     const User = require("../../models/User");
@@ -133,19 +106,93 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       throw new Error("User not connected to Facebook");
     }
 
-    // Upload to Facebook
-    const results = await fb.postToFB(
-      user.getDecryptedAccessToken(),
-      accountsArray.map(id => ({ id, type: 'page' })), // Assuming all are pages for now
-      videoUrlForDB, // ✅ Pass URL (or null for link post)
-      caption,
-      null,
-      {
-        isScheduled: !!scheduleTime,
-        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null,
-        link: tiktokUrl // ✅ Pass link for fallback
+    let results;
+    let videoUrlForDB = null;
+    let thumbnailUrlForDB = null;
+    let videoSizeMB = 0;
+    let videoPublicId;
+
+    if (postType === 'carousel') {
+      // 🎠 Handle Carousel
+      let parsedCards = [];
+      try {
+        parsedCards = JSON.parse(carouselCards);
+      } catch (e) {
+        throw new Error("Invalid carousel cards JSON");
       }
-    );
+
+      // Upload Card Media to Cloudinary
+      const processedCards = await Promise.all(parsedCards.map(async (card) => {
+        const cardFile = req.files?.find(f => f.fieldname === `file_${card.id}`);
+        let mediaUrl = null;
+
+        if (cardFile) {
+          console.log(`📤 Uploading carousel card media: ${cardFile.filename}`);
+          const result = await uploadFile(cardFile.path, "kr_post/carousel", card.type === 'video' ? 'video' : 'image');
+          mediaUrl = result.url;
+        }
+
+        return {
+          ...card,
+          url: mediaUrl // Add Cloudinary URL to card
+        };
+      }));
+
+      newPostData.carousel_cards = processedCards; // Save to DB (need to update Schema later)
+
+      // Publish Carousel
+      results = await fb.postCarousel(
+        user.getDecryptedAccessToken(),
+        accountsArray.map(id => ({ id, type: 'page' })),
+        caption,
+        processedCards,
+        {
+          isScheduled: !!scheduleTime,
+          scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
+        }
+      );
+
+    } else {
+      // 🎥 Handle Single Post
+      const videoFile = req.files?.find(f => f.fieldname === 'video');
+      const thumbFile = req.files?.find(f => f.fieldname === 'thumbnail');
+
+      if (videoFile) {
+        // 📂 Local File Upload -> Cloudinary
+        console.log(`📤 Uploading local video to Cloudinary: ${videoFile.filename}`);
+        const videoResult = await uploadFile(videoFile.path, "kr_post/videos", "video");
+        videoUrlForDB = videoResult.url;
+        videoPublicId = videoResult.public_id;
+        videoSizeMB = videoFile.size / (1024 * 1024);
+
+        if (thumbFile) {
+          console.log(`📤 Uploading thumbnail to Cloudinary...`);
+          const result = await uploadFile(thumbFile.path, "kr_post/thumbnails", "image");
+          thumbnailUrlForDB = result.url;
+        }
+      } else if (directMediaUrl) {
+        videoUrlForDB = directMediaUrl;
+      }
+
+      newPostData.video_url = videoUrlForDB || tiktokUrl;
+      newPostData.thumbnail_url = thumbnailUrlForDB;
+
+      // Publish Single Post
+      results = await fb.postToFB(
+        user.getDecryptedAccessToken(),
+        accountsArray.map(id => ({ id, type: 'page' })),
+        videoUrlForDB,
+        caption,
+        null, // Thumbnail buffer not used for Cloudinary flow usually, but we could pass it if needed
+        {
+          isScheduled: !!scheduleTime,
+          scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null,
+          link: tiktokUrl
+        }
+      );
+    }
+
+    const newPost = await ScheduledPost.create(newPostData);
 
     // Update Status
     const successCount = results.successCount;
@@ -166,7 +213,7 @@ router.post("/", requireAuth, upload.fields([{ name: 'video', maxCount: 1 }, { n
       video: {
         url: videoUrlForDB,
         name: videoPublicId,
-        size: `${videoSizeMB.toFixed(2)} MB`,
+        size: videoSizeMB ? `${videoSizeMB.toFixed(2)} MB` : "0 MB",
       },
       caption,
       accounts: accountsArray,
