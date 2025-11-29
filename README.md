@@ -66,18 +66,28 @@ Ensure the following Environment Variables are set on Render:
 - **Mobile**: Dashboard is responsive, but ensure video playback works on older mobile browsers.
 - **Monitoring**: Regularly check Render logs for `[Scheduler]` and `[Bot]` activity to ensure background jobs are running.
 
-## ❓ Troubleshooting
-### 1️⃣ Pages Not Saving / Updating
-- **Stale JWT**: If you reconnected Facebook but still see old data, **log out and clear cookies**. The browser might be holding an old session.
-- **Permissions**: Ensure your Facebook App is in **Live Mode** and has `pages_manage_metadata` and `pages_read_engagement`.
+## 🛠️ Common Issues & Troubleshooting
+### 1️⃣ Stale JWT / Cookies
+- **Symptoms**: Page selection appears to save but changes don’t persist; dashboard doesn’t refresh.
+- **Solution**: Clear browser cookies for your domain, then log out and log back in to generate a fresh JWT.
 
-### 2️⃣ Auto-Reply Not Working
-- **Webhooks**: Verify `FB_VERIFY_TOKEN` matches in Render and Facebook Developer Dashboard.
-- **Rate Limits**: If the bot stops replying, check logs for `429 Too Many Requests`.
+### 2️⃣ Facebook Permissions
+Ensure the Facebook App is **Live** and has these scopes:
+- `pages_manage_metadata`
+- `pages_read_engagement`
+- `pages_messaging`
+- `pages_manage_posts`
 
-### 3️⃣ Deployment Issues
-- **Database**: Ensure your MongoDB user has **read/write** permissions.
-- **Environment**: Double-check `CLOUDINARY_API_SECRET` and `JWT_SECRET` in Render.
+*Missing any of these can prevent page selection and auto-replies from working.*
+
+### 3️⃣ Backend / Database
+- **MongoDB**: User must have write access to update `connectedPages`.
+- **JWT_SECRET**: Must match between the frontend and backend; otherwise token validation will fail.
+
+### 4️⃣ Deployment & Environment Variables
+- **CLOUDINARY**: Keys must be correct to upload media.
+- **FB_VERIFY_TOKEN**: Should be set for webhooks.
+- **Verify**: Check all environment variables on Render before deploying.
 
 ## 🔮 Future Roadmap
 - **Analytics Dashboard**: Engagement tracking for posts and auto-replies.
