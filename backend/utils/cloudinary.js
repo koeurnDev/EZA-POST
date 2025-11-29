@@ -20,9 +20,10 @@ cloudinary.config({
  * @param {string} filePath - Local path to the file
  * @param {string} folder - Folder name in Cloudinary
  * @param {string} resourceType - 'image', 'video', or 'auto'
+ * @param {boolean} deleteAfterUpload - Whether to delete the local file after upload (default: true)
  * @returns {Promise<object>} - Cloudinary response
  */
-const uploadFile = async (filePath, folder = "kr_post", resourceType = "auto") => {
+const uploadFile = async (filePath, folder = "kr_post", resourceType = "auto", deleteAfterUpload = true) => {
     try {
         if (!filePath) throw new Error("File path is required");
 
@@ -33,13 +34,15 @@ const uploadFile = async (filePath, folder = "kr_post", resourceType = "auto") =
             unique_filename: true,
         });
 
-        // 🧹 Delete local file after successful upload
-        try {
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
+        // 🧹 Delete local file after successful upload (if requested)
+        if (deleteAfterUpload) {
+            try {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            } catch (cleanupErr) {
+                console.warn("⚠️ Failed to delete local temp file:", cleanupErr.message);
             }
-        } catch (cleanupErr) {
-            console.warn("⚠️ Failed to delete local temp file:", cleanupErr.message);
         }
 
         return {

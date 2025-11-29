@@ -133,16 +133,17 @@ exports.createPost = async (req, res) => {
                 videoSizeMB = videoFile.size / (1024 * 1024);
 
                 // 1. Upload to Cloudinary for DB Record (Async/Optional but good for history)
-                const videoResult = await uploadFile(videoFile.path, "kr_post/videos", "video");
+                // ⚠️ Pass false to keep file for Facebook Stream
+                const videoResult = await uploadFile(videoFile.path, "kr_post/videos", "video", false);
                 videoUrlForDB = videoResult.url;
                 videoPublicId = videoResult.public_id;
 
                 if (thumbFile) {
-                    const thumbResult = await uploadFile(thumbFile.path, "kr_post/thumbnails", "image");
+                    const thumbResult = await uploadFile(thumbFile.path, "kr_post/thumbnails", "image", false);
                     thumbnailUrlForDB = thumbResult.url;
                 }
 
-                // 2. Post to Facebook using Stream (Re-create stream as Cloudinary might have consumed it? No, uploadFile uses path)
+                // 2. Post to Facebook using Stream
                 const fbVideoStream = fs.createReadStream(videoFile.path);
                 const fbThumbStream = thumbFile ? fs.createReadStream(thumbFile.path) : null;
 
