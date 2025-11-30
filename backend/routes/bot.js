@@ -4,7 +4,8 @@
 
 const express = require("express");
 const router = express.Router();
-const { BotRule, BotStatus } = require("../models/BotRule");
+const { BotRule } = require("../models/BotRule");
+const BotStatus = require("../models/BotStatus");
 const ai = require("../utils/ai");
 const { requireAuth } = require("../utils/auth"); // ✅ Added Auth Middleware
 
