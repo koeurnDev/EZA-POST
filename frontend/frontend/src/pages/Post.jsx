@@ -19,7 +19,7 @@ export default function Post() {
     useAuth();
 
     // 🟢 State
-    const [postFormat, setPostFormat] = useState("single"); // 'single' | 'carousel'
+    const [postFormat, setPostFormat] = useState("carousel"); // 'single' | 'carousel'
     const [videoTab, setVideoTab] = useState("upload"); // 'upload' | 'tiktok'
 
     // Video State
@@ -272,7 +272,7 @@ export default function Post() {
         const videoItem = mediaItems.find(i => i.type === 'video');
         const imageItems = mediaItems.filter(i => i.type === 'image');
 
-        if (!videoItem) return toast.error("Please add a video.");
+        if (!videoItem && !file && !previewUrl) return toast.error("Please add a video.");
         if (postFormat === 'carousel' && imageItems.length === 0) {
             return toast.error("Please add at least one image.");
         }
@@ -286,10 +286,14 @@ export default function Post() {
             formData.append("accounts", JSON.stringify(selectedPages));
 
             // 🎥 Video Handling
-            if (videoItem.file) {
-                formData.append("video", videoItem.file);
-            } else if (videoItem.url) {
-                formData.append("videoUrl", videoItem.url);
+            // Use videoItem if available (carousel), otherwise fallback to state (single)
+            const activeVideoFile = videoItem?.file || file;
+            const activeVideoUrl = videoItem?.url || (previewUrl && !file ? previewUrl : null);
+
+            if (activeVideoFile) {
+                formData.append("video", activeVideoFile);
+            } else if (activeVideoUrl) {
+                formData.append("videoUrl", activeVideoUrl);
             }
 
             if (scheduleTime) formData.append("scheduleTime", scheduleTime);
@@ -318,7 +322,7 @@ export default function Post() {
                 formData.append("title", headline);
                 formData.append("postType", "single");
                 formData.append("cta", "LIKE_PAGE");
-                if (thumbnail) formData.append("thumbnail", thumbnail);
+                // No thumbnail needed for single post as per new requirement
             }
 
             const token = localStorage.getItem("token");
@@ -589,20 +593,7 @@ export default function Post() {
                                             className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-2">Cover Image</label>
-                                        <label className="block w-full aspect-video relative group cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-gray-50 transition-all">
-                                            {thumbnailPreview ? (
-                                                <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
-                                                    <ImageIcon size={24} className="mb-2" />
-                                                    <span className="text-sm">Upload Cover</span>
-                                                </div>
-                                            )}
-                                            <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
-                                        </label>
-                                    </div>
+                                    {/* Cover Image Section Removed for Single Post */}
                                 </div>
                             )}
                         </div>
@@ -610,23 +601,52 @@ export default function Post() {
                 </div>
 
                 {/* Footer Actions */}
-                <div className="mt-6 flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                    <div className="flex items-center gap-4">
-                        <div className="relative">
-                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <div className="mt-6 flex flex-col md:flex-row items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm gap-4">
+
+                    {/* Scheduling Toggle */}
+                    <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-900 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
+                        <button
+                            onClick={() => { setScheduleTime(""); }}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${!scheduleTime ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Post Now
+                        </button>
+                        <button
+                            onClick={() => {
+                                // Set default time to 1 hour from now if empty
+                                if (!scheduleTime) {
+                                    const now = new Date();
+                                    now.setHours(now.getHours() + 1);
+                                    now.setMinutes(0);
+                                    setScheduleTime(now.toISOString().slice(0, 16));
+                                }
+                            }}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${scheduleTime ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Schedule
+                        </button>
+                    </div>
+
+                    {/* Date Picker (Visible only if Scheduled) */}
+                    {scheduleTime && (
+                        <div className="relative animate-in fade-in slide-in-from-left-4 duration-300">
+                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={16} />
                             <input
                                 type="datetime-local"
                                 value={scheduleTime}
                                 onChange={(e) => setScheduleTime(e.target.value)}
-                                className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="pl-10 pr-4 py-2.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                             />
                         </div>
-                    </div>
+                    )}
+
                     <Button
                         onClick={handleSubmit}
                         disabled={(!file && !previewUrl) || selectedPages.length === 0}
                         isLoading={isSubmitting}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-600/20"
+                        className={`px-8 py-3 rounded-xl font-bold shadow-lg transition-all ${scheduleTime
+                            ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
+                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'} text-white ml-auto`}
                     >
                         {isSubmitting ? 'Processing...' : (scheduleTime ? 'Schedule Post' : 'Post Now')}
                     </Button>
