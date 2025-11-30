@@ -14,6 +14,7 @@ exports.createMixedCarousel = async (req, res) => {
     req.setTimeout(600000); // 10 minutes timeout
 
     let localVideoPath = null; // ✅ Defined outside try for cleanup access
+    let localThumbnailPath = null; // ✅ Defined outside try for cleanup access
 
     try {
         const { caption, accounts, scheduleTime, videoUrl } = req.body;
@@ -48,13 +49,20 @@ exports.createMixedCarousel = async (req, res) => {
         let finalVideoPublicId = null;
         let finalImageUrls = [];
         let finalImagePublicIds = [];
-        const { processMediaToSquare } = require("../utils/videoProcessor");
+        const { processMediaToSquare, generateThumbnail } = require("../utils/videoProcessor");
 
         // 1.1 Process Video
         if (videoFile) {
             console.log("🎬 Phase 1: Processing video locally (1080x1080)...");
             const processedVideoPath = await processMediaToSquare(videoFile.path);
             localVideoPath = processedVideoPath;
+
+            // ✅ Generate Thumbnail
+            try {
+                localThumbnailPath = await generateThumbnail(localVideoPath);
+            } catch (thumbErr) {
+                console.warn("⚠️ Failed to generate thumbnail, proceeding without it:", thumbErr.message);
+            }
 
             console.log("☁️ Uploading processed video to Cloudinary...");
             // 🛑 CRITICAL: Set deleteAfterUpload=false so we can use the file for Direct Upload to FB
@@ -187,7 +195,13 @@ exports.createMixedCarousel = async (req, res) => {
                                 // ✅ Use Direct File Upload if available (Reliable)
                                 if (localVideoPath) {
                                     const videoStream = fs.createReadStream(localVideoPath);
-                                    const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, videoStream);
+
+                                    let thumbStream = null;
+                                    if (localThumbnailPath) {
+                                        thumbStream = fs.createReadStream(localThumbnailPath);
+                                    }
+
+                                    const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, videoStream, thumbStream);
                                     containerId = vRes.id;
                                 } else {
                                     // Fallback to URL (e.g. TikTok)
@@ -313,6 +327,16 @@ exports.createMixedCarousel = async (req, res) => {
                 console.log(`🧹 Cleaned up local video file: ${localVideoPath}`);
             } catch (cleanupErr) {
                 console.warn(`⚠️ Failed to delete local video file: ${cleanupErr.message}`);
+            }
+        }
+
+        // 🧹 Cleanup Thumbnail
+        if (localThumbnailPath && fs.existsSync(localThumbnailPath)) {
+            try {
+                fs.unlinkSync(localThumbnailPath);
+                console.log(`🧹 Cleaned up local thumbnail file: ${localThumbnailPath}`);
+            } catch (cleanupErr) {
+                console.warn(`⚠️ Failed to delete local thumbnail file: ${cleanupErr.message}`);
             }
         }
     }

@@ -60,4 +60,37 @@ const processMediaToSquare = (inputPath) => {
     });
 };
 
-module.exports = { processMediaToSquare };
+/**
+ * 🖼️ Generate a thumbnail from a video file.
+ *
+ * @param {string} videoPath - Path to the video file
+ * @returns {Promise<string>} - Path to the generated thumbnail
+ */
+const generateThumbnail = (videoPath) => {
+    return new Promise((resolve, reject) => {
+        const thumbnailPath = path.join(
+            path.dirname(videoPath),
+            `thumb_${path.basename(videoPath, path.extname(videoPath))}.jpg`
+        );
+
+        console.log(`🖼️ Generating thumbnail: ${videoPath} -> ${thumbnailPath}`);
+
+        ffmpeg(videoPath)
+            .screenshots({
+                timestamps: ['00:00:01.000'],
+                filename: path.basename(thumbnailPath),
+                folder: path.dirname(thumbnailPath),
+                size: '1080x1080' // Ensure thumbnail matches video dimensions
+            })
+            .on('end', () => {
+                console.log("✅ Thumbnail generated");
+                resolve(thumbnailPath);
+            })
+            .on('error', (err) => {
+                console.error("❌ Thumbnail Generation Error:", err.message);
+                reject(err);
+            });
+    });
+};
+
+module.exports = { processMediaToSquare, generateThumbnail };

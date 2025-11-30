@@ -151,7 +151,7 @@ class FacebookAPI {
   /* ------------------------------------------------------------ */
   /* ✅ Upload Video for Carousel (Container ID)                   */
   /* ------------------------------------------------------------ */
-  async uploadVideoForCarousel(accessToken, pageId, videoInput) {
+  async uploadVideoForCarousel(accessToken, pageId, videoInput, thumbnailInput = null) {
     try {
       console.log(`📤 Uploading video container for carousel: ${pageId}`);
       const form = new FormData();
@@ -167,6 +167,22 @@ class FacebookAPI {
           filename: `video_${Date.now()}.mp4`,
           contentType: "video/mp4",
         });
+      }
+
+      // ✅ Handle Thumbnail (Buffer or Stream)
+      if (thumbnailInput) {
+        console.log(`🖼️ Attaching thumbnail to video upload...`);
+        if (Buffer.isBuffer(thumbnailInput)) {
+          form.append("thumb", thumbnailInput, {
+            filename: "thumb.jpg",
+            contentType: "image/jpeg",
+          });
+        } else if (typeof thumbnailInput.pipe === 'function') {
+          form.append("thumb", thumbnailInput, {
+            filename: "thumb.jpg",
+            contentType: "image/jpeg",
+          });
+        }
       }
 
       form.append("published", "false"); // CRITICAL: Draft mode
