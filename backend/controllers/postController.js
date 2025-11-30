@@ -49,97 +49,18 @@ exports.createPost = async (req, res) => {
         let videoPublicId = null;
 
         if (postType === 'carousel') {
-            // 🎠 Handle Carousel (Existing Logic - Adapted for PostLog)
-            let parsedCards = [];
-            try {
-                parsedCards = JSON.parse(carouselCards);
-            } catch (e) {
-                throw new Error("Invalid carousel cards JSON");
-            }
+            // 🎠 Delegation: Pass the heavy lifting to the dedicated controller
+            const carouselController = require("./carouselController");
 
-            // Upload Card Media to Cloudinary
-            const processedCards = await Promise.all(parsedCards.map(async (card) => {
-                const cardFile = req.files?.find(f => f.fieldname === `file_${card.id}`);
-                const cardThumbnail = req.files?.find(f => f.fieldname === `thumbnail_${card.id}`);
-                let mediaUrl = null;
-                let thumbnailUrl = null;
-
-                if (cardFile) {
-                    console.log(`📤 Uploading carousel card media: ${cardFile.filename}`);
-                    const result = await uploadFile(cardFile.path, "eza-post/carousel", card.type === 'video' ? 'video' : 'image', true, true);
-                    mediaUrl = result.url;
-                } else if (card.previewUrl) {
-                    mediaUrl = card.previewUrl;
-                }
-
-                if (cardThumbnail) {
-                    console.log(`📤 Uploading carousel card thumbnail: ${cardThumbnail.filename}`);
-                    const thumbResult = await uploadFile(cardThumbnail.path, "eza-post/thumbnails", "image");
-                    thumbnailUrl = thumbResult.url;
-                }
-
-                return {
-                    ...card,
-                    url: mediaUrl,
-                    thumbnailUrl: thumbnailUrl
-                };
-            }));
-
-            // Post to each account
-            for (const accountId of accountsArray) {
-                try {
-                    // Fetch Page
-                    const page = await FacebookPage.findOne({ pageId: accountId, userId: userId });
-                    let pageToken = page ? page.getDecryptedAccessToken() : null;
-                    if (!pageToken) {
-                        const user = await User.findOne({ id: userId });
-                        const connectedPage = user?.connectedPages?.find(p => p.id === accountId);
-                        if (connectedPage) pageToken = user.getDecryptedPageToken(accountId);
-                    }
-                    if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
-
-                    // Post Carousel
-                    const fbRes = await fb.postCarousel(
-                        pageToken,
-                        [{ id: accountId, type: 'page' }], // fb.postCarousel expects array but we loop here for PostLog
-                        caption,
-                        processedCards,
-                        {
-                            isScheduled: !!scheduleTime,
-                            scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
-                        }
-                    );
-
-                    if (fbRes.successCount > 0) {
-                        const fbPostId = fbRes.details[0].postId;
-                        await PostLog.create({
-                            userId,
-                            pageId: accountId,
-                            fbPostId: fbPostId,
-                            type: "carousel",
-                            status: scheduleTime ? "scheduled" : "published",
-                            scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
-                            cloudinaryImageIds: processedCards.map(c => c.url) // Storing URLs as IDs for now, or extract public_id if available
-                        });
-                        results.successCount++;
-                        results.details.push({ accountId, status: "success", postId: fbPostId });
-                    } else {
-                        throw new Error(fbRes.details[0].error || "Failed to post carousel");
-                    }
-
-                } catch (err) {
-                    console.error(`❌ Failed for ${accountId}:`, err.message);
-                    await PostLog.create({
-                        userId,
-                        pageId: accountId,
-                        type: "carousel",
-                        status: "failed",
-                        error: err.message
-                    });
-                    results.failedCount++;
-                    results.details.push({ accountId, status: "failed", error: err.message });
-                }
-            }
+            // We pass the raw request and accounts; the controller handles file processing, 
+            // ID creation, and posting.
+            results = await carouselController.processAndPostCarousel(
+                req,
+                accountsArray,
+                userId,
+                caption,
+                scheduleTime
+            );
 
         } else {
             // 🎥 Handle Single Post
@@ -162,7 +83,7 @@ exports.createPost = async (req, res) => {
                     thumbnailUrlForDB = thumbResult.url;
                 }
 
-                // 2. Post to Facebook using Cloudinary URL
+                // 2. Post to Facebook using Direct File Upload (Stream)
                 for (const accountId of accountsArray) {
                     try {
                         const page = await FacebookPage.findOne({ pageId: accountId, userId: userId });
@@ -179,12 +100,24 @@ exports.createPost = async (req, res) => {
                         }
                         if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
 
+                        // ✅ Use Direct File Upload (Stream) for Reliability
+                        const videoStream = fs.createReadStream(videoFile.path);
+                        let thumbStream = null;
+                        if (thumbFile) {
+                            thumbStream = fs.createReadStream(thumbFile.path);
+                        }
+
                         const fbRes = await fb.postToFB(
                             null, // User token not needed if we pass targetAccounts with tokens
                             [{ id: accountId, type: 'page', access_token: pageToken, name: pageName }],
-                            videoUrlForDB, // ✅ Use Cloudinary URL
+                            videoStream, // ✅ Pass Stream instead of URL
                             caption,
-                            null, // Thumbnail handled by FB or Cloudinary URL if needed
+                            thumbFile ? { buffer: fs.readFileSync(thumbFile.path) } : null, // fb.postToFB expects object with buffer for thumbnail if not stream? 
+                            // Wait, fb.postToFB calls uploadVideoToFacebook which handles Buffer or Stream.
+                            // Let's check fb.postToFB signature: (accessToken, accounts, videoInput, caption, thumbnail = null, options = {})
+                            // And uploadVideoToFacebook: (accessToken, pageId, videoInput, caption, thumbnailBuffer = null, options = {})
+                            // It seems uploadVideoToFacebook expects thumbnailBuffer to be a Buffer or Stream.
+                            // Let's pass the stream or buffer.
                             {
                                 title,
                                 isScheduled: !!scheduleTime,

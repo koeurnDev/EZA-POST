@@ -10,21 +10,13 @@ const User = require("../models/User");
 const fb = require("../utils/fb");
 const { uploadFile } = require("../utils/cloudinary");
 
-exports.createMixedCarousel = async (req, res) => {
-    req.setTimeout(600000); // 10 minutes timeout
-
-    let localVideoPath = null; // ✅ Defined outside try for cleanup access
-    let localThumbnailPath = null; // ✅ Defined outside try for cleanup access
+exports.processAndPostCarousel = async (req, accountsArray, userId, caption, scheduleTime) => {
+    let localVideoPath = null;
+    let localThumbnailPath = null;
 
     try {
-        const { caption, accounts, scheduleTime, videoUrl } = req.body;
-        const userId = req.user?.id;
-
-        // 🛑 Validation
-        if (!accounts) return res.status(400).json({ success: false, error: "Missing accounts" });
-
+        const { videoUrl } = req.body;
         const videoFile = req.files?.find(f => f.fieldname === 'video');
-        // ✅ Support Multiple Images
         const imageFiles = req.files?.filter(f => f.fieldname === 'images');
 
         // Check if we have either Files OR URLs
@@ -32,19 +24,10 @@ exports.createMixedCarousel = async (req, res) => {
         const hasImages = imageFiles && imageFiles.length > 0;
 
         if (!hasVideo || !hasImages) {
-            return res.status(400).json({ success: false, error: "Video and at least one image are required for mixed carousel" });
-        }
-
-        let accountsArray = [];
-        try {
-            accountsArray = JSON.parse(accounts);
-        } catch {
-            return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
+            throw new Error("Video and at least one image are required for mixed carousel");
         }
 
         // 🔄 Phase 1: Preparation (Upload & Process)
-        // Ensure both video and image are correctly processed (1080x1080) and hosted.
-
         let finalVideoUrl = videoUrl;
         let finalVideoPublicId = null;
         let finalImageUrls = [];
@@ -82,6 +65,14 @@ exports.createMixedCarousel = async (req, res) => {
                 const iRes = await uploadFile(processedImagePath, "eza-post/carousel_images", "image", true, false); // transform=false as we processed it
                 finalImageUrls.push(iRes.url);
                 finalImagePublicIds.push(iRes.public_id);
+
+                // ✅ CRITICAL FIX: Delete the raw and processed image files after successful processing/upload
+                try {
+                    if (fs.existsSync(img.path)) fs.unlinkSync(img.path);
+                    if (fs.existsSync(processedImagePath)) fs.unlinkSync(processedImagePath);
+                } catch (e) {
+                    console.warn(`⚠️ Failed to delete local image path: ${e.message}`);
+                }
             }
         }
 
@@ -108,9 +99,6 @@ exports.createMixedCarousel = async (req, res) => {
                 console.log(`🚀 Starting Mixed Carousel for ${pageName} (${accountId})...`);
 
                 // 🔄 Phase 2: Create Media Attachments (Meta API)
-                // We must tell Facebook about each item and have Facebook process it into a temporary container ID.
-
-                // 🔢 Construct Final Child Attachments from Cards Data
                 let carouselCards = [];
                 try {
                     if (req.body.carouselCards) {
@@ -120,12 +108,21 @@ exports.createMixedCarousel = async (req, res) => {
                     console.warn("⚠️ Invalid carouselCards JSON, using default logic");
                 }
 
+                // ✅ Polyfill: If no cards provided, generate them to force 2-Step Process
+                if (!carouselCards || carouselCards.length === 0) {
+                    console.log("⚠️ No carouselCards provided. Auto-generating from inputs...");
+                    // 1. Video Card
+                    carouselCards.push({ type: 'video' });
+                    // 2. Image Cards
+                    finalImageUrls.forEach((_, index) => {
+                        carouselCards.push({ type: 'image', fileIndex: index });
+                    });
+                }
+
                 const finalChildAttachments = [];
 
                 if (carouselCards.length > 0) {
                     // 🧠 Intelligent Auto-Fill System
-                    // If metadata is missing, we auto-fill it based on the Target Page.
-
                     const pageUrl = `https://facebook.com/${accountId}`;
 
                     // 1. Auto-Fill Defaults
@@ -134,7 +131,7 @@ exports.createMixedCarousel = async (req, res) => {
                     const defaultLink = pageUrl;
                     const defaultCta = "LEARN_MORE";
 
-                    // 2. Extract User Input (if any) - Priority: User Input > Default
+                    // 2. Extract User Input (if any)
                     const unifiedDescription = carouselCards[0].description || defaultDescription;
                     const unifiedCta = carouselCards[0].cta || defaultCta;
                     const unifiedHeadline = carouselCards[0].headline || defaultHeadline;
@@ -146,19 +143,16 @@ exports.createMixedCarousel = async (req, res) => {
                         let description = unifiedDescription;
                         let ctaType = unifiedCta;
 
-                        // Map internal intents to valid FB Enums
                         if (ctaType === 'SEE_PAGE' || ctaType === 'FOLLOW' || ctaType === 'LIKE_PAGE') {
                             ctaType = 'LEARN_MORE';
                         }
 
-                        // 🧠 Special Logic for "Card 3" (End Card / Profile Card)
-                        // If this is the last card AND we have at least 3 cards, treat it as the "Follow Page" card
                         const isEndCard = index >= 2 && index === carouselCards.length - 1;
 
                         if (isEndCard) {
                             headline = `Follow ${pageName}`;
                             description = "Don't miss our next post!";
-                            ctaType = "LEARN_MORE"; // Points to page URL
+                            ctaType = "LEARN_MORE";
                             link = pageUrl;
                         }
 
@@ -166,20 +160,15 @@ exports.createMixedCarousel = async (req, res) => {
                         if (card.type === 'video') {
                             url = finalVideoUrl;
                         } else if (card.type === 'image') {
-                            // Support Remote Image URL (e.g. Page Profile Pic for Card 3)
                             if (card.imageUrl) {
                                 url = card.imageUrl;
-                            }
-                            // 🧠 Auto-Fetch Page Profile Pic for End Card if no specific image provided
-                            else if (isEndCard && !card.fileIndex && !card.imageUrl) {
+                            } else if (isEndCard && !card.fileIndex && !card.imageUrl) {
                                 if (page && page.picture && page.picture.data && page.picture.data.url) {
                                     url = page.picture.data.url;
                                 } else {
                                     url = finalImageUrls[card.fileIndex] || finalImageUrls[0];
                                 }
-                            }
-                            // Map using fileIndex (Uploaded Files)
-                            else if (card.fileIndex !== undefined && finalImageUrls[card.fileIndex]) {
+                            } else if (card.fileIndex !== undefined && finalImageUrls[card.fileIndex]) {
                                 url = finalImageUrls[card.fileIndex];
                             } else {
                                 url = finalImageUrls[0];
@@ -195,16 +184,14 @@ exports.createMixedCarousel = async (req, res) => {
                                 // ✅ Use Direct File Upload if available (Reliable)
                                 if (localVideoPath) {
                                     const videoStream = fs.createReadStream(localVideoPath);
-
                                     let thumbStream = null;
                                     if (localThumbnailPath) {
                                         thumbStream = fs.createReadStream(localThumbnailPath);
                                     }
-
                                     const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, videoStream, thumbStream);
                                     containerId = vRes.id;
                                 } else {
-                                    // Fallback to URL (e.g. TikTok)
+                                    // Fallback to URL
                                     const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, url);
                                     containerId = vRes.id;
                                 }
@@ -227,33 +214,10 @@ exports.createMixedCarousel = async (req, res) => {
                                 type: ctaType,
                                 value: { link: link }
                             },
-                            // ✅ KEY FIX: Use id (container ID) and REMOVE picture/source
                             id: containerId
                         };
 
                         finalChildAttachments.push(attachment);
-                    }
-                } else {
-                    // Fallback Legacy Logic
-                    // Video Card
-                    finalChildAttachments.push({
-                        link: "https://facebook.com",
-                        source: finalVideoUrl,
-                        picture: finalVideoUrl.replace(/\.[^/.]+$/, ".jpg"),
-                        name: "Video",
-                        description: " ",
-                        call_to_action: { type: "LEARN_MORE", value: { link: "https://facebook.com" } }
-                    });
-
-                    // Image Cards
-                    for (let i = 0; i < finalImageUrls.length; i++) {
-                        finalChildAttachments.push({
-                            link: "https://facebook.com",
-                            picture: finalImageUrls[i],
-                            name: "Image " + (i + 1),
-                            description: " ",
-                            call_to_action: { type: "LEARN_MORE", value: { link: "https://facebook.com" } }
-                        });
                     }
                 }
 
@@ -311,14 +275,11 @@ exports.createMixedCarousel = async (req, res) => {
             }
         }
 
-        res.status(201).json({
-            success: true,
-            results
-        });
+        return results;
 
     } catch (err) {
         console.error("❌ Mixed Carousel Error:", err.message);
-        res.status(500).json({ success: false, error: err.message });
+        throw err;
     } finally {
         // 🧹 Final Cleanup: Delete local video file if it exists
         if (localVideoPath && fs.existsSync(localVideoPath)) {
@@ -339,5 +300,34 @@ exports.createMixedCarousel = async (req, res) => {
                 console.warn(`⚠️ Failed to delete local thumbnail file: ${cleanupErr.message}`);
             }
         }
+    }
+};
+
+exports.createMixedCarousel = async (req, res) => {
+    req.setTimeout(600000); // 10 minutes timeout
+
+    try {
+        const { caption, accounts, scheduleTime } = req.body;
+        const userId = req.user?.id;
+
+        // 🛑 Validation
+        if (!accounts) return res.status(400).json({ success: false, error: "Missing accounts" });
+
+        let accountsArray = [];
+        try {
+            accountsArray = JSON.parse(accounts);
+        } catch {
+            return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
+        }
+
+        const results = await exports.processAndPostCarousel(req, accountsArray, userId, caption, scheduleTime);
+
+        res.status(201).json({
+            success: true,
+            results
+        });
+
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
     }
 };
