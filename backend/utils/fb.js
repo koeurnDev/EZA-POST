@@ -207,12 +207,24 @@ class FacebookAPI {
   /* ------------------------------------------------------------ */
   /* ✅ Upload Photo for Carousel (Container ID)                   */
   /* ------------------------------------------------------------ */
-  async uploadPhotoForCarousel(accessToken, pageId, photoUrl) {
+  async uploadPhotoForCarousel(accessToken, pageId, photoInput) {
     try {
       console.log(`📤 Uploading photo container for carousel: ${pageId}`);
       const form = new FormData();
       form.append("access_token", accessToken);
-      form.append("url", photoUrl);
+
+      // ✅ Support Direct File Upload (Stream/Buffer) OR URL
+      if (typeof photoInput === 'string' && photoInput.startsWith('http')) {
+        console.log(`🔗 Using photo URL: ${photoInput}`);
+        form.append("url", photoInput);
+      } else {
+        console.log(`🌊 Using photo Stream/Buffer (Direct Upload)`);
+        form.append("source", photoInput, {
+          filename: `photo_${Date.now()}.jpg`,
+          contentType: "image/jpeg",
+        });
+      }
+
       form.append("published", "false"); // CRITICAL: Draft mode
 
       const res = await this.http.post(`${this.graph}/${pageId}/photos`, form, {

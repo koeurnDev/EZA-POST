@@ -13,6 +13,7 @@ const { uploadFile } = require("../utils/cloudinary");
 exports.processAndPostCarousel = async (req, accountsArray, userId, caption, scheduleTime) => {
     let localVideoPath = null;
     let localThumbnailPath = null;
+    let localImagePaths = []; // ✅ Store local image paths for direct upload
 
     try {
         const { videoUrl } = req.body;
@@ -66,13 +67,16 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                 finalImageUrls.push(iRes.url);
                 finalImagePublicIds.push(iRes.public_id);
 
-                // ✅ CRITICAL FIX: Delete the raw and processed image files after successful processing/upload
-                try {
-                    if (fs.existsSync(img.path)) fs.unlinkSync(img.path);
-                    if (fs.existsSync(processedImagePath)) fs.unlinkSync(processedImagePath);
-                } catch (e) {
-                    console.warn(`⚠️ Failed to delete local image path: ${e.message}`);
-                }
+                // ✅ Store path for Direct Upload later
+                localImagePaths.push(processedImagePath);
+
+                // ❌ DO NOT DELETE HERE - We need it for Phase 2 Direct Upload
+                // try {
+                //     if (fs.existsSync(img.path)) fs.unlinkSync(img.path);
+                //     // if (fs.existsSync(processedImagePath)) fs.unlinkSync(processedImagePath); // Keep for upload
+                // } catch (e) {
+                //     console.warn(`⚠️ Failed to delete local image path: ${e.message}`);
+                // }
             }
         }
 
@@ -197,7 +201,15 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                 }
                             } else {
                                 console.log(`📤 Uploading photo container for Card ${index + 1}...`);
-                                const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, url);
+
+                                // ✅ Use Direct File Upload if available (Reliable)
+                                let photoInput = url;
+                                if (card.fileIndex !== undefined && localImagePaths[card.fileIndex]) {
+                                    console.log(`🌊 Using local image stream for Card ${index + 1}`);
+                                    photoInput = fs.createReadStream(localImagePaths[card.fileIndex]);
+                                }
+
+                                const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, photoInput);
                                 containerId = pRes.id;
                             }
                         } catch (uploadErr) {
@@ -300,9 +312,19 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                 console.warn(`⚠️ Failed to delete local thumbnail file: ${cleanupErr.message}`);
             }
         }
+
+        // ✅ Cleanup Local Images
+        if (localImagePaths.length > 0) {
+            localImagePaths.forEach(p => {
+                try {
+                    if (fs.existsSync(p)) fs.unlinkSync(p);
+                } catch (e) {
+                    console.warn(`Failed to delete temp image: ${p}`);
+                }
+            });
+        }
     }
 };
-
 exports.createMixedCarousel = async (req, res) => {
     req.setTimeout(600000); // 10 minutes timeout
 
