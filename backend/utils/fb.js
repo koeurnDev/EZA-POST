@@ -108,6 +108,52 @@ class FacebookAPI {
   }
 
   /* ------------------------------------------------------------ */
+  /* ✅ Upload Video for Carousel (Container ID)                   */
+  /* ------------------------------------------------------------ */
+  async uploadVideoForCarousel(accessToken, pageId, videoUrl) {
+    try {
+      console.log(`📤 Uploading video container for carousel: ${pageId}`);
+      const form = new FormData();
+      form.append("access_token", accessToken);
+      form.append("file_url", videoUrl);
+      form.append("published", "false"); // CRITICAL: Draft mode
+
+      const res = await this.http.post(`${this.graph}/${pageId}/videos`, form, {
+        headers: form.getHeaders(),
+      });
+
+      console.log(`✅ Video container created (ID: ${res.data.id})`);
+      return { success: true, id: res.data.id };
+    } catch (error) {
+      console.error("❌ Video container upload failed:", error.response?.data?.error || error.message);
+      throw error;
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Upload Photo for Carousel (Container ID)                   */
+  /* ------------------------------------------------------------ */
+  async uploadPhotoForCarousel(accessToken, pageId, photoUrl) {
+    try {
+      console.log(`📤 Uploading photo container for carousel: ${pageId}`);
+      const form = new FormData();
+      form.append("access_token", accessToken);
+      form.append("url", photoUrl);
+      form.append("published", "false"); // CRITICAL: Draft mode
+
+      const res = await this.http.post(`${this.graph}/${pageId}/photos`, form, {
+        headers: form.getHeaders(),
+      });
+
+      console.log(`✅ Photo container created (ID: ${res.data.id})`);
+      return { success: true, id: res.data.id };
+    } catch (error) {
+      console.error("❌ Photo container upload failed:", error.response?.data?.error || error.message);
+      throw error;
+    }
+  }
+
+  /* ------------------------------------------------------------ */
   /* ✅ Post video/link to multiple pages or groups                */
   /* ------------------------------------------------------------ */
   async postToFB(accessToken, accounts, videoInput, caption, thumbnail = null, options = {}) {
