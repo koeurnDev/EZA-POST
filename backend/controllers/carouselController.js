@@ -217,17 +217,16 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             throw new Error(`Failed to upload media for card ${index + 1}`);
                         }
 
-                        // 3. Construct Bundle Object with ID AND picture URL
+                        // 3. Construct Bundle Object with Container ID
                         const attachment = {
                             link: link,
                             name: headline,
                             description: description,
-                            picture: url, // ✅ CRITICAL: Add picture URL for display
                             call_to_action: {
                                 type: ctaType,
                                 value: { link: link }
                             },
-                            id: containerId
+                            id: containerId // ✅ Container ID is sufficient for display
                         };
 
                         finalChildAttachments.push(attachment);
