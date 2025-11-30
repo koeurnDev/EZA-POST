@@ -226,128 +226,162 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         } catch (uploadErr) {
                             console.error(`❌ Failed to upload media for Card ${index + 1}:`, uploadErr.message);
                             throw new Error(`Failed to upload media for card ${index + 1}`);
-
-                            finalChildAttachments.push(attachment);
                         }
-                    }
 
-                    // 🔄 Phase 3: Publish the Carousel
-                    console.log("📦 Controller Payload (finalChildAttachments):", JSON.stringify(finalChildAttachments, null, 2));
+                        // 3. Construct attachment with Metadata AND Type-Specific IDs
+                        // ✅ CRITICAL: Metadata prevents "Invalid parameter", IDs ensure native display
+                        const attachment = {
+                            link: link, // ✅ Restore Link for ALL cards
+                            name: headline,
+                            description: description,
+                        };
 
-                    const feedRes = await fb.postCarousel(pageToken, [{ id: accountId, name: pageName, type: 'page' }], caption, finalChildAttachments, {
-                        isScheduled: !!scheduleTime,
-                        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
-                    });
+                        if (card.type === 'video') {
+                            // 🔄 EXPERIMENTAL: Try media_fbid instead of video_id for organic post
+                            attachment.media_fbid = containerId;
 
-                    if (feedRes.successCount > 0) {
-                        const fbPostId = feedRes.details[0].postId;
-
-                        // 🔄 Phase 4: Clean-up (Soft Delete)
-                        const { softDeleteAsset } = require("../utils/cloudinary");
-                        if (finalVideoPublicId) await softDeleteAsset(finalVideoPublicId);
-                        if (finalImagePublicIds && finalImagePublicIds.length > 0) {
-                            for (const imgId of finalImagePublicIds) {
-                                await softDeleteAsset(imgId);
+                            // ✅ Video MUST use thumbnail image for 'picture'
+                            if (finalThumbnailUrl) {
+                                attachment.picture = finalThumbnailUrl;
+                            } else {
+                                attachment.picture = url.replace(/\.[^/.]+$/, ".jpg");
                             }
+
+                            // ❌ Remove CTA for video (as per user request)
+                            // attachment.call_to_action = ... 
+
+                        } else {
+                            attachment.media_fbid = containerId; // ✅ Standard for Image Containers
+                            attachment.picture = url; // ✅ Image URL is fine for Image card
+
+                            // ✅ Keep CTA for Image
+                            attachment.call_to_action = {
+                                type: ctaType,
+                                value: { link: link }
+                            };
                         }
 
-                        await PostLog.create({
-                            userId,
-                            pageId: accountId,
-                            fbPostId: fbPostId,
-                            type: "carousel",
-                            status: scheduleTime ? "scheduled" : "published",
-                            scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
-                            cloudinaryVideoId: finalVideoPublicId,
-                            cloudinaryImageIds: finalImagePublicIds
-                        });
+                        finalChildAttachments.push(attachment);
+                    }
+                }
 
-                        results.successCount++;
-                        results.details.push({ accountId, status: "success", postId: fbPostId });
-                        console.log(`✅ Mixed Carousel Published: ${fbPostId}`);
-                    } else {
-                        throw new Error(feedRes.details[0].error || "Failed to post carousel");
+                // 🔄 Phase 3: Publish the Carousel
+                console.log("📦 Controller Payload (finalChildAttachments):", JSON.stringify(finalChildAttachments, null, 2));
+
+                const feedRes = await fb.postCarousel(pageToken, [{ id: accountId, name: pageName, type: 'page' }], caption, finalChildAttachments, {
+                    isScheduled: !!scheduleTime,
+                    scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
+                });
+
+                if (feedRes.successCount > 0) {
+                    const fbPostId = feedRes.details[0].postId;
+
+                    // 🔄 Phase 4: Clean-up (Soft Delete)
+                    const { softDeleteAsset } = require("../utils/cloudinary");
+                    if (finalVideoPublicId) await softDeleteAsset(finalVideoPublicId);
+                    if (finalImagePublicIds && finalImagePublicIds.length > 0) {
+                        for (const imgId of finalImagePublicIds) {
+                            await softDeleteAsset(imgId);
+                        }
                     }
 
-                } catch (err) {
-                    console.error(`❌ Failed for ${accountId}:`, err.message);
                     await PostLog.create({
                         userId,
                         pageId: accountId,
+                        fbPostId: fbPostId,
                         type: "carousel",
-                        status: "failed",
-                        error: err.message,
+                        status: scheduleTime ? "scheduled" : "published",
+                        scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
                         cloudinaryVideoId: finalVideoPublicId,
                         cloudinaryImageIds: finalImagePublicIds
                     });
-                    results.failedCount++;
-                    results.details.push({ accountId, status: "failed", error: err.message });
+
+                    results.successCount++;
+                    results.details.push({ accountId, status: "success", postId: fbPostId });
+                    console.log(`✅ Mixed Carousel Published: ${fbPostId}`);
+                } else {
+                    throw new Error(feedRes.details[0].error || "Failed to post carousel");
                 }
+
+            } catch (err) {
+                console.error(`❌ Failed for ${accountId}:`, err.message);
+                await PostLog.create({
+                    userId,
+                    pageId: accountId,
+                    type: "carousel",
+                    status: "failed",
+                    error: err.message,
+                    cloudinaryVideoId: finalVideoPublicId,
+                    cloudinaryImageIds: finalImagePublicIds
+                });
+                results.failedCount++;
+                results.details.push({ accountId, status: "failed", error: err.message });
             }
+        }
 
         return results;
 
-        } catch (err) {
-            console.error("❌ Mixed Carousel Error:", err.message);
-            throw err;
-        } finally {
-            // 🧹 Final Cleanup: Delete local video file if it exists
-            if (localVideoPath && fs.existsSync(localVideoPath)) {
-                try {
-                    fs.unlinkSync(localVideoPath);
-                    console.log(`🧹 Cleaned up local video file: ${localVideoPath}`);
-                } catch (cleanupErr) {
-                    console.warn(`⚠️ Failed to delete local video file: ${cleanupErr.message}`);
-                }
-            }
-
-            // 🧹 Cleanup Thumbnail
-            if (localThumbnailPath && fs.existsSync(localThumbnailPath)) {
-                try {
-                    fs.unlinkSync(localThumbnailPath);
-                    console.log(`🧹 Cleaned up local thumbnail file: ${localThumbnailPath}`);
-                } catch (cleanupErr) {
-                    console.warn(`⚠️ Failed to delete local thumbnail file: ${cleanupErr.message}`);
-                }
-            }
-
-            // ✅ Cleanup Local Images
-            if (localImagePaths.length > 0) {
-                localImagePaths.forEach(p => {
-                    try {
-                        if (fs.existsSync(p)) fs.unlinkSync(p);
-                    } catch (e) {
-                        console.warn(`Failed to delete temp image: ${p}`);
-                    }
-                });
-            }
-        }
-    };
-    exports.createMixedCarousel = async (req, res) => {
-        req.setTimeout(600000); // 10 minutes timeout
-
-        try {
-            const { caption, accounts, scheduleTime } = req.body;
-            const userId = req.user?.id;
-
-            // 🛑 Validation
-            if (!accounts) return res.status(400).json({ success: false, error: "Missing accounts" });
-
-            let accountsArray = [];
+    } catch (err) {
+        console.error("❌ Mixed Carousel Error:", err.message);
+        throw err;
+    } finally {
+        // 🧹 Final Cleanup: Delete local video file if it exists
+        if (localVideoPath && fs.existsSync(localVideoPath)) {
             try {
-                accountsArray = JSON.parse(accounts);
-            } catch {
-                return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
+                fs.unlinkSync(localVideoPath);
+                console.log(`🧹 Cleaned up local video file: ${localVideoPath}`);
+            } catch (cleanupErr) {
+                console.warn(`⚠️ Failed to delete local video file: ${cleanupErr.message}`);
             }
-
-            const results = await exports.processAndPostCarousel(req, accountsArray, userId, caption, scheduleTime);
-
-            res.status(201).json({
-                success: true,
-                results
-            });
-
-        } catch (err) {
-            res.status(500).json({ success: false, error: err.message });
         }
-    };
+
+        // 🧹 Cleanup Thumbnail
+        if (localThumbnailPath && fs.existsSync(localThumbnailPath)) {
+            try {
+                fs.unlinkSync(localThumbnailPath);
+                console.log(`🧹 Cleaned up local thumbnail file: ${localThumbnailPath}`);
+            } catch (cleanupErr) {
+                console.warn(`⚠️ Failed to delete local thumbnail file: ${cleanupErr.message}`);
+            }
+        }
+
+        // ✅ Cleanup Local Images
+        if (localImagePaths.length > 0) {
+            localImagePaths.forEach(p => {
+                try {
+                    if (fs.existsSync(p)) fs.unlinkSync(p);
+                } catch (e) {
+                    console.warn(`Failed to delete temp image: ${p}`);
+                }
+            });
+        }
+    }
+};
+exports.createMixedCarousel = async (req, res) => {
+    req.setTimeout(600000); // 10 minutes timeout
+
+    try {
+        const { caption, accounts, scheduleTime } = req.body;
+        const userId = req.user?.id;
+
+        // 🛑 Validation
+        if (!accounts) return res.status(400).json({ success: false, error: "Missing accounts" });
+
+        let accountsArray = [];
+        try {
+            accountsArray = JSON.parse(accounts);
+        } catch {
+            return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
+        }
+
+        const results = await exports.processAndPostCarousel(req, accountsArray, userId, caption, scheduleTime);
+
+        res.status(201).json({
+            success: true,
+            results
+        });
+
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
