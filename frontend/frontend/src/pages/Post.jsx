@@ -429,8 +429,8 @@ export default function Post() {
                             </h3>
                             {/* Format Switcher (Small) */}
                             <div className="flex bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
-                                <button onClick={() => setPostFormat('single')} className={`px-3 py-1 rounded-md text-xs font-bold ${postFormat === 'single' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>Single</button>
                                 <button onClick={() => setPostFormat('carousel')} className={`px-3 py-1 rounded-md text-xs font-bold ${postFormat === 'carousel' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-500'}`}>Carousel</button>
+                                <button onClick={() => setPostFormat('single')} className={`px-3 py-1 rounded-md text-xs font-bold ${postFormat === 'single' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>Single</button>
                             </div>
                         </div>
 
