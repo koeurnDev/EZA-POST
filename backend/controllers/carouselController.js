@@ -231,50 +231,28 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         // 3. Construct attachment with Metadata AND Type-Specific IDs
                         // ✅ CRITICAL: Metadata prevents "Invalid parameter", IDs ensure native display
                         const attachment = {
-                            link: link,
                             name: headline,
                             description: description,
-                            // picture: url // ❌ OLD: This was using video URL for videos
                         };
 
                         if (card.type === 'video') {
                             attachment.video_id = containerId; // ✅ REQUIRED for Video
-                            // ✅ Video MUST use thumbnail image for 'picture', NOT video URL
-                            // We need to pass the thumbnail URL here if available, or use a default
-                            // Since we don't have the Cloudinary thumbnail URL readily available in this scope (it was uploaded to FB directly),
-                            // we might need to rely on FB auto-generating it OR pass the local thumbnail path if we uploaded it to Cloudinary.
 
-                            // WAIT: The user prompt says: "picture": "https://res.cloudinary.com/.../thumb_processed_video.jpg"
-                            // We need to ensure we have this URL.
-                            // In our current flow, we upload video directly to FB. We might NOT have a Cloudinary thumbnail URL unless we uploaded it.
-                            // Let's check if we have `finalThumbnailUrl` or similar.
-
-                            // Actually, let's look at where `url` comes from. 
-                            // For video, `url` = `finalVideoUrl` (Cloudinary Video URL).
-                            // We need the THUMBNAIL URL.
-
-                            // Quick fix: If we have a thumbnail URL, use it. If not, maybe use the video URL as a fallback (though user says NO).
-                            // But wait, we generated a thumbnail locally! `localThumbnailPath`.
-                            // Did we upload it to Cloudinary? 
-                            // In `processAndPostCarousel`, we have `finalThumbnailUrl`.
-
-                            // Let's assume `finalThumbnailUrl` is available in this scope.
-                            // It is! It's passed to `postCarousel`? No, it's in `processAndPostCarousel`.
-                            // We are inside `processAndPostCarousel`.
-
+                            // ✅ Video MUST use thumbnail image for 'picture'
                             if (finalThumbnailUrl) {
                                 attachment.picture = finalThumbnailUrl;
                             } else {
-                                // Fallback: Try to derive from video URL (Cloudinary often supports .jpg extension for video thumbnails)
                                 attachment.picture = url.replace(/\.[^/.]+$/, ".jpg");
                             }
 
                             // ❌ Remove CTA for video (as per user request)
-                            // attachment.call_to_action = ... 
+                            // ❌ Remove Link for video (Potential conflict with video_id)
+                            // attachment.link = link; 
 
                         } else {
                             attachment.media_fbid = containerId; // ✅ Standard for Image Containers
                             attachment.picture = url; // ✅ Image URL is fine for Image card
+                            attachment.link = link; // ✅ Keep Link for Image
 
                             // ✅ Keep CTA for Image
                             attachment.call_to_action = {
