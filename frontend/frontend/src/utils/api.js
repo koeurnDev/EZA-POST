@@ -3,7 +3,7 @@
 // ============================================================
 
 import axios from "axios";
-import { getUserData, saveUserData, clearUserData } from "./apiUtils";
+import { getUserData, saveUserData, clearUserData, fetchCsrfToken } from "./apiUtils";
 
 /* -------------------------------------------------------------------------- */
 /* ✅ Default Constants                                                       */
@@ -82,7 +82,13 @@ const api = axios.create({
 /* ✅ Request Interceptor                                                     */
 /* -------------------------------------------------------------------------- */
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    // 🛡️ Attach CSRF Token for state-changing methods
+    if (['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase())) {
+      const token = await fetchCsrfToken();
+      if (token) config.headers['X-CSRF-Token'] = token;
+    }
+
     if (import.meta.env.DEV && !config.url?.includes("/auth/status")) {
       console.log(`🔄 [${config.method?.toUpperCase()}] ${config.url}`);
     }
