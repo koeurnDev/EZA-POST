@@ -79,8 +79,7 @@ class TikTokDownloader {
       try {
         const result =
           (await this.downloadViaAPIProxy(videoUrl, noWatermark)) ||
-          (await this.downloadViaRapidAPI(videoUrl)) ||
-          (await this.downloadViaThirdParty(videoUrl));
+          (await this.downloadViaRapidAPI(videoUrl));
 
         if (result?.buffer) return result.buffer;
         throw new Error("No valid result from any method");
@@ -148,15 +147,26 @@ class TikTokDownloader {
 
     for (const endpoint of endpoints) {
       try {
+        console.log(`Trying endpoint: ${endpoint}`);
         const res = await this.client.get(endpoint);
         const data = res.data?.data || res.data;
+
+        if (!data) {
+          console.warn(`⚠️ No data received from ${endpoint}`);
+          continue;
+        }
 
         const dl =
           (noWatermark && (data.play || data.noWatermark || data.download_url)) ||
           data.wmplay ||
           data.play;
-        if (!dl) continue;
 
+        if (!dl) {
+          console.warn(`⚠️ No download URL found in response from ${endpoint}`);
+          continue;
+        }
+
+        console.log(`🔗 Found download URL: ${dl}`);
         const vidRes = await this.client.get(dl, { responseType: "arraybuffer" });
         this.validateVideoBuffer(vidRes.data);
 
@@ -196,42 +206,6 @@ class TikTokDownloader {
       console.warn(`⚠️ RapidAPI failed: ${err.message}`);
       return null;
     }
-  }
-
-  /* ------------------------------------------------------------ */
-  /* ✅ Method 3 — Third-party scraping fallback                  */
-  /* ------------------------------------------------------------ */
-  async downloadViaThirdParty(videoUrl) {
-    const services = [
-      {
-        name: "snaptik",
-        url: `https://snaptik.app/abc.php?url=${encodeURIComponent(videoUrl)}`,
-        pattern: /href="([^"]*\.mp4)"/i,
-      },
-      {
-        name: "ssstik",
-        url: `https://ssstik.io/abc?url=${encodeURIComponent(videoUrl)}`,
-        pattern: />Without watermark<\/a><a href="([^"]+)"/i,
-      },
-    ];
-
-    for (const svc of services) {
-      try {
-        const res = await this.client.get(svc.url);
-        const match = res.data.match(svc.pattern);
-        if (!match) continue;
-
-        const videoRes = await this.client.get(match[1], { responseType: "arraybuffer" });
-        this.validateVideoBuffer(videoRes.data);
-
-        console.log(`✅ Downloaded via ${svc.name}`);
-        return { buffer: videoRes.data, method: svc.name };
-      } catch (err) {
-        console.warn(`${svc.name} failed: ${err.message}`);
-      }
-    }
-
-    return null;
   }
 
   /* ------------------------------------------------------------ */
