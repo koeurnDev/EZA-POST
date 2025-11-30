@@ -9,11 +9,19 @@ const BotStatus = require("../models/BotStatus");
 const ai = require("../utils/ai");
 const { requireAuth } = require("../utils/auth"); // ✅ Added Auth Middleware
 
+// 🔍 Debug Imports
+console.log("🔍 BotRule Import Type:", typeof BotRule, BotRule ? "Defined" : "Undefined");
+console.log("🔍 BotStatus Import Type:", typeof BotStatus, BotStatus ? "Defined" : "Undefined");
+
 // ============================================================
 // 🧠 Initialize bot_status (if missing)
 // ============================================================
 (async () => {
   try {
+    if (!BotStatus) {
+      console.error("❌ BotStatus model is undefined!");
+      return;
+    }
     const count = await BotStatus.countDocuments();
     if (count === 0) {
       await BotStatus.create({ enabled: true });
@@ -31,6 +39,9 @@ const { requireAuth } = require("../utils/auth"); // ✅ Added Auth Middleware
 // ✅ Get all bot rules for the logged-in user
 router.get("/rules", requireAuth, async (req, res) => {
   try {
+    if (!BotRule) throw new Error("BotRule model is undefined");
+    if (!BotStatus) throw new Error("BotStatus model is undefined");
+
     const rules = await BotRule.find({ userId: req.user.id }).sort({ createdAt: -1 });
     const status = await BotStatus.findOne();
     res.json({
@@ -40,7 +51,12 @@ router.get("/rules", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("❌ GET /rules error:", err.message);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
