@@ -187,6 +187,87 @@ export default function Post() {
         });
     };
 
+    // 🔄 Sync Media Items when Video changes
+    useEffect(() => {
+        if (postFormat !== 'carousel') return;
+
+        // Construct current list based on state
+        setMediaItems(prev => {
+            const currentVideo = (file || previewUrl) ? {
+                id: 'video-main',
+                type: 'video',
+                preview: previewUrl || (file ? URL.createObjectURL(file) : null),
+                file: file,
+                url: previewUrl
+            } : null;
+
+            // If list is empty, just combine
+            if (prev.length === 0) {
+                return currentVideo ? [currentVideo] : [];
+            }
+
+            // If list exists, we need to merge carefully to keep order
+            // 1. Find if video exists in prev
+            const prevVideoIndex = prev.findIndex(item => item.type === 'video');
+            let newOrder = [...prev];
+
+            // Update or Add Video
+            if (currentVideo) {
+                if (prevVideoIndex !== -1) {
+                    newOrder[prevVideoIndex] = currentVideo; // Update content, keep position
+                } else {
+                    newOrder.unshift(currentVideo); // Add to start if new
+                }
+            } else {
+                // Remove video if it was deleted
+                if (prevVideoIndex !== -1) {
+                    newOrder.splice(prevVideoIndex, 1);
+                }
+            }
+
+            // 🌟 Auto-Add Page Card (Card 2)
+            // Condition: Video exists + Page Selected
+            const hasVideo = newOrder.some(i => i.type === 'video');
+            const selectedPageId = selectedPages[0];
+
+            if (hasVideo && selectedPageId) {
+                const pageObj = availablePages.find(p => p.id === selectedPageId);
+                if (pageObj) {
+                    // Check if Page Card already exists
+                    const pageCardIndex = newOrder.findIndex(i => i.isPageCard);
+
+                    const pageCard = {
+                        id: 'card-page-auto',
+                        type: 'image',
+                        preview: pageObj.picture, // Page Profile Pic
+                        file: null, // No file, remote URL
+                        imageUrl: pageObj.picture, // Explicit remote URL
+                        isPageCard: true
+                    };
+
+                    if (pageCardIndex !== -1) {
+                        // Update existing Page Card
+                        newOrder[pageCardIndex] = pageCard;
+
+                        // 🔄 Ensure it is at Index 1 (if not already)
+                        if (pageCardIndex !== 1 && newOrder.length > 1) {
+                            newOrder.splice(pageCardIndex, 1); // Remove from old pos
+                            newOrder.splice(1, 0, pageCard);   // Insert at Index 1
+                        }
+                    } else {
+                        // Insert Page Card at Index 1 (After Video)
+                        newOrder.splice(1, 0, pageCard);
+                    }
+                }
+            } else {
+                // Remove Page Card if conditions not met
+                newOrder = newOrder.filter(i => !i.isPageCard);
+            }
+
+            return newOrder;
+        });
+    }, [file, previewUrl, postFormat, selectedPages, availablePages]);
+
     // 📸 Handle Thumbnail Change
     const handleThumbnailChange = (e) => {
         const selectedFile = e.target.files[0];
