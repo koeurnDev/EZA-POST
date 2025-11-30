@@ -217,16 +217,10 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             throw new Error(`Failed to upload media for card ${index + 1}`);
                         }
 
-                        // 3. Construct Bundle Object with media_fbid
+                        // 3. Construct attachment with ONLY the container ID
+                        // ✅ CRITICAL: No metadata - Facebook uses the media container directly
                         const attachment = {
-                            media_fbid: containerId, // ✅ Use media_fbid for container ID
-                            link: link,
-                            name: headline,
-                            description: description,
-                            call_to_action: {
-                                type: ctaType,
-                                value: { link: link }
-                            }
+                            id: containerId
                         };
 
                         finalChildAttachments.push(attachment);
