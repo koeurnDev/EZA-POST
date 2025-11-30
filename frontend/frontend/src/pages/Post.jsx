@@ -19,7 +19,6 @@ export default function Post() {
 
     // 🟢 State
     const [postFormat, setPostFormat] = useState("single"); // 'single' | 'carousel'
-    const [postType, setPostType] = useState("upload"); // 'upload' | 'tiktok'
 
     // Video State
     const [file, setFile] = useState(null);
@@ -61,16 +60,6 @@ export default function Post() {
         fetchPages();
     }, []);
 
-    // 🎛️ Mode Switcher Logic
-    const handleModeSwitch = (mode) => {
-        if (file && mode === 'tiktok') {
-            if (!window.confirm("Switching to TikTok will remove your uploaded video. Continue?")) return;
-            setFile(null);
-            setPreviewUrl(null);
-        }
-        setPostType(mode);
-    };
-
     // 🖱️ Drag & Drop Handlers (Video)
     const handleDragEnter = (e) => {
         e.preventDefault();
@@ -108,7 +97,7 @@ export default function Post() {
 
             setFile(selectedFile);
             setPreviewUrl(URL.createObjectURL(selectedFile));
-            setTiktokUrl("");
+            setTiktokUrl(""); // Clear URL if file is dropped
             toast.success("Video uploaded!");
         };
         video.src = URL.createObjectURL(selectedFile);
@@ -160,7 +149,7 @@ export default function Post() {
             const data = await response.json();
             if (data.success) {
                 setPreviewUrl(data.video.url); // Cloudinary URL
-                setFile(null);
+                setFile(null); // Clear file if URL is loaded
                 toast.success("Video loaded!", { id: toastId });
             } else {
                 throw new Error(data.error || "Failed to load video");
@@ -191,9 +180,9 @@ export default function Post() {
             formData.append("accounts", JSON.stringify(selectedPages));
 
             // Common Fields
-            if (postType === 'upload' && file) {
+            if (file) {
                 formData.append("video", file);
-            } else if (postType === 'tiktok' || (previewUrl && previewUrl.startsWith("http"))) {
+            } else if (previewUrl && previewUrl.startsWith("http")) {
                 formData.append("videoUrl", previewUrl);
             }
             if (scheduleTime) formData.append("scheduleTime", scheduleTime);
@@ -206,9 +195,6 @@ export default function Post() {
                 imageFiles.forEach(file => {
                     formData.append("images", file);
                 });
-                // Note: Mixed Carousel doesn't use 'title' or 'thumbnail' in the same way as Single Post currently
-                // But we can append them if the backend supports it. 
-                // Based on carouselController.js, it uses 'caption', 'accounts', 'scheduleTime', 'video'/'videoUrl', 'images'.
             } else {
                 // 🎥 Single Post Payload
                 formData.append("title", headline);
@@ -285,124 +271,110 @@ export default function Post() {
 
                         <div className={`grid grid-cols-1 ${postFormat === 'carousel' ? 'lg:grid-cols-2' : ''} gap-8`}>
 
-                            {/* 1. Video Section (Always Visible) */}
+                            {/* 1. Video Section (Unified) */}
                             <div className="space-y-6">
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
                                     <Video className="text-blue-500" size={20} /> Video Source
                                 </h3>
 
-                                {/* Mode Switcher */}
-                                <div className="flex bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl">
-                                    <button
-                                        onClick={() => handleModeSwitch('upload')}
-                                        className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all duration-200 ${postType === 'upload' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                                    >
-                                        <Cloud size={16} /> Upload
-                                    </button>
-                                    <button
-                                        onClick={() => handleModeSwitch('tiktok')}
-                                        className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all duration-200 ${postType === 'tiktok' ? 'bg-white dark:bg-gray-800 text-pink-500 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                                    >
-                                        <LinkIcon size={16} /> TikTok
-                                    </button>
-                                </div>
-
-                                {/* Dynamic Media Input */}
+                                {/* Unified Dropzone & URL Input */}
                                 <div className="transition-all duration-300 ease-in-out">
-                                    {postType === 'upload' ? (
-                                        <div
-                                            onDragOver={handleDragEnter}
-                                            onDragEnter={handleDragEnter}
-                                            onDragLeave={handleDragLeave}
-                                            onDrop={handleDrop}
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className={`
-                                                relative border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer transition-all duration-300 group
-                                                ${isDragging
-                                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-[1.01] shadow-lg'
-                                                    : file
-                                                        ? 'border-blue-500 bg-blue-50/30 dark:bg-blue-900/10'
-                                                        : 'border-gray-300 dark:border-gray-700 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
-                                                }
-                                            `}
-                                            tabIndex={0}
-                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
-                                        >
-                                            <input
-                                                type="file"
-                                                accept="video/*"
-                                                onChange={handleFileChange}
-                                                className="hidden"
-                                                ref={fileInputRef}
-                                            />
+                                    <div
+                                        onDragOver={handleDragEnter}
+                                        onDragEnter={handleDragEnter}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                        className={`
+                                            relative border-2 border-dashed rounded-3xl p-6 text-center transition-all duration-300 group
+                                            ${isDragging
+                                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-[1.01] shadow-lg'
+                                                : (file || previewUrl)
+                                                    ? 'border-blue-500 bg-blue-50/30 dark:bg-blue-900/10'
+                                                    : 'border-gray-300 dark:border-gray-700 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                                            }
+                                        `}
+                                    >
+                                        {/* Hidden File Input */}
+                                        <input
+                                            type="file"
+                                            accept="video/*"
+                                            onChange={handleFileChange}
+                                            className="hidden"
+                                            ref={fileInputRef}
+                                        />
 
-                                            {file ? (
-                                                <div className="relative w-full aspect-square max-h-[300px] bg-black rounded-2xl overflow-hidden shadow-inner" onClick={(e) => e.stopPropagation()}>
-                                                    <video src={previewUrl} controls className="w-full h-full object-contain" />
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setFile(null); setPreviewUrl(null); }}
-                                                        className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-full hover:bg-red-500 hover:scale-110 transition-all backdrop-blur-md border border-white/10"
-                                                    >
-                                                        <X size={18} />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div className="py-4">
+                                        {/* Preview Area */}
+                                        {(file || previewUrl) ? (
+                                            <div className="relative w-full aspect-square max-h-[300px] bg-black rounded-2xl overflow-hidden shadow-inner mx-auto">
+                                                <video
+                                                    src={previewUrl}
+                                                    controls
+                                                    className="w-full h-full object-contain"
+                                                    preload="metadata"
+                                                    poster={previewUrl && previewUrl.includes('cloudinary.com') ? previewUrl.replace('/upload/', '/upload/so_0,w_400,h_400,c_fill,q_auto,f_auto/').replace(/\.[^/.]+$/, ".jpg") : undefined}
+                                                />
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setFile(null);
+                                                        setPreviewUrl(null);
+                                                        setTiktokUrl("");
+                                                    }}
+                                                    className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-full hover:bg-red-500 hover:scale-110 transition-all backdrop-blur-md border border-white/10"
+                                                >
+                                                    <X size={18} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            /* Empty State: Upload + URL Input */
+                                            <div className="py-4 space-y-6">
+                                                {/* Drag & Drop Trigger */}
+                                                <div
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    className="cursor-pointer"
+                                                >
                                                     <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center transition-all duration-300 ${isDragging ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 group-hover:scale-110 group-hover:text-blue-500'}`}>
                                                         <Upload size={28} />
                                                     </div>
                                                     <p className="font-bold text-gray-900 dark:text-white text-lg mb-1">
-                                                        {isDragging ? "Drop it!" : "Drag video"}
+                                                        {isDragging ? "Drop video here!" : "Drag & Drop Video"}
                                                     </p>
-                                                    <p className="text-gray-500 dark:text-gray-400 text-xs">or click to browse</p>
+                                                    <p className="text-gray-500 dark:text-gray-400 text-xs">or click to browse from device</p>
                                                 </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col gap-4">
-                                            <div className="flex gap-3 items-stretch">
-                                                <div className="relative flex-1 group">
-                                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-pink-500 transition-colors">
-                                                        <LinkIcon size={20} />
-                                                    </div>
-                                                    <input
-                                                        type="text"
-                                                        value={tiktokUrl}
-                                                        onChange={(e) => setTiktokUrl(e.target.value)}
-                                                        placeholder="Paste TikTok URL..."
-                                                        className="w-full pl-12 pr-4 h-12 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none font-medium transition-all"
-                                                    />
-                                                </div>
-                                                <Button
-                                                    onClick={handleLoadTiktok}
-                                                    disabled={!tiktokUrl || isLoadingVideo}
-                                                    isLoading={isLoadingVideo}
-                                                    className="bg-pink-500 hover:bg-pink-600 text-white rounded-xl px-6 h-12 font-bold shadow-lg shadow-pink-500/20"
-                                                >
-                                                    Load
-                                                </Button>
-                                            </div>
 
-                                            {/* TikTok Preview */}
-                                            {previewUrl && !file && (
-                                                <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden shadow-inner group animate-in fade-in zoom-in duration-150">
-                                                    <video
-                                                        src={previewUrl}
-                                                        controls
-                                                        className="w-full h-full object-contain"
-                                                        preload="metadata"
-                                                        poster={previewUrl.includes('cloudinary.com') ? previewUrl.replace('/upload/', '/upload/so_0,w_400,h_400,c_fill,q_auto,f_auto/').replace(/\.[^/.]+$/, ".jpg") : undefined}
-                                                    />
-                                                    <button
-                                                        onClick={() => { setPreviewUrl(null); setTiktokUrl(""); }}
-                                                        className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-full hover:bg-red-500 hover:scale-105 transition-all duration-150 backdrop-blur-md border border-white/10 opacity-100 md:opacity-0 group-hover:opacity-100"
-                                                    >
-                                                        <X size={18} />
-                                                    </button>
+                                                <div className="flex items-center gap-4 px-8">
+                                                    <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
+                                                    <span className="text-xs font-bold text-gray-400 uppercase">OR</span>
+                                                    <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
                                                 </div>
-                                            )}
-                                        </div>
-                                    )}
+
+                                                {/* TikTok URL Input */}
+                                                <div className="flex gap-2 items-center max-w-md mx-auto">
+                                                    <div className="relative flex-1 group/input text-left">
+                                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within/input:text-pink-500 transition-colors">
+                                                            <LinkIcon size={16} />
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            value={tiktokUrl}
+                                                            onChange={(e) => setTiktokUrl(e.target.value)}
+                                                            onKeyDown={(e) => { if (e.key === 'Enter') handleLoadTiktok(); }}
+                                                            placeholder="Paste TikTok URL..."
+                                                            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-sm font-medium transition-all"
+                                                        />
+                                                    </div>
+                                                    <Button
+                                                        onClick={handleLoadTiktok}
+                                                        disabled={!tiktokUrl || isLoadingVideo}
+                                                        isLoading={isLoadingVideo}
+                                                        className="bg-pink-500 hover:bg-pink-600 text-white rounded-xl px-4 py-2.5 font-bold text-sm shadow-lg shadow-pink-500/20"
+                                                    >
+                                                        Load
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 

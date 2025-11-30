@@ -34,8 +34,6 @@ export default function DashboardLayout({ children }) {
   // 🧭 Navigation Items
   const navItems = [
     { label: "Single Video", icon: <Video size={20} />, path: "/post" },
-    { label: "Mixed Carousel", icon: <Images size={20} />, path: "/carousel" },
-    { label: "TikTok Link", icon: <LinkIcon size={20} />, path: "/tiktok" },
     { label: "Scheduled Posts", icon: <Calendar size={20} />, path: "/posts" },
     { label: "Auto-Reply Bot", icon: <MessageSquare size={20} />, path: "/bot" },
     { label: "Settings", icon: <Settings size={20} />, path: "/settings" },

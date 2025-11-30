@@ -13,8 +13,7 @@ const ScheduledPosts = lazy(() => import("../pages/ScheduledPosts"));
 const BotSettingsPage = lazy(() => import("../pages/BotSettingsPage"));
 const Settings = lazy(() => import("../pages/Settings"));
 const Post = lazy(() => import("../pages/Post"));
-const CarouselPost = lazy(() => import("../pages/CarouselPost"));
-const TikTokPost = lazy(() => import("../pages/TikTokPost"));
+
 const Profile = lazy(() => import("../pages/Profile"));
 const Welcome = lazy(() => import("../pages/Welcome"));
 const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
@@ -53,22 +52,7 @@ export default function AppRouter() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/carousel"
-            element={
-              <ProtectedRoute>
-                <CarouselPost />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tiktok"
-            element={
-              <ProtectedRoute>
-                <TikTokPost />
-              </ProtectedRoute>
-            }
-          />
+
           <Route
             path="/posts"
             element={
