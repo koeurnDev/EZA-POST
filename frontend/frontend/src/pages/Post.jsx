@@ -1,10 +1,10 @@
 // ============================================================
-// 📝 Post.jsx — Premium UX/UI Edition (Unified & Enhanced)
+// 📝 Post.jsx — System A Layout (Fixed & Enhanced)
 // ============================================================
 
 import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check, AlertCircle, Calendar, Clock, Layers, Video, Plus, Trash2, GripVertical } from "lucide-react";
+import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check, AlertCircle, Calendar, Clock, Layers, Video, Plus, Trash2, GripVertical, ChevronDown } from "lucide-react";
 import apiUtils from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
@@ -20,6 +20,7 @@ export default function Post() {
 
     // 🟢 State
     const [postFormat, setPostFormat] = useState("single"); // 'single' | 'carousel'
+    const [videoTab, setVideoTab] = useState("upload"); // 'upload' | 'tiktok'
 
     // Video State
     const [file, setFile] = useState(null);
@@ -62,16 +63,9 @@ export default function Post() {
                 url: previewUrl
             } : null;
 
-            const currentImages = imageFiles.map((img, idx) => ({
-                id: `image-${img.name}-${idx}`, // Stable ID
-                type: 'image',
-                preview: img.preview,
-                file: img
-            }));
-
             // If list is empty, just combine
             if (prev.length === 0) {
-                return currentVideo ? [currentVideo, ...currentImages] : [...currentImages];
+                return currentVideo ? [currentVideo] : [];
             }
 
             // If list exists, we need to merge carefully to keep order
@@ -92,23 +86,7 @@ export default function Post() {
                     newOrder.splice(prevVideoIndex, 1);
                 }
             }
-
-            // Update Images
-            // This is tricky because images might be added/removed. 
-            // For simplicity in this sync: 
-            // If imageFiles length changed, we might just append new ones or rebuild.
-            // A better approach for reordering is to treat `mediaItems` as the Source of Truth for order,
-            // and `imageFiles` / `file` as just data sources.
-
-            // Let's try a simpler approach: Rebuild `mediaItems` only when adding new stuff, 
-            // but we need to respect the *user's* reordering.
-
-            // Actually, let's make `mediaItems` the master list for the UI.
-            // When user adds images, we append to `mediaItems`.
-            // When user adds video, we unshift (or append) to `mediaItems`.
-            // We won't auto-sync from `imageFiles` state in this effect to avoid overwriting order.
-            // Instead, we update `mediaItems` inside the `onDrop` handlers.
-            return prev;
+            return newOrder;
         });
     }, [/* Dependencies handled manually in handlers */]);
 
@@ -138,14 +116,21 @@ export default function Post() {
     const handlePageSelection = (pageId) => {
         setSelectedPages(prev => {
             const isSelected = prev.includes(pageId);
-            const newSelection = isSelected ? prev.filter(id => id !== pageId) : [...prev, pageId];
+            // Single select for now as per "Dropdown: Choose Page" spec, but keeping array for backend compatibility
+            const newSelection = [pageId];
 
-            // Save the most recently selected one (if any)
-            if (!isSelected) {
-                localStorage.setItem("lastUsedPageId", pageId);
-            }
+            localStorage.setItem("lastUsedPageId", pageId);
             return newSelection;
         });
+    };
+
+    // 📸 Handle Thumbnail Change (Fix for ReferenceError)
+    const handleThumbnailChange = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile) {
+            setThumbnail(selectedFile);
+            setThumbnailPreview(URL.createObjectURL(selectedFile));
+        }
     };
 
     // 🖱️ Drag & Drop Handlers (Video)
@@ -320,17 +305,8 @@ export default function Post() {
                 });
 
                 // 🔢 Order Handling
-                // We send the IDs in order. The backend needs to map these.
-                // Since we can't easily send 'file objects' with IDs in FormData,
-                // we'll send a `mediaOrder` array describing the types: ['video', 'image', 'image', 'video'...]
-                // Actually, simpler: The backend receives `video` and `images` arrays.
-                // We just need to tell it the *indices*.
-                // Let's send a JSON `layout` or `order`:
-                // e.g. ["video", "image_0", "image_1"] where image_X corresponds to the index in the uploaded images array.
-
                 const orderMap = mediaItems.map(item => {
                     if (item.type === 'video') return 'video';
-                    // Find index in the filtered imageItems array
                     const imgIndex = imageItems.findIndex(img => img.id === item.id);
                     return `image_${imgIndex}`;
                 });
@@ -376,140 +352,202 @@ export default function Post() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto px-4 py-8">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create New Post</h1>
-                    <p className="text-gray-400 dark:text-gray-500 mt-1">Craft your campaign content.</p>
-                </div>
+            <div className="max-w-7xl mx-auto px-4 py-6">
 
-                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-700 overflow-hidden">
+                {/* 🔷 TOP SECTION (GLOBAL HEADER) */}
+                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 p-6">
+                    <div className="flex flex-col md:flex-row gap-6 items-start">
 
-                    {/* 0. Post Format Switcher */}
-                    <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20">
-                        <div className="flex justify-center">
-                            <div className="bg-gray-200 dark:bg-gray-700 p-1 rounded-xl inline-flex">
-                                <button
-                                    onClick={() => setPostFormat('single')}
-                                    className={`px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all duration-200 ${postFormat === 'single' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                                >
-                                    <Video size={18} /> Single Video
-                                </button>
-                                <button
-                                    onClick={() => setPostFormat('carousel')}
-                                    className={`px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all duration-200 ${postFormat === 'carousel' ? 'bg-white dark:bg-gray-800 text-pink-500 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                                >
-                                    <Layers size={18} /> Mixed Carousel
-                                </button>
+                        {/* A. Page Selection */}
+                        <div className="w-full md:w-1/3">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Post To</label>
+                            <div className="relative">
+                                {availablePages.length > 0 ? (
+                                    <div className="relative">
+                                        <select
+                                            className="w-full appearance-none pl-12 pr-10 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            onChange={(e) => handlePageSelection(e.target.value)}
+                                            value={selectedPages[0] || ""}
+                                        >
+                                            <option value="" disabled>Choose Page...</option>
+                                            {availablePages.map(page => (
+                                                <option key={page.id} value={page.id}>{page.name}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                                            {selectedPages.length > 0 ? (
+                                                <img src={availablePages.find(p => p.id === selectedPages[0])?.picture} className="w-6 h-6 rounded-full" alt="" />
+                                            ) : (
+                                                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700" />
+                                            )}
+                                        </div>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-3 bg-red-50 text-red-500 rounded-xl text-sm">No pages connected</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* C. Caption Box */}
+                        <div className="w-full md:w-2/3">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Caption</label>
+                            <div className="relative">
+                                <textarea
+                                    value={caption}
+                                    onChange={(e) => setCaption(e.target.value)}
+                                    maxLength={2200}
+                                    placeholder="Write a catchy caption... #hashtags @mentions"
+                                    rows={3}
+                                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all resize-y min-h-[100px]"
+                                />
+                                <div className={`absolute bottom-3 right-3 text-xs font-mono font-medium ${caption.length > 2000 ? 'text-red-500' : 'text-gray-400'}`}>
+                                    {caption.length}/2200
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div className="p-8 space-y-8">
+                {/* 🟦 MAIN BODY (SPLIT 50/50) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
 
-                        <div className={`grid grid-cols-1 ${postFormat === 'carousel' ? 'lg:grid-cols-2' : ''} gap-8`}>
+                    {/* 🟦 LEFT: Video Upload + Processing Zone */}
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/20">
+                            <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <Video className="text-blue-500" size={20} /> Video Source
+                            </h3>
+                            {/* Format Switcher (Small) */}
+                            <div className="flex bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
+                                <button onClick={() => setPostFormat('single')} className={`px-3 py-1 rounded-md text-xs font-bold ${postFormat === 'single' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>Single</button>
+                                <button onClick={() => setPostFormat('carousel')} className={`px-3 py-1 rounded-md text-xs font-bold ${postFormat === 'carousel' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-500'}`}>Carousel</button>
+                            </div>
+                        </div>
 
-                            {/* 1. Video Section (Input Only) */}
-                            <div className="space-y-6">
-                                <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                    <Video className="text-blue-500" size={20} /> Video Source
-                                </h3>
+                        {/* A) Input Method Tabs */}
+                        <div className="flex border-b border-gray-100 dark:border-gray-700">
+                            <button
+                                onClick={() => setVideoTab('upload')}
+                                className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${videoTab === 'upload' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
+                            >
+                                <Upload size={16} /> Upload Video
+                            </button>
+                            <button
+                                onClick={() => setVideoTab('tiktok')}
+                                className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${videoTab === 'tiktok' ? 'text-pink-500 border-b-2 border-pink-500 bg-pink-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
+                            >
+                                <LinkIcon size={16} /> TikTok Link
+                            </button>
+                        </div>
 
-                                <div className="transition-all duration-300 ease-in-out">
-                                    <div
-                                        onDragOver={handleDragEnter}
-                                        onDragEnter={handleDragEnter}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={handleDrop}
-                                        className={`
-                                            relative border-2 border-dashed rounded-3xl p-6 text-center transition-all duration-300 group
-                                            ${isDragging
-                                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-[1.01] shadow-lg'
-                                                : (file || previewUrl)
-                                                    ? 'border-blue-500 bg-blue-50/30 dark:bg-blue-900/10'
-                                                    : 'border-gray-300 dark:border-gray-700 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
-                                            }
-                                        `}
-                                    >
-                                        <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
-
-                                        {(file || previewUrl) ? (
-                                            <div className="relative w-full aspect-square max-h-[300px] bg-black rounded-2xl overflow-hidden shadow-inner mx-auto">
-                                                <video
-                                                    src={previewUrl}
-                                                    controls
-                                                    className="w-full h-full object-contain"
-                                                    preload="metadata"
-                                                    poster={previewUrl && previewUrl.includes('cloudinary.com') ? previewUrl.replace('/upload/', '/upload/so_0,w_400,h_400,c_fill,q_auto,f_auto/').replace(/\.[^/.]+$/, ".jpg") : undefined}
-                                                />
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setFile(null); setPreviewUrl(null); setTiktokUrl("");
-                                                        // Also remove from mediaItems
-                                                        setMediaItems(prev => prev.filter(i => i.type !== 'video'));
-                                                    }}
-                                                    className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-full hover:bg-red-500 hover:scale-110 transition-all backdrop-blur-md border border-white/10"
-                                                >
-                                                    <X size={18} />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="py-4 space-y-6">
-                                                <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer">
-                                                    <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center transition-all duration-300 ${isDragging ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 group-hover:scale-110 group-hover:text-blue-500'}`}>
-                                                        <Upload size={28} />
-                                                    </div>
-                                                    <p className="font-bold text-gray-900 dark:text-white text-lg mb-1">{isDragging ? "Drop video here!" : "Drag & Drop Video"}</p>
-                                                    <p className="text-gray-500 dark:text-gray-400 text-xs">or click to browse</p>
-                                                </div>
-                                                <div className="flex items-center gap-4 px-8">
-                                                    <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
-                                                    <span className="text-xs font-bold text-gray-400 uppercase">OR</span>
-                                                    <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
-                                                </div>
-                                                <div className="flex gap-2 items-center max-w-md mx-auto">
-                                                    <div className="relative flex-1 group/input text-left">
-                                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within/input:text-pink-500 transition-colors"><LinkIcon size={16} /></div>
-                                                        <input
-                                                            type="text"
-                                                            value={tiktokUrl}
-                                                            onChange={(e) => setTiktokUrl(e.target.value)}
-                                                            onKeyDown={(e) => { if (e.key === 'Enter') handleLoadTiktok(); }}
-                                                            placeholder="Paste TikTok URL..."
-                                                            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-sm font-medium transition-all"
-                                                        />
-                                                    </div>
-                                                    <Button onClick={handleLoadTiktok} disabled={!tiktokUrl || isLoadingVideo} isLoading={isLoadingVideo} className="bg-pink-500 hover:bg-pink-600 text-white rounded-xl px-4 py-2.5 font-bold text-sm shadow-lg shadow-pink-500/20">Load</Button>
-                                                </div>
-                                            </div>
-                                        )}
+                        <div className="p-6 flex-1 flex flex-col justify-center">
+                            {(file || previewUrl) ? (
+                                <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden shadow-lg group">
+                                    <video
+                                        src={previewUrl}
+                                        controls
+                                        className="w-full h-full object-contain"
+                                        preload="metadata"
+                                    />
+                                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setFile(null); setPreviewUrl(null); setTiktokUrl("");
+                                                setMediaItems(prev => prev.filter(i => i.type !== 'video'));
+                                            }}
+                                            className="p-2 bg-black/60 text-white rounded-full hover:bg-red-500 backdrop-blur-md"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+                                    <div className="absolute bottom-4 left-4 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-md">
+                                        1:1 Preview
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <>
+                                    {videoTab === 'upload' && (
+                                        <div
+                                            onDragOver={handleDragEnter}
+                                            onDragEnter={handleDragEnter}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={handleDrop}
+                                            className={`
+                                                flex-1 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-8 transition-all
+                                                ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'}
+                                            `}
+                                        >
+                                            <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
+                                            <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer text-center">
+                                                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                    <Upload size={32} />
+                                                </div>
+                                                <p className="font-bold text-gray-700">Drag & Drop Video</p>
+                                                <p className="text-sm text-gray-400 mt-1">MP4, MOV, WEBM</p>
+                                            </div>
+                                        </div>
+                                    )}
 
-                            {/* 2. Media Management (Carousel Only) */}
-                            {postFormat === 'carousel' && (
-                                <div className="space-y-6 animate-in slide-in-from-right duration-300">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                            <Layers className="text-pink-500" size={20} /> Carousel Media
-                                        </h3>
-                                        <span className="px-3 py-1 bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 text-xs font-semibold rounded-full border border-pink-100 dark:border-pink-800">
-                                            {mediaItems.length} Items
-                                        </span>
-                                    </div>
+                                    {videoTab === 'tiktok' && (
+                                        <div className="flex-1 flex flex-col justify-center items-center p-8 bg-gray-50 rounded-2xl border border-gray-200">
+                                            <div className="w-full max-w-md space-y-4">
+                                                <div className="text-center mb-6">
+                                                    <div className="w-16 h-16 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                        <LinkIcon size={32} />
+                                                    </div>
+                                                    <h3 className="font-bold text-gray-800">Import from TikTok</h3>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={tiktokUrl}
+                                                    onChange={(e) => setTiktokUrl(e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') handleLoadTiktok(); }}
+                                                    placeholder="Paste TikTok URL here..."
+                                                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none"
+                                                />
+                                                <Button
+                                                    onClick={handleLoadTiktok}
+                                                    disabled={!tiktokUrl || isLoadingVideo}
+                                                    isLoading={isLoadingVideo}
+                                                    className="w-full bg-pink-500 hover:bg-pink-600 text-white py-3 rounded-xl font-bold"
+                                                >
+                                                    Load Video
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
 
+                    {/* 🟦 RIGHT: Image Zone / Metadata */}
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20">
+                            <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                {postFormat === 'carousel' ? <Layers className="text-pink-500" size={20} /> : <ImageIcon className="text-purple-500" size={20} />}
+                                {postFormat === 'carousel' ? "Carousel Images" : "Post Details"}
+                            </h3>
+                        </div>
+
+                        <div className="p-6 flex-1 overflow-y-auto max-h-[600px]">
+                            {postFormat === 'carousel' ? (
+                                <div className="space-y-6">
                                     {/* Add Images Dropzone */}
-                                    <div {...getImageRootProps()} className={`min-h-[100px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all mb-4
-                                        ${isImageDragActive ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10' : 'border-gray-300 dark:border-gray-700 hover:border-pink-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+                                    <div {...getImageRootProps()} className={`min-h-[120px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all
+                                        ${isImageDragActive ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400 hover:bg-gray-50'}`}>
                                         <input {...getImageInputProps()} />
                                         <div className="text-center p-4 flex items-center gap-3">
                                             <Plus className="w-6 h-6 text-pink-400" />
-                                            <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Add Images</span>
+                                            <span className="text-sm text-gray-600 font-medium">Add Images</span>
                                         </div>
                                     </div>
 
-                                    {/* 🔄 Reorderable List */}
+                                    {/* Unified Media List */}
                                     <Reorder.Group axis="y" values={mediaItems} onReorder={setMediaItems} className="space-y-3">
                                         <AnimatePresence>
                                             {mediaItems.map((item) => (
@@ -517,10 +555,10 @@ export default function Post() {
                                                     initial={{ opacity: 0, y: 10 }}
                                                     animate={{ opacity: 1, y: 0 }}
                                                     exit={{ opacity: 0, scale: 0.9 }}
-                                                    className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 flex items-center gap-4 shadow-sm cursor-grab active:cursor-grabbing"
+                                                    className="bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-4 shadow-sm cursor-grab active:cursor-grabbing"
                                                 >
                                                     <GripVertical className="text-gray-400" size={20} />
-                                                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200 dark:border-gray-700">
+                                                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
                                                         {item.type === 'video' ? (
                                                             <video src={item.preview} className="w-full h-full object-cover" />
                                                         ) : (
@@ -528,194 +566,73 @@ export default function Post() {
                                                         )}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-bold text-gray-900 dark:text-white capitalize">{item.type}</p>
+                                                        <p className="text-sm font-bold text-gray-900 capitalize">{item.type}</p>
                                                         <p className="text-xs text-gray-500 truncate">{item.file ? item.file.name : 'Remote URL'}</p>
                                                     </div>
-                                                    <button
-                                                        onClick={() => removeMediaItem(item.id)}
-                                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                                    >
+                                                    <button onClick={() => removeMediaItem(item.id)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg">
                                                         <Trash2 size={18} />
                                                     </button>
                                                 </Reorder.Item>
                                             ))}
                                         </AnimatePresence>
                                     </Reorder.Group>
-
-                                    {mediaItems.length === 0 && (
-                                        <div className="text-center py-8 text-gray-400 text-sm">
-                                            No media added yet. Upload a video or images.
-                                        </div>
-                                    )}
                                 </div>
-                            )}
-                        </div>
-
-                        {/* 3. Headline & Caption */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <div className="md:col-span-2 space-y-6">
-                                {postFormat === 'single' && (
+                            ) : (
+                                <div className="space-y-6">
                                     <div>
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Video Title (Headline)</label>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Video Title (Headline)</label>
                                         <input
                                             type="text"
                                             value={headline}
                                             onChange={(e) => setHeadline(e.target.value)}
                                             placeholder="Enter a bold headline..."
-                                            className="w-full p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all"
+                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                                         />
                                     </div>
-                                )}
-
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Caption</label>
-                                    <div className="relative">
-                                        <textarea
-                                            value={caption}
-                                            onChange={(e) => setCaption(e.target.value)}
-                                            maxLength={2200}
-                                            placeholder="Write a catchy caption..."
-                                            rows={4}
-                                            className="w-full p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all resize-none"
-                                        />
-                                        <div className={`absolute bottom-3 right-3 text-xs font-mono font-medium ${caption.length > 2000 ? 'text-red-500' : 'text-gray-400'}`}>
-                                            {caption.length}/2200
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {postFormat === 'single' && (
-                                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 flex items-center justify-between border border-blue-100 dark:border-blue-900/30">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-blue-100 dark:bg-blue-900/50 text-blue-600 rounded-lg">
-                                                <Lock size={18} />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Call to Action</p>
-                                                <p className="text-xs text-blue-600 dark:text-blue-300">Locked to system setting</p>
-                                            </div>
-                                        </div>
-                                        <div className="px-3 py-1.5 bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-800 text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wide">
-                                            Like Page
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {postFormat === 'single' && (
-                                <div className="md:col-span-1">
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Cover Image</label>
-                                    <label className="block w-full aspect-[3/4] md:aspect-square relative group cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-150">
-                                        {thumbnailPreview ? (
-                                            <>
-                                                <img src={thumbnailPreview} alt="Thumbnail" loading="lazy" className="w-full h-full object-cover" />
-                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-150 flex flex-col items-center justify-center text-white">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Cover Image</label>
+                                        <label className="block w-full aspect-video relative group cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-gray-50 transition-all">
+                                            {thumbnailPreview ? (
+                                                <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
                                                     <ImageIcon size={24} className="mb-2" />
-                                                    <span className="text-sm font-bold">Change Cover</span>
+                                                    <span className="text-sm">Upload Cover</span>
                                                 </div>
-                                            </>
-                                        ) : (
-                                            <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors duration-150">
-                                                <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full mb-3 group-hover:scale-105 transition-transform duration-150"><ImageIcon size={24} /></div>
-                                                <span className="text-sm font-bold">Upload</span>
-                                                <span className="text-xs opacity-70">JPG, PNG</span>
-                                            </div>
-                                        )}
-                                        <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
-                                    </label>
+                                            )}
+                                            <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
+                                        </label>
+                                    </div>
                                 </div>
                             )}
                         </div>
-
-                        {/* 4. Page Selection */}
-                        <div className="pt-6 border-t border-gray-100 dark:border-gray-700">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                    Post to Accounts <span className="text-xs font-normal text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">{selectedPages.length} selected</span>
-                                </h3>
-                                {availablePages.length > 0 && (
-                                    <button
-                                        onClick={() => setSelectedPages(selectedPages.length === availablePages.length ? [] : availablePages.map(p => p.id))}
-                                        className="text-xs text-blue-600 font-bold hover:underline"
-                                    >
-                                        {selectedPages.length === availablePages.length ? 'Deselect All' : 'Select All'}
-                                    </button>
-                                )}
-                            </div>
-
-                            {availablePages.length === 0 ? (
-                                <div className="p-4 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 rounded-xl flex items-center gap-3 text-sm">
-                                    <AlertCircle size={18} />
-                                    No pages connected. Please connect a Facebook page in Settings.
-                                </div>
-                            ) : (
-                                <div className="flex gap-3 flex-wrap">
-                                    {availablePages.map(page => {
-                                        const isSelected = selectedPages.includes(page.id);
-                                        return (
-                                            <button
-                                                key={page.id}
-                                                onClick={() => handlePageSelection(page.id)}
-                                                className={`
-                                                    group flex items-center gap-3 pl-1 pr-4 py-1.5 rounded-full border text-sm font-medium transition-all duration-200 select-none
-                                                    ${isSelected
-                                                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20 transform scale-[1.02]'
-                                                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-blue-400 hover:shadow-sm'
-                                                    }
-                                                `}
-                                            >
-                                                <div className="relative">
-                                                    <img src={page.picture} alt="" className={`w-8 h-8 rounded-full border-2 ${isSelected ? 'border-white/30' : 'border-transparent'}`} />
-                                                    {isSelected && (
-                                                        <div className="absolute -bottom-1 -right-1 bg-white text-blue-600 rounded-full p-0.5 shadow-sm"><Check size={10} strokeWidth={4} /></div>
-                                                    )}
-                                                </div>
-                                                {page.name}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* 5. Scheduling */}
-                        <div className="pt-6 border-t border-gray-100 dark:border-gray-700">
-                            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                                <Calendar size={18} className="text-purple-500" /> Schedule Post <span className="text-xs font-normal text-gray-400">(Optional)</span>
-                            </h3>
-                            <div className="flex items-center gap-4">
-                                <div className="relative flex-1 max-w-md">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><Clock size={18} /></div>
-                                    <input
-                                        type="datetime-local"
-                                        value={scheduleTime}
-                                        onChange={(e) => setScheduleTime(e.target.value)}
-                                        min={new Date().toISOString().slice(0, 16)}
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-medium transition-all text-gray-700 dark:text-gray-200"
-                                    />
-                                </div>
-                                {scheduleTime && (
-                                    <button onClick={() => setScheduleTime("")} className="text-sm text-red-500 hover:text-red-600 font-medium hover:underline">Clear</button>
-                                )}
-                            </div>
-                        </div>
-
-                    </div >
-
-                    {/* Footer Actions */}
-                    <div className="p-6 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-end gap-4">
-                        <Button variant="secondary" onClick={() => window.location.reload()} className="w-full sm:w-auto text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors duration-200">Cancel</Button>
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={(!file && !previewUrl) || selectedPages.length === 0}
-                            isLoading={isSubmitting}
-                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-10 py-3 rounded-xl shadow-lg shadow-blue-600/20 font-bold text-base transform hover:-translate-y-0.5 transition-all duration-200"
-                        >
-                            {isSubmitting ? 'Processing...' : (scheduleTime ? 'Schedule Post' : 'Post Now')}
-                        </Button>
                     </div>
-                </div >
-            </div >
-        </DashboardLayout >
+                </div>
+
+                {/* Footer Actions */}
+                <div className="mt-6 flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <div className="flex items-center gap-4">
+                        <div className="relative">
+                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <input
+                                type="datetime-local"
+                                value={scheduleTime}
+                                onChange={(e) => setScheduleTime(e.target.value)}
+                                className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                    </div>
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={(!file && !previewUrl) || selectedPages.length === 0}
+                        isLoading={isSubmitting}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-600/20"
+                    >
+                        {isSubmitting ? 'Processing...' : (scheduleTime ? 'Schedule Post' : 'Post Now')}
+                    </Button>
+                </div>
+
+            </div>
+        </DashboardLayout>
     );
 }
