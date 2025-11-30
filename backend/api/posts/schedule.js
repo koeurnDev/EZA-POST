@@ -28,22 +28,25 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit per file
   fileFilter: (_, file, cb) => {
-    const allowed = ["video/mp4", "video/webm", "video/ogg"];
+    const allowed = ["video/mp4", "video/webm", "video/ogg", "image/jpeg", "image/png", "image/webp"];
     if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Invalid video type — only MP4, WEBM, or OGG allowed."));
+    else cb(new Error("Invalid file type. Only videos and images are allowed."));
   },
 });
 
 /* -------------------------------------------------------------------------- */
 /* ✅ POST /api/posts/schedule — Schedule a new post                          */
 /* -------------------------------------------------------------------------- */
-router.post("/", requireAuth, upload.single("video"), async (req, res) => {
+/* -------------------------------------------------------------------------- */
+/* ✅ POST /api/posts/schedule — Schedule a new post                          */
+/* -------------------------------------------------------------------------- */
+router.post("/", requireAuth, upload.array("mediaFiles", 10), async (req, res) => {
   try {
-    const { caption, accounts, scheduleTime } = req.body;
+    const { caption, accounts, scheduleTime, postType = "single" } = req.body;
     const userId = req.user?.id;
-    const file = req.file;
+    const files = req.files || [];
 
     // 🛑 Validation
     if (!caption || !accounts || !scheduleTime) {
@@ -52,10 +55,10 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
         .json({ success: false, error: "Missing required fields" });
     }
 
-    if (!file)
+    if (files.length === 0)
       return res
         .status(400)
-        .json({ success: false, error: "Video file is required" });
+        .json({ success: false, error: "At least one media file is required" });
 
     // 🕒 Validate schedule time
     const scheduleDate = new Date(scheduleTime);
@@ -77,17 +80,24 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
     }
 
     // 📤 Upload to Cloudinary
-    console.log(`📤 Uploading scheduled video to Cloudinary: ${file.filename}`);
-    const result = await uploadFile(file.path, "kr_post/videos", "video");
-    const videoUrl = result.url;
-    // Local file is deleted by uploadFile utility
+    console.log(`📤 Uploading ${files.length} files to Cloudinary...`);
+    const uploadPromises = files.map(file =>
+      uploadFile(file.path, "kr_post/scheduled", file.mimetype.startsWith("video") ? "video" : "image")
+    );
+
+    const results = await Promise.all(uploadPromises);
+    const mediaUrls = results.map(r => r.url);
+    const videoUrl = postType === "single" ? mediaUrls[0] : undefined;
 
     // 💾 Store scheduled post (MongoDB)
     const newPost = await ScheduledPost.create({
       id: `post_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, // Generate ID
       user_id: userId, // Match schema
       caption,
-      video_url: videoUrl, // Match schema
+      postType,
+      video_url: videoUrl, // Only for single video posts
+      mediaFiles: mediaUrls, // All files
+      thumbnail_url: postType === "single" ? results[0].thumbnail_url || videoUrl : mediaUrls[0], // Simple thumbnail logic
       accounts: accountsList,
       schedule_time: scheduleDate, // Match schema
       status: "scheduled",
@@ -100,7 +110,8 @@ router.post("/", requireAuth, upload.single("video"), async (req, res) => {
       message: "Post scheduled successfully!",
       data: {
         caption,
-        videoUrl,
+        postType,
+        mediaFiles: mediaUrls,
         accounts: accountsList,
         scheduleTime: scheduleDate,
         postId: newPost.id,

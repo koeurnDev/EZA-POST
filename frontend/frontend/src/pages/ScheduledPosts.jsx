@@ -151,7 +151,12 @@ export default function ScheduledPosts() {
                     title="No posts scheduled"
                     description="Your queue is empty. Start creating content to keep your audience engaged!"
                     actionLabel="Create First Post"
-                    onAction={() => window.location.href = "/dashboard"}
+                    onAction={() => window.location.href = "/post"}
+                    tips={[
+                        "Click 'Create First Post' to schedule content.",
+                        "You can schedule single videos or mixed carousels.",
+                        "Use the 'Schedule' button in the post composer."
+                    ]}
                 />
             ) : (
                 <div className="space-y-10">
@@ -204,9 +209,9 @@ export default function ScheduledPosts() {
                                                 )}
 
                                                 {/* Status Badge */}
-                                                <div className="absolute top-3 left-3">
+                                                <div className="absolute top-3 left-3 flex flex-col gap-2">
                                                     <span
-                                                        className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase backdrop-blur-md shadow-sm ${q.status === "scheduled"
+                                                        className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase backdrop-blur-md shadow-sm w-fit ${q.status === "scheduled"
                                                             ? "bg-blue-500/90 text-white"
                                                             : q.status === "processing"
                                                                 ? "bg-yellow-500/90 text-white"
@@ -215,6 +220,11 @@ export default function ScheduledPosts() {
                                                     >
                                                         {q.status}
                                                     </span>
+                                                    {q.postType === "carousel" && (
+                                                        <span className="px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase backdrop-blur-md shadow-sm bg-purple-500/90 text-white w-fit">
+                                                            Carousel
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 {/* Cancel Button */}

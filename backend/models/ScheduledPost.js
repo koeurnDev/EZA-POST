@@ -18,12 +18,22 @@ const scheduledPostSchema = new mongoose.Schema(
             ref: "User",
             index: true,
         },
+        postType: {
+            type: String,
+            enum: ["single", "carousel"],
+            default: "single",
+            required: true
+        },
         video_url: {
             type: String,
-            required: true,
+            // Not required if postType is carousel
+        },
+        mediaFiles: {
+            type: [String], // Array of URLs for carousel
+            default: []
         },
         thumbnail_url: {
-            type: String, // ✅ Added thumbnail support
+            type: String,
         },
         caption: {
             type: String,
