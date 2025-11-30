@@ -28,8 +28,7 @@ export default function Post() {
     const [previewUrl, setPreviewUrl] = useState(null);
     const [tiktokUrl, setTiktokUrl] = useState("");
 
-    // Image State (Carousel Only)
-    const [imageFiles, setImageFiles] = useState([]);
+
 
     // 🔄 Unified Media List (for Reordering)
     const [mediaItems, setMediaItems] = useState([]);
@@ -48,96 +47,6 @@ export default function Post() {
     const [selectedPages, setSelectedPages] = useState([]);
     const [availablePages, setAvailablePages] = useState([]);
     const [scheduleTime, setScheduleTime] = useState("");
-
-    // 🟡 UI State
-    const [isDragging, setIsDragging] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isLoadingVideo, setIsLoadingVideo] = useState(false);
-    const [isDraftLoaded, setIsDraftLoaded] = useState(false); // 🛑 Prevent save before load
-    const fileInputRef = useRef(null);
-
-    // 🔄 Sync Media Items when Video or Images change
-    useEffect(() => {
-        if (postFormat !== 'carousel') return;
-
-        // Construct current list based on state
-        setMediaItems(prev => {
-            const currentVideo = (file || previewUrl) ? {
-                id: 'video-main',
-                type: 'video',
-                preview: previewUrl || (file ? URL.createObjectURL(file) : null),
-                file: file,
-                url: previewUrl
-            } : null;
-
-            // If list is empty, just combine
-            if (prev.length === 0) {
-                return currentVideo ? [currentVideo] : [];
-            }
-
-            // If list exists, we need to merge carefully to keep order
-            // 1. Find if video exists in prev
-            const prevVideoIndex = prev.findIndex(item => item.type === 'video');
-            let newOrder = [...prev];
-
-            // Update or Add Video
-            if (currentVideo) {
-                if (prevVideoIndex !== -1) {
-                    newOrder[prevVideoIndex] = currentVideo; // Update content, keep position
-                } else {
-                    newOrder.unshift(currentVideo); // Add to start if new
-                }
-            } else {
-                // Remove video if it was deleted
-                if (prevVideoIndex !== -1) {
-                    newOrder.splice(prevVideoIndex, 1);
-                }
-            }
-
-            // 🌟 Auto-Add Page Card (Card 2)
-            // Condition: Video exists + Page Selected (Image is now OPTIONAL)
-            const hasVideo = newOrder.some(i => i.type === 'video');
-            const selectedPageId = selectedPages[0];
-
-            if (hasVideo && selectedPageId) {
-                const pageObj = availablePages.find(p => p.id === selectedPageId);
-                if (pageObj) {
-                    // Check if Page Card already exists
-                    const pageCardIndex = newOrder.findIndex(i => i.isPageCard);
-
-                    const pageCard = {
-                        id: 'card-page-auto',
-                        type: 'image',
-                        preview: pageObj.picture, // Page Profile Pic
-                        file: null, // No file, remote URL
-                        imageUrl: pageObj.picture, // Explicit remote URL
-                        isPageCard: true
-                    };
-
-                    if (pageCardIndex !== -1) {
-                        // Update existing Page Card
-                        newOrder[pageCardIndex] = pageCard;
-
-                        // 🔄 Ensure it is at Index 1 (if not already)
-                        if (pageCardIndex !== 1 && newOrder.length > 1) {
-                            newOrder.splice(pageCardIndex, 1); // Remove from old pos
-                            newOrder.splice(1, 0, pageCard);   // Insert at Index 1
-                        }
-                    } else {
-                        // Insert Page Card at Index 1 (After Video)
-                        // If only video exists (length 1), it becomes index 1.
-                        // If video + image exists (length 2), it inserts between them.
-                        newOrder.splice(1, 0, pageCard);
-                    }
-                }
-            } else {
-                // Remove Page Card if conditions not met
-                newOrder = newOrder.filter(i => !i.isPageCard);
-            }
-
-            return newOrder;
-        });
-    }, [file, previewUrl, postFormat, selectedPages, availablePages, imageFiles]);
 
     // 💾 Draft Persistence Logic
     useEffect(() => {
@@ -169,30 +78,6 @@ export default function Post() {
                     setFile(savedVideo);
                     setPreviewUrl(URL.createObjectURL(savedVideo));
                     // Re-add to media items logic will handle the rest via the other useEffect
-                }
-
-                // 3. Load Image File (Max 1)
-                const savedImage = await getDraftFile("draft_image");
-                if (savedImage) {
-                    // We need to simulate the drop logic
-                    const newItem = {
-                        id: `image-draft-${Date.now()}`,
-                        type: 'image',
-                        preview: URL.createObjectURL(savedImage),
-                        file: savedImage
-                    };
-
-                    // We can't easily rely on the other useEffect for images because it depends on `imageFiles` state which we aren't using directly for the unified list anymore in the same way.
-                    // So we manually inject it into mediaItems if not already there.
-                    setMediaItems(prev => {
-                        if (prev.some(i => i.type === 'image' && !i.isPageCard)) return prev; // Already has image
-
-                        const videoItem = prev.find(i => i.type === 'video');
-                        const newOrder = [];
-                        if (videoItem) newOrder.push(videoItem);
-                        newOrder.push(newItem);
-                        return newOrder;
-                    });
                 }
 
             } catch (err) {
@@ -351,40 +236,7 @@ export default function Post() {
         video.src = URL.createObjectURL(selectedFile);
     };
 
-    // 🖼️ Image Dropzone (Carousel)
-    const onDropImages = (acceptedFiles) => {
-        // 🛑 Enforce Single Image Limit for 3-Card Logic
-        const file = acceptedFiles[0];
-        if (!file) return;
 
-        const newItem = {
-            id: `image-${Date.now()}-${Math.random()}`,
-            type: 'image',
-            preview: URL.createObjectURL(file),
-            file: file
-        };
-
-        // Replace existing images or add new one (Ensure only 1 image + video + page card)
-        setMediaItems(prev => {
-            // Keep video
-            const videoItem = prev.find(i => i.type === 'video');
-            // Keep Page Card (it will be re-evaluated by useEffect anyway, but good to be clean)
-
-            const newOrder = [];
-            if (videoItem) newOrder.push(videoItem);
-            newOrder.push(newItem);
-
-            return newOrder;
-        });
-        toast.success("Image added!");
-    };
-
-    const { getRootProps: getImageRootProps, getInputProps: getImageInputProps, isDragActive: isImageDragActive } = useDropzone({
-        onDrop: onDropImages,
-        accept: { "image/*": [] },
-        multiple: false, // 🛑 Restrict to single file
-        maxFiles: 1
-    });
 
     // ➕ Helper to Add/Update Video in List
     const addToMediaList = (videoItem) => {
@@ -501,14 +353,7 @@ export default function Post() {
             if (postFormat === 'carousel') {
                 endpoint = `${API_BASE}/api/posts/mixed-carousel`;
 
-                // 🖼️ Filter Uploaded Images (Exclude Page Card)
-                const uploadedImages = imageItems.filter(item => !item.isPageCard);
 
-                uploadedImages.forEach(item => {
-                    if (item.file) {
-                        formData.append("images", item.file);
-                    }
-                });
 
                 // 🔢 Rich Media Order (Cards Data)
                 const cardsPayload = mediaItems.map(item => {
@@ -521,11 +366,7 @@ export default function Post() {
                         cta: cta
                     };
 
-                    if (item.type === 'image' && !item.isPageCard) {
-                        // Find index in the *uploaded* images array
-                        const imgIndex = uploadedImages.findIndex(img => img.id === item.id);
-                        card.fileIndex = imgIndex;
-                    }
+
 
                     // Pass remote URL for Page Card
                     if (item.isPageCard) {
@@ -777,13 +618,11 @@ export default function Post() {
                                             <Layers size={16} /> Carousel Requirements
                                         </p>
                                         <p className="opacity-90">
-                                            A carousel requires at least <strong>2 cards</strong>:
+                                            A carousel requires exactly <strong>2 cards</strong>:
                                             <br />
                                             1. <strong>Video</strong> (Upload or TikTok)
                                             <br />
                                             2. <strong>Page Card</strong> (Auto-generated from Page Profile)
-                                            <br />
-                                            3. <strong>Additional Image</strong> (Optional)
                                         </p>
                                     </div>
 
@@ -865,27 +704,7 @@ export default function Post() {
                                         )}
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Card 3: Additional Image (Optional)</label>
-                                        {!mediaItems.some(i => i.type === 'image' && !i.isPageCard) ? (
-                                            <div {...getImageRootProps()} className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer transition-all
-                                                    ${isImageDragActive ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400 hover:bg-gray-50'}`}>
-                                                <input {...getImageInputProps()} />
-                                                <Plus className="w-6 h-6 text-pink-400 mb-2" />
-                                                <span className="text-sm font-medium text-gray-600">Upload Image</span>
-                                            </div>
-                                        ) : (
-                                            <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <img src={mediaItems.find(i => i.type === 'image' && !i.isPageCard).preview} className="w-10 h-10 rounded-lg object-cover" alt="" />
-                                                    <span className="font-medium text-green-700">Image Added</span>
-                                                </div>
-                                                <button onClick={() => removeMediaItem(mediaItems.find(i => i.type === 'image' && !i.isPageCard).id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg">
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+
                                 </div>
 
                                 {/* Right: Auto-Fill Info & Preview List */}

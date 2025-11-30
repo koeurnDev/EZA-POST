@@ -13,12 +13,12 @@ const { uploadFile } = require("../utils/cloudinary");
 exports.processAndPostCarousel = async (req, accountsArray, userId, caption, scheduleTime) => {
     let localVideoPath = null;
     let localThumbnailPath = null;
-    let localImagePaths = []; // ✅ Store local image paths for direct upload
+
 
     try {
         const { videoUrl } = req.body;
         const videoFile = req.files?.find(f => f.fieldname === 'video');
-        const imageFiles = req.files?.filter(f => f.fieldname === 'images');
+
 
         // Check if we have either Files OR URLs
         const hasVideo = videoFile || videoUrl;
@@ -32,18 +32,17 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
             }
         } catch (e) { /* ignore parse error here, validation happens later */ }
 
-        const hasImages = (imageFiles && imageFiles.length > 0) || hasPageCard;
+        const hasImages = hasPageCard;
 
-        if (!hasVideo || !hasImages) {
-            throw new Error("Video and at least one image (or Page Card) are required for mixed carousel");
+        if (!hasVideo || !hasPageCard) {
+            throw new Error("Video and Page Card are required for mixed carousel");
         }
 
         // 🔄 Phase 1: Preparation (Upload & Process)
         let finalVideoUrl = videoUrl;
         let finalVideoPublicId = null;
         let finalThumbnailUrl = null; // ✅ Define variable for thumbnail URL
-        let finalImageUrls = [];
-        let finalImagePublicIds = [];
+
         const { processMediaToSquare, generateThumbnail } = require("../utils/videoProcessor");
 
         // 1.1 Process Video
@@ -83,30 +82,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
             }
         }
 
-        // 1.2 Process Images
-        if (imageFiles && imageFiles.length > 0) {
-            console.log(`🖼️ Phase 1: Processing ${imageFiles.length} images locally (1080x1080)...`);
-            for (const img of imageFiles) {
-                // Process image to square using same FFmpeg logic
-                const processedImagePath = await processMediaToSquare(img.path);
 
-                console.log("☁️ Uploading processed image to Cloudinary...");
-                // 🛑 CRITICAL: Set deleteAfterUpload=false so we can use the file for Direct Upload to FB
-                const iRes = await uploadFile(processedImagePath, "eza-post/carousel_images", "image", false, false);
-                finalImageUrls.push(iRes.url);
-                finalImagePublicIds.push(iRes.public_id);
-
-                // ✅ Store path for Direct Upload later
-                localImagePaths.push(processedImagePath);
-
-                // ✅ Delete RAW file immediately, but KEEP processed file
-                try {
-                    if (fs.existsSync(img.path)) fs.unlinkSync(img.path);
-                } catch (e) {
-                    console.warn(`⚠️ Failed to delete local raw image: ${e.message}`);
-                }
-            }
-        }
 
         // 🚀 Phase 2 & 3: Create Attachments & Publish
         const results = { successCount: 0, failedCount: 0, details: [] };
@@ -145,10 +121,8 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                     console.log("⚠️ No carouselCards provided. Auto-generating from inputs...");
                     // 1. Video Card
                     carouselCards.push({ type: 'video' });
-                    // 2. Image Cards
-                    finalImageUrls.forEach((_, index) => {
-                        carouselCards.push({ type: 'image', fileIndex: index });
-                    });
+                    // 2. Page Card
+                    carouselCards.push({ type: 'image', isPageCard: true });
                 }
 
                 const finalChildAttachments = [];
@@ -194,16 +168,10 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         } else if (card.type === 'image') {
                             if (card.imageUrl) {
                                 url = card.imageUrl;
-                            } else if (isEndCard && !card.fileIndex && !card.imageUrl) {
+                            } else if (isEndCard) {
                                 if (page && page.picture && page.picture.data && page.picture.data.url) {
                                     url = page.picture.data.url;
-                                } else {
-                                    url = finalImageUrls[card.fileIndex] || finalImageUrls[0];
                                 }
-                            } else if (card.fileIndex !== undefined && finalImageUrls[card.fileIndex]) {
-                                url = finalImageUrls[card.fileIndex];
-                            } else {
-                                url = finalImageUrls[0];
                             }
                         }
 
@@ -229,15 +197,8 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                 }
                             } else {
                                 console.log(`📤 Uploading photo container for Card ${index + 1}...`);
-
-                                // ✅ Use Direct File Upload if available (Reliable)
-                                let photoInput = url;
-                                if (card.fileIndex !== undefined && localImagePaths[card.fileIndex]) {
-                                    console.log(`🌊 Using local image stream for Card ${index + 1}`);
-                                    photoInput = fs.createReadStream(localImagePaths[card.fileIndex]);
-                                }
-
-                                const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, photoInput);
+                                // Page Card always uses URL
+                                const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, url);
                                 containerId = pRes.id;
                             }
                         } catch (uploadErr) {
@@ -293,11 +254,6 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                     // 🔄 Phase 4: Clean-up (Soft Delete)
                     const { softDeleteAsset } = require("../utils/cloudinary");
                     if (finalVideoPublicId) await softDeleteAsset(finalVideoPublicId);
-                    if (finalImagePublicIds && finalImagePublicIds.length > 0) {
-                        for (const imgId of finalImagePublicIds) {
-                            await softDeleteAsset(imgId);
-                        }
-                    }
 
                     await PostLog.create({
                         userId,
@@ -307,7 +263,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         status: scheduleTime ? "scheduled" : "published",
                         scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
                         cloudinaryVideoId: finalVideoPublicId,
-                        cloudinaryImageIds: finalImagePublicIds
+                        cloudinaryImageIds: []
                     });
 
                     results.successCount++;
@@ -326,7 +282,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                     status: "failed",
                     error: err.message,
                     cloudinaryVideoId: finalVideoPublicId,
-                    cloudinaryImageIds: finalImagePublicIds
+                    cloudinaryImageIds: []
                 });
                 results.failedCount++;
                 results.details.push({ accountId, status: "failed", error: err.message });
@@ -359,16 +315,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
             }
         }
 
-        // ✅ Cleanup Local Images
-        if (localImagePaths.length > 0) {
-            localImagePaths.forEach(p => {
-                try {
-                    if (fs.existsSync(p)) fs.unlinkSync(p);
-                } catch (e) {
-                    console.warn(`Failed to delete temp image: ${p}`);
-                }
-            });
-        }
+
     }
 };
 exports.createMixedCarousel = async (req, res) => {
