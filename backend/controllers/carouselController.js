@@ -22,10 +22,20 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
 
         // Check if we have either Files OR URLs
         const hasVideo = videoFile || videoUrl;
-        const hasImages = imageFiles && imageFiles.length > 0;
+
+        // 🛑 Check for Page Card in payload (it counts as an image)
+        let hasPageCard = false;
+        try {
+            if (req.body.carouselCards) {
+                const cards = JSON.parse(req.body.carouselCards);
+                hasPageCard = cards.some(c => c.imageUrl); // Page Card has imageUrl
+            }
+        } catch (e) { /* ignore parse error here, validation happens later */ }
+
+        const hasImages = (imageFiles && imageFiles.length > 0) || hasPageCard;
 
         if (!hasVideo || !hasImages) {
-            throw new Error("Video and at least one image are required for mixed carousel");
+            throw new Error("Video and at least one image (or Page Card) are required for mixed carousel");
         }
 
         // 🔄 Phase 1: Preparation (Upload & Process)
@@ -238,21 +248,23 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         // 3. Construct attachment with Metadata AND Type-Specific IDs
                         // ✅ CRITICAL: Metadata prevents "Invalid parameter", IDs ensure native display
                         const attachment = {
+                            link: link, // ✅ Restore Link for ALL cards
                             name: headline,
                             description: description,
                         };
 
                         if (card.type === 'video') {
-                            attachment.video_id = containerId; // ✅ Revert to video_id (Required for Video)
-                            // ❌ Remove 'link' for video card to avoid "Invalid parameter"
-                            // Video cards in mixed carousel should rely on the video content itself.
+                            // 🔄 EXPERIMENT: Use 'media_fbid' for Video (instead of video_id)
+                            // 'video_id' caused "Invalid parameter".
+                            // 'media_fbid' + 'picture' caused "White Card".
+                            // HYPOTHESIS: 'media_fbid' + NO 'picture' = Correct Video Rendering?
+                            attachment.media_fbid = containerId;
 
-                            // 🔄 EXPERIMENT: Remove 'picture' (Thumbnail) from payload
-                            // The video container ALREADY has a thumbnail attached during upload.
+                            // ❌ Ensure 'picture' is NOT sent. 
+                            // The video container has the thumbnail embedded.
                             // attachment.picture = finalThumbnailUrl; 
 
                         } else {
-                            attachment.link = link; // ✅ Keep Link for Image cards
                             attachment.media_fbid = containerId; // ✅ Standard for Image Containers
                             attachment.picture = url; // ✅ Image URL is fine for Image card
 

@@ -94,13 +94,12 @@ export default function Post() {
                 }
             }
 
-            // 🌟 Auto-Add Page Card (Card 3)
-            // Condition: Video exists + At least 1 Image exists + Page Selected
+            // 🌟 Auto-Add Page Card (Card 2)
+            // Condition: Video exists + Page Selected (Image is now OPTIONAL)
             const hasVideo = newOrder.some(i => i.type === 'video');
-            const imageCount = newOrder.filter(i => i.type === 'image' && !i.isPageCard).length;
             const selectedPageId = selectedPages[0];
 
-            if (hasVideo && imageCount >= 1 && selectedPageId) {
+            if (hasVideo && selectedPageId) {
                 const pageObj = availablePages.find(p => p.id === selectedPageId);
                 if (pageObj) {
                     // Check if Page Card already exists
@@ -112,20 +111,27 @@ export default function Post() {
                         preview: pageObj.picture, // Page Profile Pic
                         file: null, // No file, remote URL
                         imageUrl: pageObj.picture, // Explicit remote URL
-                        // Global fields are used in payload, but we can store them here for reference if needed
                         isPageCard: true
                     };
 
                     if (pageCardIndex !== -1) {
-                        // Update existing Page Card (in case Page changed)
+                        // Update existing Page Card
                         newOrder[pageCardIndex] = pageCard;
+
+                        // 🔄 Ensure it is at Index 1 (if not already)
+                        if (pageCardIndex !== 1 && newOrder.length > 1) {
+                            newOrder.splice(pageCardIndex, 1); // Remove from old pos
+                            newOrder.splice(1, 0, pageCard);   // Insert at Index 1
+                        }
                     } else {
-                        // Append Page Card
-                        newOrder.push(pageCard);
+                        // Insert Page Card at Index 1 (After Video)
+                        // If only video exists (length 1), it becomes index 1.
+                        // If video + image exists (length 2), it inserts between them.
+                        newOrder.splice(1, 0, pageCard);
                     }
                 }
             } else {
-                // Remove Page Card if conditions not met (e.g. removed all images)
+                // Remove Page Card if conditions not met
                 newOrder = newOrder.filter(i => !i.isPageCard);
             }
 
@@ -453,9 +459,10 @@ export default function Post() {
         const imageItems = mediaItems.filter(i => i.type === 'image');
 
         if (!videoItem && !file && !previewUrl) return toast.error("Please add a video.");
-        if (postFormat === 'carousel' && imageItems.length === 0) {
-            return toast.error("Please add at least one image.");
-        }
+        // 🛑 Image is now OPTIONAL
+        // if (postFormat === 'carousel' && imageItems.length === 0) {
+        //     return toast.error("Please add at least one image.");
+        // }
 
         // Validate Required Fields for Carousel
         if (postFormat === 'carousel') {
@@ -770,13 +777,13 @@ export default function Post() {
                                             <Layers size={16} /> Carousel Requirements
                                         </p>
                                         <p className="opacity-90">
-                                            A carousel requires exactly <strong>3 cards</strong>:
+                                            A carousel requires at least <strong>2 cards</strong>:
                                             <br />
                                             1. <strong>Video</strong> (Upload or TikTok)
                                             <br />
-                                            2. <strong>Image</strong> (Upload 1 image)
+                                            2. <strong>Page Card</strong> (Auto-generated from Page Profile)
                                             <br />
-                                            3. <strong>Page Card</strong> (Auto-generated from Page Profile)
+                                            3. <strong>Additional Image</strong> (Optional)
                                         </p>
                                     </div>
 
@@ -858,9 +865,8 @@ export default function Post() {
                                         )}
                                     </div>
 
-                                    {/* Image Input */}
                                     <div>
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Card 2: Image</label>
+                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Card 3: Additional Image (Optional)</label>
                                         {!mediaItems.some(i => i.type === 'image' && !i.isPageCard) ? (
                                             <div {...getImageRootProps()} className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer transition-all
                                                     ${isImageDragActive ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400 hover:bg-gray-50'}`}>
