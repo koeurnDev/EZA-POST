@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
-import { X, User, Mail, Loader2, Save } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export default function EditProfileModal({ isOpen, onClose }) {
@@ -74,9 +73,9 @@ export default function EditProfileModal({ isOpen, onClose }) {
                                 </h3>
                                 <button
                                     onClick={onClose}
-                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors text-xl"
                                 >
-                                    <X size={20} />
+                                    ✕
                                 </button>
                             </div>
 
@@ -112,7 +111,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
                                         Full Name
                                     </label>
                                     <div className="relative">
-                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">👤</span>
                                         <input
                                             type="text"
                                             value={name}
@@ -129,7 +128,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
                                         Email Address
                                     </label>
                                     <div className="relative">
-                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">✉️</span>
                                         <input
                                             type="email"
                                             value={email}
@@ -159,12 +158,12 @@ export default function EditProfileModal({ isOpen, onClose }) {
                                     >
                                         {isLoading ? (
                                             <>
-                                                <Loader2 className="animate-spin" size={18} />
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                                                 Saving...
                                             </>
                                         ) : (
                                             <>
-                                                <Save size={18} />
+                                                <span>💾</span>
                                                 Save Changes
                                             </>
                                         )}
