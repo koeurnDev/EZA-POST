@@ -44,8 +44,12 @@ const upload = multer({
             const allowed = ["image/jpeg", "image/png", "image/jpg"];
             if (allowed.includes(file.mimetype)) cb(null, true);
             else cb(new Error("Invalid thumbnail type — only JPG, PNG allowed."));
+        } else if (file.fieldname === "images") {
+            const allowed = ["image/jpeg", "image/png", "image/jpg"];
+            if (allowed.includes(file.mimetype)) cb(null, true);
+            else cb(new Error("Invalid image type — only JPG, PNG allowed."));
         } else {
-            cb(new Error("Unexpected field"));
+            cb(new Error(`Unexpected field: ${file.fieldname}`));
         }
     },
 });
