@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check, AlertCircle, Calendar, Clock, Layers, Video, Plus, Trash2, GripVertical, ChevronDown } from "lucide-react";
-import apiUtils from "../utils/apiUtils";
+import apiUtils, { fetchCsrfToken } from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
@@ -408,8 +408,10 @@ export default function Post() {
             }
 
             const token = localStorage.getItem("token");
+            const csrfToken = await fetchCsrfToken();
             const headers = {};
             if (token) headers["Authorization"] = `Bearer ${token}`;
+            if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
 
             const response = await fetch(endpoint, {
                 method: "POST",
