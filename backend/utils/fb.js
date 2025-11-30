@@ -270,6 +270,9 @@ class FacebookAPI {
       try {
         console.log(`🚀 Posting Carousel to ${account.name}...`);
 
+        // 🔍 Debug: Log Payload
+        console.log("📦 Carousel Payload (child_attachments):", JSON.stringify(childAttachments, null, 2));
+
         const payload = {
           child_attachments: childAttachments,
           access_token: account.access_token || accessToken,
