@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check, AlertCircle, Calendar, Clock, Layers, Video, Plus, Trash2, GripVertical, ChevronDown } from "lucide-react";
 import apiUtils, { fetchCsrfToken } from "../utils/apiUtils";
+import { saveDraftFile, getDraftFile, clearDraftFile } from "../utils/draftDB";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
@@ -130,6 +131,93 @@ export default function Post() {
             return newOrder;
         });
     }, [file, previewUrl, postFormat, selectedPages, availablePages, imageFiles]);
+
+    // 💾 Draft Persistence Logic
+    useEffect(() => {
+        const loadDraft = async () => {
+            try {
+                // 1. Load Text Data
+                const savedDraft = localStorage.getItem("postDraft");
+                if (savedDraft) {
+                    const parsed = JSON.parse(savedDraft);
+                    setCaption(parsed.caption || "");
+                    setHeadline(parsed.headline || "");
+                    setTargetLink(parsed.targetLink || "");
+                    setPostFormat(parsed.postFormat || "carousel");
+                    if (parsed.selectedPages) setSelectedPages(parsed.selectedPages);
+                }
+
+                // 2. Load Video File
+                const savedVideo = await getDraftFile("draft_video");
+                if (savedVideo) {
+                    setFile(savedVideo);
+                    setPreviewUrl(URL.createObjectURL(savedVideo));
+                    // Re-add to media items logic will handle the rest via the other useEffect
+                }
+
+                // 3. Load Image File (Max 1)
+                const savedImage = await getDraftFile("draft_image");
+                if (savedImage) {
+                    // We need to simulate the drop logic
+                    const newItem = {
+                        id: `image-draft-${Date.now()}`,
+                        type: 'image',
+                        preview: URL.createObjectURL(savedImage),
+                        file: savedImage
+                    };
+
+                    // We can't easily rely on the other useEffect for images because it depends on `imageFiles` state which we aren't using directly for the unified list anymore in the same way.
+                    // So we manually inject it into mediaItems if not already there.
+                    setMediaItems(prev => {
+                        if (prev.some(i => i.type === 'image' && !i.isPageCard)) return prev; // Already has image
+
+                        const videoItem = prev.find(i => i.type === 'video');
+                        const newOrder = [];
+                        if (videoItem) newOrder.push(videoItem);
+                        newOrder.push(newItem);
+                        return newOrder;
+                    });
+                }
+
+            } catch (err) {
+                console.warn("Failed to load draft:", err);
+            }
+        };
+        loadDraft();
+    }, []);
+
+    // 💾 Auto-Save Draft
+    useEffect(() => {
+        const saveTimer = setTimeout(async () => {
+            // Save Text
+            const draftData = {
+                caption,
+                headline,
+                targetLink,
+                postFormat,
+                selectedPages
+            };
+            localStorage.setItem("postDraft", JSON.stringify(draftData));
+
+            // Save Video
+            if (file) {
+                await saveDraftFile("draft_video", file);
+            } else {
+                await clearDraftFile("draft_video");
+            }
+
+            // Save Image (Find the first user-uploaded image)
+            const imageItem = mediaItems.find(i => i.type === 'image' && !i.isPageCard);
+            if (imageItem && imageItem.file) {
+                await saveDraftFile("draft_image", imageItem.file);
+            } else {
+                await clearDraftFile("draft_image");
+            }
+
+        }, 1000); // Debounce 1s
+
+        return () => clearTimeout(saveTimer);
+    }, [caption, headline, targetLink, postFormat, selectedPages, file, mediaItems]);
 
     // 🔄 Fetch Pages & Load Last Used
     useEffect(() => {
@@ -441,6 +529,11 @@ export default function Post() {
                 setThumbnail(null); setThumbnailPreview(null);
                 setHeadline(""); setCardDescription(""); setTargetLink(""); setCaption(""); setScheduleTime("");
                 setMediaItems([]);
+
+                // 🧹 Clear Draft
+                localStorage.removeItem("postDraft");
+                await clearDraftFile("draft_video");
+                await clearDraftFile("draft_image");
             } else {
                 throw new Error(data.error || "Failed to create post.");
             }
