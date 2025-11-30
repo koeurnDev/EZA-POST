@@ -42,11 +42,18 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
             const processedVideoPath = await processMediaToSquare(videoFile.path);
             localVideoPath = processedVideoPath;
 
-            // ✅ Generate Thumbnail
-            try {
-                localThumbnailPath = await generateThumbnail(localVideoPath);
-            } catch (thumbErr) {
-                console.warn("⚠️ Failed to generate thumbnail, proceeding without it:", thumbErr.message);
+            // ✅ Generate Thumbnail (or use Custom Upload)
+            const customThumbnailFile = req.files?.find(f => f.fieldname === 'thumbnail');
+
+            if (customThumbnailFile) {
+                console.log("🖼️ Using Custom Thumbnail uploaded by user");
+                localThumbnailPath = customThumbnailFile.path;
+            } else {
+                try {
+                    localThumbnailPath = await generateThumbnail(localVideoPath);
+                } catch (thumbErr) {
+                    console.warn("⚠️ Failed to generate thumbnail, proceeding without it:", thumbErr.message);
+                }
             }
 
             console.log("☁️ Uploading processed video to Cloudinary...");

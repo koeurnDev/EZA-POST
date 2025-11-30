@@ -482,6 +482,11 @@ export default function Post() {
                 formData.append("videoUrl", activeVideoUrl);
             }
 
+            // 🌟 Append Custom Thumbnail (if any)
+            if (thumbnail) {
+                formData.append("thumbnail", thumbnail);
+            }
+
             if (scheduleTime) formData.append("scheduleTime", scheduleTime);
 
             let endpoint = `${API_BASE}/api/posts`;
@@ -807,16 +812,48 @@ export default function Post() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 bg-black rounded-lg overflow-hidden">
-                                                        <video src={mediaItems.find(i => i.type === 'video').preview} className="w-full h-full object-cover" />
+                                            <div className="space-y-3">
+                                                {/* Video Preview */}
+                                                <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 bg-black rounded-lg overflow-hidden">
+                                                            <video src={mediaItems.find(i => i.type === 'video').preview} className="w-full h-full object-cover" />
+                                                        </div>
+                                                        <span className="font-medium text-green-700">Video Added</span>
                                                     </div>
-                                                    <span className="font-medium text-green-700">Video Added</span>
+                                                    <button onClick={() => removeMediaItem(mediaItems.find(i => i.type === 'video').id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg">
+                                                        <Trash2 size={16} />
+                                                    </button>
                                                 </div>
-                                                <button onClick={() => removeMediaItem(mediaItems.find(i => i.type === 'video').id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg">
-                                                    <Trash2 size={16} />
-                                                </button>
+
+                                                {/* 🌟 Custom Thumbnail Upload */}
+                                                <div className="flex items-center gap-3">
+                                                    <div className="relative group">
+                                                        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center">
+                                                            {thumbnailPreview ? (
+                                                                <img src={thumbnailPreview} className="w-full h-full object-cover" alt="Thumbnail" />
+                                                            ) : (
+                                                                <ImageIcon className="text-gray-400" size={24} />
+                                                            )}
+                                                        </div>
+                                                        {thumbnailPreview && (
+                                                            <button
+                                                                onClick={() => { setThumbnail(null); setThumbnailPreview(null); }}
+                                                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <X size={12} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <label className="block text-xs font-bold text-gray-500 mb-1">Custom Thumbnail (Optional)</label>
+                                                        <label className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors">
+                                                            <Upload size={14} />
+                                                            {thumbnail ? "Change Image" : "Upload Image"}
+                                                            <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
+                                                        </label>
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
