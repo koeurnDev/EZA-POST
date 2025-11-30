@@ -237,17 +237,14 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         };
 
                         if (card.type === 'video') {
-                            // 🔄 EXPERIMENTAL: Try media_fbid instead of video_id for organic post
-                            attachment.media_fbid = containerId;
+                            attachment.video_id = containerId; // ✅ Revert to video_id (Required for Video)
 
-                            // ✅ Video MUST use thumbnail image for 'picture'
-                            if (finalThumbnailUrl) {
-                                attachment.picture = finalThumbnailUrl;
-                            } else {
-                                attachment.picture = url.replace(/\.[^/.]+$/, ".jpg");
-                            }
+                            // 🔄 EXPERIMENT: Remove 'picture' (Thumbnail) from payload
+                            // The video container ALREADY has a thumbnail attached during upload.
+                            // Sending 'picture' here might be causing "Invalid parameter" or conflicts.
+                            // attachment.picture = finalThumbnailUrl; 
 
-                            // ❌ Remove CTA for video (as per user request)
+                            // ❌ Remove CTA for video
                             // attachment.call_to_action = ... 
 
                         } else {
