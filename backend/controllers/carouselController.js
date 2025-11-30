@@ -49,9 +49,11 @@ exports.createMixedCarousel = async (req, res) => {
         const { processMediaToSquare } = require("../utils/videoProcessor");
 
         // 1.1 Process Video
+        let localVideoPath = null; // ✅ Store local path for direct upload
         if (videoFile) {
             console.log("🎬 Phase 1: Processing video locally (1080x1080)...");
             const processedVideoPath = await processMediaToSquare(videoFile.path);
+            localVideoPath = processedVideoPath;
 
             console.log("☁️ Uploading processed video to Cloudinary...");
             const vRes = await uploadFile(processedVideoPath, "eza-post/carousel_videos", "video", true, false);
@@ -179,8 +181,17 @@ exports.createMixedCarousel = async (req, res) => {
                         try {
                             if (card.type === 'video') {
                                 console.log(`📤 Uploading video container for Card ${index + 1}...`);
-                                const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, url);
-                                containerId = vRes.id;
+
+                                // ✅ Use Direct File Upload if available (Reliable)
+                                if (localVideoPath) {
+                                    const videoStream = fs.createReadStream(localVideoPath);
+                                    const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, videoStream);
+                                    containerId = vRes.id;
+                                } else {
+                                    // Fallback to URL (e.g. TikTok)
+                                    const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, url);
+                                    containerId = vRes.id;
+                                }
                             } else {
                                 console.log(`📤 Uploading photo container for Card ${index + 1}...`);
                                 const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, url);

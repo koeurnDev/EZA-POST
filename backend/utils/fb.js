@@ -151,12 +151,24 @@ class FacebookAPI {
   /* ------------------------------------------------------------ */
   /* ✅ Upload Video for Carousel (Container ID)                   */
   /* ------------------------------------------------------------ */
-  async uploadVideoForCarousel(accessToken, pageId, videoUrl) {
+  async uploadVideoForCarousel(accessToken, pageId, videoInput) {
     try {
       console.log(`📤 Uploading video container for carousel: ${pageId}`);
       const form = new FormData();
       form.append("access_token", accessToken);
-      form.append("file_url", videoUrl);
+
+      // ✅ Support Direct File Upload (Stream/Buffer) OR URL
+      if (typeof videoInput === 'string' && videoInput.startsWith('http')) {
+        console.log(`🔗 Using video URL: ${videoInput}`);
+        form.append("file_url", videoInput);
+      } else {
+        console.log(`🌊 Using video Stream/Buffer (Direct Upload)`);
+        form.append("source", videoInput, {
+          filename: `video_${Date.now()}.mp4`,
+          contentType: "video/mp4",
+        });
+      }
+
       form.append("published", "false"); // CRITICAL: Draft mode
 
       const res = await this.http.post(`${this.graph}/${pageId}/videos`, form, {
