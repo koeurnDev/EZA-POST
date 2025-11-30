@@ -3,6 +3,8 @@ const router = express.Router();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../../models/User");
+const { authenticator } = require('otplib');
+const { decrypt2FASecret } = require('../../libs/crypto2fa');
 
 // ============================================================
 // ✅ Login Route
@@ -34,6 +36,20 @@ router.post("/", async (req, res) => {
       return res.status(401).json({
         success: false,
         error: "Invalid email or password",
+      });
+    }
+
+    // 🔐 2FA Check
+    if (user.twoFactorEnabled) {
+      const tempToken = jwt.sign(
+        { id: user.id, email: user.email, scope: '2fa_pending' },
+        process.env.JWT_SECRET || "supersecretkey",
+        { expiresIn: "5m" }
+      );
+      return res.json({
+        success: true,
+        requires2FA: true, // User requested 'requires2FA' (plural)
+        tempToken
       });
     }
 
@@ -74,6 +90,59 @@ router.post("/", async (req, res) => {
       success: false,
       error: "Internal server error during login",
     });
+  }
+});
+
+// ============================================================
+// ✅ 2FA Verification Route (Complete Login)
+// ============================================================
+router.post("/2fa", async (req, res) => {
+  const { tempToken, code } = req.body;
+
+  if (!tempToken || !code) {
+    return res.status(400).json({ success: false, error: "Token and code required" });
+  }
+
+  try {
+    // Verify Temp Token
+    const decoded = jwt.verify(tempToken, process.env.JWT_SECRET || "supersecretkey");
+    if (decoded.scope !== '2fa_pending') throw new Error('Invalid token scope');
+
+    const user = await User.findOne({ id: decoded.id });
+    if (!user) throw new Error('User not found');
+
+    // Verify TOTP
+    const secret = decrypt2FASecret(user.twoFactorSecret);
+    const isValid = authenticator.verify({ token: code, secret });
+
+    if (!isValid) return res.status(401).json({ success: false, error: "Invalid 2FA Code" });
+
+    // ✅ Success - Issue Full Token
+    user.last_login = new Date();
+    await user.save();
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET || "supersecretkey",
+      { expiresIn: "1d" }
+    );
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production" || process.env.RENDER === "true",
+      sameSite: (process.env.NODE_ENV === "production" || process.env.RENDER === "true") ? "none" : "lax",
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      success: true,
+      message: "Login successful",
+      user: { id: user.id, name: user.name, email: user.email }
+    });
+
+  } catch (err) {
+    console.error("❌ 2FA Login Error:", err.message);
+    res.status(401).json({ success: false, error: "Invalid or expired session" });
   }
 });
 

@@ -8,6 +8,31 @@ import { API_ERRORS, ERROR_MESSAGES, API_CONFIG } from "./apiConstants";
 import axios from "axios";
 
 /* ----------------------------------------------- */
+/* 🛡️ CSRF Protection Setup */
+/* ----------------------------------------------- */
+let csrfToken = null;
+
+export const fetchCsrfToken = async () => {
+  try {
+    const res = await axios.get(getFullUrl("/csrf-token"), { withCredentials: true });
+    csrfToken = res.data.csrfToken;
+    return csrfToken;
+  } catch (err) {
+    console.warn("⚠️ Failed to fetch CSRF token:", err);
+  }
+};
+
+// ✅ Axios Interceptor to attach CSRF Token
+axios.interceptors.request.use(async (config) => {
+  // Only attach for state-changing methods
+  if (['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase())) {
+    if (!csrfToken) await fetchCsrfToken();
+    if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken;
+  }
+  return config;
+}, (error) => Promise.reject(error));
+
+/* ----------------------------------------------- */
 /* ✅ Error Message Helpers */
 /* ----------------------------------------------- */
 export const getErrorMessage = (code) =>

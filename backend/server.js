@@ -120,14 +120,31 @@ app.use(
 );
 
 // ✅ Rate limiting
-app.use(
-  "/api/",
-  rateLimit({
-    windowMs: 60 * 1000,
-    max: 150,
-    message: { error: "Too many requests. Please try again later." },
+message: { error: "Too many requests. Please try again later." },
   })
 );
+
+// 🛡️ CSRF Protection
+const csrf = require('csurf');
+const csrfProtection = csrf({
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // Secure in production
+    sameSite: process.env.RENDER === "true" ? "none" : "lax"
+  }
+});
+
+// ✅ Apply CSRF globally but exempt Webhooks
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/webhooks')) return next();
+  csrfProtection(req, res, next);
+});
+
+// 🔑 CSRF Token Endpoint
+app.get('/api/csrf-token', (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
+
 
 // ------------------------------------------------------------
 // 🔐 AUTHENTICATION ROUTES
@@ -230,6 +247,10 @@ app.get("*", (req, res) => {
 // 🧰 Global Error Handler
 // ------------------------------------------------------------
 app.use((err, req, res, next) => {
+  if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ error: 'Invalid or missing CSRF Token', code: 'CSRF_ERROR' });
+  }
+
   console.error("💥 Global Error:", err.stack);
   res.status(500).json({ error: "Internal Server Error", details: err.message });
 });

@@ -84,6 +84,19 @@ const userSchema = new mongoose.Schema(
         resetPasswordExpires: {
             type: Date,
         },
+        // 🔐 2FA Fields
+        twoFactorSecret: {
+            type: String, // Encrypted secret (AES-256-GCM)
+            default: null,
+        },
+        twoFactorEnabled: {
+            type: Boolean,
+            default: false,
+        },
+        twoFactorVerified: {
+            type: Boolean,
+            default: false,
+        },
     },
     {
         timestamps: true, // Automatically adds createdAt and updatedAt
@@ -91,11 +104,7 @@ const userSchema = new mongoose.Schema(
     }
 );
 
-// Index for faster queries
-// userSchema.index({ email: 1 }); // ❌ Removed duplicate (already in schema)
-// userSchema.index({ id: 1 });    // ❌ Removed duplicate (already in schema)
-
-// 🔐 Encryption Helpers
+// 🔐 Encryption Helpers (For Access Tokens Only - Legacy/System)
 const crypto = require('crypto');
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || "default_secret_key_must_be_32_bytes_long";
 const IV_LENGTH = 16;
@@ -106,7 +115,6 @@ function getEncryptionKey() {
 
 function encrypt(text) {
     if (!text) return text;
-    // Simple check if already encrypted (iv:content)
     if (text.includes(':') && text.split(':')[0].length === 32) return text;
 
     const iv = crypto.randomBytes(IV_LENGTH);
@@ -119,7 +127,7 @@ function encrypt(text) {
 function decrypt(text) {
     if (!text) return text;
     const textParts = text.split(':');
-    if (textParts.length !== 2) return text; // Assume plain text
+    if (textParts.length !== 2) return text;
 
     const iv = Buffer.from(textParts[0], 'hex');
     const encryptedText = Buffer.from(textParts[1], 'hex');
@@ -130,11 +138,11 @@ function decrypt(text) {
         decrypted = Buffer.concat([decrypted, decipher.final()]);
         return decrypted.toString();
     } catch (err) {
-        return text; // Return original if decryption fails
+        return text;
     }
 }
 
-// 🔒 Pre-save Hook to Encrypt Tokens
+// 🔒 Pre-save Hook to Encrypt Tokens (Facebook Only)
 userSchema.pre('save', function (next) {
     // Encrypt User Token
     if (this.isModified('facebookAccessToken') && this.facebookAccessToken) {
@@ -149,6 +157,8 @@ userSchema.pre('save', function (next) {
             }
         });
     }
+
+    // ⚠️ Note: twoFactorSecret is encrypted manually in the controller using crypto2fa.js
     next();
 });
 

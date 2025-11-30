@@ -24,7 +24,9 @@ router.use("/logout", logout);
 router.use("/facebook", require("./facebook")); // ✅ Restored for "Connect Account"
 
 router.use("/forgot-password", require("./forgot-password"));
+router.use("/forgot-password", require("./forgot-password"));
 router.use("/reset-password", require("./reset-password"));
+router.use("/2fa", require("./2fa")); // 🔐 2FA Routes
 
 // Export router
 module.exports = router;

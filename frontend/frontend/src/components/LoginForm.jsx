@@ -12,6 +12,10 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
   const emailId = useId();
   const passwordId = useId();
 
+  const [show2FA, setShow2FA] = useState(false);
+  const [tempToken, setTempToken] = useState(null);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+
   // ✅ Handle Input Change
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -37,6 +41,28 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
   // ✅ Submit Handler (using backend API)
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 🔐 2FA Submission
+    if (show2FA) {
+      if (!twoFactorCode) {
+        setErrors({ submit: "Please enter the 2FA code" });
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await authAPI.verify2FALogin(tempToken, twoFactorCode);
+        toast.success("Welcome back!");
+        onSuccess?.(res.user);
+      } catch (error) {
+        setErrors({ submit: "Invalid 2FA Code" });
+        toast.error("Invalid 2FA Code");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // 📧 Normal Login
     if (!validateForm()) return;
 
     setLoading(true);
@@ -44,15 +70,6 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
     const toastId = toast.loading("Signing in...");
 
     try {
-      const res = await authAPI.login({
-        email: formData.email.trim(),
-        password: formData.password,
-      });
-
-      toast.success("Welcome back!", { id: toastId });
-      onSuccess?.(res.user); // ✅ Trigger success handler
-    } catch (error) {
-      console.error("❌ Login error:", error);
       const errorMessage =
         error?.response?.data?.error ||
         error?.message ||
@@ -76,80 +93,120 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
   // ============================================================
   return (
     <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-      {/* Email Input */}
-      <div>
-        <label htmlFor={emailId} className="block text-sm font-medium text-slate-700 mb-1">
-          Email Address
-        </label>
-        <input
-          id={emailId}
-          type="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          placeholder="you@example.com"
-          autoComplete="email"
-          disabled={loading}
-          className={`w-full px-4 py-3 bg-white border rounded-lg outline-none text-slate-900 placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 ${errors.email ? "border-red-500 focus:border-red-500" : "border-slate-200 focus:border-blue-500"
-            } ${loading ? "bg-slate-100 cursor-not-allowed" : ""}`}
-        />
-        {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
-      </div>
 
-      {/* Password Input */}
-      <div>
-        <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 mb-1">
-          Password
-        </label>
-        <div className="relative">
-          <input
-            id={passwordId}
-            type={showPassword ? "text" : "password"}
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            placeholder="••••••••"
-            autoComplete="current-password"
-            disabled={loading}
-            className={`w-full px-4 py-3 bg-white border rounded-lg outline-none text-slate-900 placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 pr-12 ${errors.password ? "border-red-500 focus:border-red-500" : "border-slate-200 focus:border-blue-500"
-              } ${loading ? "bg-slate-100 cursor-not-allowed" : ""}`}
-          />
+      {/* 🔐 2FA Input Mode */}
+      {show2FA ? (
+        <div className="space-y-4">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+              🛡️
+            </div>
+            <h3 className="text-xl font-bold text-gray-900">Two-Factor Authentication</h3>
+            <p className="text-sm text-gray-500">Enter the code from your authenticator app.</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Authentication Code</label>
+            <input
+              type="text"
+              value={twoFactorCode}
+              onChange={(e) => setTwoFactorCode(e.target.value)}
+              placeholder="123456"
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg outline-none text-center text-2xl tracking-widest focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              autoFocus
+            />
+          </div>
+
+          <Button type="submit" variant="primary" size="large" fullWidth isLoading={loading}>
+            Verify
+          </Button>
+
           <button
             type="button"
-            onClick={togglePasswordVisibility}
-            disabled={loading}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 transition-colors"
+            onClick={() => setShow2FA(false)}
+            className="w-full text-sm text-gray-500 hover:text-gray-700 mt-4"
           >
-            {showPassword ? "🙈" : "👁️"}
+            Cancel
           </button>
         </div>
-        {errors.password && <p className="text-red-600 text-sm mt-1">{errors.password}</p>}
-      </div>
+      ) : (
+        <>
+          {/* Email Input */}
+          <div>
+            <label htmlFor={emailId} className="block text-sm font-medium text-slate-700 mb-1">
+              Email Address
+            </label>
+            <input
+              id={emailId}
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="you@example.com"
+              autoComplete="email"
+              disabled={loading}
+              className={`w-full px-4 py-3 bg-white border rounded-lg outline-none text-slate-900 placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 ${errors.email ? "border-red-500 focus:border-red-500" : "border-slate-200 focus:border-blue-500"
+                } ${loading ? "bg-slate-100 cursor-not-allowed" : ""}`}
+            />
+            {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
+          </div>
 
-      {/* Forgot Password Link */}
-      {onForgotPassword && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={onForgotPassword}
-            disabled={loading}
-            className="text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
+          {/* Password Input */}
+          <div>
+            <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 mb-1">
+              Password
+            </label>
+            <div className="relative">
+              <input
+                id={passwordId}
+                type={showPassword ? "text" : "password"}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                disabled={loading}
+                className={`w-full px-4 py-3 bg-white border rounded-lg outline-none text-slate-900 placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 pr-12 ${errors.password ? "border-red-500 focus:border-red-500" : "border-slate-200 focus:border-blue-500"
+                  } ${loading ? "bg-slate-100 cursor-not-allowed" : ""}`}
+              />
+              <button
+                type="button"
+                onClick={togglePasswordVisibility}
+                disabled={loading}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {showPassword ? "🙈" : "👁️"}
+              </button>
+            </div>
+            {errors.password && <p className="text-red-600 text-sm mt-1">{errors.password}</p>}
+          </div>
+
+          {/* Forgot Password Link */}
+          {onForgotPassword && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                disabled={loading}
+                className="text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <Button
+            type="submit"
+            variant="primary"
+            size="large"
+            fullWidth
+            isLoading={loading}
           >
-            Forgot password?
-          </button>
-        </div>
+            Sign In
+          </Button>
+        </>
       )}
-
-      {/* Submit Button */}
-      <Button
-        type="submit"
-        variant="primary"
-        size="large"
-        fullWidth
-        isLoading={loading}
-      >
-        Sign In
-      </Button>
 
       {/* Error Alert (Global) */}
       {errors.submit && (
@@ -161,5 +218,7 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
     </form>
   );
 };
+
+
 
 export default LoginForm;

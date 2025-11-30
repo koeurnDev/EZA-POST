@@ -54,10 +54,12 @@ const upload = multer({
     },
 });
 
+const { validatePost, validateCarousel } = require("../middleware/validator");
+
 // ============================================================
 // ✅ POST /api/posts/create
 // ============================================================
-router.post("/", requireAuth, upload.any(), postController.createPost);
+router.post("/", requireAuth, upload.any(), validatePost, postController.createPost);
 
 // ✅ Mixed Carousel Route
 const { createMixedCarousel } = require("../controllers/carouselController");
@@ -65,6 +67,7 @@ router.post(
     "/mixed-carousel",
     requireAuth,
     upload.any(), // Accepts multiple files with different field names
+    validateCarousel, // ✅ Validate inputs
     createMixedCarousel
 );
 

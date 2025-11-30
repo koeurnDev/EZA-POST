@@ -36,8 +36,13 @@ export default function Post() {
     // Metadata State
     const [thumbnail, setThumbnail] = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
-    const [headline, setHeadline] = useState("");
+
+    // 🌟 Unified Global Fields
+    const [headline, setHeadline] = useState(""); // Unified Headline
+    const [targetLink, setTargetLink] = useState(""); // Unified Target URL
+    const [cardDescription, setCardDescription] = useState(""); // Unified Description
     const [cta, setCta] = useState("LEARN_MORE"); // Unified CTA
+
     const [caption, setCaption] = useState("");
     const [selectedPages, setSelectedPages] = useState([]);
     const [availablePages, setAvailablePages] = useState([]);
@@ -54,7 +59,6 @@ export default function Post() {
         if (postFormat !== 'carousel') return;
 
         // Construct current list based on state
-        // We want to preserve order if items already exist
         setMediaItems(prev => {
             const currentVideo = (file || previewUrl) ? {
                 id: 'video-main',
@@ -106,11 +110,8 @@ export default function Post() {
                         preview: pageObj.picture, // Page Profile Pic
                         file: null, // No file, remote URL
                         imageUrl: pageObj.picture, // Explicit remote URL
-                        link: pageObj.link || `https://facebook.com/${pageObj.id}`,
-                        cta: "LIKE_PAGE",
-                        headline: pageObj.name,
-                        description: "Follow for more!",
-                        isPageCard: true // Flag to identify
+                        // Global fields are used in payload, but we can store them here for reference if needed
+                        isPageCard: true
                     };
 
                     if (pageCardIndex !== -1) {
@@ -128,7 +129,7 @@ export default function Post() {
 
             return newOrder;
         });
-    }, [file, previewUrl, postFormat, selectedPages, availablePages, imageFiles]); // Added dependencies
+    }, [file, previewUrl, postFormat, selectedPages, availablePages, imageFiles]);
 
     // 🔄 Fetch Pages & Load Last Used
     useEffect(() => {
@@ -142,10 +143,19 @@ export default function Post() {
                     const lastUsedPageId = localStorage.getItem("lastUsedPageId");
                     if (lastUsedPageId) {
                         const found = res.data.accounts.find(p => p.id === lastUsedPageId);
-                        if (found) setSelectedPages([found.id]);
+                        if (found) {
+                            setSelectedPages([found.id]);
+                            // 🌟 Auto-Fill Global Fields
+                            setHeadline(found.name);
+                            setTargetLink(found.link || `https://facebook.com/${found.id}`);
+                        }
                     } else if (res.data.accounts.length > 0) {
                         // 🌟 Default to first page if no history
-                        setSelectedPages([res.data.accounts[0].id]);
+                        const firstPage = res.data.accounts[0];
+                        setSelectedPages([firstPage.id]);
+                        // 🌟 Auto-Fill Global Fields
+                        setHeadline(firstPage.name);
+                        setTargetLink(firstPage.link || `https://facebook.com/${firstPage.id}`);
                     }
                 }
             } catch (err) {
@@ -155,19 +165,24 @@ export default function Post() {
         fetchPages();
     }, []);
 
-    // 💾 Save Last Used Page
+    // 💾 Save Last Used Page & Auto-Fill
     const handlePageSelection = (pageId) => {
         setSelectedPages(prev => {
-            const isSelected = prev.includes(pageId);
-            // Single select for now as per "Dropdown: Choose Page" spec, but keeping array for backend compatibility
             const newSelection = [pageId];
-
             localStorage.setItem("lastUsedPageId", pageId);
+
+            // 🌟 Auto-Fill Global Fields on Selection
+            const pageObj = availablePages.find(p => p.id === pageId);
+            if (pageObj) {
+                setHeadline(pageObj.name);
+                setTargetLink(pageObj.link || `https://facebook.com/${pageObj.id}`);
+            }
+
             return newSelection;
         });
     };
 
-    // 📸 Handle Thumbnail Change (Fix for ReferenceError)
+    // 📸 Handle Thumbnail Change
     const handleThumbnailChange = (e) => {
         const selectedFile = e.target.files[0];
         if (selectedFile) {
@@ -225,30 +240,12 @@ export default function Post() {
 
     // 🖼️ Image Dropzone (Carousel)
     const onDropImages = (acceptedFiles) => {
-        const currentCount = mediaItems.length;
-        const selectedPageObj = availablePages.find(p => p.id === selectedPages[0]);
-        const pageLink = selectedPageObj?.link || "";
-
-        const newItems = acceptedFiles.map((file, index) => {
-            // Calculate the absolute index of this new item in the list
-            // currentCount + index (0-based)
-            // If it's the 3rd item (Index 2), auto-fill
-            const itemIndex = currentCount + index;
-
-            // Logic: If it's the 3rd card (Index 2), set SEE_PAGE and Page Link
-            // Note: This assumes Video is Index 0. If no video, logic might differ, but spec implies Mixed (Video + Images).
-            const isThirdCard = itemIndex === 2;
-
+        const newItems = acceptedFiles.map((file) => {
             return {
                 id: `image-${Date.now()}-${Math.random()}`,
                 type: 'image',
                 preview: URL.createObjectURL(file),
-                file: file,
-                // Auto-fill for Card 3
-                link: isThirdCard ? pageLink : "",
-                cta: isThirdCard ? "SEE_PAGE" : "LEARN_MORE",
-                headline: "",
-                description: ""
+                file: file
             };
         });
 
@@ -327,13 +324,6 @@ export default function Post() {
         }
     };
 
-    // ✏️ Update Media Item Field
-    const updateMediaItem = (id, field, value) => {
-        setMediaItems(prev => prev.map(item =>
-            item.id === id ? { ...item, [field]: value } : item
-        ));
-    };
-
     // 🚀 Submit
     const handleSubmit = async () => {
         if (selectedPages.length === 0) return toast.error("Please select a page.");
@@ -349,10 +339,9 @@ export default function Post() {
 
         // Validate Required Fields for Carousel
         if (postFormat === 'carousel') {
-            for (const item of mediaItems) {
-                if (!item.link) return toast.error(`Target URL is required for ${item.type} card.`);
-                if (!item.link.startsWith('http')) return toast.error(`Invalid URL for ${item.type} card.`);
-            }
+            if (!headline) return toast.error("Headline is required.");
+            if (!targetLink) return toast.error("Target URL is required.");
+            if (!targetLink.startsWith('http')) return toast.error("Invalid Target URL.");
         }
 
         setIsSubmitting(true);
@@ -364,7 +353,6 @@ export default function Post() {
             formData.append("accounts", JSON.stringify(selectedPages));
 
             // 🎥 Video Handling
-            // Use videoItem if available (carousel), otherwise fallback to state (single)
             const activeVideoFile = videoItem?.file || file;
             const activeVideoUrl = videoItem?.url || (previewUrl && !file ? previewUrl : null);
 
@@ -390,14 +378,14 @@ export default function Post() {
                 const cardsPayload = mediaItems.map(item => {
                     const card = {
                         type: item.type,
-                        link: item.link,
-                        headline: item.headline,
-                        description: headline, // Use Unified Description (stored in 'headline' state)
-                        cta: cta // Use Unified CTA (stored in 'cta' state)
+                        // 🌟 Unified Fields for ALL cards
+                        link: targetLink,
+                        headline: headline,
+                        description: cardDescription,
+                        cta: cta
                     };
 
                     if (item.type === 'image') {
-                        // Find index in the filtered imageItems array to map to req.files['images']
                         const imgIndex = imageItems.findIndex(img => img.id === item.id);
                         card.fileIndex = imgIndex;
                     }
@@ -417,7 +405,6 @@ export default function Post() {
                 formData.append("title", headline);
                 formData.append("postType", "single");
                 formData.append("cta", "LIKE_PAGE");
-                // No thumbnail needed for single post as per new requirement
             }
 
             const token = localStorage.getItem("token");
@@ -437,7 +424,7 @@ export default function Post() {
                 // Reset
                 setFile(null); setPreviewUrl(null); setTiktokUrl("");
                 setThumbnail(null); setThumbnailPreview(null);
-                setHeadline(""); setCaption(""); setScheduleTime("");
+                setHeadline(""); setCardDescription(""); setTargetLink(""); setCaption(""); setScheduleTime("");
                 setMediaItems([]);
             } else {
                 throw new Error(data.error || "Failed to create post.");
@@ -576,9 +563,9 @@ export default function Post() {
                                             onDragLeave={handleDragLeave}
                                             onDrop={handleDrop}
                                             className={`
-                                                flex-1 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-8 transition-all
-                                                ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'}
-                                            `}
+                                                    flex-1 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-8 transition-all
+                                                    ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'}
+                                                `}
                                         >
                                             <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
                                             <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer text-center">
@@ -639,25 +626,43 @@ export default function Post() {
                                     {/* 📝 Unified Card Description & CTA */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Headline (All Cards)</label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. Page Name"
+                                                maxLength={40}
+                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-sm"
+                                                value={headline}
+                                                onChange={(e) => setHeadline(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Target URL (All Cards)</label>
+                                            <input
+                                                type="text"
+                                                placeholder="https://..."
+                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-sm"
+                                                value={targetLink}
+                                                onChange={(e) => setTargetLink(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Card Description (All Cards)</label>
                                             <input
                                                 type="text"
                                                 placeholder="e.g. Limited Time Offer"
                                                 maxLength={20}
                                                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-sm"
-                                                value={headline}
-                                                onChange={(e) => setHeadline(e.target.value)}
+                                                value={cardDescription}
+                                                onChange={(e) => setCardDescription(e.target.value)}
                                             />
-                                            <p className="text-xs text-gray-400 mt-1 text-right">{headline.length}/20</p>
+                                            <p className="text-xs text-gray-400 mt-1 text-right">{cardDescription.length}/20</p>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Call to Action (All Cards)</label>
                                             <select
                                                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-sm"
-                                                value={cta} // Re-using 'cta' state (was unused or from Single Post?)
-                                                // Let's check if 'cta' state exists. 
-                                                // If not, I need to add it. 
-                                                // Looking at previous file content, 'cta' state was defined: const [cta, setCta] = useState('LEARN_MORE');
+                                                value={cta}
                                                 onChange={(e) => setCta(e.target.value)}
                                             >
                                                 <option value="LEARN_MORE">Learn More</option>
@@ -671,9 +676,10 @@ export default function Post() {
                                             </select>
                                         </div>
                                     </div>
+
                                     {/* Add Images Dropzone */}
                                     <div {...getImageRootProps()} className={`min-h-[120px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all
-                                        ${isImageDragActive ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400 hover:bg-gray-50'}`}>
+                                            ${isImageDragActive ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400 hover:bg-gray-50'}`}>
                                         <input {...getImageInputProps()} />
                                         <div className="text-center p-4 flex items-center gap-3">
                                             <Plus className="w-6 h-6 text-pink-400" />
@@ -717,29 +723,9 @@ export default function Post() {
                                                                 </button>
                                                             </div>
 
-                                                            {/* Inputs */}
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                                <div className="col-span-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="Target URL (Required) - https://..."
-                                                                        className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                                                        value={item.link || ""}
-                                                                        onChange={(e) => updateMediaItem(item.id, 'link', e.target.value)}
-                                                                    />
-                                                                </div>
-                                                                <div className="col-span-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="Headline (Optional)"
-                                                                        maxLength={40}
-                                                                        className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                                                        value={item.headline || ""}
-                                                                        onChange={(e) => updateMediaItem(item.id, 'headline', e.target.value)}
-                                                                    />
-                                                                </div>
-                                                                {/* Description Removed - Using Unified Description */}
-                                                                {/* CTA Removed - Using Unified CTA */}
+                                                            {/* Inputs Removed - Using Unified Global Inputs */}
+                                                            <div className="text-xs text-gray-400 italic">
+                                                                Using global settings for Headline, Description, Link, and CTA.
                                                             </div>
                                                         </div>
                                                     </div>
@@ -750,7 +736,6 @@ export default function Post() {
                                 </div>
                             ) : (
                                 <div className="space-y-6">
-                                    {/* Video Title (Headline) Removed */}
                                     <div className="p-4 bg-blue-50 text-blue-700 rounded-xl text-sm border border-blue-100">
                                         <p className="font-bold flex items-center gap-2">
                                             <AlertCircle size={16} />

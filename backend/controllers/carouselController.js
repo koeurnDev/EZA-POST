@@ -117,10 +117,14 @@ exports.createMixedCarousel = async (req, res) => {
                     const unifiedDescription = carouselCards[0].description || " ";
                     // 📝 Unified CTA Logic: Use CTA from the first card for ALL cards
                     const unifiedCta = carouselCards[0].cta || "LEARN_MORE";
+                    // 📝 Unified Headline Logic: Use Headline from the first card for ALL cards
+                    const unifiedHeadline = carouselCards[0].headline || " ";
+                    // 📝 Unified Link Logic: Use Link from the first card for ALL cards
+                    const unifiedLink = carouselCards[0].link || "https://facebook.com";
 
                     for (const card of carouselCards) {
-                        const link = card.link || "https://facebook.com";
-                        const headline = card.headline || " ";
+                        const link = unifiedLink; // Enforce unified link
+                        const headline = unifiedHeadline; // Enforce unified headline
                         const description = unifiedDescription; // Enforce unified description
                         const ctaType = unifiedCta; // Enforce unified CTA
 

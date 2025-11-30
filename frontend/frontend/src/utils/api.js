@@ -289,6 +289,7 @@ const authAPI = {
   register: async (data) =>
     (await api.post(API_ENDPOINTS.AUTH.REGISTER, data)).data,
   login: async (data) => (await api.post(API_ENDPOINTS.AUTH.LOGIN, data)).data,
+  verify2FALogin: async (tempToken, code) => (await api.post(`${API_ENDPOINTS.AUTH.LOGIN}/2fa`, { tempToken, code })).data,
   demoLogin: async () => (await api.post(API_ENDPOINTS.AUTH.DEMO)).data,
   forgotPassword: async (email) =>
     (await api.post(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, { email })).data,

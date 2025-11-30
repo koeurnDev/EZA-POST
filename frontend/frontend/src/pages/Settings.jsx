@@ -7,7 +7,7 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
-import { LogOut, Moon, Sun, Bell, CheckCircle2, RefreshCw, ExternalLink, AlertCircle, Settings as SettingsIcon, MessageSquare, Calendar, Radio } from "lucide-react";
+import { LogOut, Moon, Sun, Bell, CheckCircle2, RefreshCw, ExternalLink, AlertCircle, Settings as SettingsIcon, MessageSquare, Calendar, Radio, Shield } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
 import apiUtils from "../utils/apiUtils";
 import toast from "react-hot-toast";
@@ -24,6 +24,11 @@ export default function Settings() {
     const [isLoadingPages, setIsLoadingPages] = useState(false);
     const [pageError, setPageError] = useState(null);
     const [expandedPageId, setExpandedPageId] = useState(null); // For settings dropdown
+
+    // 🔐 2FA State
+    const [qrCode, setQrCode] = useState(null);
+    const [verifyCode, setVerifyCode] = useState("");
+    const [isVerifying, setIsVerifying] = useState(false);
 
     // Fetch Pages on Mount if Connected
     useEffect(() => {
@@ -308,6 +313,92 @@ export default function Settings() {
                                     >
                                         <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${theme === "dark" ? "translate-x-6" : "translate-x-1"}`} />
                                     </button>
+                                </div>
+                            </div>
+
+                            {/* Security & 2FA */}
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Security</h3>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg dark:bg-indigo-900/30 dark:text-indigo-400">
+                                                <Shield size={18} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Two-Factor Auth</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">{user?.twoFactorEnabled ? "Enabled" : "Disabled"}</p>
+                                            </div>
+                                        </div>
+
+                                        {!user?.twoFactorEnabled ? (
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        const res = await axios.post(apiUtils.getFullUrl("/auth/2fa/setup"), {}, { withCredentials: true });
+                                                        if (res.data.success) {
+                                                            setQrCode(res.data.qrCode);
+                                                            setIsVerifying(true);
+                                                        }
+                                                    } catch (err) {
+                                                        toast.error("Failed to start 2FA setup");
+                                                    }
+                                                }}
+                                                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors"
+                                            >
+                                                Enable
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={async () => {
+                                                    if (!window.confirm("Are you sure you want to disable 2FA?")) return;
+                                                    try {
+                                                        await axios.post(apiUtils.getFullUrl("/auth/2fa/disable"), {}, { withCredentials: true });
+                                                        window.location.reload();
+                                                    } catch (err) {
+                                                        toast.error("Failed to disable 2FA");
+                                                    }
+                                                }}
+                                                className="px-3 py-1.5 bg-red-100 text-red-600 text-xs font-bold rounded-lg hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition-colors"
+                                            >
+                                                Disable
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* QR Code & Verify Input */}
+                                    {isVerifying && !user?.twoFactorEnabled && qrCode && (
+                                        <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
+                                            <p className="text-xs text-center text-gray-500 mb-3">Scan with Google Authenticator</p>
+                                            <img src={qrCode} alt="2FA QR" className="w-32 h-32 mx-auto rounded-lg mb-4" />
+
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Enter Code (e.g. 123456)"
+                                                    className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    onChange={(e) => setVerifyCode(e.target.value)}
+                                                />
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const res = await axios.post(apiUtils.getFullUrl("/auth/2fa/verify"), { token: verifyCode }, { withCredentials: true });
+                                                            if (res.data.success) {
+                                                                toast.success("2FA Enabled Successfully!");
+                                                                window.location.reload();
+                                                            }
+                                                        } catch (err) {
+                                                            toast.error("Invalid Code");
+                                                        }
+                                                    }}
+                                                    className="px-3 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors"
+                                                >
+                                                    <CheckCircle2 size={18} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

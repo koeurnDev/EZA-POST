@@ -19,6 +19,15 @@ router.post("/", async (req, res) => {
     });
   }
 
+  // 🔒 Strong Password Policy (Min 12 chars, Upper, Lower, Number, Special)
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/;
+  if (!passwordRegex.test(password)) {
+    return res.status(400).json({
+      success: false,
+      error: "Password must be at least 12 characters long and include uppercase, lowercase, number, and special character.",
+    });
+  }
+
   try {
     // 🔍 Check if user already exists
     const existing = await User.findOne({ email });
