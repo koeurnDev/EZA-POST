@@ -70,7 +70,7 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
     const toastId = toast.loading("Signing in...");
 
     try {
-      const res = await authAPI.login(formData.email, formData.password);
+      const res = await authAPI.login({ email: formData.email, password: formData.password });
 
       // 🔐 Handle 2FA Challenge
       if (res.requires2FA) {
