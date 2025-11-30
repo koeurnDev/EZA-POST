@@ -31,6 +31,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
         // 🔄 Phase 1: Preparation (Upload & Process)
         let finalVideoUrl = videoUrl;
         let finalVideoPublicId = null;
+        let finalThumbnailUrl = null; // ✅ Define variable for thumbnail URL
         let finalImageUrls = [];
         let finalImagePublicIds = [];
         const { processMediaToSquare, generateThumbnail } = require("../utils/videoProcessor");
@@ -53,6 +54,16 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
             const vRes = await uploadFile(processedVideoPath, "eza-post/carousel_videos", "video", false, false);
             finalVideoUrl = vRes.url;
             finalVideoPublicId = vRes.public_id;
+
+            // ✅ Upload Thumbnail to Cloudinary (Required for Carousel Payload)
+            if (localThumbnailPath) {
+                try {
+                    const tRes = await uploadFile(localThumbnailPath, "eza-post/carousel_thumbnails", "image", false, false);
+                    finalThumbnailUrl = tRes.url;
+                } catch (thumbUploadErr) {
+                    console.warn("⚠️ Failed to upload thumbnail to Cloudinary:", thumbUploadErr.message);
+                }
+            }
         }
 
         // 1.2 Process Images
