@@ -282,6 +282,9 @@ class FacebookAPI {
         if (options.isScheduled && options.scheduleTime) {
           payload.published = false;
           payload.scheduled_publish_time = options.scheduleTime;
+        } else {
+          // ✅ CRITICAL: Explicitly publish immediately if not scheduled
+          payload.published = true;
         }
 
         const res = await this.http.post(`${this.graph}/${account.id}/feed`, payload);
