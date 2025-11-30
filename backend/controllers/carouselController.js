@@ -39,39 +39,47 @@ exports.createMixedCarousel = async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
         }
 
-        // ☁️ Step 1: Prepare Media (Upload to Cloudinary if needed)
+        // 🔄 Phase 1: Preparation (Upload & Process)
+        // Ensure both video and image are correctly processed (1080x1080) and hosted.
+
         let finalVideoUrl = videoUrl;
         let finalVideoPublicId = null;
         let finalImageUrls = [];
         let finalImagePublicIds = [];
+        const { processMediaToSquare } = require("../utils/videoProcessor");
 
-        // Upload Video if file provided
+        // 1.1 Process Video
         if (videoFile) {
-            console.log("☁️ Uploading video to Cloudinary...");
-            const vRes = await uploadFile(videoFile.path, "eza-post/carousel_videos", "video", true, true); // true = transform 1:1
+            console.log("🎬 Phase 1: Processing video locally (1080x1080)...");
+            const processedVideoPath = await processMediaToSquare(videoFile.path);
+
+            console.log("☁️ Uploading processed video to Cloudinary...");
+            const vRes = await uploadFile(processedVideoPath, "eza-post/carousel_videos", "video", true, false);
             finalVideoUrl = vRes.url;
             finalVideoPublicId = vRes.public_id;
         }
 
-        // Upload Images
+        // 1.2 Process Images
         if (imageFiles && imageFiles.length > 0) {
-            console.log(`☁️ Uploading ${imageFiles.length} images to Cloudinary...`);
+            console.log(`🖼️ Phase 1: Processing ${imageFiles.length} images locally (1080x1080)...`);
             for (const img of imageFiles) {
-                const iRes = await uploadFile(img.path, "eza-post/carousel_images", "image", true, true); // true = transform 1:1
+                // Process image to square using same FFmpeg logic
+                const processedImagePath = await processMediaToSquare(img.path);
+
+                console.log("☁️ Uploading processed image to Cloudinary...");
+                const iRes = await uploadFile(processedImagePath, "eza-post/carousel_images", "image", true, false); // transform=false as we processed it
                 finalImageUrls.push(iRes.url);
                 finalImagePublicIds.push(iRes.public_id);
             }
         }
 
-        // 🚀 Step 2: Post to Facebook
+        // 🚀 Phase 2 & 3: Create Attachments & Publish
         const results = { successCount: 0, failedCount: 0, details: [] };
 
         for (const accountId of accountsArray) {
             try {
-                // Fetch Page from DB
+                // Fetch Page
                 const page = await FacebookPage.findOne({ pageId: accountId, userId: userId });
-
-                // Fallback to User.connectedPages if not found in FacebookPage (migration support)
                 let pageToken = page ? page.getDecryptedAccessToken() : null;
                 let pageName = page ? page.pageName : null;
 
@@ -83,104 +91,147 @@ exports.createMixedCarousel = async (req, res) => {
                         pageName = connectedPage.name;
                     }
                 }
-
                 if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
 
                 console.log(`🚀 Starting Mixed Carousel for ${pageName} (${accountId})...`);
 
-                // 2.1 Upload Video (Unpublished) - Using Cloudinary URL
-                const videoUpload = await fb.uploadVideoToFacebook(pageToken, accountId, finalVideoUrl, "Video Part", null, {
-                    isScheduled: false,
-                    published: false
-                });
+                // 🔄 Phase 2: Create Media Attachments (Meta API)
+                // We must tell Facebook about each item and have Facebook process it into a temporary container ID.
 
-                if (!videoUpload.success) throw new Error("Failed to upload video part: " + videoUpload.error);
-                const videoId = videoUpload.postId;
-
-                // 2.2 Upload Images (Unpublished) - Using Cloudinary URLs
-                const photoIds = [];
-                for (const imgUrl of finalImageUrls) {
-                    const photoForm = new (require("form-data"))();
-                    photoForm.append("access_token", pageToken);
-                    photoForm.append("url", imgUrl); // ✅ Use 'url' for remote upload
-                    photoForm.append("published", "false");
-
-                    const photoRes = await require("axios").post(`https://graph.facebook.com/v19.0/${accountId}/photos`, photoForm, {
-                        headers: photoForm.getHeaders()
-                    });
-                    photoIds.push(photoRes.data.id);
-                }
-
-                console.log(`✅ Media Uploaded: Video ${videoId}, Photos ${photoIds.join(", ")}`);
-
-                // 2.3 Publish Carousel Feed
-                // 🔢 Reorder Media based on 'mediaOrder'
-                let attachedMedia = [];
-                let mediaOrder = [];
+                // 🔢 Construct Final Child Attachments from Cards Data
+                let carouselCards = [];
                 try {
-                    if (req.body.mediaOrder) {
-                        mediaOrder = JSON.parse(req.body.mediaOrder);
+                    if (req.body.carouselCards) {
+                        carouselCards = JSON.parse(req.body.carouselCards);
                     }
                 } catch (e) {
-                    console.warn("⚠️ Invalid mediaOrder JSON, using default order");
+                    console.warn("⚠️ Invalid carouselCards JSON, using default logic");
                 }
 
-                if (mediaOrder.length > 0) {
-                    // Map 'video' -> videoId, 'image_X' -> photoIds[X]
-                    attachedMedia = mediaOrder.map(item => {
-                        if (item === 'video') return { media_fbid: videoId };
-                        if (item.startsWith('image_')) {
-                            const index = parseInt(item.split('_')[1]);
-                            if (photoIds[index]) return { media_fbid: photoIds[index] };
+                const finalChildAttachments = [];
+                const attachmentIds = [];
+
+                if (carouselCards.length > 0) {
+                    // Use Rich Metadata from Frontend
+                    for (const card of carouselCards) {
+                        const link = card.link || "https://facebook.com";
+                        const headline = card.headline || " ";
+                        const description = card.description || " ";
+                        const ctaType = card.cta || "LEARN_MORE";
+
+                        let url;
+                        if (card.type === 'video') {
+                            url = finalVideoUrl;
+                        } else if (card.type === 'image') {
+                            // Support Remote Image URL (e.g. Page Profile Pic for Card 3)
+                            if (card.imageUrl) {
+                                url = card.imageUrl;
+                            }
+                            // Map using fileIndex (Uploaded Files)
+                            else if (card.fileIndex !== undefined && finalImageUrls[card.fileIndex]) {
+                                url = finalImageUrls[card.fileIndex];
+                            } else {
+                                url = finalImageUrls[0];
+                            }
                         }
-                        return null;
-                    }).filter(Boolean);
+
+                        // 2. Call the new fb method with all details
+                        const attachRes = await fb.createAttachment(
+                            pageToken,
+                            accountId,
+                            card.type,
+                            url,
+                            link,
+                            headline,
+                            description,
+                            ctaType
+                        );
+
+                        if (!attachRes.success) throw new Error(`Failed to create ${card.type} attachment: ` + attachRes.error);
+                        attachmentIds.push(attachRes.id);
+
+                        // 3. Construct Bundle Object
+                        const attachment = {
+                            link: link,
+                            name: headline,
+                            description: description,
+                            call_to_action: {
+                                type: ctaType,
+                                value: { link: link }
+                            }
+                        };
+
+                        if (card.type === 'video') {
+                            attachment.source = url;
+                            attachment.picture = url.replace(/\.[^/.]+$/, ".jpg");
+                        } else {
+                            attachment.picture = url;
+                        }
+
+                        finalChildAttachments.push(attachment);
+                    }
                 } else {
-                    // Default: Video first, then images
-                    attachedMedia = [
-                        { media_fbid: videoId },
-                        ...photoIds.map(id => ({ media_fbid: id }))
-                    ];
+                    // Fallback Legacy Logic
+                    // Video Card
+                    finalChildAttachments.push({
+                        link: "https://facebook.com",
+                        source: finalVideoUrl,
+                        picture: finalVideoUrl.replace(/\.[^/.]+$/, ".jpg"),
+                        name: "Video",
+                        description: " ",
+                        call_to_action: { type: "LEARN_MORE", value: { link: "https://facebook.com" } }
+                    });
+
+                    // Image Cards
+                    for (let i = 0; i < finalImageUrls.length; i++) {
+                        finalChildAttachments.push({
+                            link: "https://facebook.com",
+                            picture: finalImageUrls[i],
+                            name: "Image " + (i + 1),
+                            description: " ",
+                            call_to_action: { type: "LEARN_MORE", value: { link: "https://facebook.com" } }
+                        });
+                    }
                 }
 
-                const feedPayload = {
-                    access_token: pageToken,
-                    message: caption,
-                    attached_media: attachedMedia
-                };
-
-                if (scheduleTime) {
-                    feedPayload.published = false;
-                    feedPayload.scheduled_publish_time = Math.floor(new Date(scheduleTime).getTime() / 1000);
-                }
-
-                const feedRes = await require("axios").post(`https://graph.facebook.com/v19.0/${accountId}/feed`, feedPayload);
-
-                // 💬 Auto Comment
-                if (req.body.autoComment) {
-                    await fb.postComment(pageToken, feedRes.data.id, req.body.autoComment);
-                }
-
-                // 📝 Create PostLog
-                await PostLog.create({
-                    userId,
-                    pageId: accountId,
-                    fbPostId: feedRes.data.id,
-                    type: "carousel",
-                    status: scheduleTime ? "scheduled" : "published",
-                    scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
-                    cloudinaryVideoId: finalVideoPublicId,
-                    cloudinaryImageIds: finalImagePublicIds
+                // 🔄 Phase 3: Publish the Carousel
+                const feedRes = await fb.postCarousel(pageToken, [{ id: accountId, type: 'page' }], caption, finalChildAttachments, {
+                    isScheduled: !!scheduleTime,
+                    scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
                 });
 
-                results.successCount++;
-                results.details.push({ accountId, status: "success", postId: feedRes.data.id });
-                console.log(`✅ Mixed Carousel Published: ${feedRes.data.id}`);
+                if (feedRes.successCount > 0) {
+                    const fbPostId = feedRes.details[0].postId;
+
+                    // 🔄 Phase 4: Clean-up (Soft Delete)
+                    const { softDeleteAsset } = require("../utils/cloudinary");
+                    if (finalVideoPublicId) await softDeleteAsset(finalVideoPublicId);
+                    if (finalImagePublicIds && finalImagePublicIds.length > 0) {
+                        for (const imgId of finalImagePublicIds) {
+                            await softDeleteAsset(imgId);
+                        }
+                    }
+
+                    await PostLog.create({
+                        userId,
+                        pageId: accountId,
+                        fbPostId: fbPostId,
+                        type: "carousel",
+                        status: scheduleTime ? "scheduled" : "published",
+                        scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
+                        cloudinaryVideoId: finalVideoPublicId,
+                        cloudinaryImageIds: finalImagePublicIds
+                    });
+
+                    results.successCount++;
+                    results.details.push({ accountId, status: "success", postId: fbPostId });
+                    console.log(`✅ Mixed Carousel Published: ${fbPostId}`);
+                } else {
+                    throw new Error(feedRes.details[0].error || "Failed to post carousel");
+                }
 
             } catch (err) {
                 console.error(`❌ Failed for ${accountId}:`, err.message);
-
-                // 📝 Log Failure
                 await PostLog.create({
                     userId,
                     pageId: accountId,
@@ -190,7 +241,6 @@ exports.createMixedCarousel = async (req, res) => {
                     cloudinaryVideoId: finalVideoPublicId,
                     cloudinaryImageIds: finalImagePublicIds
                 });
-
                 results.failedCount++;
                 results.details.push({ accountId, status: "failed", error: err.message });
             }

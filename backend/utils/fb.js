@@ -189,7 +189,54 @@ class FacebookAPI {
   }
 
   /* ------------------------------------------------------------ */
-  /* ✅ Post Carousel (Link Carousel)                              */
+  /* ✅ Create Attachment (For Mixed Media Carousel)               */
+  /* ------------------------------------------------------------ */
+  async createAttachment(accessToken, pageId, type, url, targetLink, headline, description, ctaType) {
+    try {
+      console.log(`📎 Creating ${type} attachment for Page ${pageId}...`);
+
+      const payload = {
+        access_token: accessToken,
+        link: targetLink || "https://facebook.com",
+        picture: url, // The media URL (Video or Image)
+        name: headline,
+        description: description,
+        published: false
+      };
+
+      if (ctaType) {
+        payload.call_to_action = {
+          type: ctaType,
+          value: { link: targetLink || "https://facebook.com" }
+        };
+      }
+
+      // If it's a video, we might need to ensure it's treated as such, 
+      // but the /links endpoint often auto-detects or treats 'picture' as the media source.
+      // For explicit video support in carousels, sometimes 'source' is used instead of 'picture' for videos,
+      // but the user request specifies 'picture' for Image and 'source' for Video in the prompt description?
+      // WAIT: The user prompt says:
+      // Video: source (CRITICAL: Use the $CLOUDINARY_VIDEO_URL)
+      // Image: picture ($CLOUDINARY_IMAGE_URL)
+
+      if (type === 'video') {
+        delete payload.picture;
+        payload.source = url;
+      }
+
+      const res = await this.http.post(`${this.graph}/${pageId}/links`, payload);
+
+      console.log(`✅ Attachment created (ID: ${res.data.id})`);
+      return { success: true, id: res.data.id };
+
+    } catch (error) {
+      console.error(`❌ Create Attachment failed:`, error.response?.data?.error || error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Post Carousel (Mixed Media Support)                        */
   /* ------------------------------------------------------------ */
   async postCarousel(accessToken, accounts, caption, cards, options = {}) {
     const results = { successCount: 0, failedCount: 0, details: [] };
@@ -198,44 +245,39 @@ class FacebookAPI {
       return results;
     }
 
-    // Construct Child Attachments
-    const childAttachments = cards.map(card => {
-      let pictureUrl = card.url;
+    // Check if cards are already attachment IDs (strings) or objects
+    // If they are objects, we might need to create attachments first (handled in controller)
+    // But let's assume the controller passes the constructed child_attachments array if it did the work.
+    // OR we can make this flexible.
 
-      if (card.thumbnailUrl) {
-        pictureUrl = card.thumbnailUrl;
-      } else if (card.type === 'video') {
-        // 🛑 Facebook Link Carousel requires an IMAGE for 'picture'.
-        // If we don't have a custom thumbnail, try to use the Cloudinary JPG thumbnail convention.
-        if (card.url.includes('cloudinary.com')) {
-          pictureUrl = card.url.replace(/\.[^/.]+$/, ".jpg");
-        }
-      }
+    // Actually, the controller will likely pass the ready-to-use child_attachments array 
+    // OR we update this method to just take the payload.
 
-      return {
-        link: card.link || "https://facebook.com", // Required
-        name: card.headline || " ",
-        description: card.description || " ",
-        picture: pictureUrl,
-        call_to_action: {
-          type: card.cta || "LEARN_MORE",
-          value: {
-            link: card.link || "https://facebook.com"
-          }
-        }
-      };
-    });
+    // Let's keep it simple: The controller will do the heavy lifting of creating attachments 
+    // and passing the final `child_attachments` array structure to a generic feed poster?
+    // OR we update this method to handle the final step.
+
+    // Let's assume 'cards' here is the `child_attachments` array if it's already processed.
+    // But to maintain backward compatibility or clarity, let's check.
+
+    let childAttachments = cards;
+
+    // If cards contains raw data (not attachment IDs), we might be in legacy mode or need to process.
+    // But for this specific workflow, the controller will likely pass the constructed array of IDs.
+    // Let's assume the controller passes the *final* child_attachments array.
 
     for (const account of accounts) {
       try {
         console.log(`🚀 Posting Carousel to ${account.name}...`);
 
         const payload = {
-          message: caption,
-          link: cards[0]?.link || "https://facebook.com", // Main link required for carousel
           child_attachments: childAttachments,
           access_token: account.access_token || accessToken
         };
+
+        if (caption && caption.trim().length > 0) {
+          payload.message = caption;
+        }
 
         if (options.isScheduled && options.scheduleTime) {
           payload.published = false;

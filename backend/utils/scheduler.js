@@ -6,7 +6,7 @@
 const ScheduledPost = require("../models/ScheduledPost");
 const { downloadTiktokVideo } = require("./tiktokDownloader");
 const fb = require("./fb");
-const { deleteFile } = require("./cloudinary"); // ✅ Import deleteFile
+const { deleteFile, softDeleteAsset, deleteExpiredAssets } = require("./cloudinary"); // ✅ Import deleteFile
 
 // ============================================================
 // 🧠 Main Queue Processor
@@ -114,6 +114,18 @@ async function processSinglePost(post) {
 
     console.log(`✅ Published post ${post.id}`);
 
+    // 🏷️ Soft Delete Cloudinary Assets (1-Day Delay)
+    if (post.video_url && post.video_url.includes("cloudinary.com")) {
+      try {
+        const matches = post.video_url.match(/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+        if (matches && matches[1]) {
+          await softDeleteAsset(matches[1]);
+        }
+      } catch (e) {
+        console.warn("Could not extract publicId for soft delete:", post.video_url);
+      }
+    }
+
   } catch (error) {
     console.error(`❌ Post ${post.id} failed:`, error.message);
 
@@ -129,6 +141,9 @@ async function processSinglePost(post) {
 // ============================================================
 exports.cleanupOldPosts = async () => {
   try {
+    // 🧹 Run Hard Delete for Cloudinary Assets (Phase 2)
+    await deleteExpiredAssets();
+
     const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
     // 1. Find posts to delete first (to get file paths)

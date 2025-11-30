@@ -94,4 +94,76 @@ const deleteFile = async (publicId, resourceType = "image") => {
     }
 };
 
-module.exports = { uploadFile, deleteFile };
+/**
+ * 🏷️ Phase 1: Soft Delete (Immediate Action)
+ * Marks asset with metadata for future deletion.
+ * @param {string} publicId - The public ID of the file
+ */
+const softDeleteAsset = async (publicId) => {
+    try {
+        if (!publicId) return;
+
+        // Calculate deletion date (Now + 24 hours)
+        const deleteDate = new Date();
+        deleteDate.setHours(deleteDate.getHours() + 24);
+
+        await cloudinary.uploader.add_context(
+            `post_status=SUCCESS|scheduled_delete_date=${deleteDate.toISOString()}`,
+            [publicId]
+        );
+
+        console.log(`🏷️ Soft Deleted (Scheduled for ${deleteDate.toISOString()}): ${publicId}`);
+    } catch (error) {
+        console.error("❌ Cloudinary Soft Delete Error:", error.message);
+    }
+};
+
+/**
+ * 🧹 Phase 2: Hard Delete (Scheduled Job)
+ * Finds and deletes assets that are past their scheduled deletion date.
+ */
+const deleteExpiredAssets = async () => {
+    try {
+        console.log("🧹 Checking for expired Cloudinary assets...");
+
+        // Search for assets with post_status=SUCCESS
+        // Note: Cloudinary Search API has rate limits and latency.
+        // We filter results in code for precise date comparison to avoid complex search syntax issues.
+        const result = await cloudinary.search
+            .expression('context.post_status="SUCCESS"')
+            .with_field('context')
+            .max_results(100)
+            .execute();
+
+        if (result.resources.length === 0) {
+            console.log("✅ No expired assets found.");
+            return;
+        }
+
+        const now = new Date();
+        const toDelete = [];
+
+        for (const resource of result.resources) {
+            const context = resource.context?.custom;
+            if (context?.scheduled_delete_date) {
+                const deleteDate = new Date(context.scheduled_delete_date);
+                if (deleteDate <= now) {
+                    toDelete.push(resource.public_id);
+                }
+            }
+        }
+
+        if (toDelete.length > 0) {
+            console.log(`🗑️ Deleting ${toDelete.length} expired assets: ${toDelete.join(', ')}`);
+            await cloudinary.api.delete_resources(toDelete);
+            console.log("✅ Hard Delete Complete.");
+        } else {
+            console.log("✅ No assets ready for deletion yet.");
+        }
+
+    } catch (error) {
+        console.error("❌ Cloudinary Hard Delete Error:", error.message);
+    }
+};
+
+module.exports = { uploadFile, deleteFile, softDeleteAsset, deleteExpiredAssets };

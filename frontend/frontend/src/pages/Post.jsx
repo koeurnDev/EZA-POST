@@ -86,9 +86,48 @@ export default function Post() {
                     newOrder.splice(prevVideoIndex, 1);
                 }
             }
+
+            // 🌟 Auto-Add Page Card (Card 3)
+            // Condition: Video exists + At least 1 Image exists + Page Selected
+            const hasVideo = newOrder.some(i => i.type === 'video');
+            const imageCount = newOrder.filter(i => i.type === 'image' && !i.isPageCard).length;
+            const selectedPageId = selectedPages[0];
+
+            if (hasVideo && imageCount >= 1 && selectedPageId) {
+                const pageObj = availablePages.find(p => p.id === selectedPageId);
+                if (pageObj) {
+                    // Check if Page Card already exists
+                    const pageCardIndex = newOrder.findIndex(i => i.isPageCard);
+
+                    const pageCard = {
+                        id: 'card-page-auto',
+                        type: 'image',
+                        preview: pageObj.picture, // Page Profile Pic
+                        file: null, // No file, remote URL
+                        imageUrl: pageObj.picture, // Explicit remote URL
+                        link: pageObj.link || `https://facebook.com/${pageObj.id}`,
+                        cta: "LIKE_PAGE",
+                        headline: pageObj.name,
+                        description: "Follow for more!",
+                        isPageCard: true // Flag to identify
+                    };
+
+                    if (pageCardIndex !== -1) {
+                        // Update existing Page Card (in case Page changed)
+                        newOrder[pageCardIndex] = pageCard;
+                    } else {
+                        // Append Page Card
+                        newOrder.push(pageCard);
+                    }
+                }
+            } else {
+                // Remove Page Card if conditions not met (e.g. removed all images)
+                newOrder = newOrder.filter(i => !i.isPageCard);
+            }
+
             return newOrder;
         });
-    }, [/* Dependencies handled manually in handlers */]);
+    }, [file, previewUrl, postFormat, selectedPages, availablePages, imageFiles]); // Added dependencies
 
     // 🔄 Fetch Pages & Load Last Used
     useEffect(() => {
@@ -185,12 +224,32 @@ export default function Post() {
 
     // 🖼️ Image Dropzone (Carousel)
     const onDropImages = (acceptedFiles) => {
-        const newItems = acceptedFiles.map(file => ({
-            id: `image-${Date.now()}-${Math.random()}`,
-            type: 'image',
-            preview: URL.createObjectURL(file),
-            file: file
-        }));
+        const currentCount = mediaItems.length;
+        const selectedPageObj = availablePages.find(p => p.id === selectedPages[0]);
+        const pageLink = selectedPageObj?.link || "";
+
+        const newItems = acceptedFiles.map((file, index) => {
+            // Calculate the absolute index of this new item in the list
+            // currentCount + index (0-based)
+            // If it's the 3rd item (Index 2), auto-fill
+            const itemIndex = currentCount + index;
+
+            // Logic: If it's the 3rd card (Index 2), set SEE_PAGE and Page Link
+            // Note: This assumes Video is Index 0. If no video, logic might differ, but spec implies Mixed (Video + Images).
+            const isThirdCard = itemIndex === 2;
+
+            return {
+                id: `image-${Date.now()}-${Math.random()}`,
+                type: 'image',
+                preview: URL.createObjectURL(file),
+                file: file,
+                // Auto-fill for Card 3
+                link: isThirdCard ? pageLink : "",
+                cta: isThirdCard ? "SEE_PAGE" : "LEARN_MORE",
+                headline: "",
+                description: ""
+            };
+        });
 
         // Add to Media Items
         setMediaItems(prev => [...prev, ...newItems]);
@@ -267,6 +326,13 @@ export default function Post() {
         }
     };
 
+    // ✏️ Update Media Item Field
+    const updateMediaItem = (id, field, value) => {
+        setMediaItems(prev => prev.map(item =>
+            item.id === id ? { ...item, [field]: value } : item
+        ));
+    };
+
     // 🚀 Submit
     const handleSubmit = async () => {
         if (selectedPages.length === 0) return toast.error("Please select a page.");
@@ -278,6 +344,14 @@ export default function Post() {
         if (!videoItem && !file && !previewUrl) return toast.error("Please add a video.");
         if (postFormat === 'carousel' && imageItems.length === 0) {
             return toast.error("Please add at least one image.");
+        }
+
+        // Validate Required Fields for Carousel
+        if (postFormat === 'carousel') {
+            for (const item of mediaItems) {
+                if (!item.link) return toast.error(`Target URL is required for ${item.type} card.`);
+                if (!item.link.startsWith('http')) return toast.error(`Invalid URL for ${item.type} card.`);
+            }
         }
 
         setIsSubmitting(true);
@@ -311,14 +385,26 @@ export default function Post() {
                     formData.append("images", item.file);
                 });
 
-                // 🔢 Order Handling
-                const orderMap = mediaItems.map(item => {
-                    if (item.type === 'video') return 'video';
-                    const imgIndex = imageItems.findIndex(img => img.id === item.id);
-                    return `image_${imgIndex}`;
+                // 🔢 Rich Media Order (Cards Data)
+                const cardsPayload = mediaItems.map(item => {
+                    const card = {
+                        type: item.type,
+                        link: item.link,
+                        headline: item.headline,
+                        description: item.description,
+                        cta: item.cta
+                    };
+
+                    if (item.type === 'image') {
+                        // Find index in the filtered imageItems array to map to req.files['images']
+                        const imgIndex = imageItems.findIndex(img => img.id === item.id);
+                        card.fileIndex = imgIndex;
+                    }
+
+                    return card;
                 });
 
-                formData.append("mediaOrder", JSON.stringify(orderMap));
+                formData.append("carouselCards", JSON.stringify(cardsPayload));
 
             } else {
                 // Single Post
@@ -562,23 +648,84 @@ export default function Post() {
                                                     initial={{ opacity: 0, y: 10 }}
                                                     animate={{ opacity: 1, y: 0 }}
                                                     exit={{ opacity: 0, scale: 0.9 }}
-                                                    className="bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-4 shadow-sm cursor-grab active:cursor-grabbing"
+                                                    className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
                                                 >
-                                                    <GripVertical className="text-gray-400" size={20} />
-                                                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
-                                                        {item.type === 'video' ? (
-                                                            <video src={item.preview} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <img src={item.preview} alt="" className="w-full h-full object-cover" />
-                                                        )}
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="mt-2 cursor-grab active:cursor-grabbing">
+                                                            <GripVertical className="text-gray-400" size={20} />
+                                                        </div>
+
+                                                        {/* Media Preview */}
+                                                        <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
+                                                            {item.type === 'video' ? (
+                                                                <video src={item.preview} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <img src={item.preview} alt="" className="w-full h-full object-cover" />
+                                                            )}
+                                                        </div>
+
+                                                        {/* Fields */}
+                                                        <div className="flex-1 space-y-3">
+                                                            <div className="flex justify-between items-start">
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-gray-900 capitalize">{item.type}</p>
+                                                                    <p className="text-xs text-gray-500 truncate max-w-[200px]">{item.file ? item.file.name : 'Remote URL'}</p>
+                                                                </div>
+                                                                <button onClick={() => removeMediaItem(item.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                                                                    <Trash2 size={18} />
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Inputs */}
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                <div className="col-span-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Target URL (Required) - https://..."
+                                                                        className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                        value={item.link || ""}
+                                                                        onChange={(e) => updateMediaItem(item.id, 'link', e.target.value)}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Headline (Optional)"
+                                                                        maxLength={40}
+                                                                        className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                        value={item.headline || ""}
+                                                                        onChange={(e) => updateMediaItem(item.id, 'headline', e.target.value)}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Description (Optional)"
+                                                                        maxLength={20}
+                                                                        className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                        value={item.description || ""}
+                                                                        onChange={(e) => updateMediaItem(item.id, 'description', e.target.value)}
+                                                                    />
+                                                                </div>
+                                                                <div className="col-span-2">
+                                                                    <select
+                                                                        className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                                                                        value={item.cta || "LEARN_MORE"}
+                                                                        onChange={(e) => updateMediaItem(item.id, 'cta', e.target.value)}
+                                                                    >
+                                                                        <option value="LEARN_MORE">Learn More</option>
+                                                                        <option value="SHOP_NOW">Shop Now</option>
+                                                                        <option value="SIGN_UP">Sign Up</option>
+                                                                        <option value="BOOK_NOW">Book Now</option>
+                                                                        <option value="CONTACT_US">Contact Us</option>
+                                                                        <option value="WATCH_MORE">Watch More</option>
+                                                                        <option value="SEE_PAGE">See Page</option>
+                                                                        <option value="LIKE_PAGE">Follow Page</option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-bold text-gray-900 capitalize">{item.type}</p>
-                                                        <p className="text-xs text-gray-500 truncate">{item.file ? item.file.name : 'Remote URL'}</p>
-                                                    </div>
-                                                    <button onClick={() => removeMediaItem(item.id)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg">
-                                                        <Trash2 size={18} />
-                                                    </button>
                                                 </Reorder.Item>
                                             ))}
                                         </AnimatePresence>

@@ -152,8 +152,8 @@ exports.createPost = async (req, res) => {
 
                 videoSizeMB = videoFile.size / (1024 * 1024);
 
-                // Upload with transform=true (1:1 padding)
-                const videoResult = await uploadFile(videoFile.path, "eza-post/videos", "video", true, true);
+                // Upload with transform=false (Upload Original - No Padding)
+                const videoResult = await uploadFile(videoFile.path, "eza-post/videos", "video", true, false);
                 videoUrlForDB = videoResult.url;
                 videoPublicId = videoResult.public_id;
 
@@ -201,6 +201,11 @@ exports.createPost = async (req, res) => {
                                 await fb.postComment(pageToken, fbPostId, req.body.autoComment);
                             }
 
+                            // 🏷️ Soft Delete Cloudinary Assets (1-Day Delay)
+                            const { softDeleteAsset } = require("../utils/cloudinary");
+                            if (videoPublicId) await softDeleteAsset(videoPublicId);
+                            // if (thumbnailPublicId) await softDeleteAsset(thumbnailPublicId);
+
                             await PostLog.create({
                                 userId,
                                 pageId: accountId,
@@ -233,6 +238,16 @@ exports.createPost = async (req, res) => {
 
             } else if (videoUrl || directMediaUrl) {
                 videoUrlForDB = videoUrl || directMediaUrl;
+
+                // Extract Public ID if it's a Cloudinary URL
+                if (videoUrlForDB && videoUrlForDB.includes("cloudinary.com")) {
+                    try {
+                        const matches = videoUrlForDB.match(/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+                        if (matches) videoPublicId = matches[1];
+                    } catch (e) {
+                        console.warn("Could not extract publicId from URL:", videoUrlForDB);
+                    }
+                }
 
                 for (const accountId of accountsArray) {
                     try {
