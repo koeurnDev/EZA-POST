@@ -109,7 +109,6 @@ exports.createMixedCarousel = async (req, res) => {
                 }
 
                 const finalChildAttachments = [];
-                const attachmentIds = [];
 
                 if (carouselCards.length > 0) {
                     // 🧠 Intelligent Auto-Fill System
@@ -189,8 +188,6 @@ exports.createMixedCarousel = async (req, res) => {
                             }
                         } catch (uploadErr) {
                             console.error(`❌ Failed to upload media for Card ${index + 1}:`, uploadErr.message);
-                            // Continue? Or fail? Let's try to continue but this card might be broken.
-                            // Actually, if media fails, the card is useless.
                             throw new Error(`Failed to upload media for card ${index + 1}`);
                         }
 
@@ -203,53 +200,43 @@ exports.createMixedCarousel = async (req, res) => {
                                 type: ctaType,
                                 value: { link: link }
                             },
-                            // ✅ KEY FIX: Use media_id (container ID) instead of picture/source URL
-                            media_id: containerId
+                            // ✅ KEY FIX: Use id (container ID) and REMOVE picture/source
+                            id: containerId
                         };
 
-                        // NOTE: For some endpoints it's 'media_id', for others it's just 'id' inside child_attachments?
-                        // The user prompt says: { "id": "VIDEO_CONTAINER_ID" }
-                        // Let's follow the prompt exactly.
-                        // But we also need the metadata (link, name, etc.)
-                        // Usually it's { link: ..., name: ..., picture: "ID" } or { link: ..., id: "ID" }?
-                        // Meta documentation says:
-                        // child_attachments: [ { link: "...", picture: "PHOTO_ID", ... }, { link: "...", source: "VIDEO_ID", ... } ]
-                        // OR just { link: "...", media: { source: ... } } ?
-
-                        // User Prompt says:
-                        // { "id": "VIDEO_CONTAINER_ID" }
-                        // AND "The link/name/description metadata is attached to the ID object"
-
-                        // So:
-                        // {
-                        //   id: containerId,
-                        //   link: link,
-                        //   name: headline,
-                        //   description: description,
-                        //   call_to_action: ...
-                        // }
-
-                        // Let's use 'id' as per prompt.
-                        delete attachment.media_id;
-                        attachment.picture = containerId; // Wait, prompt says "Replace Attachments Objects each by its ID" ?
-                        // Prompt says:
-                        // { "message": "...", "child_attachments": [ { "id": "VIDEO_CONTAINER_ID" }, ... ] }
-                        // BUT also says "The link/name/description metadata is attached to the ID object"
-
-                        // So:
-                        attachment.id = containerId;
+                        // ❌ Do NOT set picture or source when using ID
+                        // attachment.picture = containerId; // REMOVED
 
                         finalChildAttachments.push(attachment);
                     }
                 } else {
-                    // Fallback Legacy Logic (Should not happen with new UI)
-                    // ... (omitted for brevity, assuming new UI is used)
+                    // Fallback Legacy Logic
+                    // Video Card
+                    finalChildAttachments.push({
+                        link: "https://facebook.com",
+                        source: finalVideoUrl,
+                        picture: finalVideoUrl.replace(/\.[^/.]+$/, ".jpg"),
+                        name: "Video",
+                        description: " ",
+                        call_to_action: { type: "LEARN_MORE", value: { link: "https://facebook.com" } }
+                    });
+
+                    // Image Cards
+                    for (let i = 0; i < finalImageUrls.length; i++) {
+                        finalChildAttachments.push({
+                            link: "https://facebook.com",
+                            picture: finalImageUrls[i],
+                            name: "Image " + (i + 1),
+                            description: " ",
+                            call_to_action: { type: "LEARN_MORE", value: { link: "https://facebook.com" } }
+                        });
+                    }
                 }
 
                 // 🔄 Phase 3: Publish the Carousel
                 console.log("📦 Controller Payload (finalChildAttachments):", JSON.stringify(finalChildAttachments, null, 2));
 
-                const feedRes = await fb.postCarousel(pageToken, [{ id: accountId, type: 'page' }], caption, finalChildAttachments, {
+                const feedRes = await fb.postCarousel(pageToken, [{ id: accountId, name: pageName, type: 'page' }], caption, finalChildAttachments, {
                     isScheduled: !!scheduleTime,
                     scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
                 });
