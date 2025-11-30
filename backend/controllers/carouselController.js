@@ -63,20 +63,20 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                 const processedImagePath = await processMediaToSquare(img.path);
 
                 console.log("☁️ Uploading processed image to Cloudinary...");
-                const iRes = await uploadFile(processedImagePath, "eza-post/carousel_images", "image", true, false); // transform=false as we processed it
+                // 🛑 CRITICAL: Set deleteAfterUpload=false so we can use the file for Direct Upload to FB
+                const iRes = await uploadFile(processedImagePath, "eza-post/carousel_images", "image", false, false);
                 finalImageUrls.push(iRes.url);
                 finalImagePublicIds.push(iRes.public_id);
 
                 // ✅ Store path for Direct Upload later
                 localImagePaths.push(processedImagePath);
 
-                // ❌ DO NOT DELETE HERE - We need it for Phase 2 Direct Upload
-                // try {
-                //     if (fs.existsSync(img.path)) fs.unlinkSync(img.path);
-                //     // if (fs.existsSync(processedImagePath)) fs.unlinkSync(processedImagePath); // Keep for upload
-                // } catch (e) {
-                //     console.warn(`⚠️ Failed to delete local image path: ${e.message}`);
-                // }
+                // ✅ Delete RAW file immediately, but KEEP processed file
+                try {
+                    if (fs.existsSync(img.path)) fs.unlinkSync(img.path);
+                } catch (e) {
+                    console.warn(`⚠️ Failed to delete local raw image: ${e.message}`);
+                }
             }
         }
 
