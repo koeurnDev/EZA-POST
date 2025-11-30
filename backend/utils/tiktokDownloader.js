@@ -12,19 +12,40 @@ const path = require("path");
 
 class TikTokDownloader {
   constructor() {
+    // ✅ User-Agent Rotation Pool
+    this.userAgents = [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ];
+
     this.client = axios.create({
       timeout: 30000,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        Connection: "keep-alive",
-      },
+      headers: this.getRandomHeaders(),
     });
 
     this.tempDir = path.join(__dirname, "../temp");
     if (!fs.existsSync(this.tempDir)) fs.mkdirSync(this.tempDir, { recursive: true });
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Get Random Headers (Anti-blocking)                        */
+  /* ------------------------------------------------------------ */
+  getRandomHeaders() {
+    return {
+      "User-Agent": this.userAgents[Math.floor(Math.random() * this.userAgents.length)],
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Encoding": "gzip, deflate, br",
+      Connection: "keep-alive",
+      "Upgrade-Insecure-Requests": "1",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Cache-Control": "max-age=0"
+    };
   }
 
   /* ------------------------------------------------------------ */
@@ -139,41 +160,67 @@ class TikTokDownloader {
   /* ✅ Method 1 — TikWM / Tikmate API proxy                      */
   /* ------------------------------------------------------------ */
   async downloadViaAPIProxy(videoUrl, noWatermark = true) {
+    // ✅ Updated endpoints (as of 2025)
     const endpoints = [
-      `https://www.tikwm.com/api/?url=${encodeURIComponent(videoUrl)}`,
-      `https://api.tikmate.app/api/lookup?url=${encodeURIComponent(videoUrl)}`,
-      `https://www.tiklydown.me/api/download?url=${encodeURIComponent(videoUrl)}`,
+      `https://www.tikwm.com/api/?url=${encodeURIComponent(videoUrl)}&hd=1`,
+      `https://tikmate.app/api/lookup?url=${encodeURIComponent(videoUrl)}`,
+      `https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(videoUrl)}`,
+      `https://api16-normal-c-useast1a.tiktokv.com/aweme/v1/feed/?url=${encodeURIComponent(videoUrl)}`
     ];
 
     for (const endpoint of endpoints) {
       try {
-        console.log(`Trying endpoint: ${endpoint}`);
-        const res = await this.client.get(endpoint);
-        const data = res.data?.data || res.data;
+        console.log(`🔄 Trying endpoint: ${endpoint.split('?')[0]}...`);
 
-        if (!data) {
-          console.warn(`⚠️ No data received from ${endpoint}`);
+        // ✅ Use fresh headers for each request
+        const res = await axios.get(endpoint, {
+          timeout: 30000,
+          headers: this.getRandomHeaders(),
+          validateStatus: (status) => status < 500 // Accept 4xx as valid for parsing
+        });
+
+        if (res.status >= 400) {
+          console.warn(`⚠️ API returned ${res.status} for ${endpoint.split('/')[2]}`);
           continue;
         }
 
+        const data = res.data?.data || res.data;
+
+        if (!data) {
+          console.warn(`⚠️ No data received from ${endpoint.split('/')[2]}`);
+          continue;
+        }
+
+        // ✅ Try multiple possible video URL keys
         const dl =
-          (noWatermark && (data.play || data.noWatermark || data.download_url)) ||
+          (noWatermark && (data.play || data.hdplay || data.noWatermark || data.download_url)) ||
           data.wmplay ||
           data.play;
 
         if (!dl) {
-          console.warn(`⚠️ No download URL found in response from ${endpoint}`);
+          console.warn(`⚠️ No download URL found in response from ${endpoint.split('/')[2]}`);
+          console.log(`📋 Available keys:`, Object.keys(data));
           continue;
         }
 
-        console.log(`🔗 Found download URL: ${dl}`);
-        const vidRes = await this.client.get(dl, { responseType: "arraybuffer" });
+        console.log(`🔗 Found download URL from ${endpoint.split('/')[2]}`);
+
+        // ✅ Download video with fresh headers
+        const vidRes = await axios.get(dl, {
+          responseType: "arraybuffer",
+          timeout: 60000, // 60s for video download
+          headers: this.getRandomHeaders()
+        });
+
         this.validateVideoBuffer(vidRes.data);
 
-        console.log(`✅ API Proxy Success (${endpoint})`);
+        console.log(`✅ API Proxy Success (${endpoint.split('/')[2]})`);
         return { buffer: vidRes.data, method: "api", filename: `tiktok_${Date.now()}.mp4` };
       } catch (err) {
-        console.warn(`⚠️ ${endpoint.split("/")[2]} failed: ${err.message}`);
+        console.warn(`❌ ${endpoint.split('/')[2]} failed:`, err.message);
+        if (err.response) {
+          console.warn(`   Status: ${err.response.status}, Data:`, err.response.data);
+        }
       }
     }
     return null;
@@ -184,10 +231,12 @@ class TikTokDownloader {
   /* ------------------------------------------------------------ */
   async downloadViaRapidAPI(videoUrl) {
     try {
-      const res = await this.client.get(
+      const res = await axios.get(
         `https://tiktok-video-no-watermark2.p.rapidapi.com/?url=${encodeURIComponent(videoUrl)}`,
         {
+          timeout: 30000,
           headers: {
+            ...this.getRandomHeaders(),
             "x-rapidapi-host": "tiktok-video-no-watermark2.p.rapidapi.com",
             "x-rapidapi-key": process.env.RAPIDAPI_KEY || "",
           },
@@ -197,7 +246,11 @@ class TikTokDownloader {
       const link = res.data?.data?.play || res.data?.play;
       if (!link) throw new Error("No valid video link");
 
-      const vidRes = await this.client.get(link, { responseType: "arraybuffer" });
+      const vidRes = await axios.get(link, {
+        responseType: "arraybuffer",
+        timeout: 60000,
+        headers: this.getRandomHeaders()
+      });
       this.validateVideoBuffer(vidRes.data);
 
       console.log("✅ Downloaded via RapidAPI");
