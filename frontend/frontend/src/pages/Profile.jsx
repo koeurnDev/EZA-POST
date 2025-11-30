@@ -27,11 +27,15 @@ export default function Profile() {
     const { user, updateUser } = useAuth();
     const [isDemo, setIsDemo] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [stats, setStats] = useState([
-        { label: "Posts Created", value: "0", icon: Video, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
-        { label: "Auto-Replies", value: "0", icon: MessageSquare, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-        { label: "Pages Connected", value: "0", icon: ShieldCheck, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
-    ]);
+    const [stats, setStats] = useState(() => {
+        // 💾 Load Cached Stats
+        const cached = localStorage.getItem("profileStats");
+        return cached ? JSON.parse(cached) : [
+            { label: "Posts Created", value: "0", icon: Video, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
+            { label: "Auto-Replies", value: "0", icon: MessageSquare, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+            { label: "Pages Connected", value: "0", icon: ShieldCheck, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
+        ];
+    });
 
     // ✅ Initialize Demo Mode & Fetch Stats
     useEffect(() => {
@@ -51,12 +55,19 @@ export default function Profile() {
                 const repliesCount = statsRes.success ? statsRes.stats.replies : 0;
 
                 // Update Stats
-                setStats(prev => prev.map(stat => {
-                    if (stat.label === "Pages Connected") return { ...stat, value: pageCount.toString() };
-                    if (stat.label === "Posts Created") return { ...stat, value: postsCount.toString() };
-                    if (stat.label === "Auto-Replies") return { ...stat, value: repliesCount.toString() };
-                    return stat;
-                }));
+                setStats(prev => {
+                    const newStats = prev.map(stat => {
+                        if (stat.label === "Pages Connected") return { ...stat, value: pageCount.toString() };
+                        if (stat.label === "Posts Created") return { ...stat, value: postsCount.toString() };
+                        if (stat.label === "Auto-Replies") return { ...stat, value: repliesCount.toString() };
+                        return stat;
+                    });
+
+                    // 💾 Save to Cache
+                    localStorage.setItem("profileStats", JSON.stringify(newStats));
+
+                    return newStats;
+                });
             } catch (err) {
                 console.error("Failed to fetch profile stats:", err);
             }
