@@ -232,6 +232,10 @@ class FacebookAPI {
       });
 
       console.log(`✅ Photo container created (ID: ${res.data.id})`);
+
+      // ⏳ Brief delay to allow Facebook to index the photo
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       return { success: true, id: res.data.id };
     } catch (error) {
       console.error("❌ Photo container upload failed:", error.response?.data?.error || error.message);
