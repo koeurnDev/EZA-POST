@@ -217,9 +217,11 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             throw new Error(`Failed to upload media for card ${index + 1}`);
                         }
 
-                        // 3. Construct attachment with correct ID parameter based on type
-                        // ✅ CRITICAL: Videos need 'video_id', Images use 'media_fbid' (or 'picture' fallback)
+                        // 3. Construct attachment with media_fbid AND picture AND metadata
+                        // ✅ CRITICAL: Robust payload with Container ID + Visual Fallback + Link Metadata
                         const attachment = {
+                            media_fbid: containerId, // ✅ Use media_fbid for both Video and Image
+                            picture: url,            // ✅ ALWAYS include picture as visual source/fallback
                             link: link,
                             name: headline,
                             description: description,
@@ -228,14 +230,6 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                 value: { link: link }
                             }
                         };
-
-                        if (card.type === 'video') {
-                            attachment.video_id = containerId; // ✅ REQUIRED for Video
-                            // attachment.picture = url; // Optional fallback
-                        } else {
-                            attachment.media_fbid = containerId; // ✅ Standard for Image Containers
-                            attachment.picture = url; // ✅ Fallback/Preview for Link Post mode
-                        }
 
                         finalChildAttachments.push(attachment);
                     }
