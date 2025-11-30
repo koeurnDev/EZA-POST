@@ -205,10 +205,9 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                     containerId = vRes.id;
                                 }
                             } else {
-                                console.log(`📤 Uploading photo container for Card ${index + 1}...`);
-                                // Page Card always uses URL
-                                const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, url);
-                                containerId = pRes.id;
+                                console.log(`⏩ Skipping container upload for Image Card ${index + 1} (Using URL directly)...`);
+                                // Page Card always uses URL - No Container needed for Link Attachment style
+                                containerId = null;
                             }
                         } catch (uploadErr) {
                             console.error(`❌ Failed to upload media for Card ${index + 1}:`, uploadErr.message);
@@ -224,19 +223,18 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         };
 
                         if (card.type === 'video') {
-                            // 🔄 EXPERIMENT: Use 'media_fbid' for Video (instead of video_id)
-                            // 'video_id' caused "Invalid parameter".
-                            // 'media_fbid' + 'picture' caused "White Card".
-                            // HYPOTHESIS: 'media_fbid' + NO 'picture' = Correct Video Rendering?
+                            // 🔄 EXPERIMENT: Use 'media_fbid' + 'picture' for Video
+                            // Previous: 'media_fbid' only = White Card
+                            // New: Add 'picture' back to see if it fixes display
                             attachment.media_fbid = containerId;
-
-                            // ❌ Ensure 'picture' is NOT sent. 
-                            // The video container has the thumbnail embedded.
-                            // attachment.picture = finalThumbnailUrl; 
+                            if (finalThumbnailUrl) attachment.picture = finalThumbnailUrl;
 
                         } else {
-                            attachment.media_fbid = containerId; // ✅ Standard for Image Containers
-                            attachment.picture = url; // ✅ Image URL is fine for Image card
+                            // 🔄 EXPERIMENT: Image Card - NO media_fbid, Just Picture
+                            // Previous: 'media_fbid' + 'picture' = White Card
+                            // New: Treat as Link Attachment
+                            // attachment.media_fbid = containerId; 
+                            attachment.picture = url;
 
                             // ✅ Keep CTA for Image
                             attachment.call_to_action = {
