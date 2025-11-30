@@ -217,12 +217,13 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             throw new Error(`Failed to upload media for card ${index + 1}`);
                         }
 
-                        // 3. Construct attachment with metadata AND container ID
-                        // ✅ CRITICAL: Link Post structure + Media ID for stable display
+                        // 3. Construct attachment with metadata AND container ID AND picture
+                        // ✅ CRITICAL: Link Post structure + Media ID + Picture Fallback
                         const attachment = {
                             link: link,
                             name: headline,
                             description: description,
+                            picture: url, // ✅ Add picture URL as fallback/preview
                             call_to_action: {
                                 type: ctaType,
                                 value: { link: link }
