@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check, AlertCircle, Calendar, Clock, Layers, Video, Plus, Trash2, GripVertical, ChevronDown } from "lucide-react";
+import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check, AlertCircle, Calendar, Clock, Layers, Video, Plus, Trash2, GripVertical, ChevronDown, Sparkles } from "lucide-react";
 import apiUtils, { fetchCsrfToken } from "../utils/apiUtils";
 import { saveDraftFile, getDraftFile, clearDraftFile } from "../utils/draftDB";
 import { useAuth } from "../hooks/useAuth";
