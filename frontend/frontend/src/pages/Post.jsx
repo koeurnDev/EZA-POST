@@ -1,15 +1,16 @@
 // ============================================================
-// 📝 Post.jsx — Premium UX/UI Edition (Unified)
+// 📝 Post.jsx — Premium UX/UI Edition (Unified & Enhanced)
 // ============================================================
 
 import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check, AlertCircle, Calendar, Clock, Layers, Video, Plus, Trash2 } from "lucide-react";
+import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check, AlertCircle, Calendar, Clock, Layers, Video, Plus, Trash2, GripVertical } from "lucide-react";
 import apiUtils from "../utils/apiUtils";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
 import { useDropzone } from "react-dropzone";
+import { Reorder, motion, AnimatePresence } from "framer-motion";
 
 // 🛠️ Helper for clean API URLs
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "");
@@ -28,6 +29,9 @@ export default function Post() {
     // Image State (Carousel Only)
     const [imageFiles, setImageFiles] = useState([]);
 
+    // 🔄 Unified Media List (for Reordering)
+    const [mediaItems, setMediaItems] = useState([]);
+
     // Metadata State
     const [thumbnail, setThumbnail] = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
@@ -43,15 +47,85 @@ export default function Post() {
     const [isLoadingVideo, setIsLoadingVideo] = useState(false);
     const fileInputRef = useRef(null);
 
-    // 🔄 Fetch Pages
+    // 🔄 Sync Media Items when Video or Images change
+    useEffect(() => {
+        if (postFormat !== 'carousel') return;
+
+        // Construct current list based on state
+        // We want to preserve order if items already exist
+        setMediaItems(prev => {
+            const currentVideo = (file || previewUrl) ? {
+                id: 'video-main',
+                type: 'video',
+                preview: previewUrl || (file ? URL.createObjectURL(file) : null),
+                file: file,
+                url: previewUrl
+            } : null;
+
+            const currentImages = imageFiles.map((img, idx) => ({
+                id: `image-${img.name}-${idx}`, // Stable ID
+                type: 'image',
+                preview: img.preview,
+                file: img
+            }));
+
+            // If list is empty, just combine
+            if (prev.length === 0) {
+                return currentVideo ? [currentVideo, ...currentImages] : [...currentImages];
+            }
+
+            // If list exists, we need to merge carefully to keep order
+            // 1. Find if video exists in prev
+            const prevVideoIndex = prev.findIndex(item => item.type === 'video');
+            let newOrder = [...prev];
+
+            // Update or Add Video
+            if (currentVideo) {
+                if (prevVideoIndex !== -1) {
+                    newOrder[prevVideoIndex] = currentVideo; // Update content, keep position
+                } else {
+                    newOrder.unshift(currentVideo); // Add to start if new
+                }
+            } else {
+                // Remove video if it was deleted
+                if (prevVideoIndex !== -1) {
+                    newOrder.splice(prevVideoIndex, 1);
+                }
+            }
+
+            // Update Images
+            // This is tricky because images might be added/removed. 
+            // For simplicity in this sync: 
+            // If imageFiles length changed, we might just append new ones or rebuild.
+            // A better approach for reordering is to treat `mediaItems` as the Source of Truth for order,
+            // and `imageFiles` / `file` as just data sources.
+
+            // Let's try a simpler approach: Rebuild `mediaItems` only when adding new stuff, 
+            // but we need to respect the *user's* reordering.
+
+            // Actually, let's make `mediaItems` the master list for the UI.
+            // When user adds images, we append to `mediaItems`.
+            // When user adds video, we unshift (or append) to `mediaItems`.
+            // We won't auto-sync from `imageFiles` state in this effect to avoid overwriting order.
+            // Instead, we update `mediaItems` inside the `onDrop` handlers.
+            return prev;
+        });
+    }, [/* Dependencies handled manually in handlers */]);
+
+    // 🔄 Fetch Pages & Load Last Used
     useEffect(() => {
         const fetchPages = async () => {
             try {
                 const res = await apiUtils.getUserPages();
                 if (res.data.success) {
-                    const activePages = res.data.accounts.filter(p => p.isSelected);
-                    setAvailablePages(activePages);
-                    setSelectedPages(activePages.map(p => p.id));
+                    setAvailablePages(res.data.accounts);
+
+                    // 🧠 Load Last Used Page
+                    const lastUsedPageId = localStorage.getItem("lastUsedPageId");
+                    if (lastUsedPageId) {
+                        const found = res.data.accounts.find(p => p.id === lastUsedPageId);
+                        if (found) setSelectedPages([found.id]);
+                    }
                 }
             } catch (err) {
                 console.error("Failed to load pages:", err);
@@ -60,21 +134,29 @@ export default function Post() {
         fetchPages();
     }, []);
 
+    // 💾 Save Last Used Page
+    const handlePageSelection = (pageId) => {
+        setSelectedPages(prev => {
+            const isSelected = prev.includes(pageId);
+            const newSelection = isSelected ? prev.filter(id => id !== pageId) : [...prev, pageId];
+
+            // Save the most recently selected one (if any)
+            if (!isSelected) {
+                localStorage.setItem("lastUsedPageId", pageId);
+            }
+            return newSelection;
+        });
+    };
+
     // 🖱️ Drag & Drop Handlers (Video)
     const handleDragEnter = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(true);
+        e.preventDefault(); e.stopPropagation(); setIsDragging(true);
     };
     const handleDragLeave = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
+        e.preventDefault(); e.stopPropagation(); setIsDragging(false);
     };
     const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
+        e.preventDefault(); e.stopPropagation(); setIsDragging(false);
         const selectedFile = e.dataTransfer.files[0];
         if (selectedFile) validateAndSetVideo(selectedFile);
     };
@@ -86,28 +168,45 @@ export default function Post() {
     };
 
     const validateAndSetVideo = (selectedFile) => {
-        if (!selectedFile.type.startsWith("video/")) return toast.error("Please upload a video file (MP4, MOV).");
-        if (selectedFile.size > 500 * 1024 * 1024) return toast.error("File is too large. Maximum size is 500MB.");
+        if (!selectedFile.type.startsWith("video/")) return toast.error("Please upload a video file.");
+        if (selectedFile.size > 500 * 1024 * 1024) return toast.error("File too large (Max 500MB).");
 
         const video = document.createElement("video");
         video.preload = "metadata";
         video.onloadedmetadata = () => {
             window.URL.revokeObjectURL(video.src);
-            if (video.duration > 60) return toast.error("Video too long. Max 60 seconds.");
+            if (video.duration > 60) return toast.error("Video too long. Max 60s.");
 
             setFile(selectedFile);
-            setPreviewUrl(URL.createObjectURL(selectedFile));
-            setTiktokUrl(""); // Clear URL if file is dropped
-            toast.success("Video uploaded!");
+            const url = URL.createObjectURL(selectedFile);
+            setPreviewUrl(url);
+            setTiktokUrl("");
+
+            // Add to Media Items (Unified List)
+            addToMediaList({
+                id: `video-${Date.now()}`,
+                type: 'video',
+                preview: url,
+                file: selectedFile
+            });
+
+            toast.success("Video added!");
         };
         video.src = URL.createObjectURL(selectedFile);
     };
 
     // 🖼️ Image Dropzone (Carousel)
     const onDropImages = (acceptedFiles) => {
-        const newImages = acceptedFiles.map(file => Object.assign(file, { preview: URL.createObjectURL(file) }));
-        setImageFiles(prev => [...prev, ...newImages]);
-        toast.success(`${newImages.length} image(s) added!`);
+        const newItems = acceptedFiles.map(file => ({
+            id: `image-${Date.now()}-${Math.random()}`,
+            type: 'image',
+            preview: URL.createObjectURL(file),
+            file: file
+        }));
+
+        // Add to Media Items
+        setMediaItems(prev => [...prev, ...newItems]);
+        toast.success(`${newItems.length} image(s) added!`);
     };
 
     const { getRootProps: getImageRootProps, getInputProps: getImageInputProps, isDragActive: isImageDragActive } = useDropzone({
@@ -116,25 +215,33 @@ export default function Post() {
         multiple: true,
     });
 
-    const removeImage = (index) => {
-        setImageFiles(prev => prev.filter((_, i) => i !== index));
+    // ➕ Helper to Add/Update Video in List
+    const addToMediaList = (videoItem) => {
+        setMediaItems(prev => {
+            // Remove existing video if any, then add new one to TOP
+            const filtered = prev.filter(item => item.type !== 'video');
+            return [videoItem, ...filtered];
+        });
     };
 
-    // 🖼️ Thumbnail Handling
-    const handleThumbnailChange = (e) => {
-        const selectedFile = e.target.files[0];
-        if (selectedFile) {
-            if (!selectedFile.type.startsWith("image/")) return toast.error("Please upload an image file (JPG, PNG)");
-            setThumbnail(selectedFile);
-            setThumbnailPreview(URL.createObjectURL(selectedFile));
-        }
+    // 🗑️ Remove Item
+    const removeMediaItem = (id) => {
+        setMediaItems(prev => {
+            const item = prev.find(i => i.id === id);
+            if (item && item.type === 'video') {
+                setFile(null);
+                setPreviewUrl(null);
+                setTiktokUrl("");
+            }
+            return prev.filter(i => i.id !== id);
+        });
     };
 
     // 🎵 TikTok Load
     const handleLoadTiktok = async () => {
         if (!tiktokUrl) return;
         setIsLoadingVideo(true);
-        const toastId = toast.loading("Fetching TikTok video...");
+        const toastId = toast.loading("Fetching TikTok...");
         try {
             const token = localStorage.getItem("token");
             const headers = { "Content-Type": "application/json" };
@@ -148,8 +255,19 @@ export default function Post() {
             });
             const data = await response.json();
             if (data.success) {
-                setPreviewUrl(data.video.url); // Cloudinary URL
-                setFile(null); // Clear file if URL is loaded
+                const url = data.video.url;
+                setPreviewUrl(url);
+                setFile(null);
+
+                // Add to Media List
+                addToMediaList({
+                    id: `video-tiktok-${Date.now()}`,
+                    type: 'video',
+                    preview: url, // Cloudinary URL
+                    file: null,
+                    url: url
+                });
+
                 toast.success("Video loaded!", { id: toastId });
             } else {
                 throw new Error(data.error || "Failed to load video");
@@ -164,11 +282,14 @@ export default function Post() {
     // 🚀 Submit
     const handleSubmit = async () => {
         if (selectedPages.length === 0) return toast.error("Please select a page.");
-        if (!file && !previewUrl && !tiktokUrl) return toast.error("Please add a video.");
 
-        // Carousel Validation
-        if (postFormat === 'carousel' && imageFiles.length === 0) {
-            return toast.error("Please add at least one image for the carousel.");
+        // Validate Media
+        const videoItem = mediaItems.find(i => i.type === 'video');
+        const imageItems = mediaItems.filter(i => i.type === 'image');
+
+        if (!videoItem) return toast.error("Please add a video.");
+        if (postFormat === 'carousel' && imageItems.length === 0) {
+            return toast.error("Please add at least one image.");
         }
 
         setIsSubmitting(true);
@@ -179,24 +300,45 @@ export default function Post() {
             formData.append("caption", caption);
             formData.append("accounts", JSON.stringify(selectedPages));
 
-            // Common Fields
-            if (file) {
-                formData.append("video", file);
-            } else if (previewUrl && previewUrl.startsWith("http")) {
-                formData.append("videoUrl", previewUrl);
+            // 🎥 Video Handling
+            if (videoItem.file) {
+                formData.append("video", videoItem.file);
+            } else if (videoItem.url) {
+                formData.append("videoUrl", videoItem.url);
             }
+
             if (scheduleTime) formData.append("scheduleTime", scheduleTime);
 
             let endpoint = `${API_BASE}/api/posts`;
 
             if (postFormat === 'carousel') {
-                // 🎠 Mixed Carousel Payload
                 endpoint = `${API_BASE}/api/posts/mixed-carousel`;
-                imageFiles.forEach(file => {
-                    formData.append("images", file);
+
+                // 🖼️ Images
+                imageItems.forEach(item => {
+                    formData.append("images", item.file);
                 });
+
+                // 🔢 Order Handling
+                // We send the IDs in order. The backend needs to map these.
+                // Since we can't easily send 'file objects' with IDs in FormData,
+                // we'll send a `mediaOrder` array describing the types: ['video', 'image', 'image', 'video'...]
+                // Actually, simpler: The backend receives `video` and `images` arrays.
+                // We just need to tell it the *indices*.
+                // Let's send a JSON `layout` or `order`:
+                // e.g. ["video", "image_0", "image_1"] where image_X corresponds to the index in the uploaded images array.
+
+                const orderMap = mediaItems.map(item => {
+                    if (item.type === 'video') return 'video';
+                    // Find index in the filtered imageItems array
+                    const imgIndex = imageItems.findIndex(img => img.id === item.id);
+                    return `image_${imgIndex}`;
+                });
+
+                formData.append("mediaOrder", JSON.stringify(orderMap));
+
             } else {
-                // 🎥 Single Post Payload
+                // Single Post
                 formData.append("title", headline);
                 formData.append("postType", "single");
                 formData.append("cta", "LIKE_PAGE");
@@ -217,16 +359,11 @@ export default function Post() {
             const data = await response.json();
             if (data.success) {
                 toast.success("Post created successfully!", { id: toastId });
-                // Reset Form
-                setFile(null);
-                setPreviewUrl(null);
-                setTiktokUrl("");
-                setThumbnail(null);
-                setThumbnailPreview(null);
-                setHeadline("");
-                setCaption("");
-                setScheduleTime("");
-                setImageFiles([]);
+                // Reset
+                setFile(null); setPreviewUrl(null); setTiktokUrl("");
+                setThumbnail(null); setThumbnailPreview(null);
+                setHeadline(""); setCaption(""); setScheduleTime("");
+                setMediaItems([]);
             } else {
                 throw new Error(data.error || "Failed to create post.");
             }
@@ -271,13 +408,12 @@ export default function Post() {
 
                         <div className={`grid grid-cols-1 ${postFormat === 'carousel' ? 'lg:grid-cols-2' : ''} gap-8`}>
 
-                            {/* 1. Video Section (Unified) */}
+                            {/* 1. Video Section (Input Only) */}
                             <div className="space-y-6">
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
                                     <Video className="text-blue-500" size={20} /> Video Source
                                 </h3>
 
-                                {/* Unified Dropzone & URL Input */}
                                 <div className="transition-all duration-300 ease-in-out">
                                     <div
                                         onDragOver={handleDragEnter}
@@ -294,16 +430,8 @@ export default function Post() {
                                             }
                                         `}
                                     >
-                                        {/* Hidden File Input */}
-                                        <input
-                                            type="file"
-                                            accept="video/*"
-                                            onChange={handleFileChange}
-                                            className="hidden"
-                                            ref={fileInputRef}
-                                        />
+                                        <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
 
-                                        {/* Preview Area */}
                                         {(file || previewUrl) ? (
                                             <div className="relative w-full aspect-square max-h-[300px] bg-black rounded-2xl overflow-hidden shadow-inner mx-auto">
                                                 <video
@@ -316,9 +444,9 @@ export default function Post() {
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setFile(null);
-                                                        setPreviewUrl(null);
-                                                        setTiktokUrl("");
+                                                        setFile(null); setPreviewUrl(null); setTiktokUrl("");
+                                                        // Also remove from mediaItems
+                                                        setMediaItems(prev => prev.filter(i => i.type !== 'video'));
                                                     }}
                                                     className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-full hover:bg-red-500 hover:scale-110 transition-all backdrop-blur-md border border-white/10"
                                                 >
@@ -326,34 +454,22 @@ export default function Post() {
                                                 </button>
                                             </div>
                                         ) : (
-                                            /* Empty State: Upload + URL Input */
                                             <div className="py-4 space-y-6">
-                                                {/* Drag & Drop Trigger */}
-                                                <div
-                                                    onClick={() => fileInputRef.current?.click()}
-                                                    className="cursor-pointer"
-                                                >
+                                                <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer">
                                                     <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center transition-all duration-300 ${isDragging ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 group-hover:scale-110 group-hover:text-blue-500'}`}>
                                                         <Upload size={28} />
                                                     </div>
-                                                    <p className="font-bold text-gray-900 dark:text-white text-lg mb-1">
-                                                        {isDragging ? "Drop video here!" : "Drag & Drop Video"}
-                                                    </p>
-                                                    <p className="text-gray-500 dark:text-gray-400 text-xs">or click to browse from device</p>
+                                                    <p className="font-bold text-gray-900 dark:text-white text-lg mb-1">{isDragging ? "Drop video here!" : "Drag & Drop Video"}</p>
+                                                    <p className="text-gray-500 dark:text-gray-400 text-xs">or click to browse</p>
                                                 </div>
-
                                                 <div className="flex items-center gap-4 px-8">
                                                     <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
                                                     <span className="text-xs font-bold text-gray-400 uppercase">OR</span>
                                                     <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
                                                 </div>
-
-                                                {/* TikTok URL Input */}
                                                 <div className="flex gap-2 items-center max-w-md mx-auto">
                                                     <div className="relative flex-1 group/input text-left">
-                                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within/input:text-pink-500 transition-colors">
-                                                            <LinkIcon size={16} />
-                                                        </div>
+                                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within/input:text-pink-500 transition-colors"><LinkIcon size={16} /></div>
                                                         <input
                                                             type="text"
                                                             value={tiktokUrl}
@@ -363,14 +479,7 @@ export default function Post() {
                                                             className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-sm font-medium transition-all"
                                                         />
                                                     </div>
-                                                    <Button
-                                                        onClick={handleLoadTiktok}
-                                                        disabled={!tiktokUrl || isLoadingVideo}
-                                                        isLoading={isLoadingVideo}
-                                                        className="bg-pink-500 hover:bg-pink-600 text-white rounded-xl px-4 py-2.5 font-bold text-sm shadow-lg shadow-pink-500/20"
-                                                    >
-                                                        Load
-                                                    </Button>
+                                                    <Button onClick={handleLoadTiktok} disabled={!tiktokUrl || isLoadingVideo} isLoading={isLoadingVideo} className="bg-pink-500 hover:bg-pink-600 text-white rounded-xl px-4 py-2.5 font-bold text-sm shadow-lg shadow-pink-500/20">Load</Button>
                                                 </div>
                                             </div>
                                         )}
@@ -378,49 +487,72 @@ export default function Post() {
                                 </div>
                             </div>
 
-                            {/* 2. Image Gallery (Carousel Only) */}
+                            {/* 2. Media Management (Carousel Only) */}
                             {postFormat === 'carousel' && (
                                 <div className="space-y-6 animate-in slide-in-from-right duration-300">
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                            <ImageIcon className="text-pink-500" size={20} /> Image Gallery
+                                            <Layers className="text-pink-500" size={20} /> Carousel Media
                                         </h3>
                                         <span className="px-3 py-1 bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 text-xs font-semibold rounded-full border border-pink-100 dark:border-pink-800">
-                                            {imageFiles.length} Images
+                                            {mediaItems.length} Items
                                         </span>
                                     </div>
 
-                                    <div {...getImageRootProps()} className={`min-h-[150px] border-2 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all mb-4
+                                    {/* Add Images Dropzone */}
+                                    <div {...getImageRootProps()} className={`min-h-[100px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all mb-4
                                         ${isImageDragActive ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10' : 'border-gray-300 dark:border-gray-700 hover:border-pink-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
                                         <input {...getImageInputProps()} />
-                                        <div className="text-center p-4">
-                                            <Plus className="w-8 h-8 text-pink-400 mx-auto mb-2" />
-                                            <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">Add Images</p>
-                                            <p className="text-xs text-gray-400">JPG, PNG</p>
+                                        <div className="text-center p-4 flex items-center gap-3">
+                                            <Plus className="w-6 h-6 text-pink-400" />
+                                            <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Add Images</span>
                                         </div>
                                     </div>
 
-                                    {/* Horizontal Scroll Gallery */}
-                                    <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar snap-x">
-                                        {imageFiles.map((file, index) => (
-                                            <div key={index} className="relative flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden shadow-md group/img snap-center">
-                                                <img src={file.preview} alt={`Upload ${index}`} className="w-full h-full object-cover" />
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); removeImage(index); }}
-                                                    className="absolute top-1 right-1 p-1 bg-red-500/80 text-white rounded-full hover:bg-red-600 opacity-0 group-hover/img:opacity-100 transition-all"
+                                    {/* 🔄 Reorderable List */}
+                                    <Reorder.Group axis="y" values={mediaItems} onReorder={setMediaItems} className="space-y-3">
+                                        <AnimatePresence>
+                                            {mediaItems.map((item) => (
+                                                <Reorder.Item key={item.id} value={item}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, scale: 0.9 }}
+                                                    className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 flex items-center gap-4 shadow-sm cursor-grab active:cursor-grabbing"
                                                 >
-                                                    <Trash2 size={12} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
+                                                    <GripVertical className="text-gray-400" size={20} />
+                                                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200 dark:border-gray-700">
+                                                        {item.type === 'video' ? (
+                                                            <video src={item.preview} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <img src={item.preview} alt="" className="w-full h-full object-cover" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-bold text-gray-900 dark:text-white capitalize">{item.type}</p>
+                                                        <p className="text-xs text-gray-500 truncate">{item.file ? item.file.name : 'Remote URL'}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => removeMediaItem(item.id)}
+                                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </Reorder.Item>
+                                            ))}
+                                        </AnimatePresence>
+                                    </Reorder.Group>
+
+                                    {mediaItems.length === 0 && (
+                                        <div className="text-center py-8 text-gray-400 text-sm">
+                                            No media added yet. Upload a video or images.
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
 
                         {/* 3. Headline & Caption */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            {/* Left Column: Inputs */}
                             <div className="md:col-span-2 space-y-6">
                                 {postFormat === 'single' && (
                                     <div>
@@ -470,19 +602,13 @@ export default function Post() {
                                 )}
                             </div>
 
-                            {/* Right Column: Thumbnail (Single Only) */}
                             {postFormat === 'single' && (
                                 <div className="md:col-span-1">
                                     <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Cover Image</label>
                                     <label className="block w-full aspect-[3/4] md:aspect-square relative group cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-150">
                                         {thumbnailPreview ? (
                                             <>
-                                                <img
-                                                    src={thumbnailPreview}
-                                                    alt="Thumbnail"
-                                                    loading="lazy"
-                                                    className="w-full h-full object-cover"
-                                                />
+                                                <img src={thumbnailPreview} alt="Thumbnail" loading="lazy" className="w-full h-full object-cover" />
                                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-150 flex flex-col items-center justify-center text-white">
                                                     <ImageIcon size={24} className="mb-2" />
                                                     <span className="text-sm font-bold">Change Cover</span>
@@ -490,9 +616,7 @@ export default function Post() {
                                             </>
                                         ) : (
                                             <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors duration-150">
-                                                <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full mb-3 group-hover:scale-105 transition-transform duration-150">
-                                                    <ImageIcon size={24} />
-                                                </div>
+                                                <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full mb-3 group-hover:scale-105 transition-transform duration-150"><ImageIcon size={24} /></div>
                                                 <span className="text-sm font-bold">Upload</span>
                                                 <span className="text-xs opacity-70">JPG, PNG</span>
                                             </div>
@@ -531,7 +655,7 @@ export default function Post() {
                                         return (
                                             <button
                                                 key={page.id}
-                                                onClick={() => setSelectedPages(prev => isSelected ? prev.filter(id => id !== page.id) : [...prev, page.id])}
+                                                onClick={() => handlePageSelection(page.id)}
                                                 className={`
                                                     group flex items-center gap-3 pl-1 pr-4 py-1.5 rounded-full border text-sm font-medium transition-all duration-200 select-none
                                                     ${isSelected
@@ -543,9 +667,7 @@ export default function Post() {
                                                 <div className="relative">
                                                     <img src={page.picture} alt="" className={`w-8 h-8 rounded-full border-2 ${isSelected ? 'border-white/30' : 'border-transparent'}`} />
                                                     {isSelected && (
-                                                        <div className="absolute -bottom-1 -right-1 bg-white text-blue-600 rounded-full p-0.5 shadow-sm">
-                                                            <Check size={10} strokeWidth={4} />
-                                                        </div>
+                                                        <div className="absolute -bottom-1 -right-1 bg-white text-blue-600 rounded-full p-0.5 shadow-sm"><Check size={10} strokeWidth={4} /></div>
                                                     )}
                                                 </div>
                                                 {page.name}
@@ -563,9 +685,7 @@ export default function Post() {
                             </h3>
                             <div className="flex items-center gap-4">
                                 <div className="relative flex-1 max-w-md">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                                        <Clock size={18} />
-                                    </div>
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><Clock size={18} /></div>
                                     <input
                                         type="datetime-local"
                                         value={scheduleTime}
@@ -575,12 +695,7 @@ export default function Post() {
                                     />
                                 </div>
                                 {scheduleTime && (
-                                    <button
-                                        onClick={() => setScheduleTime("")}
-                                        className="text-sm text-red-500 hover:text-red-600 font-medium hover:underline"
-                                    >
-                                        Clear
-                                    </button>
+                                    <button onClick={() => setScheduleTime("")} className="text-sm text-red-500 hover:text-red-600 font-medium hover:underline">Clear</button>
                                 )}
                             </div>
                         </div>
@@ -589,13 +704,7 @@ export default function Post() {
 
                     {/* Footer Actions */}
                     <div className="p-6 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-end gap-4">
-                        <Button
-                            variant="secondary"
-                            onClick={() => window.location.reload()}
-                            className="w-full sm:w-auto text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors duration-200"
-                        >
-                            Cancel
-                        </Button>
+                        <Button variant="secondary" onClick={() => window.location.reload()} className="w-full sm:w-auto text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors duration-200">Cancel</Button>
                         <Button
                             onClick={handleSubmit}
                             disabled={(!file && !previewUrl) || selectedPages.length === 0}

@@ -114,10 +114,34 @@ exports.createMixedCarousel = async (req, res) => {
                 console.log(`✅ Media Uploaded: Video ${videoId}, Photos ${photoIds.join(", ")}`);
 
                 // 2.3 Publish Carousel Feed
-                const attachedMedia = [
-                    { media_fbid: videoId },
-                    ...photoIds.map(id => ({ media_fbid: id }))
-                ];
+                // 🔢 Reorder Media based on 'mediaOrder'
+                let attachedMedia = [];
+                let mediaOrder = [];
+                try {
+                    if (req.body.mediaOrder) {
+                        mediaOrder = JSON.parse(req.body.mediaOrder);
+                    }
+                } catch (e) {
+                    console.warn("⚠️ Invalid mediaOrder JSON, using default order");
+                }
+
+                if (mediaOrder.length > 0) {
+                    // Map 'video' -> videoId, 'image_X' -> photoIds[X]
+                    attachedMedia = mediaOrder.map(item => {
+                        if (item === 'video') return { media_fbid: videoId };
+                        if (item.startsWith('image_')) {
+                            const index = parseInt(item.split('_')[1]);
+                            if (photoIds[index]) return { media_fbid: photoIds[index] };
+                        }
+                        return null;
+                    }).filter(Boolean);
+                } else {
+                    // Default: Video first, then images
+                    attachedMedia = [
+                        { media_fbid: videoId },
+                        ...photoIds.map(id => ({ media_fbid: id }))
+                    ];
+                }
 
                 const feedPayload = {
                     access_token: pageToken,
