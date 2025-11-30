@@ -9,21 +9,41 @@ const { encrypt2FASecret, decrypt2FASecret } = require('../../libs/crypto2fa');
 // Step 1 — Generate TOTP + QR
 router.post("/setup", requireAuth, async (req, res) => {
     try {
-        const userId = req.user.id;
+        console.log("🔐 Starting 2FA Setup for user:", req.user);
+        const userId = req.user.id || req.user._id; // Handle both cases
+        console.log("   👉 User ID:", userId);
+
+        if (!userId) {
+            throw new Error("User ID not found in request");
+        }
 
         const secret = authenticator.generateSecret();
+        console.log("   👉 Generated Secret");
+
         const encrypted = encrypt2FASecret(secret);
+        console.log("   👉 Encrypted Secret");
 
         const otpURI = authenticator.keyuri(req.user.email, "EZA_POST", secret);
         const qr = await qrcode.toDataURL(otpURI);
+        console.log("   👉 Generated QR Code");
 
-        await User.findOneAndUpdate({ id: userId }, {
+        const updatedUser = await User.findOneAndUpdate({ id: userId }, {
             twoFactorSecret: encrypted,
             twoFactorVerified: false,
-        });
+        }, { new: true });
+
+        if (!updatedUser) {
+            // Try finding by _id if custom id failed
+            await User.findByIdAndUpdate(userId, {
+                twoFactorSecret: encrypted,
+                twoFactorVerified: false,
+            });
+        }
+
+        console.log("   ✅ 2FA Secret Saved to DB");
 
         res.json({
-            success: true, // Frontend expects 'success'
+            success: true,
             ok: true,
             qrCode: qr,
         });

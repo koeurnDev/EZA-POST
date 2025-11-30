@@ -342,7 +342,9 @@ export default function Settings() {
                                                             setIsVerifying(true);
                                                         }
                                                     } catch (err) {
-                                                        toast.error("Failed to start 2FA setup");
+                                                        console.error("❌ 2FA Setup Error:", err);
+                                                        const msg = err.response?.data?.error || err.message || "Failed to start 2FA setup";
+                                                        toast.error(msg);
                                                     }
                                                 }}
                                                 className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors"
@@ -357,6 +359,7 @@ export default function Settings() {
                                                         await axios.post(apiUtils.getFullUrl("/auth/2fa/disable"), {}, { withCredentials: true });
                                                         window.location.reload();
                                                     } catch (err) {
+                                                        console.error("❌ 2FA Disable Error:", err);
                                                         toast.error("Failed to disable 2FA");
                                                     }
                                                 }}
@@ -389,6 +392,7 @@ export default function Settings() {
                                                                 window.location.reload();
                                                             }
                                                         } catch (err) {
+                                                            console.error("❌ 2FA Verify Error:", err);
                                                             toast.error("Invalid Code");
                                                         }
                                                     }}
@@ -401,37 +405,37 @@ export default function Settings() {
                                     )}
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Notifications */}
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Notifications</h3>
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-yellow-100 text-yellow-600 rounded-lg dark:bg-yellow-900/30 dark:text-yellow-400">
-                                                <Bell size={18} />
-                                            </div>
-                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Email Alerts</span>
+                        {/* Notifications */}
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Notifications</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-yellow-100 text-yellow-600 rounded-lg dark:bg-yellow-900/30 dark:text-yellow-400">
+                                            <Bell size={18} />
                                         </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" className="sr-only peer" defaultChecked />
-                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                                        </label>
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Email Alerts</span>
                                     </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" className="sr-only peer" defaultChecked />
+                                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                    </label>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Danger Zone */}
-                            <div className="bg-red-50 dark:bg-red-900/10 rounded-3xl p-6 border border-red-100 dark:border-red-900/30">
-                                <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-4">Danger Zone</h3>
-                                <button
-                                    onClick={logout}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl font-semibold border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shadow-sm"
-                                >
-                                    <LogOut size={18} />
-                                    Sign Out
-                                </button>
-                            </div>
+                        {/* Danger Zone */}
+                        <div className="bg-red-50 dark:bg-red-900/10 rounded-3xl p-6 border border-red-100 dark:border-red-900/30">
+                            <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-4">Danger Zone</h3>
+                            <button
+                                onClick={logout}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl font-semibold border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shadow-sm"
+                            >
+                                <LogOut size={18} />
+                                Sign Out
+                            </button>
                         </div>
                     </div>
                 )}
@@ -441,6 +445,6 @@ export default function Settings() {
                     onClose={() => setIsEditModalOpen(false)}
                 />
             </div>
-        </DashboardLayout>
+        </DashboardLayout >
     );
 }
