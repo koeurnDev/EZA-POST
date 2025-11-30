@@ -48,6 +48,13 @@ export default function Post() {
     const [availablePages, setAvailablePages] = useState([]);
     const [scheduleTime, setScheduleTime] = useState("");
 
+    // 🟡 UI State
+    const [isDragging, setIsDragging] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+    const [isDraftLoaded, setIsDraftLoaded] = useState(false); // 🛑 Prevent save before load
+    const fileInputRef = useRef(null);
+
     // 💾 Draft Persistence Logic
     useEffect(() => {
         const loadDraft = async () => {
