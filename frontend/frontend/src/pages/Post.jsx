@@ -37,6 +37,7 @@ export default function Post() {
     const [thumbnail, setThumbnail] = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
     const [headline, setHeadline] = useState("");
+    const [cta, setCta] = useState("LEARN_MORE"); // Unified CTA
     const [caption, setCaption] = useState("");
     const [selectedPages, setSelectedPages] = useState([]);
     const [availablePages, setAvailablePages] = useState([]);
