@@ -238,23 +238,21 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         // 3. Construct attachment with Metadata AND Type-Specific IDs
                         // ✅ CRITICAL: Metadata prevents "Invalid parameter", IDs ensure native display
                         const attachment = {
-                            link: link, // ✅ Restore Link for ALL cards
                             name: headline,
                             description: description,
                         };
 
                         if (card.type === 'video') {
                             attachment.video_id = containerId; // ✅ Revert to video_id (Required for Video)
+                            // ❌ Remove 'link' for video card to avoid "Invalid parameter"
+                            // Video cards in mixed carousel should rely on the video content itself.
 
                             // 🔄 EXPERIMENT: Remove 'picture' (Thumbnail) from payload
                             // The video container ALREADY has a thumbnail attached during upload.
-                            // Sending 'picture' here might be causing "Invalid parameter" or conflicts.
                             // attachment.picture = finalThumbnailUrl; 
 
-                            // ❌ Remove CTA for video
-                            // attachment.call_to_action = ... 
-
                         } else {
+                            attachment.link = link; // ✅ Keep Link for Image cards
                             attachment.media_fbid = containerId; // ✅ Standard for Image Containers
                             attachment.picture = url; // ✅ Image URL is fine for Image card
 
@@ -380,9 +378,19 @@ exports.createMixedCarousel = async (req, res) => {
 
         const results = await exports.processAndPostCarousel(req, accountsArray, userId, caption, scheduleTime);
 
+        // ✅ Check if ALL failed
+        if (results.failedCount === accountsArray.length) {
+            return res.status(500).json({
+                success: false,
+                error: results.details[0]?.error || "Failed to create carousel post",
+                results
+            });
+        }
+
         res.status(201).json({
             success: true,
             results
+
         });
 
     } catch (err) {
