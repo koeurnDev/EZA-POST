@@ -367,17 +367,15 @@ export default function Post() {
                     const card = {
                         type: item.type,
                         // 🌟 Unified Fields for ALL cards
-                        link: targetLink,
                         headline: headline,
                         description: cardDescription,
                         cta: cta
                     };
 
-
-
                     // Pass remote URL for Page Card
                     if (item.isPageCard) {
                         card.imageUrl = item.imageUrl;
+                        card.isPageCard = true;
                     }
 
                     return card;
