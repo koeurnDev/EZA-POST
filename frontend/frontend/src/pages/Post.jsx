@@ -489,9 +489,13 @@ export default function Post() {
             if (postFormat === 'carousel') {
                 endpoint = `${API_BASE}/api/posts/mixed-carousel`;
 
-                // 🖼️ Images
-                imageItems.forEach(item => {
-                    formData.append("images", item.file);
+                // 🖼️ Filter Uploaded Images (Exclude Page Card)
+                const uploadedImages = imageItems.filter(item => !item.isPageCard);
+
+                uploadedImages.forEach(item => {
+                    if (item.file) {
+                        formData.append("images", item.file);
+                    }
                 });
 
                 // 🔢 Rich Media Order (Cards Data)
@@ -505,8 +509,9 @@ export default function Post() {
                         cta: cta
                     };
 
-                    if (item.type === 'image') {
-                        const imgIndex = imageItems.findIndex(img => img.id === item.id);
+                    if (item.type === 'image' && !item.isPageCard) {
+                        // Find index in the *uploaded* images array
+                        const imgIndex = uploadedImages.findIndex(img => img.id === item.id);
                         card.fileIndex = imgIndex;
                     }
 
@@ -567,351 +572,377 @@ export default function Post() {
         <DashboardLayout>
             <div className="max-w-7xl mx-auto px-4 py-6">
 
-                {/* 🔷 TOP SECTION (GLOBAL HEADER) */}
+                {/* 🔷 STEP 1 & 2: POST TYPE & PAGE SELECTION */}
                 <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 p-6">
-                    <div className="flex flex-col md:flex-row gap-6 items-start">
-
-                        {/* A. Post Type & Page Selection */}
-                        <div className="w-full md:w-1/3 space-y-4">
-                            {/* 1. Post Type Switcher (Moved Here) */}
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Post Type</label>
-                                <div className="flex bg-gray-100 dark:bg-gray-900 rounded-xl p-1 border border-gray-200 dark:border-gray-700">
-                                    <button
-                                        onClick={() => setPostFormat('carousel')}
-                                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${postFormat === 'carousel' ? 'bg-white shadow text-pink-500' : 'text-gray-500 hover:text-gray-700'}`}
-                                    >
-                                        <Layers size={16} /> Carousel
-                                    </button>
-                                    <button
-                                        onClick={() => setPostFormat('single')}
-                                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${postFormat === 'single' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                                    >
-                                        <Video size={16} /> Single Video
-                                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Step 1: Post Type */}
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                1. Post Type
+                                <div className="group relative">
+                                    <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                        Select whether you want to create a single video post or a multi-card carousel post.
+                                    </div>
                                 </div>
-                            </div>
-
-                            {/* 2. Page Selection */}
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Post To</label>
-                                <div className="relative">
-                                    {availablePages.length > 0 ? (
-                                        <div className="relative">
-                                            <select
-                                                className="w-full appearance-none pl-12 pr-10 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                                onChange={(e) => handlePageSelection(e.target.value)}
-                                                value={selectedPages[0] || ""}
-                                            >
-                                                <option value="" disabled>Choose Page...</option>
-                                                {availablePages.map(page => (
-                                                    <option key={page.id} value={page.id}>{page.name}</option>
-                                                ))}
-                                            </select>
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                                                {selectedPages.length > 0 ? (
-                                                    <img src={availablePages.find(p => p.id === selectedPages[0])?.picture} className="w-6 h-6 rounded-full" alt="" />
-                                                ) : (
-                                                    <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700" />
-                                                )}
-                                            </div>
-                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                                                <ChevronDown size={16} />
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="p-3 bg-red-50 text-red-500 rounded-xl text-sm">No pages connected</div>
-                                    )}
-                                </div>
+                            </label>
+                            <div className="flex bg-gray-100 dark:bg-gray-900 rounded-xl p-1 border border-gray-200 dark:border-gray-700">
+                                <button
+                                    onClick={() => setPostFormat('carousel')}
+                                    className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${postFormat === 'carousel' ? 'bg-white shadow text-pink-500' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    <Layers size={18} /> Carousel Post
+                                </button>
+                                <button
+                                    onClick={() => setPostFormat('single')}
+                                    className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${postFormat === 'single' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    <Video size={18} /> Single Video
+                                </button>
                             </div>
                         </div>
 
-                        {/* C. Caption Box */}
-                        <div className="w-full md:w-2/3">
-                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Caption</label>
-                            <div className="relative h-full">
-                                <textarea
-                                    value={caption}
-                                    onChange={(e) => setCaption(e.target.value)}
-                                    maxLength={2200}
-                                    placeholder="Write a catchy caption... #hashtags @mentions"
-                                    className="w-full h-[132px] p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all resize-none"
-                                />
-                                <div className={`absolute bottom-3 right-3 text-xs font-mono font-medium ${caption.length > 2000 ? 'text-red-500' : 'text-gray-400'}`}>
-                                    {caption.length}/2200
-                                </div>
+                        {/* Step 2: Page Selection */}
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">2. Post To</label>
+                            <div className="relative">
+                                {availablePages.length > 0 ? (
+                                    <div className="relative">
+                                        <select
+                                            className="w-full appearance-none pl-12 pr-10 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            onChange={(e) => handlePageSelection(e.target.value)}
+                                            value={selectedPages[0] || ""}
+                                        >
+                                            <option value="" disabled>Choose Page...</option>
+                                            {availablePages.map(page => (
+                                                <option key={page.id} value={page.id}>{page.name}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                                            {selectedPages.length > 0 ? (
+                                                <img src={availablePages.find(p => p.id === selectedPages[0])?.picture} className="w-6 h-6 rounded-full" alt="" />
+                                            ) : (
+                                                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700" />
+                                            )}
+                                        </div>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-3 bg-red-50 text-red-500 rounded-xl text-sm">No pages connected</div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 🟦 MAIN BODY (SPLIT 50/50) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
-
-                    {/* 🟦 LEFT: Video Upload + Processing Zone */}
-                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
-                        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/20">
-                            <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                <Video className="text-blue-500" size={20} /> Video Source
-                            </h3>
+                {/* 🔷 STEP 3: CAPTION */}
+                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 p-6">
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                        3. Caption
+                        <div className="group relative">
+                            <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                This will be used as the main post description. Hashtags and mentions are supported.
+                            </div>
                         </div>
-
-                        {/* A) Input Method Tabs */}
-                        <div className="flex border-b border-gray-100 dark:border-gray-700">
-                            <button
-                                onClick={() => setVideoTab('upload')}
-                                className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${videoTab === 'upload' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <Upload size={16} /> Upload Video
-                            </button>
-                            <button
-                                onClick={() => setVideoTab('tiktok')}
-                                className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${videoTab === 'tiktok' ? 'text-pink-500 border-b-2 border-pink-500 bg-pink-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <LinkIcon size={16} /> TikTok Link
-                            </button>
+                    </label>
+                    <div className="relative">
+                        <textarea
+                            value={caption}
+                            onChange={(e) => setCaption(e.target.value)}
+                            maxLength={2200}
+                            placeholder="Write a catchy caption... #hashtags @mentions"
+                            className="w-full h-[120px] p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all resize-none"
+                        />
+                        <div className={`absolute bottom-3 right-3 text-xs font-mono font-medium ${caption.length > 2000 ? 'text-red-500' : 'text-gray-400'}`}>
+                            {caption.length}/2200
                         </div>
+                    </div>
+                </div>
 
-                        <div className="p-6 flex-1 flex flex-col justify-center">
-                            {(file || previewUrl) ? (
-                                <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden shadow-lg group">
-                                    <video
-                                        src={previewUrl}
-                                        controls
-                                        className="w-full h-full object-contain"
-                                        preload="metadata"
-                                    />
-                                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* 🔷 STEP 4: MEDIA UPLOAD */}
+                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 overflow-hidden">
+                    <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20">
+                        <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                            4. Media Upload
+                        </h3>
+                    </div>
+
+                    <div className="p-6">
+                        {postFormat === 'single' ? (
+                            /* SINGLE VIDEO MODE */
+                            <div className="max-w-2xl mx-auto">
+                                <div className="flex border-b border-gray-100 dark:border-gray-700 mb-6">
+                                    <button
+                                        onClick={() => setVideoTab('upload')}
+                                        className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${videoTab === 'upload' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
+                                    >
+                                        <Upload size={16} /> Upload Video
+                                    </button>
+                                    <button
+                                        onClick={() => setVideoTab('tiktok')}
+                                        className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${videoTab === 'tiktok' ? 'text-pink-500 border-b-2 border-pink-500 bg-pink-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
+                                    >
+                                        <LinkIcon size={16} /> TikTok Link
+                                    </button>
+                                </div>
+
+                                {(file || previewUrl) ? (
+                                    <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-lg group">
+                                        <video
+                                            src={previewUrl}
+                                            controls
+                                            className="w-full h-full object-contain"
+                                            preload="metadata"
+                                        />
                                         <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
+                                            onClick={() => {
                                                 setFile(null); setPreviewUrl(null); setTiktokUrl("");
                                                 setMediaItems(prev => prev.filter(i => i.type !== 'video'));
                                             }}
-                                            className="p-2 bg-black/60 text-white rounded-full hover:bg-red-500 backdrop-blur-md"
+                                            className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-full hover:bg-red-500 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity"
                                         >
                                             <X size={18} />
                                         </button>
                                     </div>
-                                    <div className="absolute bottom-4 left-4 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-md">
-                                        1:1 Preview
-                                    </div>
-                                </div>
-                            ) : (
-                                <>
-                                    {videoTab === 'upload' && (
-                                        <div
-                                            onDragOver={handleDragEnter}
-                                            onDragEnter={handleDragEnter}
-                                            onDragLeave={handleDragLeave}
-                                            onDrop={handleDrop}
-                                            className={`
-                                                    flex-1 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-8 transition-all
+                                ) : (
+                                    <>
+                                        {videoTab === 'upload' && (
+                                            <div
+                                                onDragOver={handleDragEnter}
+                                                onDragEnter={handleDragEnter}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={handleDrop}
+                                                className={`
+                                                    border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-12 transition-all cursor-pointer
                                                     ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'}
                                                 `}
-                                        >
-                                            <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
-                                            <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer text-center">
-                                                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                onClick={() => fileInputRef.current?.click()}
+                                            >
+                                                <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
+                                                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
                                                     <Upload size={32} />
                                                 </div>
                                                 <p className="font-bold text-gray-700">Drag & Drop Video</p>
-                                                <p className="text-sm text-gray-400 mt-1">MP4, MOV, WEBM</p>
+                                                <p className="text-sm text-gray-400 mt-1">MP4, MOV, WEBM (Max 500MB)</p>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {videoTab === 'tiktok' && (
-                                        <div className="flex-1 flex flex-col justify-center items-center p-8 bg-gray-50 rounded-2xl border border-gray-200">
-                                            <div className="w-full max-w-md space-y-4">
-                                                <div className="text-center mb-6">
-                                                    <div className="w-16 h-16 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                        <LinkIcon size={32} />
-                                                    </div>
-                                                    <h3 className="font-bold text-gray-800">Import from TikTok</h3>
+                                        {videoTab === 'tiktok' && (
+                                            <div className="flex flex-col items-center p-8 bg-gray-50 rounded-2xl border border-gray-200">
+                                                <div className="w-full max-w-md space-y-4">
+                                                    <input
+                                                        type="text"
+                                                        value={tiktokUrl}
+                                                        onChange={(e) => setTiktokUrl(e.target.value)}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') handleLoadTiktok(); }}
+                                                        placeholder="Paste TikTok URL here..."
+                                                        className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none"
+                                                    />
+                                                    <Button
+                                                        onClick={handleLoadTiktok}
+                                                        disabled={!tiktokUrl || isLoadingVideo}
+                                                        isLoading={isLoadingVideo}
+                                                        className="w-full bg-pink-500 hover:bg-pink-600 text-white py-3 rounded-xl font-bold"
+                                                    >
+                                                        Load Video
+                                                    </Button>
                                                 </div>
-                                                <input
-                                                    type="text"
-                                                    value={tiktokUrl}
-                                                    onChange={(e) => setTiktokUrl(e.target.value)}
-                                                    onKeyDown={(e) => { if (e.key === 'Enter') handleLoadTiktok(); }}
-                                                    placeholder="Paste TikTok URL here..."
-                                                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none"
-                                                />
-                                                <Button
-                                                    onClick={handleLoadTiktok}
-                                                    disabled={!tiktokUrl || isLoadingVideo}
-                                                    isLoading={isLoadingVideo}
-                                                    className="w-full bg-pink-500 hover:bg-pink-600 text-white py-3 rounded-xl font-bold"
-                                                >
-                                                    Load Video
-                                                </Button>
                                             </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* 🟦 RIGHT: Image Zone / Metadata */}
-                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
-                        <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20">
-                            <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                {postFormat === 'carousel' ? <Layers className="text-pink-500" size={20} /> : <ImageIcon className="text-purple-500" size={20} />}
-                                {postFormat === 'carousel' ? "Carousel Images" : "Post Details"}
-                            </h3>
-                        </div>
-
-                        <div className="p-6 flex-1 overflow-y-auto max-h-[600px]">
-                            {postFormat === 'carousel' ? (
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        ) : (
+                            /* CAROUSEL MODE */
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* Left: Media Inputs */}
                                 <div className="space-y-6">
-                                    {/* 📝 Unified Card Description & CTA */}
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <div className="p-4 bg-blue-50 text-blue-700 rounded-xl text-sm border border-blue-100">
-                                            <p className="font-bold flex items-center gap-2">
-                                                <AlertCircle size={16} />
-                                                Intelligent Auto-Fill Active
-                                            </p>
-                                            <p className="mt-1 opacity-90">
-                                                We'll automatically set the Headline, Link, and CTA based on the selected Page.
-                                                <br />
-                                                <strong>Headline:</strong> Page Name
-                                                <br />
-                                                <strong>Link:</strong> Page URL
-                                                <br />
-                                                <strong>CTA:</strong> Learn More / Follow
-                                            </p>
-                                        </div>
+                                    <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm border border-blue-100">
+                                        <p className="font-bold flex items-center gap-2 mb-1">
+                                            <Layers size={16} /> Carousel Requirements
+                                        </p>
+                                        <p className="opacity-90">
+                                            A carousel requires exactly <strong>3 cards</strong>:
+                                            <br />
+                                            1. <strong>Video</strong> (Upload or TikTok)
+                                            <br />
+                                            2. <strong>Image</strong> (Upload 1 image)
+                                            <br />
+                                            3. <strong>Page Card</strong> (Auto-generated from Page Profile)
+                                        </p>
                                     </div>
 
-                                    {/* Add Images Dropzone */}
-                                    {/* Add Images Dropzone (Hidden if Image Exists) */}
-                                    {!mediaItems.some(i => i.type === 'image' && !i.isPageCard) && (
-                                        <div {...getImageRootProps()} className={`min-h-[120px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all
-                                                ${isImageDragActive ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400 hover:bg-gray-50'}`}>
-                                            <input {...getImageInputProps()} />
-                                            <div className="text-center p-4 flex items-center gap-3">
-                                                <Plus className="w-6 h-6 text-pink-400" />
-                                                <span className="text-sm text-gray-600 font-medium">Add Image (Max 1)</span>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Unified Media List */}
-                                    <Reorder.Group axis="y" values={mediaItems} onReorder={setMediaItems} className="space-y-3">
-                                        <AnimatePresence>
-                                            {mediaItems.map((item) => (
-                                                <Reorder.Item key={item.id} value={item}
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, scale: 0.9 }}
-                                                    className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+                                    {/* Video Input */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Card 1: Video</label>
+                                        {!mediaItems.some(i => i.type === 'video') ? (
+                                            <div className="flex gap-2">
+                                                <div
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    className="flex-1 border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-gray-50 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all"
                                                 >
-                                                    <div className="flex items-start gap-4">
-                                                        <div className="mt-2 cursor-grab active:cursor-grabbing">
-                                                            <GripVertical className="text-gray-400" size={20} />
-                                                        </div>
-
-                                                        {/* Media Preview */}
-                                                        <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
-                                                            {item.type === 'video' ? (
-                                                                <video src={item.preview} className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <img src={item.preview} alt="" className="w-full h-full object-cover" />
-                                                            )}
-                                                        </div>
-
-                                                        {/* Fields */}
-                                                        <div className="flex-1 space-y-3">
-                                                            <div className="flex justify-between items-start">
-                                                                <div>
-                                                                    <p className="text-sm font-bold text-gray-900 capitalize">{item.type}</p>
-                                                                    <p className="text-xs text-gray-500 truncate max-w-[200px]">{item.file ? item.file.name : 'Remote URL'}</p>
-                                                                </div>
-                                                                <button onClick={() => removeMediaItem(item.id)} className="text-gray-400 hover:text-red-500 transition-colors">
-                                                                    <Trash2 size={18} />
-                                                                </button>
-                                                            </div>
-
-                                                            {/* Inputs Removed - Using Unified Global Inputs */}
-                                                            <div className="text-xs text-gray-400 italic">
-                                                                Using global settings for Headline, Description, Link, and CTA.
-                                                            </div>
-                                                        </div>
+                                                    <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
+                                                    <Upload className="text-blue-500 mb-2" size={24} />
+                                                    <span className="text-sm font-medium text-gray-600">Upload Video</span>
+                                                </div>
+                                                <div className="flex-1 border-2 border-dashed border-gray-300 hover:border-pink-400 hover:bg-gray-50 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all relative">
+                                                    <LinkIcon className="text-pink-500 mb-2" size={24} />
+                                                    <span className="text-sm font-medium text-gray-600">TikTok Link</span>
+                                                    <input
+                                                        type="text"
+                                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const url = prompt("Paste TikTok URL:");
+                                                            if (url) {
+                                                                setTiktokUrl(url);
+                                                                // Trigger fetch immediately (hacky but works for this simplified UI)
+                                                                setTimeout(() => handleLoadTiktok(), 100);
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 bg-black rounded-lg overflow-hidden">
+                                                        <video src={mediaItems.find(i => i.type === 'video').preview} className="w-full h-full object-cover" />
                                                     </div>
-                                                </Reorder.Item>
-                                            ))}
-                                        </AnimatePresence>
-                                    </Reorder.Group>
-                                </div>
-                            ) : (
-                                <div className="space-y-6">
-                                    <div className="p-4 bg-blue-50 text-blue-700 rounded-xl text-sm border border-blue-100">
-                                        <p className="font-bold flex items-center gap-2">
-                                            <AlertCircle size={16} />
-                                            Single Video Post
-                                        </p>
-                                        <p className="mt-1 opacity-90">
-                                            Upload a video or paste a TikTok link. The caption will be used as the post description.
-                                        </p>
+                                                    <span className="font-medium text-green-700">Video Added</span>
+                                                </div>
+                                                <button onClick={() => removeMediaItem(mediaItems.find(i => i.type === 'video').id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Image Input */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Card 2: Image</label>
+                                        {!mediaItems.some(i => i.type === 'image' && !i.isPageCard) ? (
+                                            <div {...getImageRootProps()} className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer transition-all
+                                                    ${isImageDragActive ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400 hover:bg-gray-50'}`}>
+                                                <input {...getImageInputProps()} />
+                                                <Plus className="w-6 h-6 text-pink-400 mb-2" />
+                                                <span className="text-sm font-medium text-gray-600">Upload Image</span>
+                                            </div>
+                                        ) : (
+                                            <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <img src={mediaItems.find(i => i.type === 'image' && !i.isPageCard).preview} className="w-10 h-10 rounded-lg object-cover" alt="" />
+                                                    <span className="font-medium text-green-700">Image Added</span>
+                                                </div>
+                                                <button onClick={() => removeMediaItem(mediaItems.find(i => i.type === 'image' && !i.isPageCard).id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                            )}
-                        </div>
+
+                                {/* Right: Auto-Fill Info & Preview List */}
+                                <div className="space-y-6">
+                                    {/* Auto-Fill Info */}
+                                    <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                                        <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-3">
+                                            <Sparkles size={16} className="text-purple-500" /> Intelligent Auto-Fill
+                                        </h4>
+                                        <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                                            <div className="flex justify-between">
+                                                <span>Headline:</span>
+                                                <span className="font-medium text-gray-900 dark:text-white">{headline || "(Select Page)"}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Link:</span>
+                                                <span className="font-medium text-gray-900 dark:text-white truncate max-w-[200px]">{targetLink || "(Select Page)"}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>CTA:</span>
+                                                <span className="font-medium text-gray-900 dark:text-white">{cta}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Media List Preview */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Cards Preview</label>
+                                        <div className="space-y-2">
+                                            {mediaItems.length === 0 ? (
+                                                <div className="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                                    No media added yet
+                                                </div>
+                                            ) : (
+                                                <Reorder.Group axis="y" values={mediaItems} onReorder={setMediaItems}>
+                                                    {mediaItems.map((item, index) => (
+                                                        <Reorder.Item key={item.id} value={item}>
+                                                            <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                                                                <div className="cursor-grab text-gray-400 hover:text-gray-600">
+                                                                    <GripVertical size={16} />
+                                                                </div>
+                                                                <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                                                    {item.type === 'video' ? (
+                                                                        <video src={item.preview} className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <img src={item.preview} className="w-full h-full object-cover" alt="" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-bold text-gray-800 dark:text-white truncate">
+                                                                        Card {index + 1}: {item.type === 'video' ? 'Video' : (item.isPageCard ? 'Page Card' : 'Image')}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500 truncate">
+                                                                        {item.isPageCard ? 'Auto-generated' : (item.file ? item.file.name : 'Imported')}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </Reorder.Item>
+                                                    ))}
+                                                </Reorder.Group>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="mt-6 flex flex-col md:flex-row items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm gap-4">
+                {/* 🔷 STEP 5 & 6: SCHEDULE & ACTION */}
+                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col md:flex-row justify-between items-center gap-6 sticky bottom-6 z-20">
 
-                    {/* Scheduling Toggle */}
-                    <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-900 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
-                        <button
-                            onClick={() => { setScheduleTime(""); }}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${!scheduleTime ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                            Instant
-                        </button>
-                        <button
-                            onClick={() => {
-                                // Set default time to 1 hour from now if empty
-                                if (!scheduleTime) {
-                                    const now = new Date();
-                                    now.setHours(now.getHours() + 1);
-                                    now.setMinutes(0);
-                                    setScheduleTime(now.toISOString().slice(0, 16));
-                                }
-                            }}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${scheduleTime ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                            Schedule
-                        </button>
+                    {/* Step 5: Scheduling */}
+                    <div className="w-full md:w-auto flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <Calendar className="text-gray-400" size={20} />
+                            <span className="font-bold text-gray-700 dark:text-gray-300">Schedule:</span>
+                        </div>
+                        <input
+                            type="datetime-local"
+                            value={scheduleTime}
+                            onChange={(e) => setScheduleTime(e.target.value)}
+                            className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                        />
+                        {scheduleTime && (
+                            <button onClick={() => setScheduleTime("")} className="text-xs text-red-500 hover:underline">Clear</button>
+                        )}
                     </div>
 
-                    {/* Date Picker (Visible only if Scheduled) */}
-                    {scheduleTime && (
-                        <div className="relative animate-in fade-in slide-in-from-left-4 duration-300">
-                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={16} />
-                            <input
-                                type="datetime-local"
-                                value={scheduleTime}
-                                onChange={(e) => setScheduleTime(e.target.value)}
-                                className="pl-10 pr-4 py-2.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                            />
-                        </div>
-                    )}
-
-                    <Button
-                        onClick={handleSubmit}
-                        disabled={(!file && !previewUrl) || selectedPages.length === 0}
-                        isLoading={isSubmitting}
-                        className={`px-8 py-3 rounded-xl font-bold shadow-lg transition-all ${scheduleTime
-                            ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
-                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'} text-white ml-auto`}
-                    >
-                        {isSubmitting ? 'Processing...' : (scheduleTime ? 'Schedule Post' : 'Post Now')}
-                    </Button>
+                    {/* Step 6: Action Button */}
+                    <div className="w-full md:w-auto flex gap-3">
+                        <Button
+                            onClick={handleSubmit}
+                            isLoading={isSubmitting}
+                            className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${scheduleTime ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'}`}
+                        >
+                            {scheduleTime ? <Clock size={18} /> : <Check size={18} />}
+                            {scheduleTime ? "Schedule Post" : "Post Now"}
+                        </Button>
+                    </div>
                 </div>
 
             </div>

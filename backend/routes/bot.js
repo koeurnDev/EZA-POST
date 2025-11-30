@@ -6,6 +6,7 @@ const express = require("express");
 const router = express.Router();
 const { BotRule, BotStatus } = require("../models/BotRule");
 const ai = require("../utils/ai");
+const { requireAuth } = require("../utils/auth"); // ✅ Added Auth Middleware
 
 // ============================================================
 // 🧠 Initialize bot_status (if missing)
@@ -26,10 +27,10 @@ const ai = require("../utils/ai");
 // 🧩 Routes
 // ============================================================
 
-// ✅ Get all bot rules
-router.get("/rules", async (req, res) => {
+// ✅ Get all bot rules for the logged-in user
+router.get("/rules", requireAuth, async (req, res) => {
   try {
-    const rules = await BotRule.find().sort({ createdAt: -1 });
+    const rules = await BotRule.find({ userId: req.user.id }).sort({ createdAt: -1 });
     const status = await BotStatus.findOne();
     res.json({
       success: true,
@@ -43,7 +44,7 @@ router.get("/rules", async (req, res) => {
 });
 
 // ✅ Generate AI Suggestions
-router.post("/suggestions", async (req, res) => {
+router.post("/suggestions", requireAuth, async (req, res) => {
   try {
     const suggestions = await ai.generateSuggestions();
     res.json({ success: true, suggestions });
@@ -54,13 +55,22 @@ router.post("/suggestions", async (req, res) => {
 });
 
 // ✅ Add new rule
-router.post("/rules", async (req, res) => {
-  const { keyword, reply } = req.body;
+router.post("/rules", requireAuth, async (req, res) => {
+  const { keyword, reply, ruleType, scope, postId } = req.body;
+
   if (!keyword || !reply)
     return res.status(400).json({ success: false, message: "Keyword and reply required" });
 
   try {
-    const rule = await BotRule.create({ keyword, reply, enabled: true });
+    const rule = await BotRule.create({
+      userId: req.user.id,
+      keyword,
+      reply,
+      ruleType: ruleType || "KEYWORD",
+      scope: scope || "ALL",
+      postId: postId || undefined,
+      enabled: true
+    });
     res.json({ success: true, rule });
   } catch (err) {
     console.error("❌ POST /rules error:", err.message);
@@ -69,11 +79,21 @@ router.post("/rules", async (req, res) => {
 });
 
 // ✅ Update rule
-router.put("/rules/:id", async (req, res) => {
+router.put("/rules/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { keyword, reply } = req.body;
+  const { keyword, reply, ruleType, scope, postId } = req.body;
   try {
-    await BotRule.findByIdAndUpdate(id, { keyword, reply });
+    // Ensure user owns the rule
+    const rule = await BotRule.findOne({ _id: id, userId: req.user.id });
+    if (!rule) return res.status(404).json({ success: false, message: "Rule not found" });
+
+    rule.keyword = keyword;
+    rule.reply = reply;
+    rule.ruleType = ruleType;
+    rule.scope = scope;
+    rule.postId = postId;
+
+    await rule.save();
     res.json({ success: true, message: "Rule updated" });
   } catch (err) {
     console.error("❌ PUT /rules error:", err.message);
@@ -82,11 +102,15 @@ router.put("/rules/:id", async (req, res) => {
 });
 
 // ✅ Toggle rule enabled/disabled
-router.patch("/rules/:id", async (req, res) => {
+router.patch("/rules/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { enabled } = req.body;
   try {
-    await BotRule.findByIdAndUpdate(id, { enabled });
+    const rule = await BotRule.findOne({ _id: id, userId: req.user.id });
+    if (!rule) return res.status(404).json({ success: false, message: "Rule not found" });
+
+    rule.enabled = enabled;
+    await rule.save();
     res.json({ success: true, message: "Rule toggled" });
   } catch (err) {
     console.error("❌ PATCH /rules error:", err.message);
@@ -95,10 +119,12 @@ router.patch("/rules/:id", async (req, res) => {
 });
 
 // ✅ Delete rule
-router.delete("/rules/:id", async (req, res) => {
+router.delete("/rules/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
-    await BotRule.findByIdAndDelete(id);
+    const result = await BotRule.deleteOne({ _id: id, userId: req.user.id });
+    if (result.deletedCount === 0) return res.status(404).json({ success: false, message: "Rule not found" });
+
     res.json({ success: true, message: "Rule deleted" });
   } catch (err) {
     console.error("❌ DELETE /rules error:", err.message);
@@ -107,7 +133,7 @@ router.delete("/rules/:id", async (req, res) => {
 });
 
 // ✅ Update bot settings (Global Toggle)
-router.put("/settings", async (req, res) => {
+router.put("/settings", requireAuth, async (req, res) => {
   const { enabled } = req.body;
   try {
     await BotStatus.findOneAndUpdate({}, { enabled }, { upsert: true });
