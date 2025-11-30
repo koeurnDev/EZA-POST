@@ -1,6 +1,6 @@
 const BotStatus = require("../models/BotStatus");
 const User = require("../models/User");
-const BotRule = require("../models/BotRule");
+const { BotRule } = require("../models/BotRule");
 const RepliedComment = require("../models/RepliedComment");
 const PendingReply = require("../models/PendingReply");
 const BotHistory = require("../models/BotHistory");
