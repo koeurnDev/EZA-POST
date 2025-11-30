@@ -175,20 +175,9 @@ exports.createMixedCarousel = async (req, res) => {
                             }
                         }
 
-                        // 2. Call the new fb method with all details
-                        const attachRes = await fb.createAttachment(
-                            pageToken,
-                            accountId,
-                            card.type,
-                            url,
-                            link,
-                            headline,
-                            description,
-                            ctaType
-                        );
+                        // 2. (Skipped) createAttachment is redundant as we construct the payload manually below.
+                        // The previous call here was causing Error 100/33 for videos.
 
-                        if (!attachRes.success) throw new Error(`Failed to create ${card.type} attachment: ` + attachRes.error);
-                        attachmentIds.push(attachRes.id);
 
                         // 3. Construct Bundle Object
                         const attachment = {
