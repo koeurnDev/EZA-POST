@@ -272,7 +272,9 @@ class FacebookAPI {
 
         const payload = {
           child_attachments: childAttachments,
-          access_token: account.access_token || accessToken
+          access_token: account.access_token || accessToken,
+          // ✅ Fix (#194): Top-level link is required for carousel posts
+          link: childAttachments[0]?.link || "https://facebook.com"
         };
 
         if (caption && caption.trim().length > 0) {
@@ -296,7 +298,7 @@ class FacebookAPI {
           status: "success",
           postId: res.data.id
         });
-        console.log(`✅ Carousel posted to ${account.name} (ID: ${res.data.id})`);
+        console.log(`✅ Carousel posted to ${account.name || account.id} (ID: ${res.data.id})`);
 
       } catch (err) {
         const parsed = this.handleFacebookError(err);
