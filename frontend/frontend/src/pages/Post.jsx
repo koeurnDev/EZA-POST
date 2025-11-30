@@ -103,6 +103,9 @@ export default function Post() {
                     if (lastUsedPageId) {
                         const found = res.data.accounts.find(p => p.id === lastUsedPageId);
                         if (found) setSelectedPages([found.id]);
+                    } else if (res.data.accounts.length > 0) {
+                        // 🌟 Default to first page if no history
+                        setSelectedPages([res.data.accounts[0].id]);
                     }
                 }
             } catch (err) {
@@ -583,17 +586,16 @@ export default function Post() {
                                 </div>
                             ) : (
                                 <div className="space-y-6">
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-2">Video Title (Headline)</label>
-                                        <input
-                                            type="text"
-                                            value={headline}
-                                            onChange={(e) => setHeadline(e.target.value)}
-                                            placeholder="Enter a bold headline..."
-                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                        />
+                                    {/* Video Title (Headline) Removed */}
+                                    <div className="p-4 bg-blue-50 text-blue-700 rounded-xl text-sm border border-blue-100">
+                                        <p className="font-bold flex items-center gap-2">
+                                            <AlertCircle size={16} />
+                                            Single Video Post
+                                        </p>
+                                        <p className="mt-1 opacity-90">
+                                            Upload a video or paste a TikTok link. The caption will be used as the post description.
+                                        </p>
                                     </div>
-                                    {/* Cover Image Section Removed for Single Post */}
                                 </div>
                             )}
                         </div>
