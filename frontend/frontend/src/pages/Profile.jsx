@@ -15,14 +15,28 @@ export default function Profile() {
     const { user, updateUser, loading } = useAuth(); // ✅ Added loading
     const [isDemo, setIsDemo] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+    // 📝 Static Config for Stats (Icons & Colors) - NEVER CACHE THIS
+    const statConfig = [
+        { label: "Posts Created", icon: "🎥", color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
+        { label: "Auto-Replies", icon: "💬", color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+        { label: "Pages Connected", icon: "🛡️", color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
+    ];
+
     const [stats, setStats] = useState(() => {
-        // 💾 Load Cached Stats
-        const cached = localStorage.getItem("profileStats");
-        return cached ? JSON.parse(cached) : [
-            { label: "Posts Created", value: "0", icon: "🎥", color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
-            { label: "Auto-Replies", value: "0", icon: "💬", color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-            { label: "Pages Connected", value: "0", icon: "🛡️", color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
-        ];
+        // 💾 Load Cached Values ONLY (ignore icons/structure)
+        try {
+            const cached = localStorage.getItem("profileStatsValues");
+            const values = cached ? JSON.parse(cached) : { posts: "0", replies: "0", pages: "0" };
+
+            return [
+                { ...statConfig[0], value: values.posts },
+                { ...statConfig[1], value: values.replies },
+                { ...statConfig[2], value: values.pages },
+            ];
+        } catch {
+            return statConfig.map(s => ({ ...s, value: "0" }));
+        }
     });
 
     // ✅ Initialize Demo Mode & Fetch Stats
@@ -43,19 +57,19 @@ export default function Profile() {
                 const repliesCount = statsRes.success ? statsRes.stats.replies : 0;
 
                 // Update Stats
-                setStats(prev => {
-                    const newStats = prev.map(stat => {
-                        if (stat.label === "Pages Connected") return { ...stat, value: pageCount.toString() };
-                        if (stat.label === "Posts Created") return { ...stat, value: postsCount.toString() };
-                        if (stat.label === "Auto-Replies") return { ...stat, value: repliesCount.toString() };
-                        return stat;
-                    });
+                setStats([
+                    { ...statConfig[0], value: postsCount.toString() },
+                    { ...statConfig[1], value: repliesCount.toString() },
+                    { ...statConfig[2], value: pageCount.toString() },
+                ]);
 
-                    // 💾 Save to Cache
-                    localStorage.setItem("profileStats", JSON.stringify(newStats));
+                // 💾 Save Values Only
+                localStorage.setItem("profileStatsValues", JSON.stringify({
+                    posts: postsCount.toString(),
+                    replies: repliesCount.toString(),
+                    pages: pageCount.toString()
+                }));
 
-                    return newStats;
-                });
             } catch (err) {
                 console.error("Failed to fetch profile stats:", err);
             }
