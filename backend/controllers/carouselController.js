@@ -25,12 +25,21 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
 
         // 🛑 Check for Page Card in payload (it counts as an image)
         let hasPageCard = false;
+        console.log("📦 Body:", JSON.stringify(req.body, null, 2));
+        console.log("📂 Files:", req.files ? req.files.map(f => f.fieldname) : "None");
+
         try {
             if (req.body.carouselCards) {
                 const cards = JSON.parse(req.body.carouselCards);
+                console.log("🃏 Parsed Cards:", cards);
                 hasPageCard = cards.some(c => c.imageUrl); // Page Card has imageUrl
+                console.log("✅ Has Page Card:", hasPageCard);
+            } else {
+                console.warn("⚠️ No carouselCards in body");
             }
-        } catch (e) { /* ignore parse error here, validation happens later */ }
+        } catch (e) {
+            console.error("❌ JSON Parse Error:", e.message);
+        }
 
         const hasImages = hasPageCard;
 
