@@ -8,22 +8,26 @@ const botRuleSchema = new mongoose.Schema(
     {
         keyword: {
             type: String,
-            required: function () { return this.type === 'KEYWORD'; }, // Only required if type is KEYWORD
+            required: true,
             trim: true,
         },
         reply: {
             type: String,
             required: true,
         },
-        type: {
+        ruleType: {
             type: String,
-            enum: ["KEYWORD", "ALL_POSTS"],
+            enum: ["KEYWORD", "REGEX"],
             default: "KEYWORD",
         },
-        matchType: {
+        scope: {
             type: String,
-            enum: ["EXACT", "CONTAINS"],
-            default: "CONTAINS",
+            enum: ["ALL", "SPECIFIC"],
+            default: "ALL",
+        },
+        postId: {
+            type: String,
+            // Only required if scope is SPECIFIC
         },
         enabled: {
             type: Boolean,
