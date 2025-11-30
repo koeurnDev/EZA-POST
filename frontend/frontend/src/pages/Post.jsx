@@ -391,14 +391,19 @@ export default function Post() {
                         type: item.type,
                         link: item.link,
                         headline: item.headline,
-                        description: item.description,
-                        cta: item.cta
+                        description: headline, // Use Unified Description (stored in 'headline' state)
+                        cta: cta // Use Unified CTA (stored in 'cta' state)
                     };
 
                     if (item.type === 'image') {
                         // Find index in the filtered imageItems array to map to req.files['images']
                         const imgIndex = imageItems.findIndex(img => img.id === item.id);
                         card.fileIndex = imgIndex;
+                    }
+
+                    // Pass remote URL for Page Card
+                    if (item.isPageCard) {
+                        card.imageUrl = item.imageUrl;
                     }
 
                     return card;
@@ -630,6 +635,41 @@ export default function Post() {
                         <div className="p-6 flex-1 overflow-y-auto max-h-[600px]">
                             {postFormat === 'carousel' ? (
                                 <div className="space-y-6">
+                                    {/* 📝 Unified Card Description & CTA */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Card Description (All Cards)</label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. Limited Time Offer"
+                                                maxLength={20}
+                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-sm"
+                                                value={headline}
+                                                onChange={(e) => setHeadline(e.target.value)}
+                                            />
+                                            <p className="text-xs text-gray-400 mt-1 text-right">{headline.length}/20</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Call to Action (All Cards)</label>
+                                            <select
+                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-sm"
+                                                value={cta} // Re-using 'cta' state (was unused or from Single Post?)
+                                                // Let's check if 'cta' state exists. 
+                                                // If not, I need to add it. 
+                                                // Looking at previous file content, 'cta' state was defined: const [cta, setCta] = useState('LEARN_MORE');
+                                                onChange={(e) => setCta(e.target.value)}
+                                            >
+                                                <option value="LEARN_MORE">Learn More</option>
+                                                <option value="SHOP_NOW">Shop Now</option>
+                                                <option value="SIGN_UP">Sign Up</option>
+                                                <option value="BOOK_NOW">Book Now</option>
+                                                <option value="CONTACT_US">Contact Us</option>
+                                                <option value="WATCH_MORE">Watch More</option>
+                                                <option value="SEE_PAGE">See Page</option>
+                                                <option value="LIKE_PAGE">Follow Page</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                     {/* Add Images Dropzone */}
                                     <div {...getImageRootProps()} className={`min-h-[120px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all
                                         ${isImageDragActive ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400 hover:bg-gray-50'}`}>
@@ -687,7 +727,7 @@ export default function Post() {
                                                                         onChange={(e) => updateMediaItem(item.id, 'link', e.target.value)}
                                                                     />
                                                                 </div>
-                                                                <div>
+                                                                <div className="col-span-2">
                                                                     <input
                                                                         type="text"
                                                                         placeholder="Headline (Optional)"
@@ -697,32 +737,8 @@ export default function Post() {
                                                                         onChange={(e) => updateMediaItem(item.id, 'headline', e.target.value)}
                                                                     />
                                                                 </div>
-                                                                <div>
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="Description (Optional)"
-                                                                        maxLength={20}
-                                                                        className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                                                        value={item.description || ""}
-                                                                        onChange={(e) => updateMediaItem(item.id, 'description', e.target.value)}
-                                                                    />
-                                                                </div>
-                                                                <div className="col-span-2">
-                                                                    <select
-                                                                        className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                                                                        value={item.cta || "LEARN_MORE"}
-                                                                        onChange={(e) => updateMediaItem(item.id, 'cta', e.target.value)}
-                                                                    >
-                                                                        <option value="LEARN_MORE">Learn More</option>
-                                                                        <option value="SHOP_NOW">Shop Now</option>
-                                                                        <option value="SIGN_UP">Sign Up</option>
-                                                                        <option value="BOOK_NOW">Book Now</option>
-                                                                        <option value="CONTACT_US">Contact Us</option>
-                                                                        <option value="WATCH_MORE">Watch More</option>
-                                                                        <option value="SEE_PAGE">See Page</option>
-                                                                        <option value="LIKE_PAGE">Follow Page</option>
-                                                                    </select>
-                                                                </div>
+                                                                {/* Description Removed - Using Unified Description */}
+                                                                {/* CTA Removed - Using Unified CTA */}
                                                             </div>
                                                         </div>
                                                     </div>

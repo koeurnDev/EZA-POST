@@ -113,11 +113,16 @@ exports.createMixedCarousel = async (req, res) => {
 
                 if (carouselCards.length > 0) {
                     // Use Rich Metadata from Frontend
+                    // 📝 Unified Description Logic: Use description from the first card for ALL cards
+                    const unifiedDescription = carouselCards[0].description || " ";
+                    // 📝 Unified CTA Logic: Use CTA from the first card for ALL cards
+                    const unifiedCta = carouselCards[0].cta || "LEARN_MORE";
+
                     for (const card of carouselCards) {
                         const link = card.link || "https://facebook.com";
                         const headline = card.headline || " ";
-                        const description = card.description || " ";
-                        const ctaType = card.cta || "LEARN_MORE";
+                        const description = unifiedDescription; // Enforce unified description
+                        const ctaType = unifiedCta; // Enforce unified CTA
 
                         let url;
                         if (card.type === 'video') {
