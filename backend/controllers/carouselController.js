@@ -217,9 +217,18 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             throw new Error(`Failed to upload media for card ${index + 1}`);
                         }
 
-                        // 3. Construct attachment with ID ONLY (No Metadata)
-                        // ✅ CRITICAL: Pure Media Attachment to prevent Link Post conflict
-                        const attachment = {};
+                        // 3. Construct attachment with Metadata AND Type-Specific IDs
+                        // ✅ CRITICAL: Metadata prevents "Invalid parameter", IDs ensure native display
+                        const attachment = {
+                            link: link,
+                            name: headline,
+                            description: description,
+                            call_to_action: {
+                                type: ctaType,
+                                value: { link: link }
+                            },
+                            picture: url // ✅ Visual Fallback / Thumbnail
+                        };
 
                         if (card.type === 'video') {
                             attachment.video_id = containerId; // ✅ REQUIRED for Video
