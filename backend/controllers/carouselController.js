@@ -224,6 +224,8 @@ exports.createMixedCarousel = async (req, res) => {
                 }
 
                 // 🔄 Phase 3: Publish the Carousel
+                console.log("📦 Controller Payload (finalChildAttachments):", JSON.stringify(finalChildAttachments, null, 2));
+
                 const feedRes = await fb.postCarousel(pageToken, [{ id: accountId, type: 'page' }], caption, finalChildAttachments, {
                     isScheduled: !!scheduleTime,
                     scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
