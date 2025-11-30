@@ -70,6 +70,20 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
     const toastId = toast.loading("Signing in...");
 
     try {
+      const res = await authAPI.login(formData.email, formData.password);
+
+      // 🔐 Handle 2FA Challenge
+      if (res.requires2FA) {
+        setTempToken(res.tempToken);
+        setShow2FA(true);
+        toast.success("2FA Code Sent!", { id: toastId });
+        return;
+      }
+
+      toast.success("Welcome back!", { id: toastId });
+      onSuccess?.(res.user);
+
+    } catch (error) {
       const errorMessage =
         error?.response?.data?.error ||
         error?.message ||
