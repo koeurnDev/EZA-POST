@@ -240,24 +240,37 @@ export default function Post() {
 
     // 🖼️ Image Dropzone (Carousel)
     const onDropImages = (acceptedFiles) => {
-        const newItems = acceptedFiles.map((file) => {
-            return {
-                id: `image-${Date.now()}-${Math.random()}`,
-                type: 'image',
-                preview: URL.createObjectURL(file),
-                file: file
-            };
-        });
+        // 🛑 Enforce Single Image Limit for 3-Card Logic
+        const file = acceptedFiles[0];
+        if (!file) return;
 
-        // Add to Media Items
-        setMediaItems(prev => [...prev, ...newItems]);
-        toast.success(`${newItems.length} image(s) added!`);
+        const newItem = {
+            id: `image-${Date.now()}-${Math.random()}`,
+            type: 'image',
+            preview: URL.createObjectURL(file),
+            file: file
+        };
+
+        // Replace existing images or add new one (Ensure only 1 image + video + page card)
+        setMediaItems(prev => {
+            // Keep video
+            const videoItem = prev.find(i => i.type === 'video');
+            // Keep Page Card (it will be re-evaluated by useEffect anyway, but good to be clean)
+
+            const newOrder = [];
+            if (videoItem) newOrder.push(videoItem);
+            newOrder.push(newItem);
+
+            return newOrder;
+        });
+        toast.success("Image added!");
     };
 
     const { getRootProps: getImageRootProps, getInputProps: getImageInputProps, isDragActive: isImageDragActive } = useDropzone({
         onDrop: onDropImages,
         accept: { "image/*": [] },
-        multiple: true,
+        multiple: false, // 🛑 Restrict to single file
+        maxFiles: 1
     });
 
     // ➕ Helper to Add/Update Video in List
@@ -666,7 +679,7 @@ export default function Post() {
                                         <input {...getImageInputProps()} />
                                         <div className="text-center p-4 flex items-center gap-3">
                                             <Plus className="w-6 h-6 text-pink-400" />
-                                            <span className="text-sm text-gray-600 font-medium">Add Images</span>
+                                            <span className="text-sm text-gray-600 font-medium">Add Image (Max 1)</span>
                                         </div>
                                     </div>
 
