@@ -53,6 +53,7 @@ export default function Post() {
     const [isDragging, setIsDragging] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+    const [isDraftLoaded, setIsDraftLoaded] = useState(false); // 🛑 Prevent save before load
     const fileInputRef = useRef(null);
 
     // 🔄 Sync Media Items when Video or Images change
@@ -181,6 +182,8 @@ export default function Post() {
 
             } catch (err) {
                 console.warn("Failed to load draft:", err);
+            } finally {
+                setIsDraftLoaded(true); // ✅ Load complete
             }
         };
         loadDraft();
@@ -188,6 +191,8 @@ export default function Post() {
 
     // 💾 Auto-Save Draft
     useEffect(() => {
+        if (!isDraftLoaded) return; // 🛑 Don't save until loaded
+
         const saveTimer = setTimeout(async () => {
             // Save Text
             const draftData = {
@@ -217,7 +222,7 @@ export default function Post() {
         }, 1000); // Debounce 1s
 
         return () => clearTimeout(saveTimer);
-    }, [caption, headline, targetLink, postFormat, selectedPages, file, mediaItems]);
+    }, [caption, headline, targetLink, postFormat, selectedPages, file, mediaItems, isDraftLoaded]);
 
     // 🔄 Fetch Pages & Load Last Used
     useEffect(() => {
