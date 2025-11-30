@@ -121,11 +121,9 @@ exports.createMixedCarousel = async (req, res) => {
                     const defaultHeadline = pageName || "EZA Post";
                     const defaultDescription = "Swipe to see more";
                     const defaultLink = pageUrl;
-                    const defaultCta = "LEARN_MORE"; // Maps to "See Page" intent often
+                    const defaultCta = "LEARN_MORE";
 
                     // 2. Extract User Input (if any) - Priority: User Input > Default
-                    // We check the first card for "Unified" values as per previous design, 
-                    // but now we fallback to Page Defaults instead of empty strings.
                     const unifiedDescription = carouselCards[0].description || defaultDescription;
                     const unifiedCta = carouselCards[0].cta || defaultCta;
                     const unifiedHeadline = carouselCards[0].headline || defaultHeadline;
@@ -137,16 +135,19 @@ exports.createMixedCarousel = async (req, res) => {
                         let description = unifiedDescription;
                         let ctaType = unifiedCta;
 
+                        // Map internal intents to valid FB Enums
+                        if (ctaType === 'SEE_PAGE' || ctaType === 'FOLLOW' || ctaType === 'LIKE_PAGE') {
+                            ctaType = 'LEARN_MORE';
+                        }
+
                         // 🧠 Special Logic for "Card 3" (End Card / Profile Card)
                         // If this is the last card AND we have at least 3 cards, treat it as the "Follow Page" card
-                        // OR if the user explicitly requested a "Profile Card" type (if we had that).
-                        // For now, we'll apply the "Follow Page" logic to the last card if it's an image and index >= 2.
                         const isEndCard = index >= 2 && index === carouselCards.length - 1;
 
                         if (isEndCard) {
                             headline = `Follow ${pageName}`;
                             description = "Don't miss our next post!";
-                            ctaType = "FOLLOW"; // Facebook often maps this, or we use LEARN_MORE pointing to page
+                            ctaType = "LEARN_MORE"; // Points to page URL
                             link = pageUrl;
                         }
 
@@ -160,12 +161,11 @@ exports.createMixedCarousel = async (req, res) => {
                             }
                             // 🧠 Auto-Fetch Page Profile Pic for End Card if no specific image provided
                             else if (isEndCard && !card.fileIndex && !card.imageUrl) {
-                                // We need the page's profile picture. 
-                                // Since we don't have it easily here without another API call, 
-                                // we'll rely on what was passed or fallback to the first image.
-                                // Ideally, the frontend should have passed the profile pic URL if it wanted it.
-                                // For this iteration, we'll stick to the uploaded image or first image.
-                                url = finalImageUrls[card.fileIndex] || finalImageUrls[0];
+                                if (page && page.picture && page.picture.data && page.picture.data.url) {
+                                    url = page.picture.data.url;
+                                } else {
+                                    url = finalImageUrls[card.fileIndex] || finalImageUrls[0];
+                                }
                             }
                             // Map using fileIndex (Uploaded Files)
                             else if (card.fileIndex !== undefined && finalImageUrls[card.fileIndex]) {

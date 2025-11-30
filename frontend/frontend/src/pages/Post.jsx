@@ -444,50 +444,71 @@ export default function Post() {
                 <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 p-6">
                     <div className="flex flex-col md:flex-row gap-6 items-start">
 
-                        {/* A. Page Selection */}
-                        <div className="w-full md:w-1/3">
-                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Post To</label>
-                            <div className="relative">
-                                {availablePages.length > 0 ? (
-                                    <div className="relative">
-                                        <select
-                                            className="w-full appearance-none pl-12 pr-10 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                            onChange={(e) => handlePageSelection(e.target.value)}
-                                            value={selectedPages[0] || ""}
-                                        >
-                                            <option value="" disabled>Choose Page...</option>
-                                            {availablePages.map(page => (
-                                                <option key={page.id} value={page.id}>{page.name}</option>
-                                            ))}
-                                        </select>
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                                            {selectedPages.length > 0 ? (
-                                                <img src={availablePages.find(p => p.id === selectedPages[0])?.picture} className="w-6 h-6 rounded-full" alt="" />
-                                            ) : (
-                                                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700" />
-                                            )}
+                        {/* A. Post Type & Page Selection */}
+                        <div className="w-full md:w-1/3 space-y-4">
+                            {/* 1. Post Type Switcher (Moved Here) */}
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Post Type</label>
+                                <div className="flex bg-gray-100 dark:bg-gray-900 rounded-xl p-1 border border-gray-200 dark:border-gray-700">
+                                    <button
+                                        onClick={() => setPostFormat('carousel')}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${postFormat === 'carousel' ? 'bg-white shadow text-pink-500' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        <Layers size={16} /> Carousel
+                                    </button>
+                                    <button
+                                        onClick={() => setPostFormat('single')}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${postFormat === 'single' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        <Video size={16} /> Single Video
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* 2. Page Selection */}
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Post To</label>
+                                <div className="relative">
+                                    {availablePages.length > 0 ? (
+                                        <div className="relative">
+                                            <select
+                                                className="w-full appearance-none pl-12 pr-10 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                                onChange={(e) => handlePageSelection(e.target.value)}
+                                                value={selectedPages[0] || ""}
+                                            >
+                                                <option value="" disabled>Choose Page...</option>
+                                                {availablePages.map(page => (
+                                                    <option key={page.id} value={page.id}>{page.name}</option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                                                {selectedPages.length > 0 ? (
+                                                    <img src={availablePages.find(p => p.id === selectedPages[0])?.picture} className="w-6 h-6 rounded-full" alt="" />
+                                                ) : (
+                                                    <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700" />
+                                                )}
+                                            </div>
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                                                <ChevronDown size={16} />
+                                            </div>
                                         </div>
-                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                                            <ChevronDown size={16} />
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="p-3 bg-red-50 text-red-500 rounded-xl text-sm">No pages connected</div>
-                                )}
+                                    ) : (
+                                        <div className="p-3 bg-red-50 text-red-500 rounded-xl text-sm">No pages connected</div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
                         {/* C. Caption Box */}
                         <div className="w-full md:w-2/3">
                             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Caption</label>
-                            <div className="relative">
+                            <div className="relative h-full">
                                 <textarea
                                     value={caption}
                                     onChange={(e) => setCaption(e.target.value)}
                                     maxLength={2200}
                                     placeholder="Write a catchy caption... #hashtags @mentions"
-                                    rows={3}
-                                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all resize-y min-h-[100px]"
+                                    className="w-full h-[132px] p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all resize-none"
                                 />
                                 <div className={`absolute bottom-3 right-3 text-xs font-mono font-medium ${caption.length > 2000 ? 'text-red-500' : 'text-gray-400'}`}>
                                     {caption.length}/2200
@@ -506,11 +527,6 @@ export default function Post() {
                             <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
                                 <Video className="text-blue-500" size={20} /> Video Source
                             </h3>
-                            {/* Format Switcher (Small) */}
-                            <div className="flex bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
-                                <button onClick={() => setPostFormat('carousel')} className={`px-3 py-1 rounded-md text-xs font-bold ${postFormat === 'carousel' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-500'}`}>Carousel</button>
-                                <button onClick={() => setPostFormat('single')} className={`px-3 py-1 rounded-md text-xs font-bold ${postFormat === 'single' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>Single</button>
-                            </div>
                         </div>
 
                         {/* A) Input Method Tabs */}
@@ -624,7 +640,6 @@ export default function Post() {
                             {postFormat === 'carousel' ? (
                                 <div className="space-y-6">
                                     {/* 📝 Unified Card Description & CTA */}
-                                    {/* 📝 Unified Card Description & CTA */}
                                     <div className="grid grid-cols-1 gap-4">
                                         <div className="p-4 bg-blue-50 text-blue-700 rounded-xl text-sm border border-blue-100">
                                             <p className="font-bold flex items-center gap-2">
@@ -726,7 +741,7 @@ export default function Post() {
                             onClick={() => { setScheduleTime(""); }}
                             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${!scheduleTime ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
                         >
-                            Post Now
+                            Instant
                         </button>
                         <button
                             onClick={() => {
