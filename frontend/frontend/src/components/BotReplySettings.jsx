@@ -18,12 +18,6 @@ import {
   Save,
   X,
   Power,
-  AlertCircle,
-  CheckCircle2,
-  MoreHorizontal,
-  Sparkles,
-  Loader2,
-  HelpCircle,
   Filter
 } from "lucide-react";
 import api from "../utils/api";
@@ -275,7 +269,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             : "bg-emerald-500 text-white"
             }`}
         >
-          {notification.type === "error" ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+          {notification.type === "error" ? "❌" : "✅"}
           <span className="font-medium">{notification.msg}</span>
         </div>
       )}
@@ -322,7 +316,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-purple-200 dark:border-purple-800/50"
             title="Stuck? Let AI suggest a reply rule based on your post context."
           >
-            {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {generating ? "..." : "✨"}
             AI Auto-Generate
           </button>
         </div>
@@ -334,7 +328,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
                 Rule Type
                 <div className="group relative">
-                  <HelpCircle size={14} className="text-gray-400 cursor-help" />
+                  <span className="text-gray-400 cursor-help">(?)</span>
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                     Choose how the bot triggers. Keyword matches words, Regex matches patterns.
                   </div>
@@ -361,7 +355,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
                 Scope
                 <div className="group relative">
-                  <HelpCircle size={14} className="text-gray-400 cursor-help" />
+                  <span className="text-gray-400 cursor-help">(?)</span>
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                     Apply to all posts or a specific post ID.
                   </div>
@@ -400,7 +394,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
                 {formData.ruleType === "KEYWORD" ? "Keyword" : "Regex Pattern"}
                 <div className="group relative">
-                  <HelpCircle size={14} className="text-gray-400 cursor-help" />
+                  <span className="text-gray-400 cursor-help">(?)</span>
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                     {formData.ruleType === "KEYWORD" ? "Word or phrase to trigger reply." : "Regular expression pattern to match."}
                   </div>
@@ -420,7 +414,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
                 Reply Message
                 <div className="group relative">
-                  <HelpCircle size={14} className="text-gray-400 cursor-help" />
+                  <span className="text-gray-400 cursor-help">(?)</span>
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                     Message the bot will send.
                   </div>
