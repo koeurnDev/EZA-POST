@@ -3,6 +3,7 @@
 // ============================================================
 
 const mongoose = require("mongoose");
+const BotStatus = require("./BotStatus");
 
 const botRuleSchema = new mongoose.Schema(
     {
@@ -46,20 +47,6 @@ const botRuleSchema = new mongoose.Schema(
     }
 );
 
-const botStatusSchema = new mongoose.Schema(
-    {
-        enabled: {
-            type: Boolean,
-            default: true,
-        },
-    },
-    {
-        timestamps: true,
-        collection: "bot_status",
-    }
-);
-
 const BotRule = mongoose.model("BotRule", botRuleSchema);
-const BotStatus = mongoose.model("BotStatus", botStatusSchema);
 
 module.exports = { BotRule, BotStatus };
