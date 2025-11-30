@@ -217,16 +217,16 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             throw new Error(`Failed to upload media for card ${index + 1}`);
                         }
 
-                        // 3. Construct Bundle Object with Container ID
+                        // 3. Construct Bundle Object with media_fbid
                         const attachment = {
+                            media_fbid: containerId, // ✅ Use media_fbid for container ID
                             link: link,
                             name: headline,
                             description: description,
                             call_to_action: {
                                 type: ctaType,
                                 value: { link: link }
-                            },
-                            id: containerId // ✅ Container ID is sufficient for display
+                            }
                         };
 
                         finalChildAttachments.push(attachment);
