@@ -674,14 +674,17 @@ export default function Post() {
                                     </div>
 
                                     {/* Add Images Dropzone */}
-                                    <div {...getImageRootProps()} className={`min-h-[120px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all
-                                            ${isImageDragActive ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400 hover:bg-gray-50'}`}>
-                                        <input {...getImageInputProps()} />
-                                        <div className="text-center p-4 flex items-center gap-3">
-                                            <Plus className="w-6 h-6 text-pink-400" />
-                                            <span className="text-sm text-gray-600 font-medium">Add Image (Max 1)</span>
+                                    {/* Add Images Dropzone (Hidden if Image Exists) */}
+                                    {!mediaItems.some(i => i.type === 'image' && !i.isPageCard) && (
+                                        <div {...getImageRootProps()} className={`min-h-[120px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all
+                                                ${isImageDragActive ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400 hover:bg-gray-50'}`}>
+                                            <input {...getImageInputProps()} />
+                                            <div className="text-center p-4 flex items-center gap-3">
+                                                <Plus className="w-6 h-6 text-pink-400" />
+                                                <span className="text-sm text-gray-600 font-medium">Add Image (Max 1)</span>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* Unified Media List */}
                                     <Reorder.Group axis="y" values={mediaItems} onReorder={setMediaItems} className="space-y-3">
