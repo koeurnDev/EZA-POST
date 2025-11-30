@@ -1,3 +1,9 @@
+const BotStatus = require("../models/BotStatus");
+const User = require("../models/User");
+const BotRule = require("../models/BotRule");
+const RepliedComment = require("../models/RepliedComment");
+const axios = require("axios");
+
 const botEngine = {
     /**
      * 🚀 Main Bot Loop
