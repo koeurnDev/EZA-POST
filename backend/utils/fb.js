@@ -108,6 +108,47 @@ class FacebookAPI {
   }
 
   /* ------------------------------------------------------------ */
+  /* ⏳ Poll Video Processing Status                              */
+  /* ------------------------------------------------------------ */
+  async waitForVideoProcessing(accessToken, videoId) {
+    let attempts = 0;
+    const maxAttempts = 30; // 60 seconds max
+    const delay = 2000; // 2 seconds
+
+    while (attempts < maxAttempts) {
+      try {
+        const res = await this.http.get(`${this.graph}/${videoId}`, {
+          params: {
+            access_token: accessToken,
+            fields: "status"
+          }
+        });
+
+        const status = res.data.status;
+        const videoStatus = status?.video_status;
+        console.log(`⏳ Video ${videoId} status: ${videoStatus}`);
+
+        if (videoStatus === 'ready') {
+          console.log(`✅ Video ${videoId} is ready!`);
+          return true;
+        }
+
+        if (videoStatus === 'error') {
+          throw new Error("Video processing failed on Facebook side.");
+        }
+
+      } catch (err) {
+        console.warn(`⚠️ Error checking video status: ${err.message}`);
+      }
+
+      await new Promise(r => setTimeout(r, delay));
+      attempts++;
+    }
+
+    throw new Error("Video processing timed out.");
+  }
+
+  /* ------------------------------------------------------------ */
   /* ✅ Upload Video for Carousel (Container ID)                   */
   /* ------------------------------------------------------------ */
   async uploadVideoForCarousel(accessToken, pageId, videoUrl) {
@@ -122,8 +163,13 @@ class FacebookAPI {
         headers: form.getHeaders(),
       });
 
-      console.log(`✅ Video container created (ID: ${res.data.id})`);
-      return { success: true, id: res.data.id };
+      const videoId = res.data.id;
+      console.log(`✅ Video container created (ID: ${videoId}). Waiting for processing...`);
+
+      // ⏳ Wait for processing to complete
+      await this.waitForVideoProcessing(accessToken, videoId);
+
+      return { success: true, id: videoId };
     } catch (error) {
       console.error("❌ Video container upload failed:", error.response?.data?.error || error.message);
       throw error;
