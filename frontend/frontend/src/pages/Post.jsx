@@ -146,6 +146,15 @@ export default function Post() {
                     setTargetLink(parsed.targetLink || "");
                     setPostFormat(parsed.postFormat || "carousel");
                     if (parsed.selectedPages) setSelectedPages(parsed.selectedPages);
+
+                    // 🌟 Restore Cached Page (Immediate Profile Card)
+                    if (parsed.cachedPage) {
+                        setAvailablePages(prev => {
+                            // Avoid duplicates if already loaded
+                            if (prev.some(p => p.id === parsed.cachedPage.id)) return prev;
+                            return [parsed.cachedPage, ...prev];
+                        });
+                    }
                 }
 
                 // 2. Load Video File
@@ -194,13 +203,18 @@ export default function Post() {
         if (!isDraftLoaded) return; // 🛑 Don't save until loaded
 
         const saveTimer = setTimeout(async () => {
-            // Save Text
+            // Find Selected Page Details
+            const selectedPageId = selectedPages[0];
+            const cachedPage = availablePages.find(p => p.id === selectedPageId);
+
+            // Save Text & Cache
             const draftData = {
                 caption,
                 headline,
                 targetLink,
                 postFormat,
-                selectedPages
+                selectedPages,
+                cachedPage // 🌟 Save Page Details
             };
             localStorage.setItem("postDraft", JSON.stringify(draftData));
 
