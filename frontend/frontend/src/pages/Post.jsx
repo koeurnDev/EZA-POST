@@ -339,9 +339,9 @@ export default function Post() {
 
         // Validate Required Fields for Carousel
         if (postFormat === 'carousel') {
-            if (!headline) return toast.error("Headline is required.");
-            if (!targetLink) return toast.error("Target URL is required.");
-            if (!targetLink.startsWith('http')) return toast.error("Invalid Target URL.");
+            // 🧠 Intelligent Auto-Fill: No longer require these fields from user
+            // if (!headline) return toast.error("Headline is required.");
+            // if (!targetLink) return toast.error("Target URL is required.");
         }
 
         setIsSubmitting(true);
@@ -624,56 +624,22 @@ export default function Post() {
                             {postFormat === 'carousel' ? (
                                 <div className="space-y-6">
                                     {/* 📝 Unified Card Description & CTA */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Headline (All Cards)</label>
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. Page Name"
-                                                maxLength={40}
-                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-sm"
-                                                value={headline}
-                                                onChange={(e) => setHeadline(e.target.value)}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Target URL (All Cards)</label>
-                                            <input
-                                                type="text"
-                                                placeholder="https://..."
-                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-sm"
-                                                value={targetLink}
-                                                onChange={(e) => setTargetLink(e.target.value)}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Card Description (All Cards)</label>
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. Limited Time Offer"
-                                                maxLength={20}
-                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-sm"
-                                                value={cardDescription}
-                                                onChange={(e) => setCardDescription(e.target.value)}
-                                            />
-                                            <p className="text-xs text-gray-400 mt-1 text-right">{cardDescription.length}/20</p>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Call to Action (All Cards)</label>
-                                            <select
-                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-sm"
-                                                value={cta}
-                                                onChange={(e) => setCta(e.target.value)}
-                                            >
-                                                <option value="LEARN_MORE">Learn More</option>
-                                                <option value="SHOP_NOW">Shop Now</option>
-                                                <option value="SIGN_UP">Sign Up</option>
-                                                <option value="BOOK_NOW">Book Now</option>
-                                                <option value="CONTACT_US">Contact Us</option>
-                                                <option value="WATCH_MORE">Watch More</option>
-                                                <option value="SEE_PAGE">See Page</option>
-                                                <option value="LIKE_PAGE">Follow Page</option>
-                                            </select>
+                                    {/* 📝 Unified Card Description & CTA */}
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div className="p-4 bg-blue-50 text-blue-700 rounded-xl text-sm border border-blue-100">
+                                            <p className="font-bold flex items-center gap-2">
+                                                <AlertCircle size={16} />
+                                                Intelligent Auto-Fill Active
+                                            </p>
+                                            <p className="mt-1 opacity-90">
+                                                We'll automatically set the Headline, Link, and CTA based on the selected Page.
+                                                <br />
+                                                <strong>Headline:</strong> Page Name
+                                                <br />
+                                                <strong>Link:</strong> Page URL
+                                                <br />
+                                                <strong>CTA:</strong> Learn More / Follow
+                                            </p>
                                         </div>
                                     </div>
 

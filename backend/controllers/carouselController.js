@@ -112,21 +112,43 @@ exports.createMixedCarousel = async (req, res) => {
                 const attachmentIds = [];
 
                 if (carouselCards.length > 0) {
-                    // Use Rich Metadata from Frontend
-                    // 📝 Unified Description Logic: Use description from the first card for ALL cards
-                    const unifiedDescription = carouselCards[0].description || " ";
-                    // 📝 Unified CTA Logic: Use CTA from the first card for ALL cards
-                    const unifiedCta = carouselCards[0].cta || "LEARN_MORE";
-                    // 📝 Unified Headline Logic: Use Headline from the first card for ALL cards
-                    const unifiedHeadline = carouselCards[0].headline || " ";
-                    // 📝 Unified Link Logic: Use Link from the first card for ALL cards
-                    const unifiedLink = carouselCards[0].link || "https://facebook.com";
+                    // 🧠 Intelligent Auto-Fill System
+                    // If metadata is missing, we auto-fill it based on the Target Page.
 
-                    for (const card of carouselCards) {
-                        const link = unifiedLink; // Enforce unified link
-                        const headline = unifiedHeadline; // Enforce unified headline
-                        const description = unifiedDescription; // Enforce unified description
-                        const ctaType = unifiedCta; // Enforce unified CTA
+                    const pageUrl = `https://facebook.com/${accountId}`;
+
+                    // 1. Auto-Fill Defaults
+                    const defaultHeadline = pageName || "EZA Post";
+                    const defaultDescription = "Swipe to see more";
+                    const defaultLink = pageUrl;
+                    const defaultCta = "LEARN_MORE"; // Maps to "See Page" intent often
+
+                    // 2. Extract User Input (if any) - Priority: User Input > Default
+                    // We check the first card for "Unified" values as per previous design, 
+                    // but now we fallback to Page Defaults instead of empty strings.
+                    const unifiedDescription = carouselCards[0].description || defaultDescription;
+                    const unifiedCta = carouselCards[0].cta || defaultCta;
+                    const unifiedHeadline = carouselCards[0].headline || defaultHeadline;
+                    const unifiedLink = carouselCards[0].link || defaultLink;
+
+                    for (const [index, card] of carouselCards.entries()) {
+                        let link = unifiedLink;
+                        let headline = unifiedHeadline;
+                        let description = unifiedDescription;
+                        let ctaType = unifiedCta;
+
+                        // 🧠 Special Logic for "Card 3" (End Card / Profile Card)
+                        // If this is the last card AND we have at least 3 cards, treat it as the "Follow Page" card
+                        // OR if the user explicitly requested a "Profile Card" type (if we had that).
+                        // For now, we'll apply the "Follow Page" logic to the last card if it's an image and index >= 2.
+                        const isEndCard = index >= 2 && index === carouselCards.length - 1;
+
+                        if (isEndCard) {
+                            headline = `Follow ${pageName}`;
+                            description = "Don't miss our next post!";
+                            ctaType = "FOLLOW"; // Facebook often maps this, or we use LEARN_MORE pointing to page
+                            link = pageUrl;
+                        }
 
                         let url;
                         if (card.type === 'video') {
@@ -135,6 +157,15 @@ exports.createMixedCarousel = async (req, res) => {
                             // Support Remote Image URL (e.g. Page Profile Pic for Card 3)
                             if (card.imageUrl) {
                                 url = card.imageUrl;
+                            }
+                            // 🧠 Auto-Fetch Page Profile Pic for End Card if no specific image provided
+                            else if (isEndCard && !card.fileIndex && !card.imageUrl) {
+                                // We need the page's profile picture. 
+                                // Since we don't have it easily here without another API call, 
+                                // we'll rely on what was passed or fallback to the first image.
+                                // Ideally, the frontend should have passed the profile pic URL if it wanted it.
+                                // For this iteration, we'll stick to the uploaded image or first image.
+                                url = finalImageUrls[card.fileIndex] || finalImageUrls[0];
                             }
                             // Map using fileIndex (Uploaded Files)
                             else if (card.fileIndex !== undefined && finalImageUrls[card.fileIndex]) {
