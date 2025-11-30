@@ -13,6 +13,8 @@ const { uploadFile } = require("../utils/cloudinary");
 exports.createMixedCarousel = async (req, res) => {
     req.setTimeout(600000); // 10 minutes timeout
 
+    let localVideoPath = null; // ✅ Defined outside try for cleanup access
+
     try {
         const { caption, accounts, scheduleTime, videoUrl } = req.body;
         const userId = req.user?.id;
@@ -49,14 +51,14 @@ exports.createMixedCarousel = async (req, res) => {
         const { processMediaToSquare } = require("../utils/videoProcessor");
 
         // 1.1 Process Video
-        let localVideoPath = null; // ✅ Store local path for direct upload
         if (videoFile) {
             console.log("🎬 Phase 1: Processing video locally (1080x1080)...");
             const processedVideoPath = await processMediaToSquare(videoFile.path);
             localVideoPath = processedVideoPath;
 
             console.log("☁️ Uploading processed video to Cloudinary...");
-            const vRes = await uploadFile(processedVideoPath, "eza-post/carousel_videos", "video", true, false);
+            // 🛑 CRITICAL: Set deleteAfterUpload=false so we can use the file for Direct Upload to FB
+            const vRes = await uploadFile(processedVideoPath, "eza-post/carousel_videos", "video", false, false);
             finalVideoUrl = vRes.url;
             finalVideoPublicId = vRes.public_id;
         }
@@ -303,8 +305,213 @@ exports.createMixedCarousel = async (req, res) => {
             results
         });
 
-    } catch (err) {
-        console.error("❌ Mixed Carousel Error:", err.message);
-        res.status(500).json({ success: false, error: err.message });
     }
+
+                const finalChildAttachments = [];
+
+    if (carouselCards.length > 0) {
+        // 🧠 Intelligent Auto-Fill System
+        // If metadata is missing, we auto-fill it based on the Target Page.
+
+        const pageUrl = `https://facebook.com/${accountId}`;
+
+        // 1. Auto-Fill Defaults
+        const defaultHeadline = pageName || "EZA Post";
+        const defaultDescription = "Swipe to see more";
+        const defaultLink = pageUrl;
+        const defaultCta = "LEARN_MORE";
+
+        // 2. Extract User Input (if any) - Priority: User Input > Default
+        const unifiedDescription = carouselCards[0].description || defaultDescription;
+        const unifiedCta = carouselCards[0].cta || defaultCta;
+        const unifiedHeadline = carouselCards[0].headline || defaultHeadline;
+        const unifiedLink = carouselCards[0].link || defaultLink;
+
+        for (const [index, card] of carouselCards.entries()) {
+            let link = unifiedLink;
+            let headline = unifiedHeadline;
+            let description = unifiedDescription;
+            let ctaType = unifiedCta;
+
+            // Map internal intents to valid FB Enums
+            if (ctaType === 'SEE_PAGE' || ctaType === 'FOLLOW' || ctaType === 'LIKE_PAGE') {
+                ctaType = 'LEARN_MORE';
+            }
+
+            // 🧠 Special Logic for "Card 3" (End Card / Profile Card)
+            // If this is the last card AND we have at least 3 cards, treat it as the "Follow Page" card
+            const isEndCard = index >= 2 && index === carouselCards.length - 1;
+
+            if (isEndCard) {
+                headline = `Follow ${pageName}`;
+                description = "Don't miss our next post!";
+                ctaType = "LEARN_MORE"; // Points to page URL
+                link = pageUrl;
+            }
+
+            let url;
+            if (card.type === 'video') {
+                url = finalVideoUrl;
+            } else if (card.type === 'image') {
+                // Support Remote Image URL (e.g. Page Profile Pic for Card 3)
+                if (card.imageUrl) {
+                    url = card.imageUrl;
+                }
+                // 🧠 Auto-Fetch Page Profile Pic for End Card if no specific image provided
+                else if (isEndCard && !card.fileIndex && !card.imageUrl) {
+                    if (page && page.picture && page.picture.data && page.picture.data.url) {
+                        url = page.picture.data.url;
+                    } else {
+                        url = finalImageUrls[card.fileIndex] || finalImageUrls[0];
+                    }
+                }
+                // Map using fileIndex (Uploaded Files)
+                else if (card.fileIndex !== undefined && finalImageUrls[card.fileIndex]) {
+                    url = finalImageUrls[card.fileIndex];
+                } else {
+                    url = finalImageUrls[0];
+                }
+            }
+
+            // 🚀 2-STEP PROCESS: Upload Media Container First
+            let containerId = null;
+            try {
+                if (card.type === 'video') {
+                    console.log(`📤 Uploading video container for Card ${index + 1}...`);
+
+                    // ✅ Use Direct File Upload if available (Reliable)
+                    if (localVideoPath) {
+                        const videoStream = fs.createReadStream(localVideoPath);
+                        const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, videoStream);
+                        containerId = vRes.id;
+                    } else {
+                        // Fallback to URL (e.g. TikTok)
+                        const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, url);
+                        containerId = vRes.id;
+                    }
+                } else {
+                    console.log(`📤 Uploading photo container for Card ${index + 1}...`);
+                    const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, url);
+                    containerId = pRes.id;
+                }
+            } catch (uploadErr) {
+                console.error(`❌ Failed to upload media for Card ${index + 1}:`, uploadErr.message);
+                throw new Error(`Failed to upload media for card ${index + 1}`);
+            }
+
+            // 3. Construct Bundle Object with ID
+            const attachment = {
+                link: link,
+                name: headline,
+                description: description,
+                call_to_action: {
+                    type: ctaType,
+                    value: { link: link }
+                },
+                // ✅ KEY FIX: Use id (container ID) and REMOVE picture/source
+                id: containerId
+            };
+
+            // ❌ Do NOT set picture or source when using ID
+            // attachment.picture = containerId; // REMOVED
+
+            finalChildAttachments.push(attachment);
+        }
+    } else {
+        // Fallback Legacy Logic
+        // Video Card
+        finalChildAttachments.push({
+            link: "https://facebook.com",
+            source: finalVideoUrl,
+            picture: finalVideoUrl.replace(/\.[^/.]+$/, ".jpg"),
+            name: "Video",
+            description: " ",
+            call_to_action: { type: "LEARN_MORE", value: { link: "https://facebook.com" } }
+        });
+
+        // Image Cards
+        for (let i = 0; i < finalImageUrls.length; i++) {
+            finalChildAttachments.push({
+                link: "https://facebook.com",
+                picture: finalImageUrls[i],
+                name: "Image " + (i + 1),
+                description: " ",
+                call_to_action: { type: "LEARN_MORE", value: { link: "https://facebook.com" } }
+            });
+        }
+    }
+
+    // 🔄 Phase 3: Publish the Carousel
+    console.log("📦 Controller Payload (finalChildAttachments):", JSON.stringify(finalChildAttachments, null, 2));
+
+    const feedRes = await fb.postCarousel(pageToken, [{ id: accountId, name: pageName, type: 'page' }], caption, finalChildAttachments, {
+        isScheduled: !!scheduleTime,
+        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
+    });
+
+    if (feedRes.successCount > 0) {
+        const fbPostId = feedRes.details[0].postId;
+
+        // 🔄 Phase 4: Clean-up (Soft Delete)
+        const { softDeleteAsset } = require("../utils/cloudinary");
+        if (finalVideoPublicId) await softDeleteAsset(finalVideoPublicId);
+        if (finalImagePublicIds && finalImagePublicIds.length > 0) {
+            for (const imgId of finalImagePublicIds) {
+                await softDeleteAsset(imgId);
+            }
+        }
+
+        await PostLog.create({
+            userId,
+            pageId: accountId,
+            fbPostId: fbPostId,
+            type: "carousel",
+            status: scheduleTime ? "scheduled" : "published",
+            scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
+            cloudinaryVideoId: finalVideoPublicId,
+            cloudinaryImageIds: finalImagePublicIds
+        });
+
+        results.successCount++;
+        results.details.push({ accountId, status: "success", postId: fbPostId });
+        console.log(`✅ Mixed Carousel Published: ${fbPostId}`);
+    } else {
+        throw new Error(feedRes.details[0].error || "Failed to post carousel");
+    }
+
+} catch (err) {
+    console.error(`❌ Failed for ${accountId}:`, err.message);
+    await PostLog.create({
+        userId,
+        pageId: accountId,
+        type: "carousel",
+        status: "failed",
+        error: err.message,
+        cloudinaryVideoId: finalVideoPublicId,
+        cloudinaryImageIds: finalImagePublicIds
+    });
+    results.failedCount++;
+    results.details.push({ accountId, status: "failed", error: err.message });
+}
+        }
+
+res.status(201).json({
+    success: true,
+    results
+});
+
+    } catch (err) {
+    console.error("❌ Mixed Carousel Error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+} finally {
+    // 🧹 Final Cleanup: Delete local video file if it exists
+    if (localVideoPath && fs.existsSync(localVideoPath)) {
+        try {
+            fs.unlinkSync(localVideoPath);
+            console.log(`🧹 Cleaned up local video file: ${localVideoPath}`);
+        } catch (cleanupErr) {
+            console.warn(`⚠️ Failed to delete local video file: ${cleanupErr.message}`);
+        }
+    }
+}
 };
