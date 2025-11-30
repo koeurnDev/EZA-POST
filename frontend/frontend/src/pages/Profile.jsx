@@ -8,32 +8,20 @@ import { motion } from "framer-motion"; // eslint-disable-line no-unused-vars
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useAuth } from "../context/AuthContext";
 import { authAPI, pagesAPI } from "../utils/api";
-import {
-    User,
-    Mail,
-    MapPin,
-    Calendar,
-    Edit2,
-    Camera,
-    Activity,
-    Video,
-    MessageSquare,
-    ShieldCheck
-} from "lucide-react";
 
 import EditProfileModal from "../components/EditProfileModal";
 
 export default function Profile() {
-    const { user, updateUser } = useAuth();
+    const { user, updateUser, loading } = useAuth(); // ✅ Added loading
     const [isDemo, setIsDemo] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [stats, setStats] = useState(() => {
         // 💾 Load Cached Stats
         const cached = localStorage.getItem("profileStats");
         return cached ? JSON.parse(cached) : [
-            { label: "Posts Created", value: "0", icon: Video, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
-            { label: "Auto-Replies", value: "0", icon: MessageSquare, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-            { label: "Pages Connected", value: "0", icon: ShieldCheck, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
+            { label: "Posts Created", value: "0", icon: "🎥", color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
+            { label: "Auto-Replies", value: "0", icon: "💬", color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+            { label: "Pages Connected", value: "0", icon: "🛡️", color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
         ];
     });
 
@@ -78,19 +66,16 @@ export default function Profile() {
 
     // 🕒 Mock Activity
     const activities = [
-        { id: 1, action: "Logged in from new device", time: "2 hours ago", icon: User },
-        { id: 2, action: "Scheduled a new post", time: "5 hours ago", icon: Video },
-        { id: 3, action: "Updated auto-reply rules", time: "1 day ago", icon: MessageSquare },
-        { id: 4, action: "Connected 'Gaming Hub' page", time: "2 days ago", icon: ShieldCheck },
+        { id: 1, action: "Logged in from new device", time: "2 hours ago", icon: "👤" },
+        { id: 2, action: "Scheduled a new post", time: "5 hours ago", icon: "🎥" },
+        { id: 3, action: "Updated auto-reply rules", time: "1 day ago", icon: "💬" },
+        { id: 4, action: "Connected 'Gaming Hub' page", time: "2 days ago", icon: "🛡️" },
     ];
 
     // 🖼️ Handle Cover Upload
     const handleCoverChange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
-        // Optimistic UI Update (optional, but good for UX)
-        // For now, we'll wait for the upload to finish
 
         try {
             const uploadRes = await authAPI.uploadCover(file);
@@ -102,7 +87,6 @@ export default function Profile() {
             }
         } catch (err) {
             console.error("Failed to upload cover:", err);
-            // Error toast
         }
     };
 
@@ -124,6 +108,29 @@ export default function Profile() {
         }
     };
 
+    // 🛑 1. Check Loading Status
+    if (loading) {
+        return (
+            <DashboardLayout>
+                <div className="flex items-center justify-center h-[50vh]">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    // 🛑 2. Check for Null/Undefined Data
+    if (!user) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center h-[50vh] text-center">
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Profile Not Found</h2>
+                    <p className="text-gray-500 mb-4">Please log in to view your profile.</p>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
     return (
         <DashboardLayout>
             {/* 🖼️ Hero Section */}
@@ -144,7 +151,7 @@ export default function Profile() {
 
                     <div className="absolute bottom-4 right-4 z-10">
                         <label className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-lg text-xs md:text-sm font-medium transition-colors cursor-pointer">
-                            <Camera size={14} className="md:w-4 md:h-4" />
+                            <span>📷</span>
                             <span className="hidden sm:inline">Change Cover</span>
                             <span className="sm:hidden">Cover</span>
                             <input
@@ -169,7 +176,7 @@ export default function Profile() {
 
                             {/* Avatar Upload Overlay */}
                             <label className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                                <Camera className="text-white w-8 h-8" />
+                                <span className="text-white text-2xl">📷</span>
                                 <input
                                     type="file"
                                     className="hidden"
@@ -201,7 +208,7 @@ export default function Profile() {
                         onClick={() => setIsEditModalOpen(true)}
                         className="flex items-center gap-2 px-4 py-2 md:px-6 md:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium shadow-lg shadow-blue-500/30 transition-all active:scale-95 text-sm md:text-base"
                     >
-                        <Edit2 size={16} className="md:w-[18px] md:h-[18px]" />
+                        <span>✏️</span>
                         <span className="hidden sm:inline">Edit Profile</span>
                         <span className="sm:hidden">Edit</span>
                     </button>
@@ -221,8 +228,8 @@ export default function Profile() {
                                 transition={{ delay: index * 0.1 }}
                                 className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center hover:shadow-md transition-shadow"
                             >
-                                <div className={`p-3 rounded-full mb-3 ${stat.bg} ${stat.color}`}>
-                                    <stat.icon size={24} />
+                                <div className={`p-3 rounded-full mb-3 ${stat.bg} ${stat.color} text-xl`}>
+                                    {stat.icon}
                                 </div>
                                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                                     {stat.value}
@@ -254,7 +261,7 @@ export default function Profile() {
                                     Full Name
                                 </label>
                                 <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200 font-medium">
-                                    <User size={18} className="text-gray-400" />
+                                    <span className="text-gray-400">👤</span>
                                     {user?.name || "N/A"}
                                 </div>
                             </div>
@@ -264,7 +271,7 @@ export default function Profile() {
                                     Email Address
                                 </label>
                                 <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200 font-medium">
-                                    <Mail size={18} className="text-gray-400" />
+                                    <span className="text-gray-400">✉️</span>
                                     {user?.email || "N/A"}
                                 </div>
                             </div>
@@ -274,7 +281,7 @@ export default function Profile() {
                                     Location
                                 </label>
                                 <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200 font-medium">
-                                    <MapPin size={18} className="text-gray-400" />
+                                    <span className="text-gray-400">📍</span>
                                     Phnom Penh, Cambodia
                                 </div>
                             </div>
@@ -284,7 +291,7 @@ export default function Profile() {
                                     Joined
                                 </label>
                                 <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200 font-medium">
-                                    <Calendar size={18} className="text-gray-400" />
+                                    <span className="text-gray-400">📅</span>
                                     November 2023
                                 </div>
                             </div>
@@ -296,7 +303,7 @@ export default function Profile() {
                 <div className="space-y-6">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                            <Activity size={20} className="text-blue-500" />
+                            <span className="text-blue-500 text-xl">📈</span>
                             Recent Activity
                         </h3>
 
@@ -308,8 +315,8 @@ export default function Profile() {
                                         <div className="absolute left-5 top-10 bottom-[-24px] w-0.5 bg-gray-100 dark:bg-gray-700" />
                                     )}
 
-                                    <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-700 flex items-center justify-center shrink-0 text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-600">
-                                        <activity.icon size={18} />
+                                    <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-700 flex items-center justify-center shrink-0 text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-600 text-lg">
+                                        {activity.icon}
                                     </div>
 
                                     <div>
