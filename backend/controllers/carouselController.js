@@ -41,8 +41,6 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
             console.error("❌ JSON Parse Error:", e.message);
         }
 
-        const hasImages = hasPageCard;
-
         if (!hasVideo || !hasPageCard) {
             throw new Error("Video and Page Card are required for mixed carousel");
         }
@@ -51,6 +49,8 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
         let finalVideoUrl = videoUrl;
         let finalVideoPublicId = null;
         let finalThumbnailUrl = null; // ✅ Define variable for thumbnail URL
+        let finalVideoPath = null; // Path to processed video
+        let finalThumbnailPath = null; // Path to thumbnail
 
         const { processMediaToSquare, generateThumbnail } = require("../utils/videoProcessor");
 
@@ -59,6 +59,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
             console.log("🎬 Phase 1: Processing video locally (1080x1080)...");
             const processedVideoPath = await processMediaToSquare(videoFile.path);
             localVideoPath = processedVideoPath;
+            finalVideoPath = processedVideoPath;
 
             // ✅ Generate Thumbnail (or use Custom Upload)
             const customThumbnailFile = req.files?.find(f => f.fieldname === 'thumbnail');
@@ -66,9 +67,11 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
             if (customThumbnailFile) {
                 console.log("🖼️ Using Custom Thumbnail uploaded by user");
                 localThumbnailPath = customThumbnailFile.path;
+                finalThumbnailPath = customThumbnailFile.path;
             } else {
                 try {
                     localThumbnailPath = await generateThumbnail(localVideoPath);
+                    finalThumbnailPath = localThumbnailPath;
                 } catch (thumbErr) {
                     console.warn("⚠️ Failed to generate thumbnail, proceeding without it:", thumbErr.message);
                 }
@@ -188,15 +191,13 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         let containerId = null;
                         try {
                             if (card.type === 'video') {
+                                // 🎥 Video Card
                                 console.log(`📤 Uploading video container for Card ${index + 1}...`);
 
-                                // ✅ Use Direct File Upload if available (Reliable)
-                                if (localVideoPath) {
-                                    const videoStream = fs.createReadStream(localVideoPath);
-                                    let thumbStream = null;
-                                    if (localThumbnailPath) {
-                                        thumbStream = fs.createReadStream(localThumbnailPath);
-                                    }
+                                // Check if we have a processed video path
+                                if (finalVideoPath) {
+                                    const videoStream = fs.createReadStream(finalVideoPath);
+                                    const thumbStream = finalThumbnailPath ? fs.createReadStream(finalThumbnailPath) : null;
                                     const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, videoStream, thumbStream);
                                     containerId = vRes.id;
                                 } else {
@@ -205,9 +206,52 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                     containerId = vRes.id;
                                 }
                             } else {
-                                console.log(`⏩ Skipping container upload for Image Card ${index + 1} (Using URL directly)...`);
-                                // Page Card always uses URL - No Container needed for Link Attachment style
-                                containerId = null;
+                                // 🖼️ Image Card (Page Card)
+                                console.log(`📤 Uploading photo container for Card ${index + 1}...`);
+
+                                // 📥 Download Image to Temp File first
+                                // This ensures FB gets the file even if it can't fetch the CDN URL directly
+                                try {
+                                    const axios = require('axios');
+                                    const tempPageCardPath = path.join(__dirname, `../temp/thumbnails/page_card_${Date.now()}_${index}.jpg`);
+
+                                    // Ensure temp directory exists
+                                    const tempDir = path.dirname(tempPageCardPath);
+                                    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+                                    console.log(`📥 Downloading Page Card image: ${url}`);
+                                    const response = await axios({
+                                        url: url,
+                                        method: 'GET',
+                                        responseType: 'stream'
+                                    });
+
+                                    const writer = fs.createWriteStream(tempPageCardPath);
+                                    response.data.pipe(writer);
+
+                                    await new Promise((resolve, reject) => {
+                                        writer.on('finish', resolve);
+                                        writer.on('error', reject);
+                                    });
+
+                                    console.log(`✅ Page Card downloaded to: ${tempPageCardPath}`);
+
+                                    // 📤 Upload as Stream
+                                    const imgStream = fs.createReadStream(tempPageCardPath);
+                                    const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, imgStream);
+                                    containerId = pRes.id;
+
+                                    // 🧹 Cleanup Temp File
+                                    fs.unlink(tempPageCardPath, (err) => {
+                                        if (err) console.error("⚠️ Failed to delete temp page card:", err);
+                                    });
+
+                                } catch (downloadErr) {
+                                    console.error(`⚠️ Failed to download/upload Page Card image: ${downloadErr.message}`);
+                                    // Fallback to URL upload if download fails
+                                    const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, url);
+                                    containerId = pRes.id;
+                                }
                             }
                         } catch (uploadErr) {
                             console.error(`❌ Failed to upload media for Card ${index + 1}:`, uploadErr.message);
@@ -215,26 +259,22 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         }
 
                         // 3. Construct attachment with Metadata AND Type-Specific IDs
-                        // ✅ CRITICAL: Metadata prevents "Invalid parameter", IDs ensure native display
                         const attachment = {
-                            link: link, // ✅ Restore Link for ALL cards
+                            link: link,
                             name: headline,
                             description: description,
                         };
 
                         if (card.type === 'video') {
-                            // 🔄 EXPERIMENT: Use 'media_fbid' + 'picture' for Video
-                            // Previous: 'media_fbid' only = White Card
-                            // New: Add 'picture' back to see if it fixes display
+                            // 🎥 Video Attachment
                             attachment.media_fbid = containerId;
+                            // ✅ Ensure picture is sent (Thumbnail)
                             if (finalThumbnailUrl) attachment.picture = finalThumbnailUrl;
-
                         } else {
-                            // 🔄 EXPERIMENT: Image Card - NO media_fbid, Just Picture
-                            // Previous: 'media_fbid' + 'picture' = White Card
-                            // New: Treat as Link Attachment
-                            // attachment.media_fbid = containerId; 
-                            attachment.picture = url;
+                            // 🖼️ Image Attachment
+                            // ✅ Use media_fbid for uploaded container
+                            attachment.media_fbid = containerId;
+                            // attachment.picture = url; // ❌ Don't send picture if using media_fbid for Photo
 
                             // ✅ Keep CTA for Image
                             attachment.call_to_action = {
