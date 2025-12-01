@@ -174,19 +174,54 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             link = pageUrl;
                         }
 
-                        let url;
-                        if (card.type === 'video') {
-                            url = finalVideoUrl;
-                        } else if (card.type === 'image') {
-                            if (card.imageUrl) {
-                                url = card.imageUrl;
-                            } else if (isEndCard) {
-                                if (page && page.picture && page.picture.data && page.picture.data.url) {
-                                    url = page.picture.data.url;
+                        // 🚀 2-STEP PROCESS: Upload Media Container First
+                        let containerId = null;
+                        try {
+                            if (card.type === 'video') {
+                                // 🎥 Video Card
+                                console.log(`📤 Uploading video container for Card ${index + 1}...`);
+
+                                // Check if we have a processed video path
+                                if (finalVideoPath) {
+                                    const videoStream = fs.createReadStream(finalVideoPath);
+                                    const thumbStream = finalThumbnailPath ? fs.createReadStream(finalThumbnailPath) : null;
+                                    const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, videoStream, thumbStream);
+                                    containerId = vRes.id;
+                                } else {
+                                    // Fallback to URL
+                                    const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, url);
+                                    containerId = vRes.id;
                                 }
+                            } else {
+                                // 🖼️ Image Card (Page Card)
+                                console.log(`⏩ Skipping container upload for Image Card ${index + 1} (Using URL directly)...`);
+                                containerId = null;
                             }
+                        } catch (uploadErr) {
+                            console.error(`❌ Failed to upload media for Card ${index + 1}:`, uploadErr.message);
+                            throw new Error(`Failed to upload media for card ${index + 1}`);
                         }
 
+                        // 3. Construct attachment with Metadata AND Type-Specific IDs
+                        const attachment = {
+                            link: link,
+                            name: headline,
+                            description: description,
+                        };
+
+                        if (card.type === 'video') {
+                            // 🎥 Video Attachment
+                            attachment.media_fbid = containerId;
+                        } else {
+                            // 🖼️ Image Attachment
+                            attachment.picture = url;
+
+                            // ✅ Keep CTA for Image
+                            attachment.call_to_action = {
+                                type: ctaType,
+                                value: { link: link }
+                            };
+                        }
 
                         finalChildAttachments.push(attachment);
                     }
