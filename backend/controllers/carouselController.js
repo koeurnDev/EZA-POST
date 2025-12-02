@@ -193,6 +193,12 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                     const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, finalVideoUrl);
                                     containerId = vRes.id;
                                 }
+
+                                // ✅ Explicitly Set Thumbnail (Round 3 Fix)
+                                if (finalThumbnailPath && containerId) {
+                                    const thumbStream = fs.createReadStream(finalThumbnailPath);
+                                    await fb.setVideoThumbnail(pageToken, containerId, thumbStream);
+                                }
                             } else {
                                 // 🖼️ Image Card (Page Card)
                                 console.log(`📤 Uploading photo container for Card ${index + 1}...`);
@@ -255,7 +261,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         if (card.type === 'video') {
                             // 🎥 Video Attachment
                             attachment.media_fbid = containerId;
-                            attachment.picture = finalThumbnailUrl; // ✅ Ensure thumbnail is set
+                            // attachment.picture = finalThumbnailUrl; // ❌ Remove picture, rely on video object thumbnail
                         } else {
                             // 🖼️ Image Attachment
                             attachment.media_fbid = containerId; // ✅ Use uploaded photo ID

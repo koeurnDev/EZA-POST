@@ -205,6 +205,37 @@ class FacebookAPI {
   }
 
   /* ------------------------------------------------------------ */
+  /* ✅ Set Video Thumbnail (Explicit)                            */
+  /* ------------------------------------------------------------ */
+  async setVideoThumbnail(accessToken, videoId, thumbnailInput) {
+    try {
+      console.log(`🖼️ Setting thumbnail for video ${videoId}...`);
+      const form = new FormData();
+      form.append("access_token", accessToken);
+      form.append("is_preferred", "true");
+
+      if (Buffer.isBuffer(thumbnailInput)) {
+        form.append("source", thumbnailInput, { filename: "thumb.jpg", contentType: "image/jpeg" });
+      } else if (thumbnailInput && typeof thumbnailInput.pipe === 'function') {
+        form.append("source", thumbnailInput, { filename: "thumb.jpg", contentType: "image/jpeg" });
+      } else {
+        throw new Error("Invalid thumbnail input");
+      }
+
+      const res = await this.http.post(`${this.graph}/${videoId}/thumbnails`, form, {
+        headers: form.getHeaders(),
+      });
+
+      console.log(`✅ Thumbnail set for video ${videoId} (ID: ${res.data.id})`);
+      return { success: true, id: res.data.id };
+    } catch (error) {
+      console.error("❌ Failed to set video thumbnail:", error.response?.data?.error || error.message);
+      // Don't throw, just log warning, as video might still work without custom thumb
+      return { success: false, error: error.message };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
   /* ✅ Upload Photo for Carousel (Container ID)                   */
   /* ------------------------------------------------------------ */
   async uploadPhotoForCarousel(accessToken, pageId, photoInput) {
