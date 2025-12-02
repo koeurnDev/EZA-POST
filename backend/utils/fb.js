@@ -462,13 +462,12 @@ class FacebookAPI {
         const payload = {
           child_attachments: childAttachments,
           access_token: account.access_token || accessToken,
-          // ✅ Fix (#194): Top-level link is required for carousel posts
-          link: childAttachments[0]?.link || "https://facebook.com"
+          // ✅ Fix: Parent post MUST have a link (use Page URL as fallback)
+          link: `https://facebook.com/${account.id}`
         };
 
-        if (caption && caption.trim().length > 0) {
-          payload.message = caption;
-        }
+        // ✅ Fix: Parent post MUST have a message
+        payload.message = (caption && caption.trim().length > 0) ? caption : "Swipe to see more";
 
         if (options.isScheduled && options.scheduleTime) {
           payload.published = false;
