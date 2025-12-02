@@ -199,13 +199,29 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                     const thumbStream = fs.createReadStream(finalThumbnailPath);
                                     await fb.setVideoThumbnail(pageToken, containerId, thumbStream);
 
-                                    // ⏳ Wait for propagation (Round 6 Fix: Increased to 15s)
-                                    console.log("⏳ Waiting 15s for thumbnail propagation...");
-                                    await new Promise(r => setTimeout(r, 15000));
+                                    // ⏳ Wait for propagation
+                                    console.log("⏳ Waiting 5s for thumbnail propagation...");
+                                    await new Promise(r => setTimeout(r, 5000));
                                 }
 
-                                // 🗑️ Removed Round 5 Fix (Upload as FB Photo) as it didn't help
+                                // 🆕 Round 7 Fix: Upload Thumbnail as FB Photo (Like Image Card)
                                 let fbThumbnailUrl = null;
+                                if (finalThumbnailPath) {
+                                    try {
+                                        console.log("🖼️ Uploading thumbnail as FB Photo for reliable preview...");
+                                        const thumbStreamForPhoto = fs.createReadStream(finalThumbnailPath);
+                                        const photoRes = await fb.uploadPhotoForCarousel(pageToken, accountId, thumbStreamForPhoto);
+                                        if (photoRes.id) {
+                                            const fetchedUrl = await fb.getPhotoUrl(pageToken, photoRes.id);
+                                            if (fetchedUrl) {
+                                                console.log("✅ Got FB Photo URL for thumbnail:", fetchedUrl);
+                                                fbThumbnailUrl = fetchedUrl;
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.warn("⚠️ Failed to upload thumbnail as FB Photo:", e.message);
+                                    }
+                                }
                             } else {
                                 // 🖼️ Image Card (Page Card)
                                 console.log(`📤 Uploading photo container for Card ${index + 1}...`);
@@ -268,7 +284,9 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         if (card.type === 'video') {
                             // 🎥 Video Attachment
                             attachment.media_fbid = containerId;
-                            // attachment.picture = fbThumbnailUrl; // ❌ Remove picture, rely on intrinsic video thumbnail (Round 6 Fix)
+                            if (fbThumbnailUrl) {
+                                attachment.picture = fbThumbnailUrl; // ✅ Use FB-hosted URL (Round 7 Fix)
+                            }
                         } else {
                             // 🖼️ Image Attachment
                             attachment.media_fbid = containerId; // ✅ Use uploaded photo ID
