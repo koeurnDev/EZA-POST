@@ -198,6 +198,10 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                 if (finalThumbnailPath && containerId) {
                                     const thumbStream = fs.createReadStream(finalThumbnailPath);
                                     await fb.setVideoThumbnail(pageToken, containerId, thumbStream);
+
+                                    // ⏳ Wait for propagation (Round 4 Fix)
+                                    console.log("⏳ Waiting 5s for thumbnail propagation...");
+                                    await new Promise(r => setTimeout(r, 5000));
                                 }
                             } else {
                                 // 🖼️ Image Card (Page Card)
@@ -261,7 +265,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         if (card.type === 'video') {
                             // 🎥 Video Attachment
                             attachment.media_fbid = containerId;
-                            // attachment.picture = finalThumbnailUrl; // ❌ Remove picture, rely on video object thumbnail
+                            attachment.picture = finalThumbnailUrl; // ✅ Ensure thumbnail is set (Round 4 Fix)
                         } else {
                             // 🖼️ Image Attachment
                             attachment.media_fbid = containerId; // ✅ Use uploaded photo ID
