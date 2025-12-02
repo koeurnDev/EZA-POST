@@ -189,7 +189,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                     containerId = vRes.id;
                                 } else {
                                     // Fallback to URL
-                                    const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, url);
+                                    const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, finalVideoUrl);
                                     containerId = vRes.id;
                                 }
                             } else {
@@ -214,7 +214,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             attachment.media_fbid = containerId;
                         } else {
                             // 🖼️ Image Attachment
-                            attachment.picture = url;
+                            attachment.picture = card.imageUrl;
 
                             // ✅ Keep CTA for Image
                             attachment.call_to_action = {
