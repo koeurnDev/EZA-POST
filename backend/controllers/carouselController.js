@@ -292,10 +292,14 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             attachment.media_fbid = containerId; // ✅ Use uploaded photo ID
                             // 🛑 Fix: Do NOT send 'picture' if we have a media_fbid.
 
-                            // 🛑 Fix: Only add Link/CTA if it's NOT the Page URL
+                            // ✅ Always include link for Image Cards (required)
+                            if (link) {
+                                attachment.link = link;
+                            }
+
+                            // 🛑 Fix: Only add CTA if it's NOT the Page URL
                             // Facebook rejects "LEARN_MORE" pointing to the Page itself in Carousels
                             if (link && link !== pageUrl) {
-                                attachment.link = link;
                                 attachment.call_to_action = {
                                     type: ctaType,
                                     value: { link: link }
