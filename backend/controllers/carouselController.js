@@ -284,14 +284,13 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         if (card.type === 'video') {
                             // 🎥 Video Attachment
                             attachment.media_fbid = containerId;
-                            if (fbThumbnailUrl) {
-                                attachment.picture = fbThumbnailUrl; // ✅ Use FB-hosted URL (Round 7 Fix)
-                            }
+                            // 🛑 Fix: Do NOT send 'picture' if we have a media_fbid. 
+
                             // ❌ NO LINK or CTA for Video Cards (Fixes Playback Issue)
                         } else {
                             // 🖼️ Image Attachment
                             attachment.media_fbid = containerId; // ✅ Use uploaded photo ID
-                            attachment.picture = card.imageUrl; // ✅ Fallback / Preview
+                            // 🛑 Fix: Do NOT send 'picture' if we have a media_fbid.
 
                             // 🛑 Fix: Only add Link/CTA if it's NOT the Page URL
                             // Facebook rejects "LEARN_MORE" pointing to the Page itself in Carousels
@@ -306,121 +305,120 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
 
                         finalChildAttachments.push(attachment);
                     }
-                }
 
-                // 🔄 Phase 3: Publish the Carousel
-                console.log("📦 Controller Payload (finalChildAttachments):", JSON.stringify(finalChildAttachments, null, 2));
+                    // 🔄 Phase 3: Publish the Carousel
+                    console.log("📦 Controller Payload (finalChildAttachments):", JSON.stringify(finalChildAttachments, null, 2));
 
-                const feedRes = await fb.postCarousel(pageToken, [{ id: accountId, name: pageName, type: 'page' }], caption, finalChildAttachments, {
-                    isScheduled: !!scheduleTime,
-                    scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
-                });
+                    const feedRes = await fb.postCarousel(pageToken, [{ id: accountId, name: pageName, type: 'page' }], caption, finalChildAttachments, {
+                        isScheduled: !!scheduleTime,
+                        scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
+                    });
 
-                if (feedRes.successCount > 0) {
-                    const fbPostId = feedRes.details[0].postId;
+                    if (feedRes.successCount > 0) {
+                        const fbPostId = feedRes.details[0].postId;
 
-                    // 🔄 Phase 4: Clean-up (Soft Delete)
-                    const { softDeleteAsset } = require("../utils/cloudinary");
-                    if (finalVideoPublicId) await softDeleteAsset(finalVideoPublicId);
+                        // 🔄 Phase 4: Clean-up (Soft Delete)
+                        const { softDeleteAsset } = require("../utils/cloudinary");
+                        if (finalVideoPublicId) await softDeleteAsset(finalVideoPublicId);
 
+                        await PostLog.create({
+                            userId,
+                            pageId: accountId,
+                            fbPostId: fbPostId,
+                            type: "carousel",
+                            status: scheduleTime ? "scheduled" : "published",
+                            scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
+                            cloudinaryVideoId: finalVideoPublicId,
+                            cloudinaryImageIds: []
+                        });
+
+                        results.successCount++;
+                        results.details.push({ accountId, status: "success", postId: fbPostId });
+                        console.log(`✅ Mixed Carousel Published: ${fbPostId}`);
+                    } else {
+                        throw new Error(feedRes.details[0].error || "Failed to post carousel");
+                    }
+
+                } catch (err) {
+                    console.error(`❌ Failed for ${accountId}:`, err.message);
                     await PostLog.create({
                         userId,
                         pageId: accountId,
-                        fbPostId: fbPostId,
                         type: "carousel",
-                        status: scheduleTime ? "scheduled" : "published",
-                        scheduledTime: scheduleTime ? new Date(scheduleTime) : null,
+                        status: "failed",
+                        error: err.message,
                         cloudinaryVideoId: finalVideoPublicId,
                         cloudinaryImageIds: []
                     });
-
-                    results.successCount++;
-                    results.details.push({ accountId, status: "success", postId: fbPostId });
-                    console.log(`✅ Mixed Carousel Published: ${fbPostId}`);
-                } else {
-                    throw new Error(feedRes.details[0].error || "Failed to post carousel");
+                    results.failedCount++;
+                    results.details.push({ accountId, status: "failed", error: err.message });
                 }
-
-            } catch (err) {
-                console.error(`❌ Failed for ${accountId}:`, err.message);
-                await PostLog.create({
-                    userId,
-                    pageId: accountId,
-                    type: "carousel",
-                    status: "failed",
-                    error: err.message,
-                    cloudinaryVideoId: finalVideoPublicId,
-                    cloudinaryImageIds: []
-                });
-                results.failedCount++;
-                results.details.push({ accountId, status: "failed", error: err.message });
             }
-        }
 
         return results;
 
-    } catch (err) {
-        console.error("❌ Mixed Carousel Error:", err.message);
-        throw err;
-    } finally {
-        // 🧹 Final Cleanup: Delete local video file if it exists
-        if (localVideoPath && fs.existsSync(localVideoPath)) {
-            try {
-                fs.unlinkSync(localVideoPath);
-                console.log(`🧹 Cleaned up local video file: ${localVideoPath}`);
-            } catch (cleanupErr) {
-                console.warn(`⚠️ Failed to delete local video file: ${cleanupErr.message}`);
+        } catch (err) {
+            console.error("❌ Mixed Carousel Error:", err.message);
+            throw err;
+        } finally {
+            // 🧹 Final Cleanup: Delete local video file if it exists
+            if (localVideoPath && fs.existsSync(localVideoPath)) {
+                try {
+                    fs.unlinkSync(localVideoPath);
+                    console.log(`🧹 Cleaned up local video file: ${localVideoPath}`);
+                } catch (cleanupErr) {
+                    console.warn(`⚠️ Failed to delete local video file: ${cleanupErr.message}`);
+                }
             }
-        }
 
-        // 🧹 Cleanup Thumbnail
-        if (localThumbnailPath && fs.existsSync(localThumbnailPath)) {
-            try {
-                fs.unlinkSync(localThumbnailPath);
-                console.log(`🧹 Cleaned up local thumbnail file: ${localThumbnailPath}`);
-            } catch (cleanupErr) {
-                console.warn(`⚠️ Failed to delete local thumbnail file: ${cleanupErr.message}`);
+            // 🧹 Cleanup Thumbnail
+            if (localThumbnailPath && fs.existsSync(localThumbnailPath)) {
+                try {
+                    fs.unlinkSync(localThumbnailPath);
+                    console.log(`🧹 Cleaned up local thumbnail file: ${localThumbnailPath}`);
+                } catch (cleanupErr) {
+                    console.warn(`⚠️ Failed to delete local thumbnail file: ${cleanupErr.message}`);
+                }
             }
+
+
         }
+    };
+    exports.createMixedCarousel = async (req, res) => {
+        req.setTimeout(600000); // 10 minutes timeout
 
-
-    }
-};
-exports.createMixedCarousel = async (req, res) => {
-    req.setTimeout(600000); // 10 minutes timeout
-
-    try {
-        const { caption, accounts, scheduleTime } = req.body;
-        const userId = req.user?.id;
-
-        // 🛑 Validation
-        if (!accounts) return res.status(400).json({ success: false, error: "Missing accounts" });
-
-        let accountsArray = [];
         try {
-            accountsArray = JSON.parse(accounts);
-        } catch {
-            return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
-        }
+            const { caption, accounts, scheduleTime } = req.body;
+            const userId = req.user?.id;
 
-        const results = await exports.processAndPostCarousel(req, accountsArray, userId, caption, scheduleTime);
+            // 🛑 Validation
+            if (!accounts) return res.status(400).json({ success: false, error: "Missing accounts" });
 
-        // ✅ Check if ALL failed
-        if (results.failedCount === accountsArray.length) {
-            return res.status(500).json({
-                success: false,
-                error: results.details[0]?.error || "Failed to create carousel post",
+            let accountsArray = [];
+            try {
+                accountsArray = JSON.parse(accounts);
+            } catch {
+                return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
+            }
+
+            const results = await exports.processAndPostCarousel(req, accountsArray, userId, caption, scheduleTime);
+
+            // ✅ Check if ALL failed
+            if (results.failedCount === accountsArray.length) {
+                return res.status(500).json({
+                    success: false,
+                    error: results.details[0]?.error || "Failed to create carousel post",
+                    results
+                });
+            }
+
+            res.status(201).json({
+                success: true,
                 results
+
             });
+
+        } catch (err) {
+            res.status(500).json({ success: false, error: err.message });
         }
-
-        res.status(201).json({
-            success: true,
-            results
-
-        });
-
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-};
+    };
