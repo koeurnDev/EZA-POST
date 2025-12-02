@@ -177,6 +177,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
 
                         // 🚀 2-STEP PROCESS: Upload Media Container First
                         let containerId = null;
+                        let fbThumbnailUrl = null; // ✅ Scope Fix: Declare here
                         try {
                             if (card.type === 'video') {
                                 // 🎥 Video Card
@@ -205,7 +206,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                 }
 
                                 // 🆕 Round 7 Fix: Upload Thumbnail as FB Photo (Like Image Card)
-                                let fbThumbnailUrl = null;
+                                // let fbThumbnailUrl = null; // ❌ Removed inner declaration
                                 if (finalThumbnailPath) {
                                     try {
                                         console.log("🖼️ Uploading thumbnail as FB Photo for reliable preview...");
