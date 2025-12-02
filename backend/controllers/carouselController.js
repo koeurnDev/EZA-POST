@@ -292,13 +292,16 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             // 🖼️ Image Attachment
                             attachment.media_fbid = containerId; // ✅ Use uploaded photo ID
                             attachment.picture = card.imageUrl; // ✅ Fallback / Preview
-                            attachment.link = link; // ✅ Only Image Cards get Link
 
-                            // ✅ Keep CTA for Image
-                            attachment.call_to_action = {
-                                type: ctaType,
-                                value: { link: link }
-                            };
+                            // 🛑 Fix: Only add Link/CTA if it's NOT the Page URL
+                            // Facebook rejects "LEARN_MORE" pointing to the Page itself in Carousels
+                            if (link && link !== pageUrl) {
+                                attachment.link = link;
+                                attachment.call_to_action = {
+                                    type: ctaType,
+                                    value: { link: link }
+                                };
+                            }
                         }
 
                         finalChildAttachments.push(attachment);
