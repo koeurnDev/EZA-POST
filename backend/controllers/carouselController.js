@@ -9,6 +9,7 @@ const FacebookPage = require("../models/FacebookPage");
 const User = require("../models/User");
 const fb = require("../utils/fb");
 const { uploadFile } = require("../utils/cloudinary");
+const axios = require("axios"); // ✅ Added for downloading images
 
 exports.processAndPostCarousel = async (req, accountsArray, userId, caption, scheduleTime) => {
     let localVideoPath = null;
@@ -194,8 +195,50 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                 }
                             } else {
                                 // 🖼️ Image Card (Page Card)
-                                console.log(`⏩ Skipping container upload for Image Card ${index + 1} (Using URL directly)...`);
-                                containerId = null;
+                                console.log(`📤 Uploading photo container for Card ${index + 1}...`);
+
+                                let photoId = null;
+                                let localImagePath = null;
+
+                                try {
+                                    if (card.imageUrl) {
+                                        // ⬇️ Download image locally first
+                                        const tempFileName = `temp_card_${Date.now()}_${index}.jpg`;
+                                        localImagePath = path.join(__dirname, "../temp", tempFileName);
+
+                                        console.log(`⬇️ Downloading image to: ${localImagePath}`);
+                                        const response = await axios({
+                                            url: card.imageUrl,
+                                            method: 'GET',
+                                            responseType: 'stream'
+                                        });
+
+                                        await new Promise((resolve, reject) => {
+                                            const writer = fs.createWriteStream(localImagePath);
+                                            response.data.pipe(writer);
+                                            writer.on('finish', resolve);
+                                            writer.on('error', reject);
+                                        });
+
+                                        // 📤 Upload local file to FB
+                                        const imageStream = fs.createReadStream(localImagePath);
+                                        const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, imageStream);
+                                        photoId = pRes.id;
+                                    }
+                                } catch (imgErr) {
+                                    console.error(`❌ Failed to process image for card ${index + 1}:`, imgErr.message);
+                                    // Fallback?
+                                } finally {
+                                    // 🧹 Cleanup local image
+                                    if (localImagePath && fs.existsSync(localImagePath)) {
+                                        try {
+                                            fs.unlinkSync(localImagePath);
+                                            console.log(`🧹 Cleaned up temp image: ${localImagePath}`);
+                                        } catch (e) { console.warn("⚠️ Failed to delete temp image"); }
+                                    }
+                                }
+
+                                containerId = photoId;
                             }
                         } catch (uploadErr) {
                             console.error(`❌ Failed to upload media for Card ${index + 1}:`, uploadErr.message);
@@ -212,9 +255,11 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         if (card.type === 'video') {
                             // 🎥 Video Attachment
                             attachment.media_fbid = containerId;
+                            attachment.picture = finalThumbnailUrl; // ✅ Ensure thumbnail is set
                         } else {
                             // 🖼️ Image Attachment
-                            attachment.picture = card.imageUrl;
+                            attachment.media_fbid = containerId; // ✅ Use uploaded photo ID
+                            attachment.picture = card.imageUrl; // ✅ Fallback / Preview
 
                             // ✅ Keep CTA for Image
                             attachment.call_to_action = {
