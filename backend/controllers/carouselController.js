@@ -199,10 +199,13 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                     const thumbStream = fs.createReadStream(finalThumbnailPath);
                                     await fb.setVideoThumbnail(pageToken, containerId, thumbStream);
 
-                                    // ⏳ Wait for propagation (Round 4 Fix)
-                                    console.log("⏳ Waiting 5s for thumbnail propagation...");
-                                    await new Promise(r => setTimeout(r, 5000));
+                                    // ⏳ Wait for propagation (Round 6 Fix: Increased to 15s)
+                                    console.log("⏳ Waiting 15s for thumbnail propagation...");
+                                    await new Promise(r => setTimeout(r, 15000));
                                 }
+
+                                // 🗑️ Removed Round 5 Fix (Upload as FB Photo) as it didn't help
+                                let fbThumbnailUrl = null;
                             } else {
                                 // 🖼️ Image Card (Page Card)
                                 console.log(`📤 Uploading photo container for Card ${index + 1}...`);
@@ -265,7 +268,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         if (card.type === 'video') {
                             // 🎥 Video Attachment
                             attachment.media_fbid = containerId;
-                            attachment.picture = finalThumbnailUrl; // ✅ Ensure thumbnail is set (Round 4 Fix)
+                            // attachment.picture = fbThumbnailUrl; // ❌ Remove picture, rely on intrinsic video thumbnail (Round 6 Fix)
                         } else {
                             // 🖼️ Image Attachment
                             attachment.media_fbid = containerId; // ✅ Use uploaded photo ID

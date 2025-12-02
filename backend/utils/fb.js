@@ -236,6 +236,25 @@ class FacebookAPI {
   }
 
   /* ------------------------------------------------------------ */
+  /* ✅ Get Photo URL (Full Size)                                 */
+  /* ------------------------------------------------------------ */
+  async getPhotoUrl(accessToken, photoId) {
+    try {
+      const res = await this.http.get(`${this.graph}/${photoId}`, {
+        params: {
+          access_token: accessToken,
+          fields: "images"
+        }
+      });
+      // Return the largest image (first in the array usually)
+      return res.data.images?.[0]?.source || null;
+    } catch (error) {
+      console.error(`❌ Failed to get photo URL for ${photoId}:`, error.message);
+      return null;
+    }
+  }
+
+  /* ------------------------------------------------------------ */
   /* ✅ Upload Photo for Carousel (Container ID)                   */
   /* ------------------------------------------------------------ */
   async uploadPhotoForCarousel(accessToken, pageId, photoInput) {
