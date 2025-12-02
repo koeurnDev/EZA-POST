@@ -277,7 +277,6 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
 
                         // 3. Construct attachment with Metadata AND Type-Specific IDs
                         const attachment = {
-                            link: link,
                             name: headline,
                             description: description,
                         };
@@ -288,10 +287,12 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             if (fbThumbnailUrl) {
                                 attachment.picture = fbThumbnailUrl; // ✅ Use FB-hosted URL (Round 7 Fix)
                             }
+                            // ❌ NO LINK or CTA for Video Cards (Fixes Playback Issue)
                         } else {
                             // 🖼️ Image Attachment
                             attachment.media_fbid = containerId; // ✅ Use uploaded photo ID
                             attachment.picture = card.imageUrl; // ✅ Fallback / Preview
+                            attachment.link = link; // ✅ Only Image Cards get Link
 
                             // ✅ Keep CTA for Image
                             attachment.call_to_action = {
