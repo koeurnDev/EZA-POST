@@ -44,7 +44,7 @@ const upload = multer({
             const allowed = ["image/jpeg", "image/png", "image/jpg"];
             if (allowed.includes(file.mimetype)) cb(null, true);
             else cb(new Error("Invalid thumbnail type — only JPG, PNG allowed."));
-        } else if (file.fieldname === "images") {
+        } else if (file.fieldname === "images" || file.fieldname === "rightSideImage") {
             const allowed = ["image/jpeg", "image/png", "image/jpg"];
             if (allowed.includes(file.mimetype)) cb(null, true);
             else cb(new Error("Invalid image type — only JPG, PNG allowed."));
