@@ -281,11 +281,23 @@ export default function Post() {
     };
 
     // 📸 Handle Right Side Image Change
+    // 📸 Handle Right Side Image Change
     const handleRightSideImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            const preview = URL.createObjectURL(file);
             setRightSideImage(file);
-            setRightSideImagePreview(URL.createObjectURL(file));
+            setRightSideImagePreview(preview);
+
+            // 🔄 Sync with Media Items (Update Page Card)
+            setMediaItems(prev => {
+                return prev.map(item => {
+                    if (item.isPageCard) {
+                        return { ...item, preview: preview, file: file };
+                    }
+                    return item;
+                });
+            });
         }
     };
 
@@ -979,43 +991,42 @@ export default function Post() {
                             </div>
                         </div>
                     </div>
-                </div>
-                )
-}
-                {/* 🔷 STEP 5 & 6: SCHEDULE & ACTION */}
-                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col md:flex-row justify-between items-center gap-6 sticky bottom-6 z-20">
 
-                    {/* Step 5: Scheduling */}
-                    <div className="w-full md:w-auto flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                            <Calendar className="text-gray-400" size={20} />
-                            <span className="font-bold text-gray-700 dark:text-gray-300">Schedule:</span>
+                    {/* 🔷 STEP 5 & 6: SCHEDULE & ACTION */}
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col md:flex-row justify-between items-center gap-6 sticky bottom-6 z-20">
+
+                        {/* Step 5: Scheduling */}
+                        <div className="w-full md:w-auto flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <Calendar className="text-gray-400" size={20} />
+                                <span className="font-bold text-gray-700 dark:text-gray-300">Schedule:</span>
+                            </div>
+                            <input
+                                type="datetime-local"
+                                value={scheduleTime}
+                                onChange={(e) => setScheduleTime(e.target.value)}
+                                className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                            />
+                            {scheduleTime && (
+                                <button onClick={() => setScheduleTime("")} className="text-xs text-red-500 hover:underline">Clear</button>
+                            )}
                         </div>
-                        <input
-                            type="datetime-local"
-                            value={scheduleTime}
-                            onChange={(e) => setScheduleTime(e.target.value)}
-                            className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
-                        />
-                        {scheduleTime && (
-                            <button onClick={() => setScheduleTime("")} className="text-xs text-red-500 hover:underline">Clear</button>
-                        )}
+
+                        {/* Step 6: Action Button */}
+                        <div className="w-full md:w-auto flex gap-3">
+                            <Button
+                                onClick={handleSubmit}
+                                isLoading={isSubmitting}
+                                className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${scheduleTime ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'}`}
+                            >
+                                {scheduleTime ? <Clock size={18} /> : <Check size={18} />}
+                                {scheduleTime ? "Schedule Post" : "Post Now"}
+                            </Button>
+                        </div>
                     </div>
 
-                    {/* Step 6: Action Button */}
-                    <div className="w-full md:w-auto flex gap-3">
-                        <Button
-                            onClick={handleSubmit}
-                            isLoading={isSubmitting}
-                            className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${scheduleTime ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'}`}
-                        >
-                            {scheduleTime ? <Clock size={18} /> : <Check size={18} />}
-                            {scheduleTime ? "Schedule Post" : "Post Now"}
-                        </Button>
-                    </div>
                 </div>
-
-            </div >
-        </DashboardLayout >
+            </div>
+        </DashboardLayout>
     );
 }
