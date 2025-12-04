@@ -915,98 +915,105 @@ export default function Post() {
                                 </div>
 
                             </div>
-                                            <Sparkles size={16} className="text-purple-500" /> Intelligent Auto-Fill
-                    </h4>
-                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex justify-between">
-                            <span>Headline:</span>
-                            <span className="font-medium text-gray-900 dark:text-white">{headline || "(Select Page)"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Link:</span>
-                            <span className="font-medium text-gray-900 dark:text-white truncate max-w-[200px]">{targetLink || "(Select Page)"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>CTA:</span>
-                            <span className="font-medium text-gray-900 dark:text-white">{cta}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Media List Preview */}
-                <div>
-                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Cards Preview</label>
-                    <div className="space-y-2">
-                        {mediaItems.length === 0 ? (
-                            <div className="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                                No media added yet
-                            </div>
-                        ) : (
-                            <Reorder.Group axis="y" values={mediaItems} onReorder={setMediaItems}>
-                                {mediaItems.map((item, index) => (
-                                    <Reorder.Item key={item.id} value={item}>
-                                        <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-                                            <div className="cursor-grab text-gray-400 hover:text-gray-600">
-                                                <GripVertical size={16} />
-                                            </div>
-                                            <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                                                {item.type === 'video' ? (
-                                                    <video src={item.preview} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <img src={item.preview} className="w-full h-full object-cover" alt="" />
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-bold text-gray-800 dark:text-white truncate">
-                                                    Card {index + 1}: {item.type === 'video' ? 'Video' : (item.isPageCard ? 'Page Card' : 'Image')}
-                                                </p>
-                                                <p className="text-xs text-gray-500 truncate">
-                                                    {item.isPageCard ? 'Auto-generated' : (item.file ? item.file.name : 'Imported')}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </Reorder.Item>
-                                ))}
-                            </Reorder.Group>
                         )}
                     </div>
+
+                    {/* Sidebar */}
+                    <div className="space-y-6">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+                            <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                                <Sparkles size={16} className="text-purple-500" /> Intelligent Auto-Fill
+                            </h4>
+                            <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                                <div className="flex justify-between">
+                                    <span>Headline:</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">{headline || "(Select Page)"}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Link:</span>
+                                    <span className="font-medium text-gray-900 dark:text-white truncate max-w-[200px]">{targetLink || "(Select Page)"}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>CTA:</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">{cta}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Media List Preview */}
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Cards Preview</label>
+                            <div className="space-y-2">
+                                {mediaItems.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                        No media added yet
+                                    </div>
+                                ) : (
+                                    <Reorder.Group axis="y" values={mediaItems} onReorder={setMediaItems}>
+                                        {mediaItems.map((item, index) => (
+                                            <Reorder.Item key={item.id} value={item}>
+                                                <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                                                    <div className="cursor-grab text-gray-400 hover:text-gray-600">
+                                                        <GripVertical size={16} />
+                                                    </div>
+                                                    <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                                        {item.type === 'video' ? (
+                                                            <video src={item.preview} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <img src={item.preview} className="w-full h-full object-cover" alt="" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-bold text-gray-800 dark:text-white truncate">
+                                                            Card {index + 1}: {item.type === 'video' ? 'Video' : (item.isPageCard ? 'Page Card' : 'Image')}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 truncate">
+                                                            {item.isPageCard ? 'Auto-generated' : (item.file ? item.file.name : 'Imported')}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </Reorder.Item>
+                                        ))}
+                                    </Reorder.Group>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    )
+                )
 }
-{/* 🔷 STEP 5 & 6: SCHEDULE & ACTION */ }
-<div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col md:flex-row justify-between items-center gap-6 sticky bottom-6 z-20">
+                {/* 🔷 STEP 5 & 6: SCHEDULE & ACTION */}
+                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col md:flex-row justify-between items-center gap-6 sticky bottom-6 z-20">
 
-    {/* Step 5: Scheduling */}
-    <div className="w-full md:w-auto flex items-center gap-4">
-        <div className="flex items-center gap-2">
-            <Calendar className="text-gray-400" size={20} />
-            <span className="font-bold text-gray-700 dark:text-gray-300">Schedule:</span>
-        </div>
-        <input
-            type="datetime-local"
-            value={scheduleTime}
-            onChange={(e) => setScheduleTime(e.target.value)}
-            className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
-        />
-        {scheduleTime && (
-            <button onClick={() => setScheduleTime("")} className="text-xs text-red-500 hover:underline">Clear</button>
-        )}
-    </div>
+                    {/* Step 5: Scheduling */}
+                    <div className="w-full md:w-auto flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <Calendar className="text-gray-400" size={20} />
+                            <span className="font-bold text-gray-700 dark:text-gray-300">Schedule:</span>
+                        </div>
+                        <input
+                            type="datetime-local"
+                            value={scheduleTime}
+                            onChange={(e) => setScheduleTime(e.target.value)}
+                            className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                        />
+                        {scheduleTime && (
+                            <button onClick={() => setScheduleTime("")} className="text-xs text-red-500 hover:underline">Clear</button>
+                        )}
+                    </div>
 
-    {/* Step 6: Action Button */}
-    <div className="w-full md:w-auto flex gap-3">
-        <Button
-            onClick={handleSubmit}
-            isLoading={isSubmitting}
-            className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${scheduleTime ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'}`}
-        >
-            {scheduleTime ? <Clock size={18} /> : <Check size={18} />}
-            {scheduleTime ? "Schedule Post" : "Post Now"}
-        </Button>
-    </div>
-</div>
+                    {/* Step 6: Action Button */}
+                    <div className="w-full md:w-auto flex gap-3">
+                        <Button
+                            onClick={handleSubmit}
+                            isLoading={isSubmitting}
+                            className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${scheduleTime ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'}`}
+                        >
+                            {scheduleTime ? <Clock size={18} /> : <Check size={18} />}
+                            {scheduleTime ? "Schedule Post" : "Post Now"}
+                        </Button>
+                    </div>
+                </div>
 
             </div >
         </DashboardLayout >
