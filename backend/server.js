@@ -21,6 +21,21 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 // ------------------------------------------------------------
+// ✅ Global Crash Handlers (Must be first)
+// ------------------------------------------------------------
+process.on('uncaughtException', (err) => {
+  console.error('💥 UNCAUGHT EXCEPTION! Shutting down...');
+  console.error(err.name, err.message, err.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('💥 UNHANDLED REJECTION! Shutting down...');
+  console.error(err.name, err.message, err.stack);
+  process.exit(1);
+});
+
+// ------------------------------------------------------------
 // ✅ Initialize Express
 // ------------------------------------------------------------
 const app = express();
