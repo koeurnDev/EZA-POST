@@ -12,6 +12,7 @@ import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
 import { useDropzone } from "react-dropzone";
 import { Reorder, motion, AnimatePresence } from "framer-motion";
+import { generateThumbnailFromVideo, dataURLtoFile } from "../utils/videoUtils";
 
 // 🛠️ Helper for clean API URLs
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "");
@@ -36,6 +37,8 @@ export default function Post() {
     // Metadata State
     const [thumbnail, setThumbnail] = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
+    const [rightSideImage, setRightSideImage] = useState(null);
+    const [rightSideImagePreview, setRightSideImagePreview] = useState(null);
 
     // 🌟 Unified Global Fields
     const [headline, setHeadline] = useState(""); // Unified Headline
@@ -277,6 +280,15 @@ export default function Post() {
         }
     };
 
+    // 📸 Handle Right Side Image Change
+    const handleRightSideImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setRightSideImage(file);
+            setRightSideImagePreview(URL.createObjectURL(file));
+        }
+    };
+
     // 🖱️ Drag & Drop Handlers (Video)
     const handleDragEnter = (e) => {
         e.preventDefault(); e.stopPropagation(); setIsDragging(true);
@@ -302,7 +314,7 @@ export default function Post() {
 
         const video = document.createElement("video");
         video.preload = "metadata";
-        video.onloadedmetadata = () => {
+        video.onloadedmetadata = async () => {
             window.URL.revokeObjectURL(video.src);
             if (video.duration > 60) return toast.error("Video too long. Max 60s.");
 
@@ -310,6 +322,16 @@ export default function Post() {
             const url = URL.createObjectURL(selectedFile);
             setPreviewUrl(url);
             setTiktokUrl("");
+
+            // 🌟 Auto-Generate Thumbnail
+            try {
+                const thumbDataUrl = await generateThumbnailFromVideo(selectedFile);
+                setThumbnailPreview(thumbDataUrl);
+                const thumbFile = dataURLtoFile(thumbDataUrl, "thumbnail.jpg");
+                setThumbnail(thumbFile);
+            } catch (e) {
+                console.warn("Thumbnail generation failed", e);
+            }
 
             // Add to Media Items (Unified List)
             addToMediaList({
@@ -432,6 +454,11 @@ export default function Post() {
             // 🌟 Append Custom Thumbnail (if any)
             if (thumbnail) {
                 formData.append("thumbnail", thumbnail);
+            }
+
+            // 🌟 Append Custom Right Side Image (if any)
+            if (rightSideImage) {
+                formData.append("rightSideImage", rightSideImage);
             }
 
             if (scheduleTime) formData.append("scheduleTime", scheduleTime);
@@ -695,205 +722,293 @@ export default function Post() {
                                 )}
                             </div>
                         ) : (
-                            /* CAROUSEL MODE */
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                {/* Left: Media Inputs */}
-                                <div className="space-y-6">
-                                    <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm border border-blue-100">
-                                        <p className="font-bold flex items-center gap-2 mb-1">
-                                            <Layers size={16} /> Carousel Requirements
-                                        </p>
-                                        <p className="opacity-90">
-                                            A carousel requires exactly <strong>2 cards</strong>:
-                                            <br />
-                                            1. <strong>Video</strong> (Upload or TikTok)
-                                            <br />
-                                            2. <strong>Page Card</strong> (Auto-generated from Page Profile)
-                                        </p>
-                                    </div>
+                            /* CAROUSEL MODE - WIZARD UI */
+                            <div className="space-y-8">
 
-                                    {/* Video Input */}
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Card 1: Video</label>
-                                        {!mediaItems.some(i => i.type === 'video') ? (
-                                            <div className="flex gap-2">
-                                                <div
-                                                    onClick={() => fileInputRef.current?.click()}
-                                                    className="flex-1 border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-gray-50 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all"
-                                                >
-                                                    <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
-                                                    <Upload className="text-blue-500 mb-2" size={24} />
-                                                    <span className="text-sm font-medium text-gray-600">Upload Video</span>
-                                                </div>
-                                                <div className="flex-1 border-2 border-dashed border-gray-300 hover:border-pink-400 hover:bg-gray-50 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all relative">
-                                                    <LinkIcon className="text-pink-500 mb-2" size={24} />
-                                                    <span className="text-sm font-medium text-gray-600">TikTok Link</span>
-                                                    <input
-                                                        type="text"
-                                                        className="absolute inset-0 opacity-0 cursor-pointer"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            const url = prompt("Paste TikTok URL:");
-                                                            if (url) {
-                                                                setTiktokUrl(url);
-                                                                // Trigger fetch immediately (hacky but works for this simplified UI)
-                                                                setTimeout(() => handleLoadTiktok(), 100);
-                                                            }
-                                                        }}
-                                                    />
-                                                </div>
+                                {/* 1️⃣ Step 1: Video & Thumbnail */}
+                                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">1</span>
+                                        Upload Video
+                                    </h3>
+
+                                    {!mediaItems.some(i => i.type === 'video') ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-gray-50 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all h-48"
+                                            >
+                                                <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
+                                                <Upload className="text-blue-500 mb-2" size={32} />
+                                                <span className="font-bold text-gray-700">Upload Video</span>
+                                                <span className="text-xs text-gray-400 mt-1">MP4, MOV (Max 60s)</span>
                                             </div>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                {/* Video Preview */}
-                                                <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex items-center justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-black rounded-lg overflow-hidden">
-                                                            <video src={mediaItems.find(i => i.type === 'video').preview} className="w-full h-full object-cover" />
-                                                        </div>
-                                                        <span className="font-medium text-green-700">Video Added</span>
-                                                    </div>
-                                                    <button onClick={() => removeMediaItem(mediaItems.find(i => i.type === 'video').id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg">
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
+                                            <div className="border-2 border-dashed border-gray-300 hover:border-pink-400 hover:bg-gray-50 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all h-48 relative">
+                                                <LinkIcon className="text-pink-500 mb-2" size={32} />
+                                                <span className="font-bold text-gray-700">TikTok Link</span>
+                                                <input
+                                                    type="text"
+                                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const url = prompt("Paste TikTok URL:");
+                                                        if (url) {
+                                                            setTiktokUrl(url);
+                                                            setTimeout(() => handleLoadTiktok(), 100);
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col md:flex-row gap-6">
+                                            {/* Video Preview */}
+                                            <div className="w-full md:w-1/3 aspect-[9/16] bg-black rounded-xl overflow-hidden relative group">
+                                                <video src={mediaItems.find(i => i.type === 'video').preview} className="w-full h-full object-cover" controls />
+                                                <button
+                                                    onClick={() => {
+                                                        setFile(null); setPreviewUrl(null); setTiktokUrl("");
+                                                        setMediaItems(prev => prev.filter(i => i.type !== 'video'));
+                                                        setThumbnail(null); setThumbnailPreview(null);
+                                                    }}
+                                                    className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
 
-                                                {/* 🌟 Custom Thumbnail Upload */}
-                                                <div className="flex items-center gap-3">
-                                                    <div className="relative group">
-                                                        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center">
+                                            {/* Thumbnail Selection */}
+                                            <div className="flex-1 space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Thumbnail</label>
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative">
                                                             {thumbnailPreview ? (
                                                                 <img src={thumbnailPreview} className="w-full h-full object-cover" alt="Thumbnail" />
                                                             ) : (
-                                                                <ImageIcon className="text-gray-400" size={24} />
+                                                                <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs text-center p-1">
+                                                                    Auto Generated
+                                                                </div>
                                                             )}
                                                         </div>
-                                                        {thumbnailPreview && (
-                                                            <button
-                                                                onClick={() => { setThumbnail(null); setThumbnailPreview(null); }}
-                                                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            >
-                                                                <X size={12} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <label className="block text-xs font-bold text-gray-500 mb-1">Custom Thumbnail (Optional)</label>
-                                                        <label className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors">
-                                                            <Upload size={14} />
-                                                            {thumbnail ? "Change Image" : "Upload Image"}
-                                                            <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
-                                                        </label>
+                                                        <div className="flex-1">
+                                                            <p className="text-sm text-gray-600 mb-2">
+                                                                We auto-generate a thumbnail from your video. You can upload a custom one if you prefer.
+                                                            </p>
+                                                            <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-bold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors">
+                                                                <Upload size={16} />
+                                                                Upload Custom Thumbnail
+                                                                <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
+                                                            </label>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-
-                                </div>
-
-                                {/* Right: Auto-Fill Info & Preview List */}
-                                <div className="space-y-6">
-                                    {/* Auto-Fill Info */}
-                                    <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                                        <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-3">
-                                            <Sparkles size={16} className="text-purple-500" /> Intelligent Auto-Fill
-                                        </h4>
-                                        <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                                            <div className="flex justify-between">
-                                                <span>Headline:</span>
-                                                <span className="font-medium text-gray-900 dark:text-white">{headline || "(Select Page)"}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Link:</span>
-                                                <span className="font-medium text-gray-900 dark:text-white truncate max-w-[200px]">{targetLink || "(Select Page)"}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>CTA:</span>
-                                                <span className="font-medium text-gray-900 dark:text-white">{cta}</span>
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
+                                </div>
 
-                                    {/* Media List Preview */}
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Cards Preview</label>
-                                        <div className="space-y-2">
-                                            {mediaItems.length === 0 ? (
-                                                <div className="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                                                    No media added yet
-                                                </div>
-                                            ) : (
-                                                <Reorder.Group axis="y" values={mediaItems} onReorder={setMediaItems}>
-                                                    {mediaItems.map((item, index) => (
-                                                        <Reorder.Item key={item.id} value={item}>
-                                                            <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-                                                                <div className="cursor-grab text-gray-400 hover:text-gray-600">
-                                                                    <GripVertical size={16} />
-                                                                </div>
-                                                                <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                                                                    {item.type === 'video' ? (
-                                                                        <video src={item.preview} className="w-full h-full object-cover" />
-                                                                    ) : (
-                                                                        <img src={item.preview} className="w-full h-full object-cover" alt="" />
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <p className="text-sm font-bold text-gray-800 dark:text-white truncate">
-                                                                        Card {index + 1}: {item.type === 'video' ? 'Video' : (item.isPageCard ? 'Page Card' : 'Image')}
-                                                                    </p>
-                                                                    <p className="text-xs text-gray-500 truncate">
-                                                                        {item.isPageCard ? 'Auto-generated' : (item.file ? item.file.name : 'Imported')}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        </Reorder.Item>
-                                                    ))}
-                                                </Reorder.Group>
+                                {/* 2️⃣ Step 2: Page Selection (Already handled at top, but visually connected) */}
+                                {/* We assume page is selected in top section */}
+
+                                {/* 3️⃣ Step 3: Details */}
+                                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">2</span>
+                                        Carousel Details
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Description (Optional)</label>
+                                            <input
+                                                type="text"
+                                                value={cardDescription}
+                                                onChange={(e) => setCardDescription(e.target.value)}
+                                                placeholder="Enter description..."
+                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Destination URL (Optional)</label>
+                                            <input
+                                                type="url"
+                                                value={targetLink}
+                                                onChange={(e) => setTargetLink(e.target.value)}
+                                                placeholder="https://..."
+                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 4️⃣ Step 4: Call to Action */}
+                                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">3</span>
+                                        Call To Action
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Button Type</label>
+                                            <select
+                                                value={cta}
+                                                onChange={(e) => setCta(e.target.value)}
+                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                            >
+                                                <option value="LEARN_MORE">Learn More</option>
+                                                <option value="SHOP_NOW">Shop Now</option>
+                                                <option value="SIGN_UP">Sign Up</option>
+                                                <option value="BOOK_NOW">Book Now</option>
+                                                <option value="NO_BUTTON">No Button</option>
+                                            </select>
+                                            <p className="text-xs text-gray-500 mt-2">
+                                                We recommend "Learn More" or "Shop Now" to grow your page.
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">CTA Header (Optional)</label>
+                                            <input
+                                                type="text"
+                                                value={headline}
+                                                onChange={(e) => setHeadline(e.target.value)}
+                                                placeholder="e.g. Please Like Page"
+                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 5️⃣ Step 5: Right Side Image */}
+                                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">4</span>
+                                        Right Side Image
+                                    </h3>
+                                    <div className="flex items-center gap-6">
+                                        <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200 relative group">
+                                            {/* Show Custom Right Image OR Page Profile Pic */}
+                                            <img
+                                                src={rightSideImagePreview || (selectedPages.length > 0 ? availablePages.find(p => p.id === selectedPages[0])?.picture : "https://via.placeholder.com/150")}
+                                                className="w-full h-full object-cover"
+                                                alt="Right Side"
+                                            />
+                                            {rightSideImagePreview && (
+                                                <button
+                                                    onClick={() => { setRightSideImage(null); setRightSideImagePreview(null); }}
+                                                    className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <X size={20} />
+                                                </button>
                                             )}
                                         </div>
+                                        <div className="flex-1">
+                                            <p className="text-sm text-gray-600 mb-3">
+                                                By default, we use your Page's profile picture. You can upload a custom image to override it.
+                                            </p>
+                                            <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-bold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors">
+                                                <ImageIcon size={16} />
+                                                {rightSideImage ? "Change Image" : "Choose Custom Image"}
+                                                <input type="file" accept="image/*" onChange={handleRightSideImageChange} className="hidden" />
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
+
                             </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* 🔷 STEP 5 & 6: SCHEDULE & ACTION */}
-                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col md:flex-row justify-between items-center gap-6 sticky bottom-6 z-20">
-
-                    {/* Step 5: Scheduling */}
-                    <div className="w-full md:w-auto flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                            <Calendar className="text-gray-400" size={20} />
-                            <span className="font-bold text-gray-700 dark:text-gray-300">Schedule:</span>
+                                            <Sparkles size={16} className="text-purple-500" /> Intelligent Auto-Fill
+                    </h4>
+                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="flex justify-between">
+                            <span>Headline:</span>
+                            <span className="font-medium text-gray-900 dark:text-white">{headline || "(Select Page)"}</span>
                         </div>
-                        <input
-                            type="datetime-local"
-                            value={scheduleTime}
-                            onChange={(e) => setScheduleTime(e.target.value)}
-                            className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
-                        />
-                        {scheduleTime && (
-                            <button onClick={() => setScheduleTime("")} className="text-xs text-red-500 hover:underline">Clear</button>
-                        )}
-                    </div>
-
-                    {/* Step 6: Action Button */}
-                    <div className="w-full md:w-auto flex gap-3">
-                        <Button
-                            onClick={handleSubmit}
-                            isLoading={isSubmitting}
-                            className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${scheduleTime ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'}`}
-                        >
-                            {scheduleTime ? <Clock size={18} /> : <Check size={18} />}
-                            {scheduleTime ? "Schedule Post" : "Post Now"}
-                        </Button>
+                        <div className="flex justify-between">
+                            <span>Link:</span>
+                            <span className="font-medium text-gray-900 dark:text-white truncate max-w-[200px]">{targetLink || "(Select Page)"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>CTA:</span>
+                            <span className="font-medium text-gray-900 dark:text-white">{cta}</span>
+                        </div>
                     </div>
                 </div>
 
+                {/* Media List Preview */}
+                <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Cards Preview</label>
+                    <div className="space-y-2">
+                        {mediaItems.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                No media added yet
+                            </div>
+                        ) : (
+                            <Reorder.Group axis="y" values={mediaItems} onReorder={setMediaItems}>
+                                {mediaItems.map((item, index) => (
+                                    <Reorder.Item key={item.id} value={item}>
+                                        <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                                            <div className="cursor-grab text-gray-400 hover:text-gray-600">
+                                                <GripVertical size={16} />
+                                            </div>
+                                            <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                                {item.type === 'video' ? (
+                                                    <video src={item.preview} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <img src={item.preview} className="w-full h-full object-cover" alt="" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-gray-800 dark:text-white truncate">
+                                                    Card {index + 1}: {item.type === 'video' ? 'Video' : (item.isPageCard ? 'Page Card' : 'Image')}
+                                                </p>
+                                                <p className="text-xs text-gray-500 truncate">
+                                                    {item.isPageCard ? 'Auto-generated' : (item.file ? item.file.name : 'Imported')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </Reorder.Item>
+                                ))}
+                            </Reorder.Group>
+                        )}
+                    </div>
+                </div>
             </div>
-        </DashboardLayout>
+        </div>
+    )
+}
+{/* 🔷 STEP 5 & 6: SCHEDULE & ACTION */ }
+<div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col md:flex-row justify-between items-center gap-6 sticky bottom-6 z-20">
+
+    {/* Step 5: Scheduling */}
+    <div className="w-full md:w-auto flex items-center gap-4">
+        <div className="flex items-center gap-2">
+            <Calendar className="text-gray-400" size={20} />
+            <span className="font-bold text-gray-700 dark:text-gray-300">Schedule:</span>
+        </div>
+        <input
+            type="datetime-local"
+            value={scheduleTime}
+            onChange={(e) => setScheduleTime(e.target.value)}
+            className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+        />
+        {scheduleTime && (
+            <button onClick={() => setScheduleTime("")} className="text-xs text-red-500 hover:underline">Clear</button>
+        )}
+    </div>
+
+    {/* Step 6: Action Button */}
+    <div className="w-full md:w-auto flex gap-3">
+        <Button
+            onClick={handleSubmit}
+            isLoading={isSubmitting}
+            className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${scheduleTime ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'}`}
+        >
+            {scheduleTime ? <Clock size={18} /> : <Check size={18} />}
+            {scheduleTime ? "Schedule Post" : "Post Now"}
+        </Button>
+    </div>
+</div>
+
+            </div >
+        </DashboardLayout >
     );
 }

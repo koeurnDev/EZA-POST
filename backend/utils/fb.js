@@ -489,6 +489,11 @@ class FacebookAPI {
         console.log(`✅ Carousel posted to ${account.name || account.id} (ID: ${res.data.id})`);
 
       } catch (err) {
+        // 🔍 Debug: Log FULL Facebook Error
+        if (err.response && err.response.data) {
+          console.error("❌ FB API Error Details:", JSON.stringify(err.response.data, null, 2));
+        }
+
         const parsed = this.handleFacebookError(err);
         results.failedCount++;
         results.details.push({

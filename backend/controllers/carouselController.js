@@ -52,6 +52,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
         let finalThumbnailUrl = null; // ✅ Define variable for thumbnail URL
         let finalVideoPath = null; // Path to processed video
         let finalThumbnailPath = null; // Path to thumbnail
+        let finalRightSideImagePath = null; // ✅ Path to custom right side image
 
         const { processMediaToSquare, generateThumbnail } = require("../utils/videoProcessor");
 
@@ -93,6 +94,15 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                     console.warn("⚠️ Failed to upload thumbnail to Cloudinary:", thumbUploadErr.message);
                 }
             }
+        }
+
+        // ✅ 1.2 Process Right Side Image (Custom Page Card Image)
+        const rightSideImageFile = req.files?.find(f => f.fieldname === 'rightSideImage');
+        if (rightSideImageFile) {
+            console.log("🖼️ Processing Custom Right Side Image...");
+            // Optional: Process to square if needed, but for now just use as is or upload
+            // We might need it local for FB upload, so keep path
+            finalRightSideImagePath = rightSideImageFile.path;
         }
 
 
@@ -231,7 +241,13 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                                 let localImagePath = null;
 
                                 try {
-                                    if (card.imageUrl) {
+                                    // ✅ Priority: Custom Right Side Image -> Provided URL -> Default
+                                    if (finalRightSideImagePath && card.isPageCard) {
+                                        console.log(`🖼️ Using Custom Right Side Image: ${finalRightSideImagePath}`);
+                                        const imageStream = fs.createReadStream(finalRightSideImagePath);
+                                        const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, imageStream);
+                                        photoId = pRes.id;
+                                    } else if (card.imageUrl) {
                                         // ⬇️ Download image locally first
                                         const tempFileName = `temp_card_${Date.now()}_${index}.jpg`;
                                         localImagePath = path.join(__dirname, "../temp", tempFileName);
@@ -365,17 +381,15 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
             }
         }
 
-        // 🧹 Cleanup Thumbnail
-        if (localThumbnailPath && fs.existsSync(localThumbnailPath)) {
+        // 🧹 Cleanup Right Side Image
+        if (finalRightSideImagePath && fs.existsSync(finalRightSideImagePath)) {
             try {
-                fs.unlinkSync(localThumbnailPath);
-                console.log(`🧹 Cleaned up local thumbnail file: ${localThumbnailPath}`);
+                fs.unlinkSync(finalRightSideImagePath);
+                console.log(`🧹 Cleaned up right side image file: ${finalRightSideImagePath}`);
             } catch (cleanupErr) {
-                console.warn(`⚠️ Failed to delete local thumbnail file: ${cleanupErr.message}`);
+                console.warn(`⚠️ Failed to delete right side image file: ${cleanupErr.message}`);
             }
         }
-
-
     }
 };
 exports.createMixedCarousel = async (req, res) => {
