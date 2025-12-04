@@ -118,7 +118,7 @@ app.set("trust proxy", 1);
 app.use(
   session({
     store: MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/mongkul",
+      mongoUrl: process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/mongkul",
       collectionName: "sessions",
       ttl: 24 * 60 * 60, // 1 day in seconds
     }),
