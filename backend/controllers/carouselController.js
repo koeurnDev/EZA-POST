@@ -94,6 +94,69 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                     console.warn("⚠️ Failed to upload thumbnail to Cloudinary:", thumbUploadErr.message);
                 }
             }
+        } else if (videoUrl) {
+            console.log("🔗 Phase 1: Processing video from URL (TikTok/External)...");
+
+            // 1. Download Video to Temp
+            const tempVideoName = `temp_video_url_${Date.now()}.mp4`;
+            const tempDownloadPath = path.join(__dirname, "../temp", tempVideoName);
+
+            // Ensure temp dir exists
+            const tempDir = path.dirname(tempDownloadPath);
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+            console.log(`⬇️ Downloading video from URL: ${videoUrl}`);
+            const response = await axios({
+                url: videoUrl,
+                method: 'GET',
+                responseType: 'stream'
+            });
+
+            await new Promise((resolve, reject) => {
+                const writer = fs.createWriteStream(tempDownloadPath);
+                response.data.pipe(writer);
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+
+            // 2. Process to Square (Black Padding & Centered)
+            console.log("🎬 Processing downloaded video to 1:1 Square...");
+            const processedVideoPath = await processMediaToSquare(tempDownloadPath);
+
+            // Mark for cleanup
+            localVideoPath = processedVideoPath;
+            finalVideoPath = processedVideoPath;
+
+            // Cleanup the raw download immediately as we have the processed version
+            try { fs.unlinkSync(tempDownloadPath); } catch (e) { console.warn("⚠️ Failed to delete temp download"); }
+
+            // 3. Generate Thumbnail
+            const customThumbnailFile = req.files?.find(f => f.fieldname === 'thumbnail');
+            if (customThumbnailFile) {
+                localThumbnailPath = customThumbnailFile.path;
+                finalThumbnailPath = customThumbnailFile.path;
+            } else {
+                try {
+                    localThumbnailPath = await generateThumbnail(localVideoPath);
+                    finalThumbnailPath = localThumbnailPath;
+                } catch (thumbErr) {
+                    console.warn("⚠️ Failed to generate thumbnail:", thumbErr.message);
+                }
+            }
+
+            // 4. Upload Processed Video to Cloudinary
+            console.log("☁️ Uploading processed video to Cloudinary...");
+            const vRes = await uploadFile(processedVideoPath, "eza-post/carousel_videos", "video", false, false);
+            finalVideoUrl = vRes.url;
+            finalVideoPublicId = vRes.public_id;
+
+            // 5. Upload Thumbnail
+            if (localThumbnailPath) {
+                try {
+                    const tRes = await uploadFile(localThumbnailPath, "eza-post/carousel_thumbnails", "image", false, false);
+                    finalThumbnailUrl = tRes.url;
+                } catch (thumbUploadErr) { console.warn("⚠️ Failed to upload thumbnail:", thumbUploadErr.message); }
+            }
         }
 
         // ✅ 1.2 Process Right Side Image (Custom Page Card Image)
