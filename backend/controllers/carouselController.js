@@ -160,17 +160,15 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
         }
 
         // ✅ 1.2 Process Right Side Image (Custom Page Card Image)
+        let finalRightSideImageUrl = null;
         const rightSideImageFile = req.files?.find(f => f.fieldname === 'rightSideImage');
         if (rightSideImageFile) {
-            console.log("🖼️ Processing Custom Right Side Image...");
-            // Optional: Process to square if needed, but for now just use as is or upload
-            // We might need it local for FB upload, so keep path
-            finalRightSideImagePath = rightSideImageFile.path;
+            console.log("🖼️ Uploading Custom Right Side Image to Cloudinary...");
+            const rRes = await uploadFile(rightSideImageFile.path, "eza-post/carousel_images", "image", false, false);
+            finalRightSideImageUrl = rRes.url;
         }
 
-
-
-        // 🚀 Phase 2 & 3: Create Attachments & Publish
+        // 🚀 Phase 2: Create Attachments & Publish (Link Carousel Method)
         const results = { successCount: 0, failedCount: 0, details: [] };
 
         for (const accountId of accountsArray) {
@@ -190,9 +188,9 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                 }
                 if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
 
-                console.log(`🚀 Starting Mixed Carousel for ${pageName} (${accountId})...`);
+                console.log(`🚀 Starting Link Carousel for ${pageName} (${accountId})...`);
 
-                // 🔄 Phase 2: Create Media Attachments (Meta API)
+                // 🔄 Construct Child Attachments (JSON Payload)
                 let carouselCards = [];
                 try {
                     if (req.body.carouselCards) {
@@ -202,181 +200,68 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                     console.warn("⚠️ Invalid carouselCards JSON, using default logic");
                 }
 
-                // ✅ Polyfill: If no cards provided, generate them to force 2-Step Process
+                // ✅ Auto-Generate Cards if missing
                 if (!carouselCards || carouselCards.length === 0) {
-                    console.log("⚠️ No carouselCards provided. Auto-generating from inputs...");
-                    // 1. Video Card
                     carouselCards.push({ type: 'video' });
-                    // 2. Page Card
                     carouselCards.push({ type: 'image', isPageCard: true });
                 }
 
                 const finalChildAttachments = [];
+                const pageUrl = `https://facebook.com/${accountId}`;
 
-                if (carouselCards.length > 0) {
-                    // 🧠 Intelligent Auto-Fill System
-                    const pageUrl = `https://facebook.com/${accountId}`;
+                // 1. Auto-Fill Defaults
+                const defaultHeadline = pageName || "EZA Post";
+                const defaultDescription = "Swipe to see more";
+                const defaultLink = pageUrl;
 
-                    // 1. Auto-Fill Defaults
-                    const defaultHeadline = pageName || "EZA Post";
-                    const defaultDescription = "Swipe to see more";
-                    const defaultLink = pageUrl;
-                    const defaultCta = "LEARN_MORE";
+                // 2. Extract User Input (if any)
+                const unifiedDescription = carouselCards[0].description || defaultDescription;
+                const unifiedHeadline = carouselCards[0].headline || defaultHeadline;
+                const unifiedLink = carouselCards[0].link || defaultLink;
 
-                    // 2. Extract User Input (if any)
-                    const unifiedDescription = carouselCards[0].description || defaultDescription;
-                    const unifiedCta = carouselCards[0].cta || defaultCta;
-                    const unifiedHeadline = carouselCards[0].headline || defaultHeadline;
-                    const unifiedLink = carouselCards[0].link || defaultLink;
+                for (const [index, card] of carouselCards.entries()) {
+                    let link = unifiedLink;
+                    let headline = unifiedHeadline;
+                    let description = unifiedDescription;
+                    let pictureUrl = null;
 
-                    for (const [index, card] of carouselCards.entries()) {
-                        let link = unifiedLink;
-                        let headline = unifiedHeadline;
-                        let description = unifiedDescription;
-                        let ctaType = unifiedCta;
+                    const isEndCard = index >= 2 && index === carouselCards.length - 1;
 
-                        if (ctaType === 'SEE_PAGE' || ctaType === 'FOLLOW' || ctaType === 'LIKE_PAGE') {
-                            ctaType = 'LEARN_MORE';
-                        }
-
-                        const isEndCard = index >= 2 && index === carouselCards.length - 1;
-
-                        if (isEndCard) {
-                            headline = `Follow ${pageName}`;
-                            description = "Don't miss our next post!";
-                            ctaType = "LEARN_MORE";
-                            link = pageUrl;
-                        }
-
-                        // 🚀 2-STEP PROCESS: Upload Media Container First
-                        let containerId = null;
-                        let fbThumbnailUrl = null; // ✅ Scope Fix: Declare here
-                        try {
-                            if (card.type === 'video') {
-                                // 🎥 Video Card
-                                console.log(`📤 Uploading video container for Card ${index + 1}...`);
-
-                                // Check if we have a processed video path
-                                if (finalVideoPath) {
-                                    const videoStream = fs.createReadStream(finalVideoPath);
-                                    const thumbStream = finalThumbnailPath ? fs.createReadStream(finalThumbnailPath) : null;
-                                    const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, videoStream, thumbStream);
-                                    containerId = vRes.id;
-                                } else {
-                                    // Fallback to URL
-                                    const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, finalVideoUrl);
-                                    containerId = vRes.id;
-                                }
-
-                                // ✅ Explicitly Set Thumbnail (Round 3 Fix)
-                                if (finalThumbnailPath && containerId) {
-                                    const thumbStream = fs.createReadStream(finalThumbnailPath);
-                                    await fb.setVideoThumbnail(pageToken, containerId, thumbStream);
-
-                                    // ⏳ Wait for propagation
-                                    console.log("⏳ Waiting 5s for thumbnail propagation...");
-                                    await new Promise(r => setTimeout(r, 5000));
-                                }
-
-                                // 🆕 Round 7 Fix: Upload Thumbnail as FB Photo (Like Image Card)
-                                // let fbThumbnailUrl = null; // ❌ Removed inner declaration
-                                if (finalThumbnailPath) {
-                                    try {
-                                        console.log("🖼️ Uploading thumbnail as FB Photo for reliable preview...");
-                                        const thumbStreamForPhoto = fs.createReadStream(finalThumbnailPath);
-                                        const photoRes = await fb.uploadPhotoForCarousel(pageToken, accountId, thumbStreamForPhoto);
-                                        if (photoRes.id) {
-                                            const fetchedUrl = await fb.getPhotoUrl(pageToken, photoRes.id);
-                                            if (fetchedUrl) {
-                                                console.log("✅ Got FB Photo URL for thumbnail:", fetchedUrl);
-                                                fbThumbnailUrl = fetchedUrl;
-                                            }
-                                        }
-                                    } catch (e) {
-                                        console.warn("⚠️ Failed to upload thumbnail as FB Photo:", e.message);
-                                    }
-                                }
-                            } else {
-                                // 🖼️ Image Card (Page Card)
-                                console.log(`📤 Uploading photo container for Card ${index + 1}...`);
-
-                                let photoId = null;
-                                let localImagePath = null;
-
-                                try {
-                                    // ✅ Priority: Custom Right Side Image -> Provided URL -> Default
-                                    if (finalRightSideImagePath && card.isPageCard) {
-                                        console.log(`🖼️ Using Custom Right Side Image: ${finalRightSideImagePath}`);
-                                        const imageStream = fs.createReadStream(finalRightSideImagePath);
-                                        const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, imageStream);
-                                        photoId = pRes.id;
-                                    } else if (card.imageUrl) {
-                                        // ⬇️ Download image locally first
-                                        const tempFileName = `temp_card_${Date.now()}_${index}.jpg`;
-                                        localImagePath = path.join(__dirname, "../temp", tempFileName);
-
-                                        console.log(`⬇️ Downloading image to: ${localImagePath}`);
-                                        const response = await axios({
-                                            url: card.imageUrl,
-                                            method: 'GET',
-                                            responseType: 'stream'
-                                        });
-
-                                        await new Promise((resolve, reject) => {
-                                            const writer = fs.createWriteStream(localImagePath);
-                                            response.data.pipe(writer);
-                                            writer.on('finish', resolve);
-                                            writer.on('error', reject);
-                                        });
-
-                                        // 📤 Upload local file to FB
-                                        const imageStream = fs.createReadStream(localImagePath);
-                                        const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, imageStream);
-                                        photoId = pRes.id;
-                                    }
-                                } catch (imgErr) {
-                                    console.error(`❌ Failed to process image for card ${index + 1}:`, imgErr.message);
-                                    // Fallback?
-                                } finally {
-                                    // 🧹 Cleanup local image
-                                    if (localImagePath && fs.existsSync(localImagePath)) {
-                                        try {
-                                            fs.unlinkSync(localImagePath);
-                                            console.log(`🧹 Cleaned up temp image: ${localImagePath}`);
-                                        } catch (e) { console.warn("⚠️ Failed to delete temp image"); }
-                                    }
-                                }
-
-                                containerId = photoId;
-                            }
-                        } catch (uploadErr) {
-                            console.error(`❌ Failed to upload media for Card ${index + 1}:`, uploadErr.message);
-                            throw new Error(`Failed to upload media for card ${index + 1}`);
-                        }
-
-                        // 3. Construct attachment with Metadata AND Type-Specific IDs
-                        const attachment = {
-                            name: headline,
-                            description: description,
-                        };
-
-                        if (card.type === 'video') {
-                            // 🎥 Video Attachment
-                            attachment.media_fbid = containerId;
-                            // 🛑 Fix: Do NOT send 'picture' if we have a media_fbid. 
-
-                            // ❌ NO LINK or CTA for Video Cards (Fixes Playback Issue)
-                        } else {
-                            // 🖼️ Image Attachment
-                            attachment.media_fbid = containerId; // ✅ Use uploaded photo ID
-                            // 🛑 Fix: Do NOT send 'picture' if we have a media_fbid.
-
-                            // ❌ NO LINK or CTA for Image Cards either (Facebook Rule)
-                            // Parent post handles the link.
-                        }
-
-                        finalChildAttachments.push(attachment);
+                    if (isEndCard) {
+                        headline = `Follow ${pageName}`;
+                        description = "Don't miss our next post!";
+                        link = pageUrl;
                     }
+
+                    if (card.type === 'video') {
+                        // 🎥 Video Card -> Use Thumbnail as Picture, Video URL as Link
+                        pictureUrl = finalThumbnailUrl;
+                        link = finalVideoUrl || link; // Link to video
+                        if (!pictureUrl) console.warn("⚠️ No thumbnail available for video card");
+                    } else {
+                        // 🖼️ Image Card (Page Card)
+                        if (finalRightSideImageUrl && card.isPageCard) {
+                            pictureUrl = finalRightSideImageUrl;
+                        } else if (card.imageUrl) {
+                            pictureUrl = card.imageUrl;
+                        }
+                        // Ensure we have a picture
+                        if (!pictureUrl) {
+                            // Fallback to page picture if possible, or skip
+                            // For now, let's use a placeholder or the thumbnail again if really missing
+                            pictureUrl = finalThumbnailUrl;
+                        }
+                    }
+
+                    // 3. Construct Attachment Object
+                    const attachment = {
+                        link: link,
+                        name: headline,
+                        description: description,
+                        picture: pictureUrl
+                    };
+
+                    finalChildAttachments.push(attachment);
                 }
 
                 // 🔄 Phase 3: Publish the Carousel
