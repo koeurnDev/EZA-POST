@@ -209,6 +209,10 @@ const AccountSelector = React.memo(function AccountSelector({
                       src={acc.picture}
                       alt=""
                       className="w-4 h-4 rounded-full object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "https://ui-avatars.com/api/?name=" + acc.name;
+                      }}
                     />
                   )}
                   {acc.name}
@@ -308,6 +312,10 @@ const AccountSelector = React.memo(function AccountSelector({
                           src={acc.picture}
                           alt={acc.name}
                           className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = "https://ui-avatars.com/api/?name=" + acc.name;
+                          }}
                         />
                       ) : (
                         <div

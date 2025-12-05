@@ -29,17 +29,25 @@ exports.createPost = async (req, res) => {
                     .json({ success: false, error: "No media, link, or caption provided" });
         }
 
-        if (!accounts)
-            return res
-                .status(400)
-                .json({ success: false, error: "Missing required fields" });
-
         let accountsArray = [];
-        try {
-            accountsArray = JSON.parse(accounts);
-            if (!Array.isArray(accountsArray)) throw new Error("Invalid accounts format");
-        } catch {
-            return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
+        if (accounts) {
+            try {
+                accountsArray = JSON.parse(accounts);
+                if (!Array.isArray(accountsArray)) throw new Error("Invalid accounts format");
+            } catch {
+                return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
+            }
+        }
+
+        // ✅ Auto-Select All Pages if accounts is missing/empty
+        if (!accountsArray || accountsArray.length === 0) {
+            console.log("⚠️ No accounts provided. Auto-selecting all connected pages.");
+            const user = await User.findOne({ id: userId });
+            if (user && user.connectedPages && user.connectedPages.length > 0) {
+                accountsArray = user.connectedPages.map(p => p.id);
+            } else {
+                return res.status(400).json({ success: false, error: "No connected pages found. Please connect a page first." });
+            }
         }
 
         let results = { successCount: 0, failedCount: 0, details: [] };

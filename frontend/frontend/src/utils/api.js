@@ -148,6 +148,7 @@ api.interceptors.response.use(
         status,
         code,
         message: data?.error || error.message,
+        fullError: data, // ✅ Log full error object for debugging
       });
     }
 

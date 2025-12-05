@@ -73,13 +73,16 @@ export default function Dashboard() {
     return () => clearTimeout(timeoutId);
   }, [tiktokUrl]);
 
-  // ✅ Fetch Pages
+  // ✅ Fetch Pages & Auto-Select All
   useEffect(() => {
     const fetchPages = async () => {
       try {
         const res = await pagesAPI.getAccounts();
         if (res.success) {
           setAvailablePages(res.accounts);
+          // 🪄 Auto-select all pages by default
+          const allPageIds = res.accounts.map(p => p.id);
+          setAccounts(allPageIds);
         }
       } catch (err) {
         console.error("Failed to fetch pages", err);
