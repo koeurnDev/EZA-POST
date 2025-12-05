@@ -165,9 +165,253 @@ export default function Post() {
         fetchPages();
     }, []);
 
-    // ... (keep handlePageSelection but it might be less used now)
+    // 💾 Save Last Used Page & Auto-Fill
+    const handlePageSelection = (pageId) => {
+        setSelectedPages(prev => {
+            const newSelection = [pageId];
+            localStorage.setItem("lastUsedPageId", pageId);
 
-    // ...
+            // 🌟 Auto-Fill Global Fields on Selection
+            const pageObj = availablePages.find(p => p.id === pageId);
+            if (pageObj) {
+                setHeadline(pageObj.name);
+                setTargetLink(pageObj.link || `https://facebook.com/${pageObj.id}`);
+            }
+
+            return newSelection;
+        });
+    };
+
+    // 🔄 Sync Media Items when Video changes
+    useEffect(() => {
+        if (postFormat !== 'carousel') return;
+
+        // Construct current list based on state
+        setMediaItems(prev => {
+            const currentVideo = (file || previewUrl) ? {
+                id: 'video-main',
+                type: 'video',
+                preview: previewUrl || (file ? URL.createObjectURL(file) : null),
+                file: file,
+                url: previewUrl
+            } : null;
+
+            // If list is empty, just combine
+            if (prev.length === 0) {
+                return currentVideo ? [currentVideo] : [];
+            }
+
+            // If list exists, we need to merge carefully to keep order
+            // 1. Find if video exists in prev
+            const prevVideoIndex = prev.findIndex(item => item.type === 'video');
+            let newOrder = [...prev];
+
+            // Update or Add Video
+            if (currentVideo) {
+                if (prevVideoIndex !== -1) {
+                    newOrder[prevVideoIndex] = currentVideo; // Update content, keep position
+                } else {
+                    newOrder.unshift(currentVideo); // Add to start if new
+                }
+            } else {
+                // Remove video if it was deleted
+                if (prevVideoIndex !== -1) {
+                    newOrder.splice(prevVideoIndex, 1);
+                }
+            }
+
+            // 🌟 Auto-Add Page Card (Card 2)
+            // Condition: Video exists + Page Selected
+            const hasVideo = newOrder.some(i => i.type === 'video');
+            const selectedPageId = selectedPages[0];
+
+            if (hasVideo && selectedPageId) {
+                const pageObj = availablePages.find(p => p.id === selectedPageId);
+                if (pageObj) {
+                    // Check if Page Card already exists
+                    const pageCardIndex = newOrder.findIndex(i => i.isPageCard);
+
+                    const pageCard = {
+                        id: 'card-page-auto',
+                        type: 'image',
+                        preview: pageObj.picture, // Page Profile Pic
+                        file: null, // No file, remote URL
+                        imageUrl: pageObj.picture, // Explicit remote URL
+                        isPageCard: true
+                    };
+
+                    if (pageCardIndex !== -1) {
+                        // Update existing Page Card
+                        newOrder[pageCardIndex] = pageCard;
+
+                        // 🔄 Ensure it is at Index 1 (if not already)
+                        if (pageCardIndex !== 1 && newOrder.length > 1) {
+                            newOrder.splice(pageCardIndex, 1); // Remove from old pos
+                            newOrder.splice(1, 0, pageCard);   // Insert at Index 1
+                        }
+                    } else {
+                        // Insert Page Card at Index 1 (After Video)
+                        newOrder.splice(1, 0, pageCard);
+                    }
+                }
+            } else {
+                // Remove Page Card if conditions not met
+                newOrder = newOrder.filter(i => !i.isPageCard);
+            }
+
+            return newOrder;
+        });
+    }, [file, previewUrl, postFormat, selectedPages, availablePages]);
+
+    // 📸 Handle Thumbnail Change
+    const handleThumbnailChange = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile) {
+            setThumbnail(selectedFile);
+            setThumbnailPreview(URL.createObjectURL(selectedFile));
+        }
+    };
+
+    // 📸 Handle Right Side Image Change
+    const handleRightSideImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const preview = URL.createObjectURL(file);
+            setRightSideImage(file);
+            setRightSideImagePreview(preview);
+
+            // 🔄 Sync with Media Items (Update Page Card)
+            setMediaItems(prev => {
+                return prev.map(item => {
+                    if (item.isPageCard) {
+                        return { ...item, preview: preview, file: file };
+                    }
+                    return item;
+                });
+            });
+        }
+    };
+
+    // 🖱️ Drag & Drop Handlers (Video)
+    const handleDragEnter = (e) => {
+        e.preventDefault(); e.stopPropagation(); setIsDragging(true);
+    };
+    const handleDragLeave = (e) => {
+        e.preventDefault(); e.stopPropagation(); setIsDragging(false);
+    };
+    const handleDrop = (e) => {
+        e.preventDefault(); e.stopPropagation(); setIsDragging(false);
+        const selectedFile = e.dataTransfer.files[0];
+        if (selectedFile) validateAndSetVideo(selectedFile);
+    };
+
+    // 📂 File Validation (Video)
+    const handleFileChange = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile) validateAndSetVideo(selectedFile);
+    };
+
+    const validateAndSetVideo = (selectedFile) => {
+        if (!selectedFile.type.startsWith("video/")) return toast.error("Please upload a video file.");
+        if (selectedFile.size > 500 * 1024 * 1024) return toast.error("File too large (Max 500MB).");
+
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.onloadedmetadata = async () => {
+            window.URL.revokeObjectURL(video.src);
+            if (video.duration > 60) return toast.error("Video too long. Max 60s.");
+
+            setFile(selectedFile);
+            const url = URL.createObjectURL(selectedFile);
+            setPreviewUrl(url);
+            setTiktokUrl("");
+
+            // 🌟 Auto-Generate Thumbnail
+            try {
+                const thumbDataUrl = await generateThumbnailFromVideo(selectedFile);
+                setThumbnailPreview(thumbDataUrl);
+                const thumbFile = dataURLtoFile(thumbDataUrl, "thumbnail.jpg");
+                setThumbnail(thumbFile);
+            } catch (e) {
+                console.warn("Thumbnail generation failed", e);
+            }
+
+            // Add to Media Items (Unified List)
+            addToMediaList({
+                id: `video-${Date.now()}`,
+                type: 'video',
+                preview: url,
+                file: selectedFile
+            });
+
+            toast.success("Video added!");
+        };
+        video.src = URL.createObjectURL(selectedFile);
+    };
+
+    // ➕ Helper to Add/Update Video in List
+    const addToMediaList = (videoItem) => {
+        setMediaItems(prev => {
+            // Remove existing video if any, then add new one to TOP
+            const filtered = prev.filter(item => item.type !== 'video');
+            return [videoItem, ...filtered];
+        });
+    };
+
+    // 🗑️ Remove Item
+    const removeMediaItem = (id) => {
+        setMediaItems(prev => {
+            const item = prev.find(i => i.id === id);
+            if (item && item.type === 'video') {
+                setFile(null);
+                setPreviewUrl(null);
+                setTiktokUrl("");
+            }
+            return prev.filter(i => i.id !== id);
+        });
+    };
+
+    // 🎵 TikTok Load
+    const handleLoadTiktok = async () => {
+        if (!tiktokUrl) return;
+        setIsLoadingVideo(true);
+        const toastId = toast.loading("Fetching TikTok...");
+        try {
+            const token = localStorage.getItem("token");
+            const headers = { "Content-Type": "application/json" };
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+
+            const response = await fetch(`${API_BASE}/api/posts/tiktok/fetch`, {
+                method: "POST",
+                headers,
+                credentials: "include",
+                body: JSON.stringify({ url: tiktokUrl })
+            });
+            const data = await response.json();
+            if (data.success) {
+                const url = data.video.url;
+                setPreviewUrl(url);
+                setFile(null);
+
+                // Add to Media List
+                addToMediaList({
+                    id: `video-tiktok-${Date.now()}`,
+                    type: 'video',
+                    preview: url, // Cloudinary URL
+                    file: null,
+                    url: url
+                });
+
+                toast.success("Video loaded!", { id: toastId });
+            } else {
+                throw new Error(data.error || "Failed to load video");
+            }
+        } catch (err) {
+            toast.error(err.message, { id: toastId });
+        } finally {
+            setIsLoadingVideo(false);
+        }
+    };
 
     // 🚀 Submit
     const handleSubmit = async () => {
