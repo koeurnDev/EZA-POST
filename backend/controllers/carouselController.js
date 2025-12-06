@@ -51,6 +51,19 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
             console.warn("⚠️ Invalid carouselCards JSON");
         }
 
+        // 🚨 AUTO-FIX: Ensure minimum 2 cards for Carousel
+        // If user only provided 1 video card, auto-add a Page Card (Profile Pic)
+        if (carouselCards.length === 1 && carouselCards[0].type === 'video') {
+            console.log("ℹ️ Single video detected. Auto-injecting Page Card to satisfy Facebook requirements.");
+            carouselCards.push({
+                type: 'image',
+                isPageCard: true,
+                headline: "Follow Us",
+                description: "Visit our page",
+                link: null // Will default to page link
+            });
+        }
+
         // 3. Process Per Account
         const results = { successCount: 0, failedCount: 0, details: [] };
 
