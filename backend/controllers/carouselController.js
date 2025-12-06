@@ -118,19 +118,33 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             if (card.isPageCard && rightSideImageFile) {
                                 currentImageInput = fs.createReadStream(rightSideImageFile.path);
                             } else if (card.isPageCard && !rightSideImageFile) {
-                                // 🖼️ Auto-Generated Page Card (Use Page Profile Pic)
-                                // We need to download it or pass URL if FB supports it.
-                                // FB uploadPhotoForCarousel supports URL.
-                                // We need to get the Page Picture URL.
-                                const pagePic = page?.picture || (await fb.getUserProfile(pageToken))?.avatar;
-                                if (pagePic) currentImageInput = pagePic;
+                                // 🖼️ Auto-Generated Page Card (Robust High-Res Stream)
+                                try {
+                                    console.log(`🖼️ Fetching High-Res Profile Picture for Page ${accountId}...`);
+
+                                    // 1. Get High-Res URL
+                                    const picUrlRes = await axios.get(`https://graph.facebook.com/v19.0/${accountId}/picture`, {
+                                        params: { width: 1000, redirect: false, access_token: pageToken }
+                                    });
+                                    const picUrl = picUrlRes.data?.data?.url;
+
+                                    if (picUrl) {
+                                        console.log(`🔗 Downloading stream: ${picUrl}`);
+                                        // 2. Download Stream
+                                        const picStream = await axios.get(picUrl, { responseType: 'stream' });
+
+                                        // 3. Upload Stream as Photo Container
+                                        const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, picStream.data);
+                                        mediaFbid = pRes.id;
+                                    } else {
+                                        console.warn("⚠️ Could not fetch high-res picture URL");
+                                    }
+                                } catch (picErr) {
+                                    console.error("❌ Failed to process auto-page-card:", picErr.message);
+                                }
                             } else if (card.imageUrl) {
                                 // Custom Image URL (if any)
-                                currentImageInput = card.imageUrl;
-                            }
-
-                            if (currentImageInput) {
-                                const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, currentImageInput);
+                                const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, card.imageUrl);
                                 mediaFbid = pRes.id;
                             }
                         }
