@@ -212,6 +212,7 @@ export default function Settings() {
                                                             src={page.picture || "https://via.placeholder.com/50"}
                                                             alt={page.name}
                                                             className="w-14 h-14 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm"
+                                                            referrerPolicy="no-referrer"
                                                         />
                                                         <div>
                                                             <h4 className={`font-bold text-lg ${page.isSelected ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-400"}`}>

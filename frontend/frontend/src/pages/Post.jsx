@@ -578,7 +578,7 @@ export default function Post() {
                                         </select>
                                         <div className="absolute left-3 top-1/2 -translate-y-1/2">
                                             {selectedPages.length > 0 ? (
-                                                <img src={availablePages.find(p => p.id === selectedPages[0])?.picture} className="w-6 h-6 rounded-full" alt="" />
+                                                <img src={availablePages.find(p => p.id === selectedPages[0])?.picture} className="w-6 h-6 rounded-full" alt="" referrerPolicy="no-referrer" />
                                             ) : (
                                                 <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700" />
                                             )}
