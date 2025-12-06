@@ -156,6 +156,7 @@ export default function Profile() {
                             src={user.coverImage}
                             alt="Cover"
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                            referrerPolicy="no-referrer"
                         />
                     ) : (
                         <div className="w-full h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
@@ -183,7 +184,7 @@ export default function Profile() {
                     <div className="relative group">
                         <div className="w-28 h-28 md:w-40 md:h-40 rounded-full border-4 border-white dark:border-gray-900 bg-white dark:bg-gray-800 shadow-xl overflow-hidden flex items-center justify-center text-3xl md:text-4xl font-bold text-gray-400 relative">
                             {user?.avatar ? (
-                                <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+                                <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             ) : (
                                 user?.name?.[0] || "U"
                             )}

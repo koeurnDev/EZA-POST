@@ -180,7 +180,7 @@ export default function DashboardLayout({ children }) {
             <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
                 {user?.avatar ? (
-                  <img src={user.avatar} alt="User" className="w-full h-full object-cover" />
+                  <img src={user.avatar} alt="User" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   <User size={16} className="text-gray-500 dark:text-gray-400" />
                 )}

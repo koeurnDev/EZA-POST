@@ -56,7 +56,7 @@ const ScheduledPostList = ({ posts, onCancel, onRetry, error }) => {
                                     <div className="flex items-center gap-4">
                                         <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 border border-gray-200 dark:border-gray-700">
                                             {post.thumbnailUrl ? (
-                                                <img src={post.thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" />
+                                                <img src={post.thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-gray-400">
                                                     <Calendar size={20} />
@@ -91,6 +91,7 @@ const ScheduledPostList = ({ posts, onCancel, onRetry, error }) => {
                                                         alt={acc.name}
                                                         className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800 object-cover bg-white"
                                                         title={acc.name}
+                                                        referrerPolicy="no-referrer"
                                                     />
                                                 ) : (
                                                     <div
