@@ -223,9 +223,13 @@ const apiUtils = {
   handleApiError,
   // Facebook Pages
   getUserPages: () => axios.get(getFullUrl("/user/pages"), { withCredentials: true }),
+  getUserConnections: () => axios.get(getFullUrl("/user/connections"), { withCredentials: true }), // ✅ Get Connections
   toggleUserPage: (pageId, isSelected) => axios.post(getFullUrl("/user/pages/toggle"), { pageId, isSelected }, { withCredentials: true }),
   updatePageSettings: (pageId, settings) => axios.post(getFullUrl("/user/pages/settings"), { pageId, settings }, { withCredentials: true }),
   disconnectFacebook: () => axios.delete(getFullUrl("/auth/facebook"), { withCredentials: true }), // ✅ Disconnect Facebook
+
+  // 🎵 TikTok Tools
+  getTikTokTrending: (region = 'US', count = 20, type = 'music') => axios.post(getFullUrl('/tools/tiktok/trending'), { region, count, type }, { withCredentials: true }),
 };
 
 export default apiUtils;

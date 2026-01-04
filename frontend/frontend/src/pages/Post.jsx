@@ -24,6 +24,14 @@ export default function Post() {
     const [postFormat, setPostFormat] = useState("carousel"); // 'single' | 'carousel'
     const [videoTab, setVideoTab] = useState("upload"); // 'upload' | 'tiktok'
 
+    // 🌐 Multi-Platform State
+    const [platforms, setPlatforms] = useState({
+        facebook: true,
+        youtube: false,
+        tiktok: false,
+        instagram: false
+    });
+
     // Video State
     const [file, setFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
@@ -50,6 +58,14 @@ export default function Post() {
     const [selectedPages, setSelectedPages] = useState([]);
     const [availablePages, setAvailablePages] = useState([]);
     const [scheduleTime, setScheduleTime] = useState("");
+    const [staggerDelay, setStaggerDelay] = useState(0); // 🕒 Stagger in minutes
+
+    // 🤖 AI Randomizer State
+    const [aiOptions, setAiOptions] = useState({
+        safeMode: false,
+        pitchShift: false,
+        flip: false
+    });
 
     // 🟡 UI State
     const [isDragging, setIsDragging] = useState(false);
@@ -139,31 +155,61 @@ export default function Post() {
         return () => clearTimeout(saveTimer);
     }, [caption, headline, targetLink, postFormat, selectedPages, file, mediaItems, isDraftLoaded]);
 
-    // 🔄 Fetch Pages & Load Last Used
+    // 🔄 Fetch Pages & Connections
     useEffect(() => {
-        const fetchPages = async () => {
+        const fetchInitialData = async () => {
             try {
-                const res = await apiUtils.getUserPages();
-                if (res.data.success) {
-                    setAvailablePages(res.data.accounts);
+                const [pagesRes, connRes] = await Promise.all([
+                    apiUtils.getUserPages(),
+                    apiUtils.getUserConnections()
+                ]);
+
+                // 1. Pages
+                if (pagesRes.data.success) {
+                    setAvailablePages(pagesRes.data.accounts);
 
                     // 🌟 AUTO-SELECT ALL PAGES (Simplified UX)
-                    if (res.data.accounts.length > 0) {
-                        const allPageIds = res.data.accounts.map(p => p.id);
+                    if (pagesRes.data.accounts.length > 0) {
+                        const allPageIds = pagesRes.data.accounts.map(p => p.id);
                         setSelectedPages(allPageIds);
 
-                        // Set defaults based on first page (for visual consistency if needed)
-                        const firstPage = res.data.accounts[0];
+                        // Set defaults based on first page
+                        const firstPage = pagesRes.data.accounts[0];
                         setHeadline(firstPage.name);
                         setTargetLink(firstPage.link || `https://facebook.com/${firstPage.id}`);
                     }
                 }
+
+                // 2. Connections (YouTube, TikTok, Instagram)
+                if (connRes.data.success) {
+                    // Update toggles based on connection
+                    // Note: We don't auto-enable them, just allow enabling.
+                    // But we can enable Facebook by default if pages exist (which we effectively did via selectedPages)
+                    // Let's store connection status in state to validate clicks
+                    setConnectedPlatforms(connRes.data.connections);
+                }
             } catch (err) {
-                console.error("Failed to load pages:", err);
+                console.error("Failed to load initial data:", err);
             }
         };
-        fetchPages();
+        fetchInitialData();
     }, []);
+
+    // 🔒 Enforce Connections
+    const [connectedPlatforms, setConnectedPlatforms] = useState({ youtube: false, tiktok: false, instagram: false });
+
+    const togglePlatform = (platform) => {
+        if (platform === 'facebook') {
+            setPlatforms(prev => ({ ...prev, facebook: !prev.facebook }));
+            return;
+        }
+
+        if (!connectedPlatforms[platform]) {
+            toast.error(`Please connect ${platform.charAt(0).toUpperCase() + platform.slice(1)} first (Settings > Connections)`);
+            return;
+        }
+        setPlatforms(prev => ({ ...prev, [platform]: !prev[platform] }));
+    };
 
     // 💾 Save Last Used Page & Auto-Fill
     const handlePageSelection = (pageId) => {
@@ -428,7 +474,9 @@ export default function Post() {
         try {
             const formData = new FormData();
             formData.append("caption", caption);
+            formData.append("caption", caption);
             formData.append("accounts", JSON.stringify(selectedPages));
+            formData.append("platforms", JSON.stringify(Object.keys(platforms).filter(k => platforms[k]))); // Send active platforms
 
             // 🎥 Video Handling
             const activeVideoFile = videoItem?.file || file;
@@ -451,6 +499,10 @@ export default function Post() {
             }
 
             if (scheduleTime) formData.append("scheduleTime", scheduleTime);
+            if (staggerDelay) formData.append("staggerDelay", staggerDelay);
+
+            // 🤖 Append AI Options
+            formData.append("aiOptions", JSON.stringify(aiOptions));
 
             let endpoint = `${API_BASE}/api/posts`;
 
@@ -544,6 +596,39 @@ export default function Post() {
                                     </div>
                                 </div>
                             </label>
+
+                            {/* 🌐 Platform Selector */}
+                            <div className="flex gap-2 mb-4">
+                                <button
+                                    onClick={() => togglePlatform('facebook')}
+                                    className={`flex-1 py-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${platforms.facebook ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}
+                                >
+                                    <div className="font-bold text-lg">Facebook</div>
+                                    <div className="text-[10px] uppercase font-bold">{platforms.facebook ? 'ON' : 'OFF'}</div>
+                                </button>
+                                <button
+                                    onClick={() => togglePlatform('youtube')}
+                                    className={`flex-1 py-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${platforms.youtube ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-50 border-gray-200 text-gray-400'}`}
+                                >
+                                    <div className="font-bold text-lg">YouTube</div>
+                                    <div className="text-[10px] uppercase font-bold">{platforms.youtube ? 'ON' : 'OFF'}</div>
+                                </button>
+                                <button
+                                    onClick={() => togglePlatform('tiktok')}
+                                    className={`flex-1 py-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${platforms.tiktok ? 'bg-black text-white border-black' : 'bg-gray-50 border-gray-200 text-gray-400'}`}
+                                >
+                                    <div className="font-bold text-lg">TikTok</div>
+                                    <div className="text-[10px] uppercase font-bold">{platforms.tiktok ? 'ON' : 'OFF'}</div>
+                                </button>
+                                <button
+                                    onClick={() => togglePlatform('instagram')}
+                                    className={`flex-1 py-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${platforms.instagram ? 'bg-pink-50 border-pink-200 text-pink-600' : 'bg-gray-50 border-gray-200 text-gray-400'}`}
+                                >
+                                    <div className="font-bold text-lg">Instagram</div>
+                                    <div className="text-[10px] uppercase font-bold">{platforms.instagram ? 'ON' : 'OFF'}</div>
+                                </button>
+                            </div>
+
                             <div className="flex bg-gray-100 dark:bg-gray-900 rounded-xl p-1 border border-gray-200 dark:border-gray-700">
                                 <button
                                     onClick={() => setPostFormat('carousel')}
@@ -712,6 +797,42 @@ export default function Post() {
                                         )}
                                     </>
                                 )}
+                                {/* 🤖 AI Randomizer Controls */}
+                                <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-100 dark:border-purple-800">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Sparkles size={16} className="text-purple-600" />
+                                        <h4 className="font-bold text-sm text-purple-900 dark:text-purple-300">AI Content Randomizer (MMO)</h4>
+                                    </div>
+                                    <div className="flex flex-wrap gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={aiOptions.safeMode}
+                                                onChange={(e) => setAiOptions(prev => ({ ...prev, safeMode: e.target.checked }))}
+                                                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                                            />
+                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Safe Mode (Hash Change)</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={aiOptions.pitchShift}
+                                                onChange={(e) => setAiOptions(prev => ({ ...prev, pitchShift: e.target.checked }))}
+                                                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                                            />
+                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Pitch Shift (Avoid ID)</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={aiOptions.flip}
+                                                onChange={(e) => setAiOptions(prev => ({ ...prev, flip: e.target.checked }))}
+                                                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                                            />
+                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Mirror Video</span>
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             /* CAROUSEL MODE - WIZARD UI */
@@ -981,19 +1102,52 @@ export default function Post() {
                     <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col md:flex-row justify-between items-center gap-6 sticky bottom-6 z-20">
 
                         {/* Step 5: Scheduling */}
-                        <div className="w-full md:w-auto flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <Calendar className="text-gray-400" size={20} />
-                                <span className="font-bold text-gray-700 dark:text-gray-300">Schedule:</span>
+                        <div className="w-full md:w-auto flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
+                            <div className="flex-1">
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Schedule Time (Optional)</label>
+                                <div className="relative">
+                                    <input
+                                        type="datetime-local"
+                                        value={scheduleTime}
+                                        onChange={(e) => setScheduleTime(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                                        <Calendar size={18} />
+                                    </div>
+                                </div>
                             </div>
-                            <input
-                                type="datetime-local"
-                                value={scheduleTime}
-                                onChange={(e) => setScheduleTime(e.target.value)}
-                                className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
-                            />
-                            {scheduleTime && (
-                                <button onClick={() => setScheduleTime("")} className="text-xs text-red-500 hover:underline">Clear</button>
+
+                            {/* 🕒 Stagger Delay */}
+                            {selectedPages.length > 1 && (
+                                <div className="flex-1">
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                        Stagger Posts
+                                        <div className="group relative">
+                                            <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                                Add a delay between each page post to avoid spam detection.
+                                            </div>
+                                        </div>
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            value={staggerDelay}
+                                            onChange={(e) => setStaggerDelay(Number(e.target.value))}
+                                            className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                                        >
+                                            <option value={0}>No Delay (All at once)</option>
+                                            <option value={5}>5 Minutes</option>
+                                            <option value={10}>10 Minutes</option>
+                                            <option value={15}>15 Minutes</option>
+                                            <option value={30}>30 Minutes</option>
+                                            <option value={60}>1 Hour</option>
+                                        </select>
+                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                                            <Clock size={18} />
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                         </div>
 
@@ -1012,6 +1166,6 @@ export default function Post() {
 
                 </div>
             </div>
-        </DashboardLayout>
+        </DashboardLayout >
     );
 }

@@ -73,7 +73,7 @@ router.post("/suggestions", requireAuth, async (req, res) => {
 
 // ✅ Add new rule
 router.post("/rules", requireAuth, async (req, res) => {
-  const { keyword, reply, ruleType, scope, postId } = req.body;
+  const { keyword, reply, ruleType, scope, postId, attachmentUrl } = req.body;
 
   if (!keyword || !reply)
     return res.status(400).json({ success: false, message: "Keyword and reply required" });
@@ -85,7 +85,9 @@ router.post("/rules", requireAuth, async (req, res) => {
       reply,
       ruleType: ruleType || "KEYWORD",
       scope: scope || "ALL",
+      scope: scope || "ALL",
       postId: postId || undefined,
+      attachmentUrl: attachmentUrl || null,
       enabled: true
     });
     res.json({ success: true, rule });
@@ -98,7 +100,7 @@ router.post("/rules", requireAuth, async (req, res) => {
 // ✅ Update rule
 router.put("/rules/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { keyword, reply, ruleType, scope, postId } = req.body;
+  const { keyword, reply, ruleType, scope, postId, attachmentUrl } = req.body;
   try {
     // Ensure user owns the rule
     const rule = await BotRule.findOne({ _id: id, userId: req.user.id });
@@ -109,6 +111,7 @@ router.put("/rules/:id", requireAuth, async (req, res) => {
     rule.ruleType = ruleType;
     rule.scope = scope;
     rule.postId = postId;
+    rule.attachmentUrl = attachmentUrl;
 
     await rule.save();
     res.json({ success: true, message: "Rule updated" });

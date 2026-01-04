@@ -18,7 +18,9 @@ import {
   Save,
   X,
   Power,
-  Filter
+  Filter,
+  Image as ImageIcon,
+  Loader
 } from "lucide-react";
 import api from "../utils/api";
 
@@ -31,7 +33,9 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     scope: "ALL",        // ALL, SPECIFIC
     postId: "",
     keyword: "",
+    keyword: "",
     reply: "",
+    attachmentUrl: null,
   });
   const [editingId, setEditingId] = useState(null);
 
@@ -40,6 +44,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
   const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const deferredSearch = useDeferredValue(searchTerm);
 
@@ -99,7 +104,9 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       scope: "ALL",
       postId: "",
       keyword: "",
+      keyword: "",
       reply: "",
+      attachmentUrl: null,
     });
     setEditingId(null);
   };
@@ -111,7 +118,9 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       scope: rule.scope || "ALL",
       postId: rule.postId || "",
       keyword: rule.keyword,
+      keyword: rule.keyword,
       reply: rule.reply,
+      attachmentUrl: rule.attachmentUrl || null,
     });
     setEditingId(rule.id);
     // Scroll to top
@@ -120,7 +129,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
 
   // ✅ Save Rule (Create or Update)
   const saveRule = useCallback(async () => {
-    const { ruleType, scope, postId, keyword, reply } = formData;
+    const { ruleType, scope, postId, keyword, reply, attachmentUrl } = formData;
 
     // Validation
     if (!keyword.trim() || !reply.trim()) return showNotify("Keyword and Reply are required", "error");
@@ -131,7 +140,9 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       scope,
       postId: scope === "SPECIFIC" ? postId : undefined,
       keyword: keyword.trim(),
-      reply: reply.trim()
+      keyword: keyword.trim(),
+      reply: reply.trim(),
+      attachmentUrl
     };
 
     try {
@@ -245,6 +256,41 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     } finally {
       setGenerating(false);
     }
+  };
+
+  // ✅ Handle Image Upload
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showNotify("File size too large (Max 5MB)", "error");
+      return;
+    }
+
+    setUploading(true);
+    const uploadData = new FormData();
+    uploadData.append("image", file);
+
+    try {
+      const res = await api.post("/upload/bot-image", uploadData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (res.data.success) {
+        setFormData((prev) => ({ ...prev, attachmentUrl: res.data.url }));
+        showNotify("Image attached successfully!");
+      }
+    } catch (error) {
+      console.error("Upload failed", error);
+      showNotify("Failed to upload image", "error");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImage = () => {
+    setFormData((prev) => ({ ...prev, attachmentUrl: null }));
   };
 
   // ============================================================
@@ -430,6 +476,48 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             </div>
           </div>
 
+          {/* Image Attachment */}
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+              Attachment (Optional)
+            </label>
+
+            <div className="flex items-start gap-4">
+              {formData.attachmentUrl ? (
+                <div className="relative group">
+                  <img
+                    src={formData.attachmentUrl}
+                    alt="Attachment"
+                    className="w-32 h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-700"
+                  />
+                  <button
+                    onClick={removeImage}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all group">
+                  {uploading ? (
+                    <Loader size={24} className="animate-spin text-blue-500" />
+                  ) : (
+                    <>
+                      <ImageIcon size={24} className="text-gray-400 group-hover:text-blue-500 mb-1" />
+                      <span className="text-xs text-gray-500 font-medium">Upload</span>
+                    </>
+                  )}
+                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+                </label>
+              )}
+
+              <div className="flex-1 text-sm text-gray-500 dark:text-gray-400 mt-2">
+                <p>Attach a photo to send with your reply.</p>
+                <p className="text-xs mt-1 text-gray-400">Supported: JPG, PNG • Max: 5MB</p>
+              </div>
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-2">
             <button
@@ -506,9 +594,18 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2">
-                        {r.reply}
-                      </p>
+                      <div className="flex items-start gap-3">
+                        {r.attachmentUrl && (
+                          <img
+                            src={r.attachmentUrl}
+                            alt="Attachment"
+                            className="w-10 h-10 rounded-lg object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0"
+                          />
+                        )}
+                        <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2 pt-0.5">
+                          {r.reply}
+                        </p>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <button

@@ -247,11 +247,11 @@ export default function ScheduledPosts() {
                                                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/30 p-2.5 rounded-xl">
                                                         <Clock size={16} className="text-blue-500" />
                                                         <span className="font-medium">
-                                                            {new Date(q.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            {new Date(q.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Phnom_Penh' })}
                                                         </span>
                                                         <span className="text-gray-300 dark:text-gray-600">|</span>
                                                         <span>
-                                                            {new Date(q.scheduleTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                            {new Date(q.scheduleTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'Asia/Phnom_Penh' })}
                                                         </span>
                                                     </div>
 

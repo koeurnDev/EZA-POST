@@ -27,7 +27,67 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <AppRouter />
-          <Toaster position="top-center" reverseOrder={false} />
+          <Toaster
+            position="top-center"
+            reverseOrder={false}
+            containerStyle={{
+              top: '50%',
+              transform: 'translateY(-50%)',
+            }}
+            toastOptions={{
+              // Default options
+              duration: 4000,
+              style: {
+                background: 'var(--card-bg)',
+                color: 'var(--text)',
+                border: '1px solid var(--card-border)',
+                borderRadius: '12px',
+                padding: '16px',
+                fontSize: '14px',
+                fontWeight: '500',
+                boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06)',
+                maxWidth: '500px',
+              },
+              // Success
+              success: {
+                duration: 3000,
+                style: {
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                },
+                iconTheme: {
+                  primary: '#ffffff',
+                  secondary: '#10b981',
+                },
+              },
+              // Error
+              error: {
+                duration: 5000,
+                style: {
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                },
+                iconTheme: {
+                  primary: '#ffffff',
+                  secondary: '#ef4444',
+                },
+              },
+              // Loading
+              loading: {
+                style: {
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                },
+                iconTheme: {
+                  primary: '#ffffff',
+                  secondary: '#3b82f6',
+                },
+              },
+            }}
+          />
         </AuthProvider>
       </ThemeProvider>
     </React.StrictMode>

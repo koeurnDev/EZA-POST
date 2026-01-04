@@ -31,9 +31,23 @@ const postSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
-    error: {
+    platforms: [{
+        name: { type: String, enum: ['facebook', 'youtube', 'tiktok', 'instagram'] },
+        status: { type: String, enum: ['pending', 'published', 'failed'], default: 'pending' },
+        postId: { type: String }, // External ID
+        error: { type: String }
+    }],
+    mediaType: {
         type: String,
-        default: null,
+        enum: ["video", "image", "carousel"],
+        default: "video"
+    },
+    // Legacy support (optional helper)
+    platformStatus: {
+        facebook: { type: String },
+        youtube: { type: String },
+        tiktok: { type: String },
+        instagram: { type: String }
     }
 });
 

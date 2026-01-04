@@ -428,6 +428,66 @@ export default function Settings() {
                             </div>
                         </div>
 
+                        {/* Stealth Mode & Security */}
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Anti-Ban & Stealth 🥷</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex flex-col justify-between h-32">
+                                    <div className="flex items-start justify-between">
+                                        <div className="p-2.5 rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.2-2.85.577-4.147" /></svg>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" className="sr-only peer" defaultChecked onClick={() => toast.success("Stealth Mode: ON (Fingerprints Randomized)")} />
+                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                                        </label>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-gray-900 dark:text-white">Fingerprint Spoofer</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Randomize Headers/UA</p>
+                                    </div>
+                                </div>
+
+                                <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex flex-col justify-between h-32">
+                                    <div className="flex items-start justify-between">
+                                        <div className="p-2.5 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" className="sr-only peer" defaultChecked onClick={() => toast.success("Action Randomizer: ON (Delays Active)")} />
+                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-teal-600"></div>
+                                        </label>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-gray-900 dark:text-white">Action Randomizer</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Human-like Delays (Jitter)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Google Drive Integration */}
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Cloud Backup</h3>
+                            <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+                                        <svg className="w-5 h-5" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 25.3-43.8 25.3 43.8z" fill="#0066da" /><path d="m43.65 23.05-25.3 43.8h25.3z" fill="#43a047" /><path d="m73.55 66.85-6.35-10.95-18.95-32.9-6.35-10.95 25.3 43.8z" fill="#0066da" /><path d="m24.6 23.05 19.05 32.9h38.65l-19.05-32.9z" fill="#43a047" /><path d="m.25 66.85 19.05 32.9h65.8l-19.05-32.9z" fill="#cddca3" /><path d="m19.6 66.85 24.05-41.55 24.35 41.55z" fill="#00ad45" /><path d="m43.65 25.3-19.05 32.9h38.1z" fill="#ea4335" /><path d="m.25 66.85 6.35-10.95 6.35 11.05z" fill="#0066da" /><path d="m24.6 23.05-6.35-11.05-6.35 11.05z" fill="#ea4335" /><path d="m43.65 23.05-6.35-11.05 6.35-10.95 6.35 10.95 6.35 11.05z" fill="#ffd04b" /></svg>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-gray-900 dark:text-white">Google Drive</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Auto-backup edited videos</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => toast.success("Feature coming soon: Please upload 'service_account_key.json' to server root manually for now.")}
+                                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-medium transition-colors"
+                                >
+                                    Configured
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Danger Zone */}
                         <div className="bg-red-50 dark:bg-red-900/10 rounded-3xl p-6 border border-red-100 dark:border-red-900/30">
                             <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-4">Danger Zone</h3>

@@ -21,6 +21,10 @@ const botRuleSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        attachmentUrl: {
+            type: String,
+            default: null,
+        },
         ruleType: {
             type: String,
             enum: ["KEYWORD", "REGEX"],

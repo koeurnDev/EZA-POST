@@ -49,37 +49,52 @@ const upload = multer({
 });
 
 /* -------------------------------------------------------------------------- */
-/* ✅ POST /api/upload/video — Upload a new video                             */
+/* ✅ POST /api/upload/video — Upload Video(s) (Single or Bulk)               */
 /* -------------------------------------------------------------------------- */
-router.post("/", requireAuth, upload.single("video"), async (req, res) => {
+const uploadFields = upload.fields([
+  { name: 'video', maxCount: 1 }, // Legacy (Single)
+  { name: 'videos', maxCount: 50 } // New (Bulk)
+]);
+
+router.post("/", requireAuth, uploadFields, async (req, res) => {
   try {
-    if (!req.file) {
-      return res
-        .status(400)
-        .json({ success: false, error: "No video file uploaded" });
+    // 1️⃣ Handle Bulk Upload (videos)
+    if (req.files?.videos?.length > 0) {
+      console.log(`📤 Bulk Uploading ${req.files.videos.length} videos...`);
+      const results = await Promise.all(req.files.videos.map(async (file) => {
+        const result = await uploadFile(file.path, "eza-post/videos", "video");
+        return {
+          name: result.publicId,
+          url: result.url,
+          publicId: result.publicId,
+          type: file.mimetype,
+          originalName: file.originalname
+        };
+      }));
+      return res.status(201).json({ success: true, files: results });
     }
 
-    console.log(`📤 Uploading video to Cloudinary: ${req.file.filename}`);
+    // 2️⃣ Handle Single Upload (video)
+    if (req.files?.video?.length > 0) {
+      const file = req.files.video[0];
+      console.log(`📤 Uploading single video: ${file.filename}`);
+      const result = await uploadFile(file.path, "eza-post/videos", "video");
 
-    // ☁️ Upload to Cloudinary
-    const result = await uploadFile(req.file.path, "eza-post/videos", "video");
+      return res.status(201).json({
+        success: true,
+        message: "✅ Video uploaded successfully",
+        file: {
+          name: result.publicId,
+          url: result.url,
+          publicId: result.publicId,
+          type: file.mimetype,
+          originalName: file.originalname
+        }
+      });
+    }
 
-    const response = {
-      success: true,
-      message: "✅ Video uploaded successfully",
-      file: {
-        name: result.publicId, // Use publicId as name/identifier
-        url: result.url,
-        path: result.url, // Backward compatibility
-        sizeMB: `${(result.size / (1024 * 1024)).toFixed(2)} MB`,
-        type: req.file.mimetype,
-        uploadedAt: new Date().toISOString(),
-        publicId: result.publicId,
-      },
-    };
+    return res.status(400).json({ success: false, error: "No video files uploaded" });
 
-    console.log(`✅ Upload complete: ${result.publicId}`);
-    res.status(201).json(response);
   } catch (err) {
     console.error("❌ Video upload failed:", err.message);
     res

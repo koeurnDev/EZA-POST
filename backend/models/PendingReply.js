@@ -16,6 +16,10 @@ const pendingReplySchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        attachmentUrl: {
+            type: String,
+            default: null,
+        },
         pageId: {
             type: String,
             required: true,

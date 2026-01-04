@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
-import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
+import { motion } from "framer-motion";
 import NetworkStatus from "../components/NetworkStatus";
 import {
   LayoutDashboard,
@@ -17,34 +17,92 @@ import {
   Moon,
   User,
   Images,
-  Link as LinkIcon
+  Link as LinkIcon,
+  UploadCloud,
+  Download,
+  Sparkles,
+  Facebook,
+  Send,
+  Instagram,
+  Scissors,
+  BarChart2,
+  Music,
+  TrendingUp,
+  Film,
+  ShoppingBag,
+  Languages,
+  Wand2,
+  EyeOff,
+  Repeat,
+  FileText,
+  ImagePlus,
+  Cloud,
+  Users
 } from "lucide-react";
 
-export default function DashboardLayout({ children }) {
-  const { theme, toggleTheme } = useTheme();
-  const { user, logout } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+// 🧭 Navigation Items (Organized by Category)
+const NAV_ITEMS = [
+  // Core
+  { label: "Dashboard", icon: <LayoutDashboard size={20} />, path: "/dashboard" },
+  { type: "divider" },
 
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
+  // Downloaders (Most Used - Top Priority)
+  { type: "header", label: "Downloaders" },
+  { label: "TikTok", icon: <Download size={20} />, path: "/tools/tiktok" },
+  { label: "YouTube", icon: <Video size={20} />, path: "/tools/youtube" },
+  { label: "Instagram", icon: <Instagram size={20} />, path: "/tools/instagram" },
+  { label: "Facebook", icon: <Facebook size={20} />, path: "/tools/facebook" },
+  { label: "Pinterest", icon: <Images size={20} />, path: "/tools/pinterest" },
+  { label: "Telegram", icon: <Send size={20} />, path: "/tools/telegram" },
+  { label: "CapCut", icon: <Scissors size={20} />, path: "/tools/capcut" },
+  { type: "divider" },
 
-  // 🧭 Navigation Items
-  const navItems = [
-    { label: "Single Video", icon: <Video size={20} />, path: "/post" },
-    { label: "Scheduled Posts", icon: <Calendar size={20} />, path: "/posts" },
-    { label: "Auto-Reply Bot", icon: <MessageSquare size={20} />, path: "/bot" },
-    { label: "Settings", icon: <Settings size={20} />, path: "/settings" },
-  ];
+  // AI Tools
+  { type: "header", label: "AI Tools" },
+  { label: "AI Script Writer", icon: <FileText size={20} />, path: "/tools/script-writer" },
+  { label: "AI Thumbnails", icon: <ImagePlus size={20} />, path: "/tools/thumbnail-generator" },
+  { label: "Auto Censorship", icon: <EyeOff size={20} />, path: "/tools/censorship" },
+  { label: "Label Swap", icon: <Repeat size={20} />, path: "/tools/label-swap" },
+  { label: "Magic Motion", icon: <Wand2 size={20} />, path: "/tools/magic-motion" },
+  { label: "AI Magic Tools", icon: <Sparkles size={20} />, path: "/tools/ai" },
+  { type: "divider" },
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
+  // Content Tools
+  { type: "header", label: "Content Tools" },
+  { label: "Video Creator", icon: <Film size={20} />, path: "/tools/video-creator" },
+  { label: "Khmer Subtitles", icon: <Languages size={20} />, path: "/tools/subtitle-generator" },
+  { label: "Viral Finder", icon: <TrendingUp size={20} />, path: "/tools/viral-finder" },
+  { label: "Trending Sounds", icon: <Music size={20} />, path: "/tools/tiktok/trends" },
+  { type: "divider" },
 
-  const SidebarContent = () => (
+  // Posting
+  { type: "header", label: "Posting" },
+  { label: "Single Video", icon: <Video size={20} />, path: "/post" },
+  { label: "Bulk Upload 30+", icon: <UploadCloud size={20} />, path: "/bulk-upload" },
+  { label: "Scheduled Posts", icon: <Calendar size={20} />, path: "/posts" },
+  { type: "divider" },
+
+  // Advanced
+  { type: "header", label: "Advanced" },
+  { label: "Cloud Farm", icon: <Users size={20} />, path: "/tools/farm" },
+  { label: "Cloud → Telegram", icon: <Cloud size={20} />, path: "/tools/telegram-cloud" },
+  { label: "Dropship Center", icon: <ShoppingBag size={20} />, path: "/tools/dropship-center" },
+  { type: "divider" },
+
+  // System
+  { type: "header", label: "System" },
+  { label: "Analytics", icon: <BarChart2 size={20} />, path: "/analytics" },
+  { label: "Connections", icon: <LinkIcon size={20} />, path: "/connections" },
+  { label: "Auto-Reply Bot", icon: <MessageSquare size={20} />, path: "/bot" },
+  { label: "Settings", icon: <Settings size={20} />, path: "/settings" },
+];
+
+/**
+ * Optimized Sidebar Component
+ * Memoized to prevent re-renders unless user/location changes
+ */
+const SidebarContent = React.memo(({ user, handleLogout, location, onLinkClick }) => {
+  return (
     <div className="flex flex-col h-full">
       {/* Logo Area */}
       <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-800">
@@ -57,14 +115,30 @@ export default function DashboardLayout({ children }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+      <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto min-h-0 pb-20">
+        {NAV_ITEMS.map((item, index) => {
+          // Section Header
+          if (item.type === "header") {
+            return (
+              <div key={`header-${index}`} className="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                {item.label}
+              </div>
+            );
+          }
+
+          // Divider
+          if (item.type === "divider") {
+            return <div key={`divider-${index}`} className="my-2 border-t border-gray-200 dark:border-gray-700" />;
+          }
+
+          // Regular Link
           const isActive = location.pathname === item.path;
           return (
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive
+              onClick={onLinkClick}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 group ${isActive
                 ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
                 : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200"
                 }`}
@@ -73,12 +147,6 @@ export default function DashboardLayout({ children }) {
                 {item.icon}
               </span>
               {item.label}
-              {isActive && (
-                <motion.div
-                  layoutId="activeIndicator"
-                  className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400"
-                />
-              )}
             </Link>
           );
         })}
@@ -109,44 +177,59 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   );
+});
+
+export default function DashboardLayout({ children }) {
+  const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
 
   return (
     <div className={`min-h-screen flex ${theme === "dark" ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-900"}`}>
 
       {/* 🖥️ Desktop Sidebar */}
       <aside className="hidden lg:block w-64 fixed inset-y-0 left-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-30">
-        <SidebarContent />
+        <SidebarContent user={user} handleLogout={handleLogout} location={location} />
       </aside>
 
-      {/* 📱 Mobile Sidebar (Drawer) */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setMobileMenuOpen(false)}
-              className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
+      {/* 📱 Mobile Sidebar (Drawer) - Optimized for Performance */}
+      {mobileMenuOpen && (
+        <>
+          <div
+            onClick={() => setMobileMenuOpen(false)}
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden animate-in fade-in duration-200"
+          />
+          <aside
+            style={{ willChange: 'transform' }}
+            className={`fixed inset-y-0 left-0 w-[80%] max-w-xs bg-white dark:bg-gray-900 z-50 lg:hidden shadow-2xl transform transition-transform duration-300 ease-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+              }`}
+          >
+            <SidebarContent
+              user={user}
+              handleLogout={handleLogout}
+              location={location}
+              onLinkClick={() => setMobileMenuOpen(false)}
             />
-            <motion.aside
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-72 bg-white dark:bg-gray-900 z-50 lg:hidden shadow-2xl"
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="absolute top-4 right-4 p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
             >
-              <SidebarContent />
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="absolute top-4 right-4 p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
-              >
-                <X size={20} />
-              </button>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+              <X size={20} />
+            </button>
+          </aside>
+        </>
+      )}
 
       {/* 📄 Main Content Wrapper */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen transition-all duration-300">
@@ -192,13 +275,7 @@ export default function DashboardLayout({ children }) {
         {/* Page Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
           <div className="max-w-7xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-            >
-              {children}
-            </motion.div>
+            {children}
           </div>
         </main>
       </div>

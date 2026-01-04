@@ -8,6 +8,7 @@ const session = require("express-session");
 const MongoStore = require("connect-mongo");
 const cors = require("cors");
 const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
 const mongoSanitize = require("express-mongo-sanitize");
@@ -49,6 +50,8 @@ connectDB();
 // ✅ Middleware & Security
 // ------------------------------------------------------------
 app.use(morgan("dev"));
+app.use(express.json()); // Changed: Moved up and removed limit
+app.use(cookieParser()); // Changed: Moved up
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -58,8 +61,7 @@ app.use(
 );
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-const cookieParser = require("cookie-parser");
-app.use(cookieParser());
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // 🛡️ Security Middlewares
 app.use(mongoSanitize()); // Prevent NoSQL Injection
@@ -91,9 +93,11 @@ app.use(
       // Allow requests with no origin (like mobile apps, curl, Postman)
       if (!origin) return callback(null, true);
 
-      // In development, allow all localhost origins
-      if (process.env.NODE_ENV !== "production" && origin.includes("localhost")) {
-        return callback(null, true);
+      // In development, allow all localhost origins AND local network IPs
+      if (process.env.NODE_ENV !== "production") {
+        if (origin.includes("localhost") || origin.startsWith("http://192.168.")) {
+          return callback(null, true);
+        }
       }
 
       // Check against allowed origins
@@ -138,7 +142,7 @@ app.use(
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    max: 1000, // Limit each IP to 1000 requests per windowMs
     message: { error: "Too many requests. Please try again later." },
   })
 );
@@ -193,19 +197,45 @@ app.use("/api/auth", require("./api/auth"));
 // ------------------------------------------------------------
 const routeModules = [
   ["posts", "./routes/postRoutes"],
+  ["posts/bulk", "./api/posts/bulk"],
   ["posts/schedule", "./api/posts/schedule"],
   ["posts/queue", "./api/posts/queue"],
   ["upload/video", "./api/upload/videoUpload"],
   ["upload/thumbnail", "./api/upload/uploadThumbnail"],
   ["upload/cover", "./api/upload/cover"],
   ["upload/avatar", "./api/upload/avatar"],
-  ["error-log", "./api/upload/error-log"],
+  ["upload/error-log", "./api/upload/error-log"],
+  ["upload/bot-image", "./api/upload/botImage"],
   ["bot", "./routes/bot"],
   ["tiktok", "./api/tiktok"],
   ["user/pages", "./api/user/pages"],
   ["user/update", "./api/user/update"],
   ["user/stats", "./api/user/stats"],
+  ["user/connections", "./api/user/connections"], // ✅ Connections Check
+  ["analytics", "./api/analytics"],               // ✅ Analytics & Stats
+  ["tools/tiktok", "./api/tools/tiktok"],
+  ["auth/youtube", "./api/auth/youtube"], // ✅ YouTube Auth
+  ["auth/tiktok", "./api/auth/tiktok"],   // ✅ TikTok Auth
+  ["auth/instagram", "./api/auth/instagram"], // ✅ Instagram Auth
+  ["tools/ai", "./api/tools/ai"],         // ✅ AI Tools
+  ["tools/pinterest", "./api/tools/pinterest"], // ✅ Pinterest Downloader
+  ["tools/youtube", "./api/tools/youtube"],     // ✅ YouTube Downloader
   ["webhooks/facebook", "./api/webhooks/facebook"], // ✅ Added Webhook
+  ["tools/facebook", "./api/tools/facebook"],   // ✅ Facebook Downloader
+  ["tools/telegram", "./api/tools/telegram"],   // ✅ Telegram Downloader
+  ["tools/instagram", "./api/tools/instagram"], // ✅ Instagram Downloader
+  ["tools/capcut", "./api/tools/capcut"],       // ✅ CapCut Downloader
+  ["tools/video-creator", "./api/tools/video_creator"], // ✅ Video Creator (Images -> Reels)
+  ["tools/ecommerce", "./api/tools/ecommerce"],         // ✅ Dropship Scraper (1688/Taobao)
+  ["tools/subtitle", "./api/tools/subtitle"],           // ✅ Auto Khmer Subtitle (Gemini + FFmpeg)
+  ["tools/magic-motion", "./api/tools/magic_motion"],   // ✅ AI Magic Motion (FFmpeg Effects)
+  ["tools/censorship", "./api/tools/censorship"],       // ✅ Censorship Tool
+  ["tools/label-swap", "./api/tools/label_swap"], // ✅ Label Swap Tool
+  ["tools/script", "./api/tools/script"], // ✅ Script Writer Tool
+  ["tools/thumbnail", "./api/tools/thumbnail"], // ✅ Thumbnail Generator Tool
+  ["tools/telegram-cloud", "./api/tools/telegram_cloud"], // ✅ Cloud Download to Telegram
+  ["tools/drive-sync", "./api/tools/drive_sync"], // ✅ Google Drive Sync
+  ["tools/farm", "./api/tools/farm"], // ✅ Cloud Farm Automation
 ];
 
 for (const [route, file] of routeModules) {

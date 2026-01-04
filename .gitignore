@@ -5,3 +5,23 @@ dist
 coverage
 .vscode
 .idea
+
+# Temporary files
+backend/temp/
+backend/*.js
+!backend/server.js
+
+# Debug logs
+backend/debug_errors.log
+
+# Large video files
+*.part
+*.mp4
+*.webm
+*.avi
+*.mov
+
+# Build artifacts
+bakong-server/
+bakong-ui/
+server/uploads/

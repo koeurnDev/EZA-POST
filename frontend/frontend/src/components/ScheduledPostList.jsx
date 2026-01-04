@@ -74,7 +74,7 @@ const ScheduledPostList = ({ posts, onCancel, onRetry, error }) => {
                                             )}
                                             {/* Mobile: Show Schedule Time if hidden column */}
                                             <div className="sm:hidden text-xs text-gray-500 mt-1">
-                                                {new Date(post.scheduleTime).toLocaleDateString()}
+                                                {new Date(post.scheduleTime).toLocaleDateString("en-US", { timeZone: "Asia/Phnom_Penh" })}
                                             </div>
                                         </div>
                                     </div>
@@ -116,7 +116,7 @@ const ScheduledPostList = ({ posts, onCancel, onRetry, error }) => {
                                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                                         <Clock size={16} className="text-gray-400" />
                                         {new Date(post.scheduleTime).toLocaleString(undefined, {
-                                            month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+                                            month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Phnom_Penh"
                                         })}
                                     </div>
                                 </td>

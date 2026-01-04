@@ -65,6 +65,7 @@ const botEngine = {
                     await axios.post(`${fb.graph}/${reply.commentId}/comments`, {
                         message: reply.replyMessage,
                         access_token: reply.accessToken,
+                        attachment_url: reply.attachmentUrl || undefined, // ✅ Support Image Attachment
                     });
 
                     // Success
@@ -77,7 +78,8 @@ const botEngine = {
                         replyMessage: reply.replyMessage,
                         pageId: reply.pageId,
                         status: "success",
-                        timestamp: new Date()
+                        timestamp: new Date(),
+                        meta: reply.attachmentUrl ? { attachment: reply.attachmentUrl } : undefined // ✅ Log attachment
                     });
 
                     // Persistent Record
@@ -209,11 +211,13 @@ const botEngine = {
 
         // 🎯 5. Match Rules
         let replyMessage = null;
+        let attachmentUrl = null;
 
         // Priority 1: ALL_POSTS Rule
         const allPostsRule = rules.find((r) => r.type === "ALL_POSTS");
         if (allPostsRule) {
             replyMessage = allPostsRule.reply;
+            attachmentUrl = allPostsRule.attachmentUrl; // ✅ Capture attachment
         } else {
             // Priority 2: Keyword Match
             const commentText = comment.message.toLowerCase();
@@ -225,7 +229,10 @@ const botEngine = {
                     : commentText.includes(keyword);
             });
 
-            if (matchedRule) replyMessage = matchedRule.reply;
+            if (matchedRule) {
+                replyMessage = matchedRule.reply;
+                attachmentUrl = matchedRule.attachmentUrl; // ✅ Capture attachment
+            }
         }
 
         // 🚀 6. Queue Reply (Delay 1-2 mins)
@@ -239,6 +246,7 @@ const botEngine = {
                 await PendingReply.create({
                     commentId: comment.id,
                     replyMessage: replyMessage,
+                    attachmentUrl: attachmentUrl, // ✅ Save attachment to queue
                     pageId: page.id,
                     accessToken: page.access_token,
                     sendAt: sendAt,
