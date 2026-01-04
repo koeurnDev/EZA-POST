@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "code": "NEW MEMBER VOUCHER",
+    "title": "NEW MEMBER VOUCHER",
+    "subtitle": "ALL CATEGORIES DISCOUNT VOUCHER",
+    "discountAmount": 0.3,
+    "type": "percentage",
+    "displayDiscount": "30%",
+    "valid": "Valid Until 31 May 2022",
+    "color": "from-teal-200 to-teal-100",
+    "textColor": "text-gray-700"
+  },
+  {
+    "id": 2,
+    "code": "RAMADHAN SPECIAL",
+    "title": "RAMADHAN SPECIAL",
+    "subtitle": "ALL CATEGORIES DISCOUNT VOUCHER",
+    "discountAmount": 0.6,
+    "type": "percentage",
+    "displayDiscount": "60%",
+    "valid": "Valid Until 30 Apr 2022",
+    "color": "from-teal-300 to-teal-100",
+    "textColor": "text-gray-800"
+  },
+  {
+    "id": 3,
+    "code": "PAY DAY VOUCHER",
+    "title": "PAY DAY VOUCHER",
+    "subtitle": "ALL CATEGORIES DISCOUNT VOUCHER",
+    "discountAmount": 0.5,
+    "type": "percentage",
+    "displayDiscount": "50%",
+    "valid": "Valid Until 31 May 2022",
+    "color": "from-emerald-300 to-emerald-100",
+    "textColor": "text-gray-800"
+  },
+  {
+    "id": 4,
+    "code": "SKINCARE VOUCHER",
+    "title": "SKINCARE VOUCHER",
+    "subtitle": "ALL CATEGORIES DISCOUNT VOUCHER",
+    "discountAmount": 0.25,
+    "type": "percentage",
+    "displayDiscount": "25%",
+    "valid": "Valid Until 31 May 2022",
+    "color": "from-cyan-200 to-cyan-100",
+    "textColor": "text-gray-800"
+  },
+  {
+    "id": 1765633935025,
+    "code": "SKINCARE VOUCHER",
+    "title": "SKINCARE VOUCHER",
+    "subtitle": "DISCOUNT SUBTITLE",
+    "displayDiscount": "99%",
+    "valid": "Valid until 31 Dec 2025",
+    "color": "from-pink-200 to-pink-100",
+    "textColor": "text-gray-800",
+    "type": "percentage",
+    "discountAmount": 0.1
+  }
+]

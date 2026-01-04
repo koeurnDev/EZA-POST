@@ -1,0 +1,55 @@
+[
+  {
+    "id": 1765640017394,
+    "src": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765705646/girly-shop/banners/banner-new-skincare.png",
+    "title": "New Skincare Arrival",
+    "subtitle": "Hydrate and glow with our premium skincare line.",
+    "btnText": "Shop Skincare"
+  },
+  {
+    "id": 1765640017393,
+    "src": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765705644/girly-shop/banners/banner-new-makeup.png",
+    "title": "New Makeup Collection",
+    "subtitle": "Express yourself with our latest vibrant shades.",
+    "btnText": "Explore Makeup"
+  },
+  {
+    "id": 1,
+    "src": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713046/girly-shop/banners/banner-laneige_i8wnfk.jpg",
+    "alt": "Laneige Special",
+    "title": "Glow Up With Laneige",
+    "subtitle": "Discover the secret to sleeping beauty.",
+    "btnText": "Shop Laneige"
+  },
+  {
+    "id": 2,
+    "src": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713047/girly-shop/banners/banner-vitapair_rygrvl.jpg",
+    "alt": "Vitapair C Serum",
+    "title": "Brighten Your Day",
+    "subtitle": "Vitamin C for that radiant summer glow.",
+    "btnText": "Shop Serums"
+  },
+  {
+    "id": 3,
+    "src": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713048/girly-shop/banners/banner-innisfree_etgbjo.jpg",
+    "alt": "Innisfree Green Tea",
+    "title": "Fresh from Jeju",
+    "subtitle": "Hydrate with the power of Green Tea.",
+    "btnText": "Explore Innisfree"
+  },
+  {
+    "id": 4,
+    "src": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713049/girly-shop/banners/banner-serum1_tgsgzb.jpg",
+    "alt": "Glow Serum",
+    "title": "Glass Skin Goals",
+    "subtitle": "Achieve the look you've always wanted.",
+    "btnText": "Shop Now"
+  },
+  {
+    "id": 1765640017392,
+    "src": "https://girly-shop.onrender.com/uploads/image-1765640023841-453992764.jpg",
+    "title": "New Banner",
+    "subtitle": "Subtitle goes here",
+    "btnText": "Shop Now"
+  }
+]

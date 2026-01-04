@@ -1,0 +1,1060 @@
+[
+  {
+    "id": 105,
+    "name": "Gucci Flora Gorgeous Magnolia",
+    "price": 120,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713050/girly-shop/products/gucci-flora_lhskuu.jpg",
+    "category": "Treat",
+    "rating": 4.9,
+    "reviews": 320,
+    "isNew": true,
+    "stock": 10,
+    "oldPrice": null,
+    "brand": "",
+    "volume": "",
+    "description": ""
+  },
+  {
+    "id": 106,
+    "name": "Chanel Chance Eau Tendre",
+    "price": 135,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713051/girly-shop/products/chanel-chance_ehjhxg.jpg",
+    "category": "Treat",
+    "rating": 5,
+    "reviews": 450,
+    "isNew": true,
+    "stock": 50
+  },
+  {
+    "id": 107,
+    "name": "Dior Addict Lip Glow",
+    "price": 40,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713052/girly-shop/products/dior-addict_vufrhe.jpg",
+    "category": "Treat",
+    "rating": 4.8,
+    "reviews": 890,
+    "isNew": false,
+    "stock": 50
+  },
+  {
+    "id": 108,
+    "name": "CeraVe Daily Moisturizing Lotion",
+    "price": 15,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713053/girly-shop/products/cerave-lotion_w987bt.jpg",
+    "category": "Moisturize",
+    "rating": 4.7,
+    "reviews": 1200,
+    "isNew": false,
+    "stock": 50
+  },
+  {
+    "id": 109,
+    "name": "Rom&nd Zero Velvet Tint",
+    "price": 12,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713054/girly-shop/products/romand-lip_nacbqh.jpg",
+    "category": "Treat",
+    "rating": 4.6,
+    "reviews": 560,
+    "isNew": true,
+    "stock": 50
+  },
+  {
+    "id": 101,
+    "name": "Anua Niacinamide 10% + TXA 4%",
+    "price": 24,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713056/girly-shop/products/anua-niacinamide_djdnbb.jpg",
+    "category": "Treat",
+    "rating": 4.9,
+    "reviews": 120,
+    "isNew": true,
+    "stock": 50
+  },
+  {
+    "id": 102,
+    "name": "Medicube PDRN Pink Peptide Serum",
+    "price": 32,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713057/girly-shop/products/medicube-serum_x2fmzr.jpg",
+    "category": "Treat",
+    "rating": 5,
+    "reviews": 85,
+    "isNew": true,
+    "stock": 50
+  },
+  {
+    "id": 103,
+    "name": "Anessa Perfect UV Sunscreen",
+    "price": 28.5,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713058/girly-shop/products/anessa-sunscreen_mtkwpr.jpg",
+    "category": "Protect",
+    "rating": 4.8,
+    "reviews": 340,
+    "isNew": false,
+    "stock": 50
+  },
+  {
+    "id": 104,
+    "name": "Tocobo Cotton Soft Sun Stick",
+    "price": 18,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713059/girly-shop/products/tocobo-sunstick_liog91.jpg",
+    "category": "Protect",
+    "rating": 4.7,
+    "reviews": 210,
+    "isNew": true,
+    "stock": 50
+  },
+  {
+    "id": 1,
+    "name": "Anua Heartleaf Pore Control Cleansing Oil",
+    "brand": "Anua",
+    "price": 18,
+    "oldPrice": 22,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713060/girly-shop/products/prod-anua_hpd9ui.jpg",
+    "category": "Cleanser",
+    "rating": 4.9,
+    "volume": "200 ml",
+    "stock": 50
+  },
+  {
+    "id": 2,
+    "name": "Mixsoon Bean Essence",
+    "brand": "Mixsoon",
+    "price": 24,
+    "oldPrice": 30,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713061/girly-shop/products/prod-mixsoon_hrwxfy.jpg",
+    "category": "Essence",
+    "rating": 4.8,
+    "volume": "50 ml",
+    "stock": 50
+  },
+  {
+    "id": 3,
+    "name": "Nature Republic Aloe Vera 92% Soothing Gel",
+    "brand": "Nature Republic",
+    "price": 8,
+    "oldPrice": 12,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713062/girly-shop/products/prod-aloe_cajqzy.jpg",
+    "category": "Moisturizer",
+    "rating": 4.7,
+    "volume": "300 ml",
+    "stock": 50
+  },
+  {
+    "id": 4,
+    "name": "Medicube Collagen Night Wrapping Mask",
+    "brand": "Medicube",
+    "price": 28,
+    "oldPrice": 35,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713063/girly-shop/products/prod-collagen_zimyvn.jpg",
+    "category": "Mask",
+    "rating": 4.9,
+    "volume": "75 ml",
+    "stock": 50
+  },
+  {
+    "id": 5,
+    "name": "Anua Dark Spot Serum",
+    "volume": "30 ml",
+    "price": 17.5,
+    "oldPrice": 21,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713064/girly-shop/products/prod-anua_aeaxcq.jpg",
+    "rating": 4.8,
+    "category": "Treat",
+    "stock": 50
+  },
+  {
+    "id": 6,
+    "name": "Benton Snail Bee High Content content",
+    "volume": "60 ml",
+    "price": 14.5,
+    "oldPrice": 16,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765713066/girly-shop/products/prod-collagen_zi41tl.jpg",
+    "rating": 4.6,
+    "category": "Repair",
+    "stock": 50
+  },
+  {
+    "id": 110,
+    "name": "Pich Pisey Bikini Moisture Cream",
+    "price": 10,
+    "oldPrice": 15,
+    "image": "https://girly-shop.onrender.com/uploads/bikini-cream.jpg",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/bikini-cream.jpg",
+      "/products/anua-niacinamide.jpg",
+      "/products/medicube-serum.jpg"
+    ],
+    "category": "Moisturize",
+    "brand": "Pich Pisey",
+    "rating": 5,
+    "reviews": 12,
+    "isNew": true,
+    "volume": "50 g",
+    "highlights": [
+      "Intense 24h hydration",
+      "Safe for sensitive areas",
+      "Brightening formula",
+      "Non-sticky texture"
+    ],
+    "howToUse": [
+      "Cleanse the area thoroughly before application.",
+      "Take a pea-sized amount of the cream.",
+      "Gently massage into the skin until fully absorbed.",
+      "Use twice daily (morning and night) for best results."
+    ],
+    "description": "Reveal your confidence with the Pich Pisey Bikini Moisture Cream. This specialized formula is designed to hydrate, brighten, and smooth delicate skin. Infused with gentle nourishing ingredients, it helps reduce dark spots and irritation while providing deep moisture.",
+    "stock": 50
+  },
+  {
+    "id": 111,
+    "name": "Phka Blush (Pkor Lorn)",
+    "price": 10,
+    "oldPrice": 12.5,
+    "image": "https://girly-shop.onrender.com/uploads/phka-blush.png",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/phka-blush.png"
+    ],
+    "category": "Makeup",
+    "brand": "Em's",
+    "rating": 4.8,
+    "reviews": 8,
+    "isNew": true,
+    "highlights": [
+      "Natural matte finish",
+      "Long-lasting pigment",
+      "Blendable texture",
+      "Includes mirror"
+    ],
+    "howToUse": [
+      "Swirl a brush into the powder.",
+      "Tap off excess product.",
+      "Smile and apply to the apples of your cheeks.",
+      "Blend upwards towards your temples for a lifted look."
+    ],
+    "description": "Add a pop of natural color to your complexion with Phka Blush. The silky-smooth powder blends effortlessly into the skin, creating a soft-focus finish that lasts all day. Available in a universally flattering shade that suits all skin tones.",
+    "stock": 50
+  },
+  {
+    "id": 112,
+    "name": "Phka Blush (Kolab)",
+    "price": 10,
+    "oldPrice": 12.5,
+    "image": "https://girly-shop.onrender.com/uploads/kolab-1.png",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/kolab-1.png",
+      "https://girly-shop.onrender.com/uploads/kolab-2.png",
+      "https://girly-shop.onrender.com/uploads/kolab-3.png",
+      "https://girly-shop.onrender.com/uploads/kolab-4.png",
+      "https://girly-shop.onrender.com/uploads/kolab-5.png"
+    ],
+    "category": "Makeup",
+    "brand": "Em's",
+    "rating": 5,
+    "reviews": 3,
+    "isNew": true,
+    "highlights": [
+      "Rosy pink shade",
+      "Highly pigmented",
+      "Smooth matte finish",
+      "Cute heart packaging"
+    ],
+    "howToUse": [
+      "Best applied with a fluffy blush brush.",
+      "Start light and build up intensity.",
+      "Perfect for a 'cold girl' makeup look."
+    ],
+    "description": "The Kolab shade offers a stunning rosy pink hue that gives your cheeks a fresh, blooming appearance. Inspired by the beauty of roses (Kolab), this blush provides a romantic flush of color.",
+    "stock": 50
+  },
+  {
+    "id": 113,
+    "name": "Phka Blush (Chhuk)",
+    "price": 10,
+    "oldPrice": 12.5,
+    "image": "https://girly-shop.onrender.com/uploads/chhuk-1.png",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/chhuk-1.png",
+      "https://girly-shop.onrender.com/uploads/chhuk-2.png",
+      "https://girly-shop.onrender.com/uploads/chhuk-3.jpg",
+      "https://girly-shop.onrender.com/uploads/chhuk-4.jpg"
+    ],
+    "category": "Makeup",
+    "brand": "Em's",
+    "rating": 5,
+    "reviews": 5,
+    "isNew": true,
+    "highlights": [
+      "Vibrant lotus pink",
+      "Soft-matte powder",
+      "All-day wear",
+      "Cruelty-free"
+    ],
+    "howToUse": [
+      "Dip brush into powder.",
+      "Smile to find apples of cheeks.",
+      "Sweep upwards for a fresh look."
+    ],
+    "description": "Chhuk (Lotus) brings a vibrant pop of color to your cheeks. This lively shade embodies the energy and beauty of the lotus flower, perfect for brightening up any makeup look.",
+    "stock": 50
+  },
+  {
+    "id": 114,
+    "name": "Phka Blush (Romduol)",
+    "price": 10,
+    "oldPrice": 12.5,
+    "image": "https://girly-shop.onrender.com/uploads/romduol-1.png",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/romduol-1.png",
+      "https://girly-shop.onrender.com/uploads/romduol-2.png",
+      "https://girly-shop.onrender.com/uploads/romduol-3.jpg",
+      "https://girly-shop.onrender.com/uploads/romduol-4.jpg"
+    ],
+    "category": "Makeup",
+    "brand": "Em's",
+    "rating": 5,
+    "reviews": 2,
+    "isNew": true,
+    "highlights": [
+      "Warm orange-yellow tone",
+      "Sun-kissed glow",
+      "National Flower shade",
+      "Soft focus effect"
+    ],
+    "howToUse": [
+      "Apply to cheeks for a warm glow.",
+      "Can also be used as eyeshadow.",
+      "Build up for a more intense sunset look."
+    ],
+    "description": "Inspired by the Romduol, Cambodia's national flower, this unique yellowish-orange shade provides a stunning sun-kissed warmth to your complexion. Perfect for warm undertones or creating a trendy monochromatic look.",
+    "stock": 50
+  },
+  {
+    "id": 115,
+    "name": "Phka Blush (Tirk Dos)",
+    "price": 10,
+    "oldPrice": 12.5,
+    "image": "https://girly-shop.onrender.com/uploads/tirkdos-1.png",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/tirkdos-1.png",
+      "https://girly-shop.onrender.com/uploads/tirkdos-2.png",
+      "https://girly-shop.onrender.com/uploads/tirkdos-3.png"
+    ],
+    "category": "Makeup",
+    "brand": "Em's",
+    "rating": 5,
+    "reviews": 1,
+    "isNew": true,
+    "highlights": [
+      "Warm terracotta nude",
+      "Natural contour shade",
+      "Soft matte finish",
+      "Multipurpose (Cheek/Eye)"
+    ],
+    "howToUse": [
+      "Apply under cheekbones for a contoured look.",
+      "Use as a transition shade for eyeshadow.",
+      "Blend well for a seamless natural flush."
+    ],
+    "description": "Tirk Dos offers a sophisticated warm terracotta nude shade. Perfect for a natural everyday look or for adding warmth and definition to the face (like a soft bronzer/blush hybrid).",
+    "stock": 50
+  },
+  {
+    "id": 116,
+    "name": "Phka Blush (Angkeadey)",
+    "price": 10,
+    "oldPrice": 12.5,
+    "image": "https://girly-shop.onrender.com/uploads/angkeadey-1.png",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/angkeadey-1.png",
+      "https://girly-shop.onrender.com/uploads/angkeadey-2.png"
+    ],
+    "category": "Makeup",
+    "brand": "Em's",
+    "rating": 5,
+    "reviews": 4,
+    "isNew": true,
+    "highlights": [
+      "Deep berry red",
+      "Bold & dramatic",
+      "High color payoff",
+      "Velvet matte finish"
+    ],
+    "howToUse": [
+      "Use a light hand as it is very pigmented.",
+      "Tap onto cheeks and blend quickly.",
+      "Can create a 'drunk blush' or 'sunburn' look."
+    ],
+    "description": "Angkeadey delivers a rich, deep berry red hue. This bold shade allows for a dramatic flush, perfect for evening looks or for those who love a striking pop of color.",
+    "stock": 50
+  },
+  {
+    "id": 117,
+    "name": "Phka Malis Lip Oil",
+    "price": 10,
+    "oldPrice": 14,
+    "image": "https://girly-shop.onrender.com/uploads/malis-1.png",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/malis-1.png",
+      "https://girly-shop.onrender.com/uploads/malis-2.png",
+      "https://girly-shop.onrender.com/uploads/malis-3.png",
+      "https://girly-shop.onrender.com/uploads/malis-4.png"
+    ],
+    "category": "Lip Care",
+    "brand": "Em's",
+    "rating": 5,
+    "reviews": 8,
+    "isNew": true,
+    "highlights": [
+      "Clear with subtle shimmer",
+      "Non-sticky formula",
+      "Hydrating & Plumping",
+      "Jasmine (Malis) Scent"
+    ],
+    "howToUse": [
+      "Apply directly to bare lips for a glossy look.",
+      "Layer over lipstick for added shine.",
+      "Use daily for hydration."
+    ],
+    "description": "Inspired by the fragrant Jasmine flower (Malis), this crystal-clear lip oil provides intense hydration with a non-sticky, glass-like finish. Infused with subtle shimmer particles to make your lips look plump and juicy.",
+    "stock": 50
+  },
+  {
+    "id": 118,
+    "name": "Phka Romyol Lip Oil",
+    "price": 10,
+    "oldPrice": 14,
+    "image": "https://girly-shop.onrender.com/uploads/romyol-1.png",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/romyol-1.png",
+      "https://girly-shop.onrender.com/uploads/romyol-2.png",
+      "https://girly-shop.onrender.com/uploads/romyol-3.png",
+      "https://girly-shop.onrender.com/uploads/romyol-4.png"
+    ],
+    "category": "Lip Care",
+    "brand": "Em's",
+    "rating": 5,
+    "reviews": 12,
+    "isNew": true,
+    "highlights": [
+      "Tinted Strawberry Red",
+      "High Shine & Plumping",
+      "Nourishing Formula",
+      "Hibiscus (Romyol) Inspired"
+    ],
+    "howToUse": [
+      "Swipe on lips for a sheer red tint.",
+      "Apply multiple layers for more color payoff.",
+      "Perfect for a 'clean girl' makeup look."
+    ],
+    "description": "Named after the vibrant Hibiscus (Romyol), this tinted lip oil gives your lips a juicy, sheer red glaze. It combines the shine of a gloss with the nourishment of an oil for the perfect healthy lip glow.",
+    "stock": 50
+  },
+  {
+    "id": 119,
+    "name": "Phka Trabekprei Lip Oil",
+    "price": 10,
+    "oldPrice": 14,
+    "image": "https://girly-shop.onrender.com/uploads/trabekprei-1.png",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/trabekprei-1.png",
+      "https://girly-shop.onrender.com/uploads/trabekprei-2.png",
+      "https://girly-shop.onrender.com/uploads/trabekprei-3.png",
+      "https://girly-shop.onrender.com/uploads/trabekprei-4.png",
+      "https://girly-shop.onrender.com/uploads/trabekprei-5.png"
+    ],
+    "category": "Lip Care",
+    "brand": "Em's",
+    "rating": 5,
+    "reviews": 6,
+    "isNew": true,
+    "highlights": [
+      "Color-Changing (Blue to Pink)",
+      "Reacts to pH level",
+      "Unique Wild Guava Scent",
+      "Glassy Shine"
+    ],
+    "howToUse": [
+      "Apply the blue oil to bare lips.",
+      "Watch it magically transform to pink.",
+      "The shade adjusts to your unique pH."
+    ],
+    "description": "Experience magic with Trabekprei (Wild Guava). This transparent blue oil transforms into a personalized soft pink shade upon contact with your lips, adjusting to your unique pH level.",
+    "stock": 50
+  },
+  {
+    "id": 120,
+    "name": "Pich Pisey Armpit Cream",
+    "price": 7.5,
+    "oldPrice": 12,
+    "image": "https://girly-shop.onrender.com/uploads/armpit-cream-1.png",
+    "images": [
+      "https://girly-shop.onrender.com/uploads/armpit-cream-1.png",
+      "https://girly-shop.onrender.com/uploads/armpit-cream-2.png",
+      "https://girly-shop.onrender.com/uploads/armpit-cream-3.png",
+      "https://girly-shop.onrender.com/uploads/armpit-cream-4.png",
+      "https://girly-shop.onrender.com/uploads/armpit-cream-5.png"
+    ],
+    "category": "Body Care",
+    "brand": "Pich Pisey",
+    "rating": 4.8,
+    "reviews": 34,
+    "isNew": true,
+    "highlights": [
+      "Whitens & Brightens",
+      "Smooths Chicken Skin",
+      "Reduces Odor",
+      "Fast Absorption"
+    ],
+    "howToUse": [
+      "Apply a small amount to clean, dry underarms.",
+      "Massage gently until fully absorbed.",
+      "Use twice daily (morning & night) for best results."
+    ],
+    "description": "Achieve smooth, bright, and confident underarms with Pich Pisey Armpit Cream. This specialized formula targets chicken skin, dark spots, and roughness, leaving your skin soft and evenly toned. Perfect for sleeveless days!",
+    "stock": 50
+  },
+  {
+    "id": 121,
+    "name": "D-nee",
+    "price": 2,
+    "image": "https://girly-shop.onrender.com/uploads/image-1765631525802-446363262.jpg",
+    "category": "Cleanse",
+    "brand": "SOOY LOTION",
+    "rating": 0,
+    "reviews": 0,
+    "isNew": true,
+    "stock": 50
+  },
+  {
+    "id": 122,
+    "name": "Peptide 3R Derma Eye Serum",
+    "price": 25,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765705084/girly-shop/products/peptide-3r-derma-eye-serum.png",
+    "category": "Treat",
+    "rating": 5,
+    "reviews": 0,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Eyenlip Beauty",
+    "volume": "25ml",
+    "description": "A premium wrinkle-care eye serum formulated with peptides to rejuvenate and firm the delicate skin around your eyes.",
+    "howToUse": [
+      "Apply a small amount around the eye area.",
+      "Gently tap with fingertips until absorbed.",
+      "Use morning and night for best results."
+    ],
+    "ingredients": "Water, Glycerin, Butylene Glycol, Peptide Complex, Adenosine, Niacinamide...",
+    "highlights": [
+      "Anti-Wrinkle",
+      "Hydrating",
+      "Firming",
+      "Peptide Complex"
+    ]
+  },
+  {
+    "id": 123,
+    "name": "Luminous Damage Repair Treatment",
+    "price": 18,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765705413/girly-shop/products/luminous-damage-repair-treatment.png",
+    "category": "Treat",
+    "rating": 5,
+    "reviews": 0,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Eyenlip",
+    "volume": "Standard",
+    "description": "Intensive hair treatment that restores shine and smoothness to damaged hair.",
+    "howToUse": [
+      "Apply as directed on packaging.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "Silky Protein, Argan Oil, Keratin...",
+    "highlights": [
+      "Damage Repair",
+      "Smooth & Shiny",
+      "Protein Rich"
+    ]
+  },
+  {
+    "id": 124,
+    "name": "Ceramide Repair Foot Cream",
+    "price": 12,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765705414/girly-shop/products/ceramide-repair-foot-cream.png",
+    "category": "Moisturize",
+    "rating": 5,
+    "reviews": 0,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Eyenlip",
+    "volume": "Standard",
+    "description": "Rich foot cream with ceramides to heal and soften dry, cracked heels.",
+    "howToUse": [
+      "Apply as directed on packaging.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "Ceramide NP, Shea Butter, Urea...",
+    "highlights": [
+      "Deep Moisture",
+      "Heal Cracks",
+      "Ceramide Infused"
+    ]
+  },
+  {
+    "id": 125,
+    "name": "Rice Glow pH Balance Toner",
+    "price": 22,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765705415/girly-shop/products/rice-glow-ph-toner.png",
+    "category": "Treat",
+    "rating": 5,
+    "reviews": 0,
+    "isNew": true,
+    "stock": 50,
+    "brand": "FABYOU",
+    "volume": "Standard",
+    "description": "Balancing toner enriched with rice extract to brighten and refine skin texture.",
+    "howToUse": [
+      "Apply as directed on packaging.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "Rice Extract, Niacinamide, Centella Asiatica...",
+    "highlights": [
+      "Brightening",
+      "pH Balance",
+      "Pore Care"
+    ]
+  },
+  {
+    "id": 126,
+    "name": "Stem Cell Peptide Retinol Night Cream",
+    "price": 35,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765705416/girly-shop/products/stem-cell-peptide-night-cream.png",
+    "category": "Moisturize",
+    "rating": 5,
+    "reviews": 0,
+    "isNew": true,
+    "stock": 50,
+    "brand": "FABYOU",
+    "volume": "Standard",
+    "description": "Advanced night cream combining stem cells, peptides, and retinol for total anti-aging care.",
+    "howToUse": [
+      "Apply as directed on packaging.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "Stem Cell Culture, Retinol, Peptide Complex...",
+    "highlights": [
+      "Anti-Aging",
+      "Retinol & Peptides",
+      "Night Repair"
+    ]
+  },
+  {
+    "id": 127,
+    "name": "Rice Pore Control Cleansing Oil",
+    "price": 24,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765705417/girly-shop/products/rice-pore-control-cleansing-oil.png",
+    "category": "Cleanse",
+    "rating": 5,
+    "reviews": 0,
+    "isNew": true,
+    "stock": 50,
+    "brand": "FABYOU",
+    "volume": "Standard",
+    "description": "Lightweight cleansing oil that melts away makeup and impurities while managing pores.",
+    "howToUse": [
+      "Apply as directed on packaging.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "Rice Bran Oil, Olive Oil, Jojoba Oil...",
+    "highlights": [
+      "Deep Cleansing",
+      "Pore Control",
+      "Non-Greasy"
+    ]
+  },
+  {
+    "id": 128,
+    "name": "Naturie Hatomugi Skin Conditioner",
+    "price": 13.4,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765705750/girly-shop/products/naturie-hatomugi-skin-conditioner.png",
+    "category": "Treat",
+    "rating": 4.8,
+    "reviews": 22,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Naturie",
+    "volume": "500ml",
+    "description": "This mild Naturie Hatomugi Skin Conditioner contains coix seed extract derived from natural plants to moisture, brighten and smoothen your skin. It prepares your skin to better absorb skincare products layered on after.",
+    "howToUse": [
+      "Apply a generous amount onto your skin.",
+      "Gently blend it in with your hands until fully absorbed.",
+      "Can also be used as a face mask or body care."
+    ],
+    "ingredients": "Water, DPG, BG, Glycerin, Glycyrrhizic acid 2K, Hatomugi extract (Coix Seed), (Styrene/Acrylate) copolymer, Ethanol, Citric acid...",
+    "highlights": [
+      "Deep Penetration",
+      "Highly Moisturising",
+      "Fragrance-free",
+      "Start for Daily Use",
+      "Hypoallergenic"
+    ]
+  },
+  {
+    "id": 129,
+    "name": "Anessa Perfect UV Sunscreen Skincare Milk",
+    "price": 13.49,
+    "oldPrice": 14.98,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765706066/girly-shop/products/anessa-perfect-uv-sunscreen.png",
+    "category": "Protect",
+    "rating": 4.9,
+    "reviews": 15,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Anessa",
+    "volume": "60ml",
+    "description": "The gold standard of sun protection. Anessa Perfect UV Sunscreen Skincare Milk offers the strongest UV protection with a smooth, non-sticky milky texture. Features Aqua Booster EX Technology which gets stronger coming into contact with sweat or water.",
+    "howToUse": [
+      "Shake well before use.",
+      "Apply generously to face and neck as the last step of skincare.",
+      "Reapply fast after sweating or swimming."
+    ],
+    "ingredients": "Water, Dimethicone, Zinc Oxide, Ethylhexyl Methoxycinnamate, Alcohol, Cyclopentasiloxane...",
+    "highlights": [
+      "SPF50+ PA++++",
+      "Water Resistant (80 mins)",
+      "Non-Sticky Milk Texture",
+      "Skincare Ingredients (50%)",
+      "Aqua Booster Technology"
+    ]
+  },
+  {
+    "id": 130,
+    "name": "Skin Aqua Super Moisture Gel Pump Type SPF50+/PA++++",
+    "price": 10.92,
+    "oldPrice": 12.14,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765706171/girly-shop/products/skin-aqua-super-moisture-gel-pump.jpg",
+    "category": "Protect",
+    "rating": 4.8,
+    "reviews": 17,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Skin Aqua (Rohto)",
+    "volume": "140g",
+    "description": "A fresh, water-like sensation sunscreen gel. Skin Aqua Super Moisture Gel contains 4 moisturizing ingredients including Super Hyaluronic Acid and Collagen to keep skin hydrated while providing strong UV protection.",
+    "howToUse": [
+      "Apply evenly to the skin.",
+      "Recommended to reapply frequently to maintain protection.",
+      "Can be removed with soap."
+    ],
+    "ingredients": "Water, Ethanol, Ethylhexyl Methoxycinnamate, BG, Diphenylsiloxy Phenyl Trimethicone, Sodium Hyaluronate...",
+    "highlights": [
+      "SPF50+ PA++++",
+      "Water-like Texture",
+      "Sweat & Water Resistant",
+      "Large Pump Bottle (140g)",
+      "Fragrance-free"
+    ]
+  },
+  {
+    "id": 131,
+    "name": "Naturie Hatomugi Skin Conditioning Gel",
+    "price": 11.81,
+    "oldPrice": 13.13,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765706337/girly-shop/products/naturie-hatomugi-skin-conditioning-gel.png",
+    "category": "Moisturize",
+    "rating": 4.7,
+    "reviews": 10,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Naturie",
+    "volume": "180g",
+    "description": "A lightweight, non-sticky moisturizing gel containing Job's Tears (Hatomugi) extract. Deeply hydrates skin and locks in moisture without feeling heavy. Can be used on face and body.",
+    "howToUse": [
+      "Use as a moisturizer after lotion.",
+      "Can be used as a moisturizing pack by applying a thick layer.",
+      "Suitable for face and body."
+    ],
+    "ingredients": "Water, Glycerin, DPG, Dimethicone, Ascorbyl Tetraisopalmitate, Sodium Tocopheryl Phosphate, Coix Lacryma-Jobi Ma-yuen Seed Extract...",
+    "highlights": [
+      "Non-Sticky Formula",
+      "Deep Hydration",
+      "Alcohol-Free",
+      "Colorant-Free",
+      "Fragrance-Free"
+    ]
+  },
+  {
+    "id": 132,
+    "name": "Black Sheep Booster Whitening Body Cream",
+    "price": 15,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765706630/girly-shop/products/black-sheep-booster-whitening-body-cream.png",
+    "category": "Treat",
+    "rating": 5,
+    "reviews": 0,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Black Sheep",
+    "volume": "Standard",
+    "description": "A premium whitening body booster cream. Helps to brighten skin tone and reduce dark spots effectively.",
+    "howToUse": [
+      "Apply daily to body after shower.",
+      "Focus on dark areas or spots."
+    ],
+    "ingredients": "Niacinamide, Alpha Arbutin, Collagen...",
+    "highlights": [
+      "Whitening Booster",
+      "Body Care",
+      "Brightening"
+    ]
+  },
+  {
+    "id": 133,
+    "name": "Justeen Miracle Massaya Whitening Set",
+    "price": 28,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765706824/girly-shop/products/justeen-miracle-massaya-set.png",
+    "category": "Treat",
+    "rating": 5,
+    "reviews": 0,
+    "isNew": true,
+    "stock": 30,
+    "brand": "Justeen Miracle",
+    "volume": "Set",
+    "description": "A complete 3-in-1 body whitening set containing: Booster Whitening Cream (100g), Whitening Body Lotion (500g), and Vitamin Body Serum (300ml).",
+    "howToUse": [
+      "Mix the serum and lotion together for best results.",
+      "Apply the booster cream on dark spots.",
+      "Use daily after shower."
+    ],
+    "ingredients": "Vitamin C, Alpha Arbutin, Glutathione, Collagen, Hyaluronic Acid...",
+    "highlights": [
+      "Complete Body Care Set",
+      "Whitening & Brightening",
+      "Deep Moisture",
+      "Vitamin Enriched"
+    ]
+  },
+  {
+    "id": 134,
+    "name": "Hada Labo Koi-Gokujyun UV White Gel SPF50+ PA++++",
+    "price": 14.5,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765707052/girly-shop/products/hada-labo-uv-white-gel.png",
+    "category": "Protect",
+    "rating": 4.8,
+    "reviews": 24,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Hada Labo",
+    "volume": "90g",
+    "description": "A multi-functional UV gel that acts as a lotion, beauty serum, emulsion, cream, and mask. Provides strong SPF50+ protection while hydrating the skin with Hyaluronic Acid and Vitamin C.",
+    "howToUse": [
+      "Apply as directed.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "",
+    "highlights": [
+      "All-in-One Gel",
+      "SPF50+ PA++++",
+      "Lightweight",
+      "Vitamin C Infused"
+    ]
+  },
+  {
+    "id": 135,
+    "name": "Hada Labo Gokujyun Premium Hydrating Lotion",
+    "price": 13.8,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765707054/girly-shop/products/hada-labo-premium-lotion.png",
+    "category": "Treat",
+    "rating": 4.9,
+    "reviews": 45,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Hada Labo",
+    "volume": "170ml",
+    "description": "A rich, essence-like toner containing 5 types of Hyaluronic Acid to deliver intense moisture to the skin. Perfect for dry skin, leaving it supple and soft.",
+    "howToUse": [
+      "Apply as directed.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "",
+    "highlights": [
+      "5 Types of Hyaluronic Acid",
+      "Intense Hydration",
+      "Alcohol-Free",
+      "Fragrance-Free"
+    ]
+  },
+  {
+    "id": 136,
+    "name": "Biore UV Aqua Rich Watery Essence SPF50+ PA++++",
+    "price": 10.5,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765707055/girly-shop/products/biore-uv-aqua-rich-essence.png",
+    "category": "Protect",
+    "rating": 4.8,
+    "reviews": 120,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Biore",
+    "volume": "50g",
+    "description": "Water-based sunscreen that applies effortlessly like a serum. Features Micro Defense formula to cover uneven skin surfaces. Water resistant yet washes off with soap.",
+    "howToUse": [
+      "Apply as directed.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "",
+    "highlights": [
+      "Micro Defense Formula",
+      "Watery Texture",
+      "No White Cast",
+      "Hyaluronic Acid"
+    ]
+  },
+  {
+    "id": 137,
+    "name": "Care:nel Sleeping Lip Care Lime Night Mask",
+    "price": 8,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765707056/girly-shop/products/carenel-lime-lip-mask.png",
+    "category": "Treat",
+    "rating": 4.7,
+    "reviews": 15,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Care:nel",
+    "volume": "5g",
+    "description": "A sleeping mask for dry, chapped lips. Enriched with Lime and Vitamin C to gently exfoliate and deeply moisturize lips overnight.",
+    "howToUse": [
+      "Apply as directed.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "",
+    "highlights": [
+      "Overnight Lip Repair",
+      "Vitamin C Rich",
+      "Fresh Lime Scent",
+      "Melt-in Texture"
+    ]
+  },
+  {
+    "id": 138,
+    "name": "KLEN Herbal Hair Shampoo & Conditioner",
+    "price": 8.5,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765707510/girly-shop/products/klen-herbal-shampoo-conditioner.png",
+    "category": "Treat",
+    "rating": 4.8,
+    "reviews": 0,
+    "isNew": true,
+    "stock": 50,
+    "brand": "KLEN",
+    "volume": "Standard",
+    "description": "Advanced Korean herbal formula hair care range. Available for different hair needs: Anti-Dandruff (Men/Women), Hair Fall Control, Damaged Hair Repair, and Normal Hair maintenance.",
+    "howToUse": [
+      "Apply to wet hair and massage into scalp.",
+      "Rinse thoroughly.",
+      "Follow with KLEN Conditioner for best results."
+    ],
+    "ingredients": "Korean Ginseng, Herbal Extracts, Keratin, Zinc Pyrithione...",
+    "highlights": [
+      "Korean Herbal Formula",
+      "Anti-Dandruff Expert",
+      "Hair Fall Control",
+      "Scalp Care"
+    ]
+  },
+  {
+    "id": 139,
+    "name": "Kate Somerville Goat Milk Moisturizing Cleanser",
+    "price": 44,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765707930/girly-shop/products/kate-somerville-goat-milk-cleanser.png",
+    "category": "Cleanse",
+    "rating": 4.8,
+    "reviews": 320,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Kate Somerville",
+    "volume": "120ml",
+    "description": "A gentle, daily foaming cleanser that deeply cleanses without stripping skin. Formulated with Goat Milk to soothe and moisturize dry, sensitive skin.",
+    "howToUse": [
+      "Apply as directed.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "",
+    "highlights": [
+      "Sulfate-Free",
+      "Goat Milk Soothing",
+      "Manuka Honey",
+      "For Sensitive Skin"
+    ]
+  },
+  {
+    "id": 140,
+    "name": "KLEN Anti-Hairfall Shampoo",
+    "price": 8.5,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765707931/girly-shop/products/klen-anti-hairfall-shampoo.png",
+    "category": "Treat",
+    "rating": 4.7,
+    "reviews": 12,
+    "isNew": true,
+    "stock": 50,
+    "brand": "KLEN",
+    "volume": "Standard",
+    "description": "Specialized formula to reduce hair fall and strengthen hair roots. Enriched with herbal extracts to promote healthy hair growth.",
+    "howToUse": [
+      "Apply as directed.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "",
+    "highlights": [
+      "Reduces Hair Fall",
+      "Strengthens Roots",
+      "Herbal Formula",
+      "Daily Use"
+    ]
+  },
+  {
+    "id": 141,
+    "name": "KLEN Sport Cool Men Anti-Dandruff Shampoo",
+    "price": 8.5,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765707932/girly-shop/products/klen-sport-cool-men-shampoo.png",
+    "category": "Treat",
+    "rating": 4.9,
+    "reviews": 25,
+    "isNew": true,
+    "stock": 50,
+    "brand": "KLEN",
+    "volume": "Standard",
+    "description": "Refreshing cool menthol shampoo designed for men. effectively fights dandruff while providing an icy cool sensation for the scalp.",
+    "howToUse": [
+      "Apply as directed.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "",
+    "highlights": [
+      "Anti-Dandruff",
+      "Icy Cool Menthol",
+      "Scalp Care",
+      "For Men"
+    ]
+  },
+  {
+    "id": 142,
+    "name": "Fresh Rose Face Mask",
+    "price": 64,
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765707932/girly-shop/products/fresh-rose-face-mask.png",
+    "category": "Treat",
+    "rating": 4.9,
+    "reviews": 580,
+    "isNew": true,
+    "stock": 50,
+    "brand": "Fresh",
+    "volume": "100ml",
+    "description": "An instant hydrating mask with real rose petals suspended in a silky gel that gently soothes and tones by plumping the skin with hydration.",
+    "howToUse": [
+      "Apply as directed.",
+      "Suitable for daily use."
+    ],
+    "ingredients": "",
+    "highlights": [
+      "Real Rose Petals",
+      "Hydrates & Tones",
+      "Cucumber & Aloe",
+      "All Skin Types"
+    ]
+  }
+]

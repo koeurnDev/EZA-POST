@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "title": "Portré: Capture the Moment",
+    "subtitle": "Blur Texture Tint & Essentials",
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765708286/girly-shop/promotions/promo-portre-model.png",
+    "type": "campaign",
+    "dateAdded": "2025-12-14T10:31:27.408Z"
+  },
+  {
+    "id": 2,
+    "title": "Innisfree x Wonyoung: Sun Care",
+    "subtitle": "Green Tea Hyaluronic Moist Sun Serum",
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765708289/girly-shop/promotions/promo-innisfree-sun-serum.png",
+    "type": "campaign",
+    "dateAdded": "2025-12-14T10:31:30.173Z"
+  },
+  {
+    "id": 3,
+    "title": "Brighten Your Day",
+    "subtitle": "Vitamin C Green Tea Enzyme Brightening Cream",
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765708296/girly-shop/promotions/promo-innisfree-vit-c.png",
+    "type": "campaign",
+    "dateAdded": "2025-12-14T10:31:37.425Z"
+  },
+  {
+    "id": 4,
+    "title": "Hydration Powerhouse",
+    "subtitle": "The New Green Tea Seed Hyaluronic Line",
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765708299/girly-shop/promotions/promo-innisfree-green-tea-line.png",
+    "type": "campaign",
+    "dateAdded": "2025-12-14T10:31:40.529Z"
+  },
+  {
+    "id": 5,
+    "title": "Amuse x Wonyoung",
+    "subtitle": "New Bebe Tint Mini Collection",
+    "image": "https://res.cloudinary.com/daqrcfqrt/image/upload/v1765708647/girly-shop/promotions/promo-amuse-bebe-tint.png",
+    "type": "campaign",
+    "dateAdded": "2025-12-14T10:37:28.540Z"
+  }
+]

@@ -1,0 +1,41 @@
+[
+  {
+    "id": "u1",
+    "username": "Ashwin",
+    "email": "ashwin@gmail.com",
+    "password": "123",
+    "role": "admin",
+    "avatar": "/user-avatar.jpg",
+    "wishlist": [
+      1,
+      3
+    ]
+  },
+  {
+    "id": "u2",
+    "username": "ly",
+    "email": "ly@gmail.com",
+    "password": "ly@gmail.com",
+    "role": "customer",
+    "avatar": "/user-avatar.jpg",
+    "wishlist": []
+  },
+  {
+    "id": "u3",
+    "username": "ly1@gmail.com",
+    "email": "ly1@gmail.com",
+    "password": "ly1@gmail.com",
+    "role": "customer",
+    "avatar": "http://localhost:5001/uploads/image-1765613544767-866343567.jpg",
+    "wishlist": []
+  },
+  {
+    "id": "u4",
+    "username": "Seab",
+    "email": "owner@girlyshop.com",
+    "password": "123",
+    "role": "owner",
+    "avatar": "/user-avatar.jpg",
+    "wishlist": []
+  }
+]
