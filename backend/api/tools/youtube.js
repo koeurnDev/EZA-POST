@@ -131,7 +131,8 @@ router.post("/download", requireAuth, async (req, res) => {
             noWarnings: true,
             noCheckCertificate: true,
             output: outputTemplate,
-            ffmpegLocation: ffmpegPath
+            ffmpegLocation: ffmpegPath,
+            concurrentFragments: 4, // 🚀 Speed up download with parallel chunks
         };
 
         if (isAudio) {
@@ -150,15 +151,15 @@ router.post("/download", requireAuth, async (req, res) => {
             if (quality && quality <= 720) {
                 // ⚡ Fast Path: Try to find a pre-merged MP4 at the exact quality first.
                 // "best[ext=mp4][height=...]" guarantees a single file (no merge).
-                // Fallback 1: video+audio merge at exact quality.
-                // Fallback 2: best available if exact fails.
-                formatSelector = `best[ext=mp4][height=${quality}]/bestvideo[height=${quality}]+bestaudio/best[height<=${quality}]`;
+                formatSelector = `best[ext=mp4][height=${quality}]/bestvideo[height=${quality}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height=${quality}]+bestaudio/best[height<=${quality}]`;
             } else if (quality) {
                 // 💎 High Quality (1080p+): Usually implies creating a merge.
-                formatSelector = `bestvideo[height=${quality}]+bestaudio/bestvideo[height<=${quality}]+bestaudio/best[height<=${quality}]`;
+                // Prefer MP4 video (H.264) + M4A audio (AAC) to avoid re-encoding.
+                formatSelector = `bestvideo[height=${quality}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height=${quality}][ext=mp4]+bestaudio/bestvideo[height=${quality}]+bestaudio`;
             } else {
                 // 🌟 Best Available
-                formatSelector = 'bestvideo+bestaudio/best';
+                // Try to get H.264/AAC first for speed, otherwise fall back to best quality (likely VP9)
+                formatSelector = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best';
             }
 
             console.log(`🎯 Strategy: ${formatSelector}`);

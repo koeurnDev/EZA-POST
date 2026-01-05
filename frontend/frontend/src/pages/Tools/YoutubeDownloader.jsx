@@ -107,7 +107,7 @@ export default function YoutubeDownloader() {
                 url,
                 quality: selectedQuality,
                 format
-            }, { timeout: 300000 });
+            }, { timeout: 1800000 }); // 30 minutes timeout for large files
 
             if (res.data.success) {
                 setProgress(100);
@@ -178,9 +178,16 @@ export default function YoutubeDownloader() {
     };
 
     const triggerDownload = (url, name) => {
+        // Convert relative /uploads/temp/... path to absolute /api/download?file=...
+        // The URL from backend is typically "/uploads/temp/videos/filename.mp4"
+        const filename = url.split('/').pop();
+        const downloadUrl = `${api.defaults.baseURL}/download?file=${filename}`;
+
+        // window.open(downloadUrl, '_blank'); // Sometimes better for IDM
+        // OR
         const link = document.createElement('a');
-        link.href = url;
-        link.download = name;
+        link.href = downloadUrl;
+        link.setAttribute('download', name); // Hint name
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

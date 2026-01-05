@@ -253,6 +253,30 @@ for (const [route, file] of routeModules) {
 }
 
 // ------------------------------------------------------------
+// 📥 Download Controller (Forces Save As / IDM)
+// ------------------------------------------------------------
+app.get("/api/download", (req, res) => {
+  const { file } = req.query;
+  if (!file) return res.status(400).send("No file specified");
+
+  // Security: Prevent path traversal
+  const safeFile = path.basename(file);
+  const filePath = path.join(__dirname, "temp", safeFile);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send("File not found or expired");
+  }
+
+  // Force download (Content-Disposition: attachment)
+  res.download(filePath, safeFile, (err) => {
+    if (err) {
+      console.error("❌ Download Error:", err);
+      if (!res.headersSent) res.status(500).send("Download failed");
+    }
+  });
+});
+
+// ------------------------------------------------------------
 // ✅ Health Check
 // ------------------------------------------------------------
 app.get("/api/health", async (req, res) => {
