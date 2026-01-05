@@ -37,7 +37,6 @@ router.post("/lookup", requireAuth, async (req, res) => {
             dumpSingleJson: true,
             flatPlaylist: true, // Key: Don't resolve every video immediately
             noWarnings: true,
-            noCallHome: true,
             noCheckCertificate: true,
         });
 
@@ -66,7 +65,6 @@ router.post("/lookup", requireAuth, async (req, res) => {
         const output = await youtubedl(url, {
             dumpSingleJson: true,
             noWarnings: true,
-            noCallHome: true,
             noCheckCertificate: true,
         });
 
@@ -99,7 +97,13 @@ router.post("/lookup", requireAuth, async (req, res) => {
         res.json({ success: true, isPlaylist: false, video: metadata });
 
     } catch (err) {
-        console.error("❌ YouTube Lookup Error:", err.message);
+        console.error("❌ YouTube Lookup Error Details:", {
+            message: err.message,
+            stack: err.stack,
+            code: err.code,
+            signal: err.signal,
+            stderr: err.stderr, // yt-dlp often outputs to stderr
+        });
         res.status(500).json({ success: false, error: "Failed to fetch info: " + err.message });
     }
 });
@@ -125,7 +129,6 @@ router.post("/download", requireAuth, async (req, res) => {
 
         const flags = {
             noWarnings: true,
-            noCallHome: true,
             noCheckCertificate: true,
             output: outputTemplate,
             ffmpegLocation: ffmpegPath

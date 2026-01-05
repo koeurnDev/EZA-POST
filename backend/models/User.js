@@ -97,6 +97,20 @@ const userSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        // 💰 Credits System
+        credits: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        totalCreditsSpent: {
+            type: Number,
+            default: 0
+        },
+        totalCreditsPurchased: {
+            type: Number,
+            default: 0
+        },
     },
     {
         timestamps: true, // Automatically adds createdAt and updatedAt

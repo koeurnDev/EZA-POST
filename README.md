@@ -38,16 +38,18 @@ EZA-POST is a comprehensive social media management tool designed to automate po
 - **Rules Engine**: Keyword matching (Exact/Contains) and "All Posts" fallback.
 - **AI Integration**: Auto-generate reply rules using AI.
 
-### 6️⃣ Authentication & Security 🔐
-- **Facebook Login**: Secure OAuth flow with requested permissions.
-- **Long-Lived Tokens**: Automatic exchange for ~60-day tokens.
-- **Auto-Refresh**: Daily background job refreshes tokens automatically—users never need to reconnect.
-- **JWT**: Secure session management with encrypted cookies.
+### 6️⃣ Auto-Boost Posts 🚀
+- **Viral Detection**: AI-powered viral score calculation (0-100) for all published posts.
+- **Smart Recommendations**: Automatic budget recommendations based on post performance.
+- **One-Click Boosting**: Create Facebook ad campaigns with a single click.
+- **Audience Targeting**: Configure age, gender, location, and interests.
+- **Campaign Management**: Real-time monitoring of spend, impressions, clicks, and CTR.
+- **Auto-Sync**: Metrics update every 15 minutes, campaign performance every 30 minutes.
 
 ## 🛠️ Tech Stack
 - **Frontend**: React, Vite, TailwindCSS, Framer Motion
 - **Backend**: Node.js, Express, MongoDB (Mongoose)
-- **Services**: Cloudinary (Media), Facebook Graph API (Social)
+- **Services**: Cloudinary (Media), Facebook Graph API (Social), Facebook Marketing API (Ads)
 - **Deployment**: Render (Web Service)
 
 ## 📂 Project Structure
@@ -66,16 +68,19 @@ Ensure the following Environment Variables are set on Render:
 - `CLOUDINARY_API_KEY`: Your API Key.
 - `CLOUDINARY_API_SECRET`: Your API Secret.
 - `FB_VERIFY_TOKEN`: Token for Facebook Webhooks.
+- `FB_AD_ACCOUNT_ID`: Facebook Ad Account ID (for Auto-Boost).
+- `FB_APP_SECRET`: Facebook App Secret (for Auto-Boost).
 
 ## ⚠️ Considerations & Best Practices
 - **Rate Limits**: The Auto-Reply bot uses random delays (1-2 mins) to avoid Facebook spam filters. Monitor logs for 429 errors.
 - **Error Handling**: All API failures (Cloudinary, Facebook) trigger UI toasts. Check browser console for detailed logs.
 - **Mobile**: Dashboard is responsive, but ensure video playback works on older mobile browsers.
 - **Monitoring**: Regularly check Render logs for `[Scheduler]` and `[Bot]` activity to ensure background jobs are running.
+- **Auto-Boost**: Requires Facebook Marketing API approval and `ads_management` permission. See implementation plan for setup.
 
 ## 🛠️ Common Issues & Troubleshooting
 ### 1️⃣ Stale JWT / Cookies
-- **Symptoms**: Page selection appears to save but changes don’t persist; dashboard doesn’t refresh.
+- **Symptoms**: Page selection appears to save but changes don't persist; dashboard doesn't refresh.
 - **Solution**: Clear browser cookies for your domain, then log out and log back in to generate a fresh JWT.
 
 ### 2️⃣ Facebook Permissions
@@ -84,6 +89,7 @@ Ensure the Facebook App is **Live** and has these scopes:
 - `pages_read_engagement`
 - `pages_messaging`
 - `pages_manage_posts`
+- `ads_management` (for Auto-Boost feature)
 
 *Missing any of these can prevent page selection and auto-replies from working.*
 
@@ -94,11 +100,14 @@ Ensure the Facebook App is **Live** and has these scopes:
 ### 4️⃣ Deployment & Environment Variables
 - **CLOUDINARY**: Keys must be correct to upload media.
 - **FB_VERIFY_TOKEN**: Should be set for webhooks.
+- **FB_AD_ACCOUNT_ID**: Required for Auto-Boost feature.
 - **Verify**: Check all environment variables on Render before deploying.
 
 ## 🔮 Future Roadmap
-- **Analytics Dashboard**: Engagement tracking for posts and auto-replies.
+- **Analytics Dashboard**: Engagement tracking for posts and auto-replies. ✅ (Implemented)
+- **Auto-Boost Posts**: Identify viral content and promote with one-click ad campaigns. ✅ (Implemented)
 - **Multi-Page Posting**: Post to multiple pages simultaneously.
 - **Instagram Integration**: Expand platform coverage.
 - **Onboarding**: Guided setup for new users.
 - **2FA**: Two-factor authentication for admins.
+- **Advanced Boost Targeting**: Custom audiences, lookalike audiences, A/B testing.

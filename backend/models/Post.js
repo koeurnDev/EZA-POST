@@ -48,6 +48,26 @@ const postSchema = new mongoose.Schema({
         youtube: { type: String },
         tiktok: { type: String },
         instagram: { type: String }
+    },
+
+    // Boost Tracking
+    isBoosted: {
+        type: Boolean,
+        default: false
+    },
+    boostCampaigns: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'BoostCampaign'
+    }],
+    viralScore: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100
+    },
+    lastMetricsSync: {
+        type: Date,
+        default: null
     }
 });
 

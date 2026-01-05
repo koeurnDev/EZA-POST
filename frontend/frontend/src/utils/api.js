@@ -150,6 +150,8 @@ api.interceptors.response.use(
         message: data?.error || error.message,
         fullError: data, // ✅ Log full error object for debugging
       });
+      // ✅ Also log a clear string for visibility
+      console.error(`❌ ${url} failed: ${data?.error || error.message}`);
     }
 
     // 4️⃣ Clear Session on 401

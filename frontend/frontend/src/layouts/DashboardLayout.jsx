@@ -37,7 +37,9 @@ import {
   FileText,
   ImagePlus,
   Cloud,
-  Users
+  Users,
+  Zap,
+  Coins
 } from "lucide-react";
 
 // 🧭 Navigation Items (Organized by Category)
@@ -80,6 +82,14 @@ const NAV_ITEMS = [
   { label: "Single Video", icon: <Video size={20} />, path: "/post" },
   { label: "Bulk Upload 30+", icon: <UploadCloud size={20} />, path: "/bulk-upload" },
   { label: "Scheduled Posts", icon: <Calendar size={20} />, path: "/posts" },
+  { type: "divider" },
+
+  // Auto-Boost
+  { type: "header", label: "Auto-Boost" },
+  { label: "Boost Settings", icon: <Zap size={20} />, path: "/boost-settings" },
+  { label: "Boost Analytics", icon: <TrendingUp size={20} />, path: "/boost-analytics" },
+  { label: "Boost Accounts", icon: <Users size={20} />, path: "/boost-accounts" },
+  { label: "Buy Credits", icon: <Coins size={20} />, path: "/buy-credits" },
   { type: "divider" },
 
   // Advanced

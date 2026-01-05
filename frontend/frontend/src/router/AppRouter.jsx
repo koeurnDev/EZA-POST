@@ -37,6 +37,12 @@ const ViralFinder = lazy(() => import("../pages/Tools/ViralFinder")); // ✅ New
 const AiTools = lazy(() => import("../pages/Tools/AiTools"));
 const Connections = lazy(() => import("../pages/Connections"));
 const Analytics = lazy(() => import("../pages/Analytics")); // ✅ New
+const ViralPosts = lazy(() => import("../pages/ViralPosts")); // ✅ Boost Feature
+const BoostCampaigns = lazy(() => import("../pages/BoostCampaigns")); // ✅ Boost Feature
+const BoostSettings = lazy(() => import("../pages/BoostSettings"));
+const BoostAnalytics = lazy(() => import("../pages/BoostAnalytics"));
+const BoostAccounts = lazy(() => import("../pages/BoostAccounts"));
+const BuyCredits = lazy(() => import("../pages/BuyCredits"));
 
 const Profile = lazy(() => import("../pages/Profile"));
 const Welcome = lazy(() => import("../pages/Welcome"));
@@ -278,10 +284,58 @@ export default function AppRouter() {
             }
           />
           <Route
+            path="/buy-credits"
+            element={
+              <ProtectedRoute>
+                <BuyCredits />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/analytics"
             element={
               <ProtectedRoute>
                 <Analytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/viral-posts"
+            element={
+              <ProtectedRoute>
+                <ViralPosts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/boost-campaigns"
+            element={
+              <ProtectedRoute>
+                <BoostCampaigns />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/boost-settings"
+            element={
+              <ProtectedRoute>
+                <BoostSettings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/boost-analytics"
+            element={
+              <ProtectedRoute>
+                <BoostAnalytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/boost-accounts"
+            element={
+              <ProtectedRoute>
+                <BoostAccounts />
               </ProtectedRoute>
             }
           />
