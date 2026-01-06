@@ -243,7 +243,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {/* Left Column: Form */}
               <div className="lg:col-span-7 space-y-6">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
                   <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
                     Create New Post
                   </h3>
@@ -287,7 +287,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
                   <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
                     Publishing Settings
                   </h3>
@@ -355,7 +355,7 @@ export default function Dashboard() {
 
               {/* Right Column: Preview */}
               <div className="lg:col-span-5 space-y-6">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 sticky top-24">
+                <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 sticky top-24">
                   <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
                     Preview
                   </h3>

@@ -66,7 +66,7 @@ export default function TikTokTrends() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto px-4 py-8">
+            <div className="max-w-6xl mx-auto px-4 py-4 md:py-8">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
                     <div>
@@ -122,7 +122,7 @@ export default function TikTokTrends() {
                         ))
                     ) : (
                         trends.map((music, idx) => (
-                            <div key={music.id || idx} className="bg-white dark:bg-gray-800 rounded-3xl p-5 border border-gray-100 dark:border-gray-700 hover:border-pink-200 dark:hover:border-pink-900 transition-all shadow-sm group relative overflow-hidden">
+                            <div key={music.id || idx} className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-5 border border-gray-100 dark:border-gray-700 hover:border-pink-200 dark:hover:border-pink-900 transition-all shadow-sm group relative overflow-hidden">
 
                                 {/* Rank Badge */}
                                 <div className="absolute top-0 right-0 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs font-bold px-3 py-1 rounded-bl-xl z-10">

@@ -24,6 +24,7 @@ const InstagramDownloader = lazy(() => import("../pages/Tools/InstagramDownloade
 const CapCutDownloader = lazy(() => import("../pages/Tools/CapCutDownloader")); // ✅ New
 const VideoCreator = lazy(() => import("../pages/Tools/VideoCreator")); // ✅ New
 const DropshipCenter = lazy(() => import("../pages/Tools/DropshipCenter")); // ✅ New
+const DocumentConverter = lazy(() => import("../pages/Tools/DocumentConverter")); // ✅ New
 const SubtitleGenerator = lazy(() => import("../pages/Tools/SubtitleGenerator")); // ✅ New
 const MagicMotion = lazy(() => import('../pages/Tools/MagicMotion'));
 const CensorshipTool = lazy(() => import('../pages/Tools/CensorshipTool')); // ✅ New
@@ -208,6 +209,14 @@ export default function AppRouter() {
             element={
               <ProtectedRoute>
                 <DropshipCenter />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/document-converter"
+            element={
+              <ProtectedRoute>
+                <DocumentConverter />
               </ProtectedRoute>
             }
           />

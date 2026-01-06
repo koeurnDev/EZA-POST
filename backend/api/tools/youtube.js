@@ -19,11 +19,11 @@ const youtubedl = require("youtube-dl-exec");
 const tempDir = path.join(__dirname, "../../temp/videos");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
+// 🍪 Cookies File (for Age-Gated / Premium content)
+const cookiesPath = path.join(__dirname, "../../cookies.txt");
+
 /* -------------------------------------------------------------------------- */
 /* 🔍 POST /lookup — Get Video Info & Formats                                 */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/* 🔍 POST /lookup — Get Video Info & Formats (Supports Single & Playlist)    */
 /* -------------------------------------------------------------------------- */
 router.post("/lookup", requireAuth, async (req, res) => {
     try {
@@ -32,13 +32,21 @@ router.post("/lookup", requireAuth, async (req, res) => {
 
         console.log(`📺 Lookup YouTube (yt-dlp): ${url}`);
 
-        // 1. Fast Check: Is it a playlist/channel?
-        const fastOutput = await youtubedl(url, {
+        const flags = {
             dumpSingleJson: true,
             flatPlaylist: true, // Key: Don't resolve every video immediately
             noWarnings: true,
             noCheckCertificate: true,
-        });
+            userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        };
+
+        // Inject cookies if file exists
+        if (fs.existsSync(cookiesPath)) {
+            flags.cookies = cookiesPath;
+        }
+
+        // 1. Fast Check: Is it a playlist/channel?
+        const fastOutput = await youtubedl(url, flags);
 
         // 📋 CASE A: Playlist / Channel
         if (fastOutput.entries && Array.isArray(fastOutput.entries) && fastOutput.entries.length > 0) {
@@ -49,7 +57,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
                 title: entry.title,
                 url: entry.url || `https://www.youtube.com/watch?v=${entry.id}`,
                 duration: entry.duration,
-                thumbnail: entry.thumbnails ? entry.thumbnails[0]?.url : null // flatPlaylist might not have full thumbs
+                thumbnail: entry.thumbnails ? entry.thumbnails[0]?.url : null
             }));
 
             return res.json({
@@ -61,12 +69,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
         }
 
         // 🎬 CASE B: Single Video (Full Detail Lookup)
-        // If not a playlist, we need full format details which flatPlaylist might miss
-        const output = await youtubedl(url, {
-            dumpSingleJson: true,
-            noWarnings: true,
-            noCheckCertificate: true,
-        });
+        const output = await youtubedl(url, { ...flags, flatPlaylist: false });
 
         // Parse relevant info
         const formats = output.formats || [];
@@ -91,7 +94,8 @@ router.post("/lookup", requireAuth, async (req, res) => {
             thumbnail: output.thumbnail,
             duration: output.duration,
             author: output.uploader,
-            resolutions: availableResolutions
+            resolutions: availableResolutions,
+            audioBitrates: [320, 256, 192, 128] // ✅ Supported MP3 Bitrates
         };
 
         res.json({ success: true, isPlaylist: false, video: metadata });
@@ -99,10 +103,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
     } catch (err) {
         console.error("❌ YouTube Lookup Error Details:", {
             message: err.message,
-            stack: err.stack,
-            code: err.code,
-            signal: err.signal,
-            stderr: err.stderr, // yt-dlp often outputs to stderr
+            stderr: err.stderr,
         });
         res.status(500).json({ success: false, error: "Failed to fetch info: " + err.message });
     }
@@ -113,18 +114,20 @@ router.post("/lookup", requireAuth, async (req, res) => {
 /* -------------------------------------------------------------------------- */
 router.post("/download", requireAuth, async (req, res) => {
     try {
-        const { url, quality, format } = req.body; // format: 'mp4' | 'mp3', quality: number (height)
+        const { url, quality, format } = req.body; // format: 'mp4' | 'mp3', quality: number (height or bitrate)
         if (!url) return res.status(400).json({ success: false, error: "No URL provided" });
 
         const isAudio = format === 'mp3';
-        const safeTitle = `yt-${Date.now()}`;
+        const safeTitle = `youtube-${Date.now()}`;
         const outputTemplate = path.join(tempDir, `${safeTitle}.%(ext)s`);
 
-        const qualityLabel = quality ? `${quality}p` : 'Best Quality';
-        console.log(`📥 Downloading YouTube (${qualityLabel}) as ${isAudio ? 'MP3' : 'MP4'}...`);
+        // Log the user's choice
+        const qualityLabel = isAudio
+            ? (quality ? `${quality}kbps` : 'Best Audio')
+            : (quality ? `${quality}p` : 'Best Video');
 
-        // Requires ffmpeg for merging or audio extraction
-        // const ffmpegPath = require("ffmpeg-static"); // Already imported at top if you did that, but let's ensure it's used
+        console.log(`📥 Downloading YouTube (${qualityLabel}) as ${isAudio ? 'MP3' : 'MP4'} (Prefix: ${safeTitle})...`);
+
         const ffmpegPath = require("ffmpeg-static");
 
         const flags = {
@@ -132,15 +135,22 @@ router.post("/download", requireAuth, async (req, res) => {
             noCheckCertificate: true,
             output: outputTemplate,
             ffmpegLocation: ffmpegPath,
-            concurrentFragments: 4, // 🚀 Speed up download with parallel chunks
+            concurrentFragments: 4,
+            userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         };
+
+        // Inject cookies if file exists
+        if (fs.existsSync(cookiesPath)) {
+            flags.cookies = cookiesPath;
+        }
 
         if (isAudio) {
             // 🎵 Audio Only
             Object.assign(flags, {
                 extractAudio: true,
                 audioFormat: 'mp3',
-                audioQuality: 0, // Best quality
+                // Use explicit bitrate (e.g. '320K') or default to '0' (Best VBR)
+                audioQuality: quality ? `${quality}K` : '0',
             });
         } else {
             // 🎥 Video (Smart Selection)
@@ -178,7 +188,11 @@ router.post("/download", requireAuth, async (req, res) => {
 
         // We look for files starting with safeTitle
         const files = fs.readdirSync(tempDir);
-        const foundFile = files.find(f => f.startsWith(safeTitle));
+        const foundFile = files.find(f =>
+            f.startsWith(safeTitle) &&
+            !f.endsWith('.part') &&
+            !f.endsWith('.ytdl')
+        );
 
         if (foundFile) {
             console.log("✅ Download Complete:", foundFile);

@@ -178,7 +178,7 @@ const LabelSwapTool = () => {
                     {/* Input Section */}
                     <div className="space-y-6">
                         {/* Video Upload */}
-                        <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl">
+                        <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl">
                             <h2 className="text-lg font-semibold text-white mb-4">1. Choose Video</h2>
                             <input
                                 type="file"
@@ -189,7 +189,7 @@ const LabelSwapTool = () => {
                         </div>
 
                         {/* Logo Upload */}
-                        <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl">
+                        <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl">
                             <h2 className="text-lg font-semibold text-white mb-4">2. Choose New Logo (PNG)</h2>
                             <input
                                 type="file"
@@ -243,7 +243,7 @@ const LabelSwapTool = () => {
                     </div>
 
                     {/* Canvas / Preview Section */}
-                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl relative min-h-[400px] flex items-center justify-center bg-black/50 overflow-hidden">
+                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl relative min-h-[400px] flex items-center justify-center bg-black/50 overflow-hidden">
                         {/* Hidden Video for Canvas Source */}
                         {videoPreview && (
                             <video
@@ -272,7 +272,7 @@ const LabelSwapTool = () => {
 
                         {/* Result Overlay */}
                         {result && (
-                            <div className="absolute inset-0 z-20 bg-[#1e1e1e] flex flex-col items-center justify-center p-6">
+                            <div className="absolute inset-0 z-20 bg-[#1e1e1e] flex flex-col items-center justify-center p-4 md:p-6">
                                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                                     <CheckCircle className="text-green-400" /> Success!
                                 </h2>

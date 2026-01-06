@@ -45,7 +45,7 @@ export default function Connections() {
     };
 
     const ConnectionCard = ({ name, icon: Icon, color, isConnected }) => (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 md:p-6 border border-gray-100 dark:border-gray-700 flex items-center justify-between">
             <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center ${color} text-white`}>
                     <Icon size={24} />
@@ -75,7 +75,7 @@ export default function Connections() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto px-4 py-4 md:py-8">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
                     <LinkIcon size={24} className="text-blue-500" />
                     Platform Connections

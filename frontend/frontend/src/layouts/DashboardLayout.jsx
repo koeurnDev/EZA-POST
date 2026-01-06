@@ -61,6 +61,7 @@ const NAV_ITEMS = [
 
   // AI Tools
   { type: "header", label: "AI Tools" },
+  { label: "Doc Converter", icon: <FileText size={20} />, path: "/tools/document-converter" }, // ✅ Added
   { label: "AI Script Writer", icon: <FileText size={20} />, path: "/tools/script-writer" },
   { label: "AI Thumbnails", icon: <ImagePlus size={20} />, path: "/tools/thumbnail-generator" },
   { label: "Auto Censorship", icon: <EyeOff size={20} />, path: "/tools/censorship" },

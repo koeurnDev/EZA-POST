@@ -30,7 +30,7 @@ export default function CapCutDownloader() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto px-4 py-4 md:py-8">
                 <div className="text-center mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 text-black dark:text-white mb-4 shadow-lg">
                         <Scissors size={32} />
@@ -66,7 +66,7 @@ export default function CapCutDownloader() {
 
                 {/* 🎥 Result */}
                 {result && (
-                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-2xl border border-gray-100 dark:border-gray-700 max-w-sm mx-auto animate-in zoom-in duration-300">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-2xl border border-gray-100 dark:border-gray-700 max-w-sm mx-auto animate-in zoom-in duration-300">
                         <div className="text-center">
                             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6 flex items-center justify-center gap-2">
                                 <CheckCircle className="text-green-500" /> Done!
@@ -97,15 +97,15 @@ export default function CapCutDownloader() {
 
                 {!result && !loading && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center opacity-50 mt-12">
-                        <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                        <div className="p-4 md:p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                             <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-2">1. Copy Link</h4>
                             <p className="text-sm">From CapCut App (Share -> Copy Link)</p>
                         </div>
-                        <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                        <div className="p-4 md:p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                             <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-2">2. Paste</h4>
                             <p className="text-sm">Paste into the box above</p>
                         </div>
-                        <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                        <div className="p-4 md:p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                             <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-2">3. Save</h4>
                             <p className="text-sm">Download Templates instantly</p>
                         </div>

@@ -80,7 +80,7 @@ export default function BuyCredits() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="max-w-7xl mx-auto px-4 py-4 md:py-8">
                 {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 flex items-center gap-3">
@@ -91,7 +91,7 @@ export default function BuyCredits() {
                 </div>
 
                 {/* Current Balance */}
-                <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl p-6 text-white shadow-lg mb-8">
+                <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl p-4 md:p-6 text-white shadow-lg mb-8">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm opacity-90 font-medium">Current Balance</p>
@@ -109,7 +109,7 @@ export default function BuyCredits() {
                         {packages.map((pkg) => (
                             <div
                                 key={pkg._id}
-                                className={`bg-white dark:bg-gray-800 rounded-xl p-6 border-2 ${pkg.popular
+                                className={`bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 border-2 ${pkg.popular
                                     ? 'border-blue-500 shadow-xl scale-105'
                                     : 'border-gray-200 dark:border-gray-700'
                                     } hover:shadow-lg transition-all relative`}
@@ -171,7 +171,7 @@ export default function BuyCredits() {
                     </h2>
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                         {transactions.length === 0 ? (
-                            <div className="p-12 text-center text-gray-500">
+                            <div className="p-6 md:p-12 text-center text-gray-500">
                                 <History size={48} className="mx-auto mb-4 opacity-50" />
                                 <p>No transactions yet</p>
                             </div>

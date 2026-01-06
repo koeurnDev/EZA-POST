@@ -78,7 +78,7 @@ export default function DropshipCenter() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-4xl mx-auto px-6 py-10 min-h-screen">
+            <div className="max-w-4xl mx-auto px-4 py-6 md:px-6 md:py-10 min-h-screen">
 
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-8">
@@ -118,7 +118,7 @@ export default function DropshipCenter() {
                     <div className="bg-white dark:bg-gray-800 rounded-3xl overflow-hidden border border-gray-100 dark:border-gray-700 shadow-xl animate-fade-in-up">
 
                         {/* Images Grid */}
-                        <div className="p-6 pb-0">
+                        <div className="p-4 pb-0 md:p-6 md:pb-0">
                             <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
                                 <ImageIcon size={18} className="text-blue-500" /> Gallery ({product.images.length})
                             </h3>
@@ -135,7 +135,7 @@ export default function DropshipCenter() {
                         </div>
 
                         {/* Info & Edit */}
-                        <div className="p-8 space-y-6">
+                        <div className="p-6 md:p-8 space-y-6">
 
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Product Title (Original)</label>

@@ -71,7 +71,7 @@ const CensorshipTool = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Upload Section */}
-                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl">
+                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl">
                         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                             <FileVideo className="w-5 h-5 text-blue-400" />
                             Source Video
@@ -131,7 +131,7 @@ const CensorshipTool = () => {
                     </div>
 
                     {/* Result Section */}
-                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl relative overflow-hidden">
                         {result ? (
                             <div className="h-full flex flex-col">
                                 <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">

@@ -237,7 +237,7 @@ export default function ScheduledPosts() {
                                                 </button>
                                             </div>
 
-                                            <div className="p-5 flex-1 flex flex-col">
+                                            <div className="p-4 md:p-5 flex-1 flex flex-col">
                                                 <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-2 mb-3 min-h-[3rem] leading-relaxed">
                                                     {q.caption || "No caption provided"}
                                                 </h4>

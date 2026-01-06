@@ -58,7 +58,7 @@ export default function ViralFinder() {
     return (
         <DashboardLayout>
             <div className="min-h-screen bg-gray-50/50 dark:bg-[#0f1115]">
-                <div className="max-w-[1400px] mx-auto px-6 py-10">
+                <div className="max-w-[1400px] mx-auto px-4 py-6 md:px-6 md:py-10">
 
                     {/* ✨ Hero Header */}
                     <div className="mb-12 flex flex-col items-center text-center space-y-4">

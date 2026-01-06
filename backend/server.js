@@ -50,7 +50,7 @@ connectDB();
 // ✅ Middleware & Security
 // ------------------------------------------------------------
 app.use(morgan("dev"));
-app.use(express.json()); // Changed: Moved up and removed limit
+// app.use(express.json()); // REMOVED DUPLICATE
 app.use(cookieParser()); // Changed: Moved up
 app.use(
   helmet({
@@ -59,9 +59,8 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" }, // ✅ Allow images to be loaded from different origin
   })
 );
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // 🛡️ Security Middlewares
 app.use(mongoSanitize()); // Prevent NoSQL Injection
@@ -221,6 +220,7 @@ const routeModules = [
   ["tools/pinterest", "./api/tools/pinterest"], // ✅ Pinterest Downloader
   ["tools/youtube", "./api/tools/youtube"],     // ✅ YouTube Downloader
   ["webhooks/facebook", "./api/webhooks/facebook"], // ✅ Added Webhook
+  ["tools/document-converter", "./api/tools/document_converter"], // ✅ Document Converter
   ["tools/facebook", "./api/tools/facebook"],   // ✅ Facebook Downloader
   ["tools/telegram", "./api/tools/telegram"],   // ✅ Telegram Downloader
   ["tools/instagram", "./api/tools/instagram"], // ✅ Instagram Downloader
@@ -261,7 +261,15 @@ app.get("/api/download", (req, res) => {
 
   // Security: Prevent path traversal
   const safeFile = path.basename(file);
-  const filePath = path.join(__dirname, "temp", safeFile);
+  let filePath = path.join(__dirname, "temp", safeFile);
+
+  // 🔄 Check specific subfolders if not found in root temp
+  if (!fs.existsSync(filePath)) {
+    const videoPath = path.join(__dirname, "temp", "videos", safeFile);
+    if (fs.existsSync(videoPath)) {
+      filePath = videoPath;
+    }
+  }
 
   if (!fs.existsSync(filePath)) {
     return res.status(404).send("File not found or expired");

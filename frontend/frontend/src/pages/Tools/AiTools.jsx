@@ -141,7 +141,7 @@ export default function AiTools() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto px-4 py-8">
+            <div className="max-w-6xl mx-auto px-4 py-4 md:py-8">
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 flex items-center justify-center gap-3">
                         <Sparkles className="text-purple-500" /> AI Image Studio
@@ -192,7 +192,7 @@ export default function AiTools() {
                 </div>
 
                 {/* 🖼️ Workplace */}
-                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 p-8 min-h-[500px]">
+                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 p-4 md:p-8 min-h-[500px]">
 
                     {/* Prompt Input for Generator */}
                     {activeTab === "generator" && (

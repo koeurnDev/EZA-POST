@@ -91,7 +91,7 @@ export default function BoostSettings() {
                 </div>
 
                 {/* Master Toggle */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-6 border border-gray-200 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-lg mb-6 border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center justify-between">
                         <div>
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Enable Auto-Boost</h3>
@@ -107,7 +107,7 @@ export default function BoostSettings() {
                 </div>
 
                 {/* Real Boost Toggle */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-6 border border-gray-200 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-lg mb-6 border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center justify-between">
                         <div>
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Enable Real TikTok Boost 🤖</h3>
@@ -132,7 +132,7 @@ export default function BoostSettings() {
                 {/* Rules List */}
                 <div className="space-y-4 mb-6">
                     {rules.map((rule, index) => (
-                        <div key={index} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+                        <div key={index} className="bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-lg border border-gray-200 dark:border-gray-700">
                             <div className="flex items-start justify-between mb-4">
                                 <h4 className="text-lg font-bold text-gray-900 dark:text-white">Rule {index + 1}</h4>
                                 <button onClick={() => deleteRule(index)} className="text-red-500 hover:text-red-700">
@@ -194,7 +194,7 @@ export default function BoostSettings() {
                                 {/* Actions */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Actions</label>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         {['like', 'comment', 'share'].map(action => (
                                             <button
                                                 key={action}

@@ -30,7 +30,7 @@ export default function Analytics() {
     }, []);
 
     const StatCard = ({ title, value, subtext, icon: Icon, color, trend }) => (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-start justify-between">
+        <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-start justify-between">
             <div>
                 <p className="text-gray-500 text-sm font-medium mb-1">{title}</p>
                 <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{value}</h3>
@@ -55,7 +55,7 @@ export default function Analytics() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="max-w-7xl mx-auto px-4 py-4 md:py-8">
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -102,7 +102,7 @@ export default function Analytics() {
                 {/* 📈 Charts Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                     {/* Main Chart: Posts Activity */}
-                    <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+                    <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-4 md:p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Posting Activity</h3>
                         <div className="h-[300px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
@@ -126,7 +126,7 @@ export default function Analytics() {
                     </div>
 
                     {/* Side Chart: Platform Distribution */}
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+                    <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Platform Mix</h3>
                         <div className="h-[250px] w-full flex items-center justify-center">
                             <ResponsiveContainer width="100%" height="100%">
@@ -167,7 +167,7 @@ export default function Analytics() {
 
                 {/* 🕑 Best Time to Post */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+                    <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-5 md:p-8 text-white shadow-xl relative overflow-hidden">
                         <div className="relative z-10">
                             <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
                                 <Clock /> Best Time to Post
@@ -190,7 +190,7 @@ export default function Analytics() {
                     </div>
 
                     {/* Needs Attention / Alerts */}
-                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border border-gray-100 dark:border-gray-700">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-5 md:p-8 border border-gray-100 dark:border-gray-700">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Recent Issues</h3>
                         {stats?.failed > 0 ? (
                             <div className="space-y-4">

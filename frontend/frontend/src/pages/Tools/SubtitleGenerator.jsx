@@ -46,7 +46,7 @@ export default function SubtitleGenerator() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-5xl mx-auto px-6 py-10 min-h-screen">
+            <div className="max-w-5xl mx-auto px-4 py-6 md:px-6 md:py-10 min-h-screen">
 
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-10">
@@ -63,7 +63,7 @@ export default function SubtitleGenerator() {
 
                     {/* 👈 Left: Upload */}
                     <div className="space-y-6">
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
+                        <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
                             {/* Pro Badge */}
                             <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1">
                                 <Zap size={12} fill="currentColor" /> PRO FEATURE
@@ -73,7 +73,7 @@ export default function SubtitleGenerator() {
 
                             <div
                                 onClick={() => fileInputRef.current.click()}
-                                className="border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-2xl p-10 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                className="border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-2xl p-6 md:p-10 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                             >
                                 <input
                                     type="file"
@@ -117,7 +117,7 @@ export default function SubtitleGenerator() {
                                 className="w-full h-full object-contain bg-black"
                             />
                         ) : (
-                            <div className="text-center text-gray-600 p-10">
+                            <div className="text-center text-gray-600 p-6 md:p-10">
                                 <div className="w-20 h-20 bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-800">
                                     <Video size={32} />
                                 </div>

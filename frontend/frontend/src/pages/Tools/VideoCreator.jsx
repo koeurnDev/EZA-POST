@@ -64,7 +64,7 @@ export default function VideoCreator() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-5xl mx-auto px-6 py-10 min-h-screen">
+            <div className="max-w-5xl mx-auto px-4 py-6 md:px-6 md:py-10 min-h-screen">
 
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-10">
@@ -83,7 +83,7 @@ export default function VideoCreator() {
                     <div className="space-y-6">
 
                         {/* Image Upload */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                        <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
                             <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
                                 <Upload size={18} className="text-blue-500" /> Upload Images
                             </h3>
@@ -128,7 +128,7 @@ export default function VideoCreator() {
                         </div>
 
                         {/* Audio Upload */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                        <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
                             <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
                                 <Music size={18} className="text-pink-500" /> Background Music
                             </h3>
@@ -174,7 +174,7 @@ export default function VideoCreator() {
                                 className="w-full h-full object-cover"
                             />
                         ) : (
-                            <div className="text-center text-gray-500 p-10">
+                            <div className="text-center text-gray-500 p-6 md:p-10">
                                 <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <Video size={32} className="text-gray-600" />
                                 </div>

@@ -101,7 +101,7 @@ export default function BoostAccounts() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto px-4 py-8">
+            <div className="max-w-6xl mx-auto px-4 py-4 md:py-8">
                 <div className="mb-8 flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 flex items-center gap-3">
@@ -121,7 +121,7 @@ export default function BoostAccounts() {
 
                 {/* Add Account Form */}
                 {showAddForm && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 mb-6">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-lg border border-gray-200 dark:border-gray-700 mb-6">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Add New TikTok Account</h3>
 
                         <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -190,7 +190,7 @@ export default function BoostAccounts() {
                 {/* Accounts List */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                     {accounts.length === 0 ? (
-                        <div className="p-12 text-center text-gray-500">
+                        <div className="p-6 md:p-12 text-center text-gray-500">
                             <Users size={48} className="mx-auto mb-4 opacity-50" />
                             <p>No accounts yet. Add your first TikTok account!</p>
                         </div>

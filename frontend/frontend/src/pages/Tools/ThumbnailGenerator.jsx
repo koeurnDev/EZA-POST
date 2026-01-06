@@ -53,7 +53,7 @@ const ThumbnailGenerator = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Input Section */}
-                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl h-fit">
+                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl h-fit">
                         <h2 className="text-lg font-semibold text-white mb-4">Video Topic / Title</h2>
                         <textarea
                             className="w-full h-40 bg-black/50 border border-white/10 rounded-xl p-4 text-white placeholder-gray-500 focus:outline-none focus:border-pink-500/50 resize-none"
@@ -90,7 +90,7 @@ const ThumbnailGenerator = () => {
                     </div>
 
                     {/* Output Section */}
-                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl relative min-h-[400px] flex flex-col items-center justify-center overflow-hidden">
+                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl relative min-h-[400px] flex flex-col items-center justify-center overflow-hidden">
                         {imageUrl ? (
                             <div className="w-full h-full flex flex-col items-center animate-in fade-in duration-500">
                                 <h2 className="text-lg font-semibold text-white self-start mb-4 flex items-center gap-2">

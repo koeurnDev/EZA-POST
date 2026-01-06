@@ -32,7 +32,7 @@ export default function PinterestDownloader() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto px-4 py-4 md:py-8">
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
                         Pinterest <span className="text-red-600">Downloader (HD)</span>
@@ -95,7 +95,7 @@ export default function PinterestDownloader() {
                         </div>
 
                         {/* Info & Actions */}
-                        <div className="w-full md:w-1/2 p-8 flex flex-col">
+                        <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col">
                             <div className="mb-6">
                                 <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide mb-3 ${mediaData.type === 'video' ? 'bg-purple-100 text-purple-600' : 'bg-green-100 text-green-600'}`}>
                                     {mediaData.type === 'video' ? <Video size={14} /> : <ImageIcon size={14} />}

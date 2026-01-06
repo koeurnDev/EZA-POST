@@ -49,7 +49,7 @@ export default function MagicMotion() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-5xl mx-auto px-6 py-10 min-h-screen">
+            <div className="max-w-5xl mx-auto px-4 py-6 md:px-6 md:py-10 min-h-screen">
 
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-10">
@@ -69,7 +69,7 @@ export default function MagicMotion() {
                         {/* Upload */}
                         <div
                             onClick={() => fileInputRef.current.click()}
-                            className="bg-white dark:bg-gray-800 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-3xl p-8 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                            className="bg-white dark:bg-gray-800 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-3xl p-6 md:p-8 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                         >
                             <input
                                 type="file"
@@ -106,8 +106,8 @@ export default function MagicMotion() {
                                         key={ef.id}
                                         onClick={() => setEffect(ef.id)}
                                         className={`p-4 rounded-xl border text-left transition-all ${effect === ef.id
-                                                ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20 ring-2 ring-pink-500/20'
-                                                : 'border-gray-200 dark:border-gray-700 hover:border-pink-300'
+                                            ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20 ring-2 ring-pink-500/20'
+                                            : 'border-gray-200 dark:border-gray-700 hover:border-pink-300'
                                             }`}
                                     >
                                         <div className="text-2xl mb-1">{ef.icon}</div>
@@ -138,7 +138,7 @@ export default function MagicMotion() {
                                 className="w-full h-full object-contain bg-black"
                             />
                         ) : (
-                            <div className="text-center text-gray-600 p-10">
+                            <div className="text-center text-gray-600 p-6 md:p-10">
                                 <Sparkles size={48} className="mx-auto mb-4 opacity-50" />
                                 <h3 className="font-bold text-gray-500">Magic Preview</h3>
                                 <p className="text-xs mt-2 text-gray-600">Your animated video will appear here.</p>

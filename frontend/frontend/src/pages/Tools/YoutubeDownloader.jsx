@@ -15,6 +15,7 @@ export default function YoutubeDownloader() {
     const [downloadingMp3, setDownloadingMp3] = useState(false);
     const [downloadingMp4, setDownloadingMp4] = useState(false);
     const [selectedQuality, setSelectedQuality] = useState(1080);
+    const [selectedAudioQuality, setSelectedAudioQuality] = useState(320);
     const [finalUrl, setFinalUrl] = useState(null);
 
     // Playlist/Channel State
@@ -105,7 +106,7 @@ export default function YoutubeDownloader() {
         try {
             const res = await api.post("/tools/youtube/download", {
                 url,
-                quality: selectedQuality,
+                quality: format === 'mp3' ? selectedAudioQuality : selectedQuality,
                 format
             }, { timeout: 1800000 }); // 30 minutes timeout for large files
 
@@ -146,24 +147,25 @@ export default function YoutubeDownloader() {
         setIsBulkProcessing(true);
         const queue = playlistVideos.filter(v => selectedVideoIds.has(v.id) && v.status !== 'ready');
 
-        toast.success(`Processing ${queue.length} videos...`);
+        toast.success(`Processing ${queue.length} videos (5 at a time)...`);
 
-        // Process sequentially to be nice to the server (or concurrent limit 2)
-        for (const video of queue) {
+        const CONCURRENCY = 5;
+
+        const processOne = async (video) => {
             // Update status to processing
             setPlaylistVideos(prev => prev.map(v => v.id === video.id ? { ...v, status: 'processing' } : v));
 
             try {
-                // Default to 720p for fast bulk (or make configurable later)
-                // Use existing download endpoint
+                // Default to 720p for fast bulk
                 const res = await api.post("/tools/youtube/download", {
                     url: video.url,
-                    quality: 720, // Default for batch
+                    quality: 720,
                     format: 'mp4'
                 }, { timeout: 180000 });
 
                 if (res.data.success) {
                     setPlaylistVideos(prev => prev.map(v => v.id === video.id ? { ...v, status: 'ready', downloadUrl: res.data.url } : v));
+                    triggerDownload(res.data.url, `${video.title.replace(/[^a-z0-9]/gi, '_')}.mp4`);
                 } else {
                     setPlaylistVideos(prev => prev.map(v => v.id === video.id ? { ...v, status: 'error' } : v));
                 }
@@ -171,6 +173,12 @@ export default function YoutubeDownloader() {
                 console.error(err);
                 setPlaylistVideos(prev => prev.map(v => v.id === video.id ? { ...v, status: 'error' } : v));
             }
+        };
+
+        // Execution pool
+        for (let i = 0; i < queue.length; i += CONCURRENCY) {
+            const chunk = queue.slice(i, i + CONCURRENCY);
+            await Promise.all(chunk.map(v => processOne(v)));
         }
 
         setIsBulkProcessing(false);
@@ -195,7 +203,7 @@ export default function YoutubeDownloader() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-5xl mx-auto px-4 py-8">
+            <div className="max-w-5xl mx-auto px-4 py-4 md:py-8">
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
                         YouTube <span className="text-red-600">Premium Downloader</span>
@@ -216,16 +224,26 @@ export default function YoutubeDownloader() {
                     <button
                         onClick={handleLookup}
                         disabled={loading}
-                        className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                        className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-6 py-3 md:px-8 md:py-4 rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
                     >
-                        {loading ? <Loader2 className="animate-spin" /> : <><Search size={20} /> Search</>}
+                        {loading ? (
+                            <>
+                                <Loader2 className="animate-spin" size={20} />
+                                <span>Checking...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Search size={20} />
+                                <span>Search</span>
+                            </>
+                        )}
                     </button>
                 </div>
 
                 {/* 📂 Playlist / Channel Result */}
                 {isPlaylist && (
                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4">
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <PlaySquare className="text-red-600" />
@@ -322,7 +340,7 @@ export default function YoutubeDownloader() {
                                 </div>
                             </div>
 
-                            <div className="w-full md:w-7/12 p-6 flex flex-col justify-between">
+                            <div className="w-full md:w-7/12 p-4 md:p-6 flex flex-col justify-between">
                                 <div>
                                     <h3 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-2 mb-2">
                                         {videoData.title}
@@ -336,55 +354,84 @@ export default function YoutubeDownloader() {
                                 </div>
 
                                 <div className="mt-6 flex flex-col gap-3">
-                                    {/* ⚙️ Quality Selector */}
-                                    {videoData.resolutions && (
-                                        <div className="mb-2">
-                                            <label className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1 block">Video Quality:</label>
-                                            <select
-                                                className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-red-500 text-gray-700 dark:text-white transition-all hover:bg-white dark:hover:bg-gray-600 cursor-pointer"
-                                                value={selectedQuality}
-                                                onChange={(e) => setSelectedQuality(Number(e.target.value))}
+                                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* 🎥 Video Option */}
+                                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 flex flex-col justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 p-2 rounded-lg">
+                                                        <Video size={20} />
+                                                    </span>
+                                                    <span className="font-bold text-gray-900 dark:text-white">Video</span>
+                                                </div>
+
+                                                {videoData.resolutions && (
+                                                    <div className="mb-4">
+                                                        <select
+                                                            className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500 text-sm text-gray-700 dark:text-gray-200 transition-all cursor-pointer"
+                                                            value={selectedQuality}
+                                                            onChange={(e) => setSelectedQuality(Number(e.target.value))}
+                                                        >
+                                                            {videoData.resolutions.map(res => (
+                                                                <option key={res} value={res}>
+                                                                    {res}p {res >= 1080 ? 'HD' : ''}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <button
+                                                onClick={() => handleDownload('mp4')}
+                                                disabled={downloadingMp4 || downloadingMp3}
+                                                className={`w-full py-3 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${downloadingMp4
+                                                    ? "bg-red-800 text-red-200 cursor-not-allowed cursor-wait"
+                                                    : "bg-red-600 hover:bg-red-700 text-white shadow-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    }`}
                                             >
-                                                {videoData.resolutions.map(res => (
-                                                    <option key={res} value={res}>
-                                                        {res}p {res >= 1080 ? '(High Quality - Slow)' : '(⚡ Lightning Fast)'}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                                {downloadingMp4 ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
+                                                {downloadingMp4 ? "Processing..." : "Download"}
+                                            </button>
                                         </div>
-                                    )}
 
-                                    {/* 🎬 Download Video Button */}
-                                    <button
-                                        onClick={() => handleDownload('mp4')}
-                                        disabled={downloadingMp4 || downloadingMp3}
-                                        className={`w-full py-4 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${downloadingMp4
-                                            ? "bg-red-800 text-red-100 cursor-not-allowed opacity-90"
-                                            : "bg-red-600 hover:bg-red-700 text-white shadow-red-500/30"
-                                            }`}
-                                    >
-                                        {downloadingMp4 ? (
-                                            <> <Loader2 className="animate-spin" size={24} /> Generating {selectedQuality}p Video... </>
-                                        ) : (
-                                            <> <Video size={24} /> Download Video ({selectedQuality}p) </>
-                                        )}
-                                    </button>
+                                        {/* 🎵 Audio Option */}
+                                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 flex flex-col justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 p-2 rounded-lg">
+                                                        <div className="font-black text-xs">MP3</div>
+                                                    </span>
+                                                    <span className="font-bold text-gray-900 dark:text-white">Audio Only</span>
+                                                </div>
+                                                <div className="mb-4">
+                                                    <select
+                                                        className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700 dark:text-gray-200 transition-all cursor-pointer"
+                                                        value={selectedAudioQuality}
+                                                        onChange={(e) => setSelectedAudioQuality(Number(e.target.value))}
+                                                    >
+                                                        {[320, 256, 192, 128].map(rate => (
+                                                            <option key={rate} value={rate}>
+                                                                {rate}kbps {rate >= 320 ? '(High Quality)' : ''}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
 
-                                    {/* 🎵 Download Audio Button */}
-                                    <button
-                                        onClick={() => handleDownload('mp3')}
-                                        disabled={downloadingMp4 || downloadingMp3}
-                                        className={`w-full py-4 font-bold rounded-xl flex items-center justify-center gap-2 transition-all border ${downloadingMp3
-                                            ? "bg-gray-200 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
-                                            : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600"
-                                            }`}
-                                    >
-                                        {downloadingMp3 ? (
-                                            <> <Loader2 className="animate-spin" size={24} /> Converting to MP3 Audio... </>
-                                        ) : (
-                                            <> <div className="font-black bg-gray-200 dark:bg-gray-600 px-2 rounded text-xs">MP3</div> Download Audio Only </>
-                                        )}
-                                    </button>
+                                            <button
+                                                onClick={() => handleDownload('mp3')}
+                                                disabled={downloadingMp4 || downloadingMp3}
+                                                className={`w-full py-3 font-bold rounded-xl flex items-center justify-center gap-2 transition-all border ${downloadingMp3
+                                                    ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 border-blue-200 cursor-not-allowed cursor-wait"
+                                                    : "bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    }`}
+                                            >
+                                                {downloadingMp3 ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
+                                                {downloadingMp3 ? "Converting..." : "Download MP3"}
+                                            </button>
+                                        </div>
+                                    </div>
 
                                     {/* ℹ️ Processing Info with Progress Bar */}
                                     {(downloadingMp4 || downloadingMp3) && (
@@ -407,22 +454,7 @@ export default function YoutubeDownloader() {
                                         </div>
                                     )}
 
-                                    {/* 🟢 IDM / Manual Download Button */}
-                                    {finalUrl && !downloadingMp4 && !downloadingMp3 && (
-                                        <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl text-center animate-in zoom-in duration-300">
-                                            <p className="text-green-700 dark:text-green-300 font-bold mb-2">File Ready!</p>
-                                            <a
-                                                href={finalUrl}
-                                                download
-                                                className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-green-500/30 transition-all transform hover:scale-105"
-                                            >
-                                                <Download size={20} /> Download Now (IDM Friendly)
-                                            </a>
-                                            <p className="text-xs text-gray-500 mt-2">
-                                                If it didn't start, click above. Right-click to use IDM.
-                                            </p>
-                                        </div>
-                                    )}
+
                                 </div>
                             </div>
                         </div>

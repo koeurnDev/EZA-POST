@@ -94,7 +94,7 @@ const BoostCampaigns = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
             {/* Header */}
             <div className="max-w-7xl mx-auto mb-8">
                 <motion.div
@@ -127,8 +127,8 @@ const BoostCampaigns = () => {
                             key={status}
                             onClick={() => setFilter(status)}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${filter === status
-                                    ? 'bg-blue-600 text-white shadow-lg'
-                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                ? 'bg-blue-600 text-white shadow-lg'
+                                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                                 }`}
                         >
                             {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -155,7 +155,7 @@ const BoostCampaigns = () => {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: index * 0.05 }}
-                                className="bg-gray-800 rounded-xl p-6 shadow-xl hover:shadow-2xl transition-shadow"
+                                className="bg-gray-800 rounded-xl p-4 md:p-6 shadow-xl hover:shadow-2xl transition-shadow"
                             >
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex-1">

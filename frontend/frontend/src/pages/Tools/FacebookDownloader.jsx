@@ -12,12 +12,16 @@ export default function FacebookDownloader() {
 
     // 🔍 Step 1: Lookup
     const handleLookup = async () => {
-        if (!url.includes("facebook.com") && !url.includes("fb.watch")) return toast.error("Invalid Facebook URL");
-
         setLoading(true);
         setVideoData(null);
 
         try {
+            const isFb = /(facebook\.com|fb\.watch|fb\.me)/.test(url);
+            if (!isFb) {
+                setLoading(false);
+                return toast.error("Invalid Facebook URL");
+            }
+
             const res = await api.post("/tools/facebook/lookup", { url });
             if (res.data.success) {
                 setVideoData(res.data.video);
@@ -36,7 +40,9 @@ export default function FacebookDownloader() {
         const toastId = toast.loading("Downloading...");
 
         try {
-            const res = await api.post("/tools/facebook/download", { url });
+            const downloadPayload = { url };
+
+            const res = await api.post("/tools/facebook/download", downloadPayload);
             if (res.data.success) {
                 toast.success("Ready!", { id: toastId });
                 const link = document.createElement('a');
@@ -47,7 +53,7 @@ export default function FacebookDownloader() {
                 document.body.removeChild(link);
             }
         } catch (err) {
-            toast.error("Download failed", { id: toastId });
+            toast.error(err.response?.data?.error || "Download failed", { id: toastId });
         } finally {
             setDownloading(false);
         }
@@ -55,39 +61,48 @@ export default function FacebookDownloader() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto px-4 py-4 md:py-8">
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
                         Facebook <span className="text-blue-600">Video Downloader</span>
                     </h1>
-                    <p className="text-gray-500">Download Public Videos & Reels from Facebook in HD.</p>
+                    <p className="text-gray-500">Download Public Videos, Reels & Watch Videos.</p>
                 </div>
 
-                {/* 🔍 Search Box */}
-                <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 flex items-center gap-2 mb-8 transform transition-all hover:scale-[1.01]">
-                    <input
-                        type="text"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-                        placeholder="Paste Facebook video/reel link here..."
-                        className="flex-1 bg-transparent p-4 outline-none text-lg text-gray-700 dark:text-gray-200"
-                    />
-                    <button
-                        onClick={handleLookup}
-                        disabled={loading}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2"
-                    >
-                        {loading ? <Loader2 className="animate-spin" /> : <><Search size={20} /> Search</>}
-                    </button>
+                {/* 🔍 Input Section */}
+                <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 transform transition-all hover:scale-[1.01] mb-8">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            value={url}
+                            onChange={(e) => setUrl(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleLookup()}
+                            placeholder="Paste Facebook video/reel URL..."
+                            className="flex-1 bg-transparent p-4 outline-none text-lg text-gray-700 dark:text-gray-200"
+                        />
+                        <button
+                            onClick={handleLookup}
+                            disabled={loading}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {loading ? <Loader2 className="animate-spin" /> : <><Search size={20} /> Search</>}
+                        </button>
+                    </div>
                 </div>
 
                 {/* 🎥 Result Card */}
                 {videoData && (
                     <div className="bg-white dark:bg-gray-800 rounded-3xl overflow-hidden shadow-xl border border-gray-200 dark:border-gray-700 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="flex flex-col md:flex-row">
-                            <div className="w-full md:w-5/12 relative bg-black group">
-                                <img src={videoData.thumbnail} className="w-full h-full object-contain aspect-video" alt="Thumb" />
+                            <div className="w-full md:w-5/12 relative bg-black group flex items-center justify-center">
+                                {videoData.thumbnail ? (
+                                    <img src={videoData.thumbnail} className="w-full h-full object-contain aspect-video" alt="Thumb" />
+                                ) : (
+                                    <div className="w-full aspect-video flex items-center justify-center bg-gray-900 text-gray-700">
+                                        <Facebook size={64} />
+                                    </div>
+                                )}
+
                                 {videoData.type !== 'image' && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
                                         <Play size={48} className="text-white opacity-80" />
@@ -95,7 +110,7 @@ export default function FacebookDownloader() {
                                 )}
                             </div>
 
-                            <div className="w-full md:w-7/12 p-6 flex flex-col justify-between">
+                            <div className="w-full md:w-7/12 p-4 md:p-6 flex flex-col justify-between">
                                 <div>
                                     <h3 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-2 mb-2">
                                         {videoData.title}
@@ -129,7 +144,7 @@ export default function FacebookDownloader() {
                                             {downloading ? (
                                                 <> <Loader2 className="animate-spin" size={24} /> Downloading... </>
                                             ) : (
-                                                <> <Download size={24} /> Download Video (HD) </>
+                                                <> <Download size={24} /> Download Video </>
                                             )}
                                         </button>
                                     )}

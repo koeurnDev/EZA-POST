@@ -161,7 +161,7 @@ export default function TikTokDownloader() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto px-4 py-8">
+            <div className="max-w-6xl mx-auto px-4 py-4 md:py-8">
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
                         TikTok <span className="text-pink-500">Master Tool</span>
@@ -248,7 +248,7 @@ export default function TikTokDownloader() {
                                 </div>
 
                                 {/* Info & Actions */}
-                                <div className="w-full md:w-2/3 p-8 flex flex-col">
+                                <div className="w-full md:w-2/3 p-4 md:p-8 flex flex-col">
                                     <h3 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-2 mb-2">
                                         {videoData.title || "Untitled TikTok"}
                                     </h3>
@@ -315,7 +315,7 @@ export default function TikTokDownloader() {
 
                         {/* 📜 Download History */}
                         {downloadHistory.length > 0 && (
-                            <div className="mt-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-6 rounded-2xl border border-blue-100 dark:border-gray-700">
+                            <div className="mt-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 md:p-6 rounded-2xl border border-blue-100 dark:border-gray-700">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                         📜 Download History ({downloadHistory.length})
@@ -367,7 +367,7 @@ export default function TikTokDownloader() {
                             <button
                                 onClick={handleProfileLookup}
                                 disabled={profileLoading}
-                                className="bg-black hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black px-8 py-4 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                                className="bg-black hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black px-6 py-3 md:px-8 md:py-4 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2"
                             >
                                 {profileLoading ? "Loading..." : "Get Videos"}
                             </button>

@@ -159,8 +159,8 @@ export default function Settings() {
                         {/* 👈 Left Column: Main Content (Pages) */}
                         <div className="lg:col-span-2 space-y-6">
                             {/* Connected Profile Card */}
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                                <div className="flex items-center gap-5">
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
                                     <div className="relative">
                                         <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-2xl font-bold text-gray-500 dark:text-gray-400 border-4 border-white dark:border-gray-800 shadow-md">
                                             {user.facebookName?.[0] || "F"}
@@ -178,7 +178,7 @@ export default function Settings() {
                                 </div>
                                 <button
                                     onClick={handleReRequest}
-                                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-medium transition-colors"
+                                    className="w-full sm:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-medium transition-colors"
                                 >
                                     Reconnect
                                 </button>
@@ -186,7 +186,7 @@ export default function Settings() {
 
                             {/* Pages List */}
                             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                                <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                                <div className="p-4 md:p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                                     <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                         Your Pages
                                         <span className="px-2.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-full font-bold">
@@ -206,16 +206,16 @@ export default function Settings() {
                                     ) : (
                                         pages.map(page => (
                                             <div key={page.id} className={`group border rounded-2xl transition-all duration-300 ${page.isSelected ? "bg-blue-50/30 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800" : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700"}`}>
-                                                <div className="p-5 flex items-center justify-between">
-                                                    <div className="flex items-center gap-4">
+                                                <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                                    <div className="flex items-center gap-4 w-full sm:w-auto">
                                                         <img
                                                             src={page.picture || "https://via.placeholder.com/50"}
                                                             alt={page.name}
-                                                            className="w-14 h-14 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm"
+                                                            className="w-14 h-14 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm shrink-0"
                                                             referrerPolicy="no-referrer"
                                                         />
-                                                        <div>
-                                                            <h4 className={`font-bold text-lg ${page.isSelected ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-400"}`}>
+                                                        <div className="min-w-0">
+                                                            <h4 className={`font-bold text-lg truncate ${page.isSelected ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-400"}`}>
                                                                 {page.name}
                                                             </h4>
                                                             <div className="flex items-center gap-2 mt-1">
@@ -228,7 +228,7 @@ export default function Settings() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                                                         {page.isSelected && (
                                                             <button
                                                                 onClick={() => setExpandedPageId(expandedPageId === page.id ? null : page.id)}
@@ -297,7 +297,7 @@ export default function Settings() {
                         {/* 👉 Right Column: Sidebar (Preferences) */}
                         <div className="space-y-6">
                             {/* Theme & Appearance */}
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Appearance</h3>
                                 <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
                                     <div className="flex items-center gap-3">
@@ -319,7 +319,7 @@ export default function Settings() {
                             </div>
 
                             {/* Security & 2FA */}
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Security</h3>
 
                                 <div className="space-y-4">
@@ -410,7 +410,7 @@ export default function Settings() {
                         </div>
 
                         {/* Notifications */}
-                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Notifications</h3>
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
@@ -429,7 +429,7 @@ export default function Settings() {
                         </div>
 
                         {/* Stealth Mode & Security */}
-                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Anti-Ban & Stealth 🥷</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex flex-col justify-between h-32">
@@ -467,7 +467,7 @@ export default function Settings() {
                         </div>
 
                         {/* Google Drive Integration */}
-                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Cloud Backup</h3>
                             <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
                                 <div className="flex items-center gap-3">
@@ -489,7 +489,7 @@ export default function Settings() {
                         </div>
 
                         {/* Danger Zone */}
-                        <div className="bg-red-50 dark:bg-red-900/10 rounded-3xl p-6 border border-red-100 dark:border-red-900/30">
+                        <div className="bg-red-50 dark:bg-red-900/10 rounded-3xl p-4 md:p-6 border border-red-100 dark:border-red-900/30">
                             <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-4">Danger Zone</h3>
                             <button
                                 onClick={logout}

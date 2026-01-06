@@ -89,7 +89,7 @@ const FarmControl = () => {
                     {/* Left: Controls */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Account Input */}
-                        <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl">
+                        <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl">
                             <h2 className="text-lg font-semibold text-white mb-2">1. Import Accounts (JSON Cookies)</h2>
                             <p className="text-xs text-gray-500 mb-4">Format: <code>[{`{ "id": "acc1", "cookie": [...] }`}, ...]</code></p>
                             <textarea
@@ -103,7 +103,7 @@ const FarmControl = () => {
                         {/* Actions Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Story Poster */}
-                            <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                            <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl flex flex-col justify-between">
                                 <div>
                                     <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                                         <Upload className="w-5 h-5 text-pink-500" /> Mass Story Poster
@@ -124,7 +124,7 @@ const FarmControl = () => {
                             </div>
 
                             {/* Warm-up */}
-                            <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                            <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl flex flex-col justify-between">
                                 <div>
                                     <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                                         <Activity className="w-5 h-5 text-green-500" /> Auto-Warmup
@@ -144,7 +144,7 @@ const FarmControl = () => {
                     </div>
 
                     {/* Right: Logs/Status */}
-                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl h-fit flex flex-col">
+                    <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl h-fit flex flex-col">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold text-white">Live Activity Logs</h2>
                             <button

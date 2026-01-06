@@ -1,8 +1,7 @@
 /**
  * 🎵 tiktokController.js — Handle TikTok Video Fetching & Processing
-/**
- * 🎵 tiktokController.js — Handle TikTok Video Fetching & Processing
  */
+
 
 const path = require("path");
 const fs = require("fs");
@@ -49,10 +48,18 @@ exports.fetchTikTokVideo = async (req, res) => {
         );
 
         // 5. Return Response
+        const mp3Url = uploadResult.url.replace(/\.[^/.]+$/, ".mp3");
+        const downloadUrl = uploadResult.url.replace("/upload/", "/upload/fl_attachment/");
+        const downloadMp3Url = mp3Url.replace("/upload/", "/upload/fl_attachment/");
+
         res.json({
             success: true,
             video: {
-                url: uploadResult.url, // Cloudinary URL
+                url: uploadResult.url, // Cloudinary URL (Stream)
+                download: {
+                    mp4: downloadUrl, // Force Download MP4
+                    mp3: downloadMp3Url // Force Download MP3
+                },
                 publicId: uploadResult.publicId,
                 meta: metadata,
                 duration: uploadResult.duration,

@@ -14,7 +14,7 @@ export default function Welcome() {
 
             {/* 🌟 Navbar */}
             <nav className="fixed top-0 w-full z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+                <div className="max-w-7xl mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-2 text-2xl font-bold tracking-tighter">
                         <span className="text-3xl">🚀</span>
                         <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
@@ -39,7 +39,7 @@ export default function Welcome() {
             </nav>
 
             {/* 🦸 Hero Section */}
-            <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6">
+            <section className="relative pt-24 pb-16 lg:pt-48 lg:pb-32 px-4 md:px-6">
                 <div className="max-w-7xl mx-auto text-center relative z-10">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -86,7 +86,7 @@ export default function Welcome() {
 
             {/* 🍱 Features Grid */}
             <section className="py-20 bg-gray-50 dark:bg-gray-800/50">
-                <div className="max-w-7xl mx-auto px-6">
+                <div className="max-w-7xl mx-auto px-4 md:px-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {[
                             {
@@ -111,7 +111,7 @@ export default function Welcome() {
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
                                 transition={{ delay: i * 0.1 }}
-                                className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow"
+                                className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow"
                             >
                                 <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-2xl w-fit">
                                     {feature.icon}
@@ -128,7 +128,7 @@ export default function Welcome() {
 
             {/* 🦶 Footer */}
             <footer className="py-12 border-t border-gray-100 dark:border-gray-800">
-                <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col md:flex-row justify-between items-center gap-6">
                     <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-white">
                         <span className="text-xl">🚀</span> EZA_POST
                     </div>

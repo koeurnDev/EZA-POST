@@ -580,10 +580,10 @@ export default function Post() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-7xl mx-auto px-4 py-6">
+            <div className="max-w-7xl mx-auto px-4 pt-6 pb-24">
 
                 {/* 🔷 STEP 1 & 2: POST TYPE & PAGE SELECTION */}
-                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 p-6">
+                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 p-4 md:p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Step 1: Post Type */}
                         <div>
@@ -598,7 +598,7 @@ export default function Post() {
                             </label>
 
                             {/* 🌐 Platform Selector */}
-                            <div className="flex gap-2 mb-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
                                 <button
                                     onClick={() => togglePlatform('facebook')}
                                     className={`flex-1 py-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${platforms.facebook ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}
@@ -681,7 +681,7 @@ export default function Post() {
                 </div>
 
                 {/* 🔷 STEP 3: CAPTION */}
-                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 p-6">
+                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 p-4 md:p-6">
                     <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                         3. Caption
                         <div className="group relative">
@@ -713,7 +713,7 @@ export default function Post() {
                         </h3>
                     </div>
 
-                    <div className="p-6">
+                    <div className="p-4 md:p-6">
                         {postFormat === 'single' ? (
                             /* SINGLE VIDEO MODE */
                             <div className="max-w-2xl mx-auto">
@@ -849,14 +849,14 @@ export default function Post() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div
                                                 onClick={() => fileInputRef.current?.click()}
-                                                className="border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-gray-50 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all h-48"
+                                                className="border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-gray-50 rounded-xl p-4 md:p-8 flex flex-col items-center justify-center cursor-pointer transition-all h-48"
                                             >
                                                 <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
                                                 <Upload className="text-blue-500 mb-2" size={32} />
                                                 <span className="font-bold text-gray-700">Upload Video</span>
                                                 <span className="text-xs text-gray-400 mt-1">MP4, MOV (Max 60s)</span>
                                             </div>
-                                            <div className="border-2 border-dashed border-gray-300 hover:border-pink-400 hover:bg-gray-50 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all h-48 relative">
+                                            <div className="border-2 border-dashed border-gray-300 hover:border-pink-400 hover:bg-gray-50 rounded-xl p-4 md:p-8 flex flex-col items-center justify-center cursor-pointer transition-all h-48 relative">
                                                 <LinkIcon className="text-pink-500 mb-2" size={32} />
                                                 <span className="font-bold text-gray-700">TikTok Link</span>
                                                 <input
@@ -1099,7 +1099,7 @@ export default function Post() {
                     </div>
 
                     {/* 🔷 STEP 5 & 6: SCHEDULE & ACTION */}
-                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col md:flex-row justify-between items-center gap-6 sticky bottom-6 z-20">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 md:p-6 flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6 sticky bottom-4 md:bottom-6 z-20">
 
                         {/* Step 5: Scheduling */}
                         <div className="w-full md:w-auto flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">

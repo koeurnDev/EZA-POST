@@ -75,7 +75,7 @@ const ViralPosts = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
             {/* Header */}
             <div className="max-w-7xl mx-auto mb-8">
                 <motion.div
@@ -108,8 +108,8 @@ const ViralPosts = () => {
                             key={tier}
                             onClick={() => setFilter(tier)}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${filter === tier
-                                    ? 'bg-blue-600 text-white shadow-lg'
-                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                ? 'bg-blue-600 text-white shadow-lg'
+                                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                                 }`}
                         >
                             {tier.charAt(0).toUpperCase() + tier.slice(1)}
@@ -161,7 +161,7 @@ const ViralPosts = () => {
                                 </div>
 
                                 {/* Content */}
-                                <div className="p-5">
+                                <div className="p-4 md:p-5">
                                     {/* Caption */}
                                     <p className="text-gray-300 text-sm mb-4 line-clamp-2">
                                         {item.post.caption}

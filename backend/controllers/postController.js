@@ -82,7 +82,7 @@ exports.createPost = async (req, res) => {
                 videoSizeMB = videoFile.size / (1024 * 1024);
 
                 // Upload with transform=false (Upload Original - No Padding)
-                const videoResult = await uploadFile(videoFile.path, "eza-post/videos", "video", true, false);
+                let videoResult = await uploadFile(videoFile.path, "eza-post/videos", "video", true, false);
                 videoUrlForDB = videoResult.url;
                 videoPublicId = videoResult.public_id;
 
@@ -114,7 +114,7 @@ exports.createPost = async (req, res) => {
                 videoSizeMB = fs.statSync(finalVideoPath).size / (1024 * 1024);
 
                 // Upload with transform=false (Upload Original - No Padding)
-                const videoResult = await uploadFile(finalVideoPath, "eza-post/videos", "video", true, false);
+                videoResult = await uploadFile(finalVideoPath, "eza-post/videos", "video", true, false);
                 videoUrlForDB = videoResult.url;
                 videoPublicId = videoResult.public_id;
                 for (let i = 0; i < accountsArray.length; i++) {

@@ -38,6 +38,8 @@ services:
         sync: false
       - key: FFMPEG_PATH
         sync: false # Optional: If needed for custom FFmpeg paths
+      - key: GITHUB_TOKEN
+        sync: false # Required to bypass GitHub API rate limits during build
 
   # --------------------------------------------------------------------------------
   # 🔵 Frontend Service (Static Site)

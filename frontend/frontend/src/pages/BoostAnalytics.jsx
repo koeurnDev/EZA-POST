@@ -33,7 +33,7 @@ export default function BoostAnalytics() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto px-4 py-8">
+            <div className="max-w-6xl mx-auto px-4 py-4 md:py-8">
                 <div className="mb-8">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 flex items-center gap-3">
                         <TrendingUp className="text-green-500" size={32} />
@@ -44,7 +44,7 @@ export default function BoostAnalytics() {
 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-lg border border-gray-200 dark:border-gray-700">
                         <div className="flex items-center justify-between mb-2">
                             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Boosted</h3>
                             <Zap className="text-yellow-500" size={20} />
@@ -79,12 +79,12 @@ export default function BoostAnalytics() {
 
                 {/* Boosted Posts List */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700">
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Boosted Posts</h2>
                     </div>
 
                     {posts.length === 0 ? (
-                        <div className="p-12 text-center text-gray-500">
+                        <div className="p-6 md:p-12 text-center text-gray-500">
                             <Zap size={48} className="mx-auto mb-4 opacity-50" />
                             <p>No boosted posts yet. Enable auto-boost in settings!</p>
                         </div>
@@ -132,8 +132,8 @@ export default function BoostAnalytics() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${post.status === 'completed'
-                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
                                                     }`}>
                                                     {post.status === 'completed' && <CheckCircle size={12} />}
                                                     {post.status}
