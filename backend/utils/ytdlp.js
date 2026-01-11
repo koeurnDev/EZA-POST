@@ -1,30 +1,82 @@
-const ytDlpExec = require('youtube-dl-exec');
-const path = require('path');
-const fs = require('fs');
+// 🛠️ Simple wrapper to use system installed yt-dlp (via pip)
+// avoiding youtube-dl-exec npm package issues on Render
 
-// 🛠️ Wrapper to unify usage
-// youtube-dl-exec returns a promise that resolves to the output (stdout or formatted object)
+const { spawn, execFile } = require('child_process');
+const path = require('path');
+
+// Helper to run yt-dlp with arguments
+const runYtDlp = (args, options = {}) => {
+    return new Promise((resolve, reject) => {
+        // Detect OS and command
+        const command = 'yt-dlp'; // Assumes it's in PATH (installed via pip)
+
+        const child = spawn(command, args, {
+            maxBuffer: 1024 * 1024 * 50, // 50MB buffer
+            ...options
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        child.stdout.on('data', (data) => {
+            stdout += data;
+        });
+
+        child.stderr.on('data', (data) => {
+            stderr += data;
+        });
+
+        child.on('close', (code) => {
+            if (code !== 0) {
+                // If it fails, reject with stderr
+                reject(new Error(stderr || `yt-dlp process exited with code ${code}`));
+            } else {
+                // Try to parse JSON if requested
+                try {
+                    if (args.includes('--dump-json') || args.includes('-j')) {
+                        // Sometimes yt-dlp outputs warnings before JSON, so we look for the last valid JSON line or trim
+                        const lines = stdout.trim().split('\n');
+                        const jsonLine = lines.find(l => l.startsWith('{'));
+                        if (jsonLine) {
+                            resolve(JSON.parse(jsonLine));
+                        } else {
+                            resolve(stdout);
+                        }
+                    } else {
+                        resolve(stdout);
+                    }
+                } catch (e) {
+                    resolve(stdout);
+                }
+            }
+        });
+
+        child.on('error', (err) => {
+            reject(new Error(`Failed to start yt-dlp: ${err.message}`));
+        });
+    });
+};
 
 /**
  * Executes yt-dlp with arguments and returns JSON output (Promisified)
  */
 const lookup = async (url, options = {}) => {
     try {
-        const flags = {
-            dumpSingleJson: true,
-            noWarnings: true,
-            noCheckCertificates: true,
-            preferFreeFormats: true,
-            noPlaylist: true,
-            ...options
-        };
+        const args = [
+            url,
+            '--dump-json',
+            '--no-warnings',
+            '--no-check-certificates',
+            '--prefer-free-formats',
+            '--no-playlist'
+        ];
 
-        // Handles flatPlaylist mapping
-        if (options.flatPlaylist) flags.flatPlaylist = true;
-        if (options.playlistEnd) flags.playlistEnd = options.playlistEnd;
-        if (options.userAgent) flags.userAgent = options.userAgent;
+        // Handles options
+        if (options.flatPlaylist) args.push('--flat-playlist');
+        if (options.playlistEnd) args.push('--playlist-end', options.playlistEnd);
+        if (options.userAgent) args.push('--user-agent', options.userAgent);
 
-        const output = await ytDlpExec(url, flags);
+        const output = await runYtDlp(args);
         return output;
     } catch (err) {
         throw new Error(`yt-dlp lookup failed: ${err.message}`);
@@ -33,31 +85,30 @@ const lookup = async (url, options = {}) => {
 
 /**
  * Streams video content.
- * Note: youtube-dl-exec is a promise wrapper, but it exposes the child process via .exec()
- * However, simpler to use raw spawn for streaming if we know where the binary is.
- * youtube-dl-exec downloads the binary to node_modules/youtube-dl-exec/bin/yt-dlp
+ * Returns the child process.
  */
 const stream = (url, res) => {
-    // We need to find the binary path that youtube-dl-exec uses
-    const ytDlpBinary = require('youtube-dl-exec/src/constants').YOUTUBE_DL_PATH || 'yt-dlp';
+    const command = 'yt-dlp';
 
-    // Fallback to searching in node_modules if the constant isn't exposed (it varies by version)
-    // Actually, asking youtube-dl-exec to stream to stdout is effectively just running it.
+    // Arguments for streaming to stdout
+    const args = [
+        url,
+        '-o', '-',
+        '-f', 'best',
+        '--no-part', // Write directly, no .part files
+        '--no-cache-dir',
+        '--no-check-certificates',
+        '--no-warnings',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    ];
 
-    // Let's use the 'exec' method which gives us the process
-    const subprocess = ytDlpExec.exec(url, {
-        output: '-',
-        format: 'best',
-        noPart: true,
-        noCacheDir: true,
-        noCheckCertificates: true,
-        noWarnings: true
-    });
+    const subprocess = spawn(command, args);
 
     subprocess.stdout.pipe(res);
 
     subprocess.stderr.on('data', (data) => {
         const msg = data.toString();
+        // Ignore progress bars or small info
         if (msg.includes('ERROR')) console.error("❌ yt-dlp stream stderr:", msg);
     });
 
@@ -68,13 +119,18 @@ const stream = (url, res) => {
  * Downloads file to local path
  */
 const download = (url, outputPath, options = {}) => {
-    return ytDlpExec(url, {
-        output: outputPath,
-        noWarnings: true,
-        noCheckCertificates: true,
-        format: options.format,
-        cookies: options.cookies
-    });
+    const args = [
+        url,
+        '-o', outputPath,
+        '--no-warnings',
+        '--no-check-certificates'
+    ];
+
+    if (options.format) args.push('-f', options.format);
+    if (options.cookies) args.push('--cookies', options.cookies);
+    if (options.userAgent) args.push('--user-agent', options.userAgent);
+
+    return runYtDlp(args);
 };
 
 module.exports = {
