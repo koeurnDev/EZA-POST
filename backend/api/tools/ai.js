@@ -28,18 +28,27 @@ router.post("/remove-watermark", requireAuth, upload.single("image"), async (req
 
         // 🔧 FIX: Detect OS to choose python command
         const isWin = process.platform === "win32";
-        const pythonCmd = isWin ? "python" : "python3";
-
-        // 🔍 FIX: Explicitly find user site-packages for Render/Linux
+        let pythonCmd = isWin ? "python" : "python3";
         let env = { ...process.env };
+
         if (!isWin) {
             try {
-                // Get the user site-packages path dynamically
+                // 1. Get location of python3
+                const whichPython = require("child_process").execSync("which python3").toString().trim();
+                console.log(`🐍 System Python Path: ${whichPython}`);
+
+                // 2. Get user site-packages
                 const sitePackages = require("child_process").execSync("python3 -m site --user-site").toString().trim();
-                console.log(`🐍 Python Site Packages: ${sitePackages}`);
+                console.log(`📦 Python Site Packages: ${sitePackages}`);
+
+                // 3. Force PYTHONPATH
                 env.PYTHONPATH = sitePackages + ":" + (process.env.PYTHONPATH || "");
+
+                // 4. Update python command to use absolute path if found
+                if (whichPython) pythonCmd = whichPython;
+
             } catch (e) {
-                console.warn("⚠️ Failed to detect Python site-packages:", e.message);
+                console.warn("⚠️ Failed to detect Python environment:", e.message);
             }
         }
 
@@ -51,7 +60,7 @@ router.post("/remove-watermark", requireAuth, upload.single("image"), async (req
         const position = req.body.position || "br"; // Default to Bottom-Right
 
         // Command to run python script
-        const command = `${pythonCmd} "${scriptPath}" "${imagePath}" "${position}"`;
+        const command = `"${pythonCmd}" "${scriptPath}" "${imagePath}" "${position}"`;
         console.log("🚀 Executing:", command);
 
         exec(command, { env: env }, (error, stdout, stderr) => {
