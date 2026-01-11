@@ -58,7 +58,7 @@ const NAV_ITEMS = [
 
   { type: "header", label: "Active AI Tools" },
   { label: "Watermark Remover", icon: <Eraser size={20} />, path: "/tools/ai" },
-  { label: "Doc Converter", icon: <FileText size={20} />, path: "/tools/document-converter" },
+
   { type: "divider" },
 
   { type: "header", label: "Discovery" },
@@ -82,6 +82,7 @@ const NAV_ITEMS = [
   { label: "Auto Censorship", icon: <EyeOff size={20} />, path: "/tools/censorship" },
   { label: "Label Swap", icon: <Repeat size={20} />, path: "/tools/label-swap" },
   { label: "Khmer Subtitles", icon: <Languages size={20} />, path: "/tools/subtitle-generator" },
+  { label: "Doc Converter", icon: <FileText size={20} />, path: "/tools/document-converter" },
   { type: "divider" },
 
   { type: "header", label: "Advanced (Coming Soon)" },

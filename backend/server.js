@@ -228,7 +228,7 @@ const routeModules = [
   ["tools/pinterest", "./api/tools/pinterest"], // ✅ Pinterest Downloader
   ["tools/youtube", "./api/tools/youtube"],     // ✅ YouTube Downloader
   ["webhooks/facebook", "./api/webhooks/facebook"], // ✅ Added Webhook
-  ["tools/document-converter", "./api/tools/document_converter"], // ✅ Document Converter
+  // ["tools/document-converter", "./api/tools/document_converter"], // ⏸️ Document Converter (Coming Soon)
   ["tools/facebook", "./api/tools/facebook"],   // ✅ Facebook Downloader
   ["tools/telegram", "./api/tools/telegram"],   // ✅ Telegram Downloader
   ["tools/instagram", "./api/tools/instagram"], // ✅ Instagram Downloader
