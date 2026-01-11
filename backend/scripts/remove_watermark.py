@@ -1,7 +1,30 @@
-import cv2
 import sys
-import numpy as np
 import os
+
+# 🕵️ DEBUG: Print Environment environment info
+print(f"🐍 Python Executable: {sys.executable}")
+print(f"🐍 Python Version: {sys.version}")
+print(f"🐍 PYTHONPATH env var: {os.environ.get('PYTHONPATH', 'Not Set')}")
+print(f"🐍 sys.path: {sys.path}")
+
+try:
+    import cv2
+except ImportError:
+    print("❌ FATAL: Could not import cv2. Check sys.path above.")
+    # Try to append known likely paths if missing (Last ditch effort)
+    try:
+        site_packages = "/opt/render/.local/lib/python3.11/site-packages"
+        if site_packages not in sys.path:
+            print(f"⚠️ Attempting to manually append: {site_packages}")
+            sys.path.append(site_packages)
+            import cv2
+            print("✅ Manual append worked!")
+    except Exception as e:
+        print(f"❌ Manual append failed: {e}")
+        pass
+    import cv2 # Re-raise normal error if still failing
+
+import numpy as np
 
 def remove_watermark(image_path, position="br"):
     try:
