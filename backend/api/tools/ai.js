@@ -35,16 +35,16 @@ router.post("/remove-watermark", requireAuth, upload.single("image"), async (req
             try {
                 // 1. Get location of python3
                 const whichPython = require("child_process").execSync("which python3").toString().trim();
+
+                // 2. Set PYTHONPATH to local pylibs folder (Relative to this file: api/tools -> backend -> pylibs)
+                const localPyLibs = path.join(__dirname, "../../pylibs");
+
                 console.log(`🐍 System Python Path: ${whichPython}`);
+                console.log(`📦 Local PyLibs Path: ${localPyLibs}`);
 
-                // 2. Get user site-packages
-                const sitePackages = require("child_process").execSync("python3 -m site --user-site").toString().trim();
-                console.log(`📦 Python Site Packages: ${sitePackages}`);
+                // Prepend to ensure it takes precedence
+                env.PYTHONPATH = localPyLibs + ":" + (process.env.PYTHONPATH || "");
 
-                // 3. Force PYTHONPATH
-                env.PYTHONPATH = sitePackages + ":" + (process.env.PYTHONPATH || "");
-
-                // 4. Update python command to use absolute path if found
                 if (whichPython) pythonCmd = whichPython;
 
             } catch (e) {

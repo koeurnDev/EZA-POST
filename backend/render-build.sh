@@ -8,17 +8,15 @@ pip3 --version
 
 npm install
 
-echo "Installing Python Dependencies..."
-pip3 install --upgrade pip
-pip3 install -r requirements.txt --user
+echo "Installing Python Dependencies Locally..."
+# Ensure pylibs directory exists
+mkdir -p pylibs
 
-# 🔍 Find where modules were installed
-SITE_PACKAGES=$(python3 -m site --user-site)
-echo "📦 Python User Site Packages: $SITE_PACKAGES"
-
-# 🚀 Add to PYTHONPATH for runtime
-export PYTHONPATH=$SITE_PACKAGES:$PYTHONPATH
+# Install dependencies into pylibs to ensure they travel with the project
+pip3 install -r requirements.txt --target ./pylibs --upgrade
 
 echo "Verifying Installed Packages:"
 pip3 list
-python3 -c "import sys; sys.path.append('$SITE_PACKAGES'); import cv2; print('OpenCV imported successfully via build script')" || echo "❌ OpenCV import failed during build"
+# Verify import using PYTHONPATH pointing to local lib
+export PYTHONPATH=$(pwd)/pylibs
+python3 -c "import sys; print(sys.path); import cv2; print('✅ OpenCV imported successfully from pylibs')" || echo "❌ OpenCV import failed during build"
