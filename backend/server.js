@@ -224,7 +224,7 @@ const routeModules = [
   ["auth/youtube", "./api/auth/youtube"], // ✅ YouTube Auth
   ["auth/tiktok", "./api/auth/tiktok"],   // ✅ TikTok Auth
   ["auth/instagram", "./api/auth/instagram"], // ✅ Instagram Auth
-  ["tools/ai", "./api/tools/ai"],         // ✅ AI Tools
+  // ["tools/ai", "./api/tools/ai"],         // ⏸️ AI Tools (Watermark Remover - Coming Soon)
   ["tools/pinterest", "./api/tools/pinterest"], // ✅ Pinterest Downloader
   ["tools/youtube", "./api/tools/youtube"],     // ✅ YouTube Downloader
   ["webhooks/facebook", "./api/webhooks/facebook"], // ✅ Added Webhook
