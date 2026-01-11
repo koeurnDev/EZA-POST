@@ -114,6 +114,14 @@ app.use(
   })
 );
 
+// ✅ Enable Preflight for all routes
+app.options('*', cors());
+
+// ✅ Ensure Temp Directories Exist (Critical for Render)
+const fs = require('fs'); // Ensure fs is required if not already top-level (it is)
+const tempUploadsPath = path.join(__dirname, "temp", "uploads");
+if (!fs.existsSync(tempUploadsPath)) fs.mkdirSync(tempUploadsPath, { recursive: true });
+
 // ✅ Trust Proxy (Required for Render/Heroku secure cookies)
 app.set("trust proxy", 1);
 
@@ -240,7 +248,8 @@ const routeModules = [
   // ["tools/drive-sync", "./api/tools/drive_sync"], // ⏸️ Google Drive Sync
   // ["tools/farm", "./api/tools/farm"], // ⏸️ Cloud Farm Automation
   // ["boost/metrics", "./api/boost/metrics"], // ⏸️ Boost Metrics API
-  // ["boost/campaigns", "./api/boost/campaigns"], // ⏸️ Boost Campaigns API
+  ["boost/campaigns", "./api/boost/campaigns"], // ⏸️ Boost Campaigns API
+  ["debug", "./api/debug_python"], // ✅ Debug Python Route
 ];
 
 for (const [route, file] of routeModules) {
