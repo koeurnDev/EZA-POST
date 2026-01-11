@@ -26,3 +26,7 @@ bakong-server/
 bakong-ui/
 server/uploads/
 ts-khqr/
+
+# Secrets
+service_account_key.json
+kr-post-*.json

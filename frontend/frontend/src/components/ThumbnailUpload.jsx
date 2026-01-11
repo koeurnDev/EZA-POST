@@ -53,7 +53,7 @@ const ThumbnailUpload = ({ onChange, currentThumbnail = null, isDemo = false }) 
               const formData = new FormData();
               formData.append("thumbnail", file);
               const res = await fetch(
-                `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/upload/thumbnail`,
+                `${import.meta.env.VITE_API_URL || "https://eza-post-backend.onrender.com/api"}/api/upload/thumbnail`,
                 { method: "POST", body: formData }
               );
               const data = await res.json();

@@ -40,75 +40,97 @@ router.post('/convert', upload.single('file'), async (req, res) => {
     const outputFilePath = path.resolve(req.file.path + '_converted' + outputExtension);
 
     try {
-        console.log(`Processing local conversion: ${originalName} -> ${outputExtension}`);
+        console.log(`Processing conversion: ${originalName} -> ${outputExtension} (Env: ${process.env.NODE_ENV})`);
 
-        // Special Case: PDF -> DOCX (Use Python if valid, else PS)
-        // Special Case: PDF -> PPTX (PDF -> DOCX (Py) -> PPTX (PS))
+        // --------------------------------------------------------------------------
+        // 1. CHOOSE CONVERSION METHOD
+        // --------------------------------------------------------------------------
 
-        if (ext === '.pdf' && targetFormat === 'docx') {
-            // Try Python first
-            const pyScript = path.resolve(__dirname, '../../scripts/pdf_to_docx_py.py');
-            try {
-                await new Promise((resolve, reject) => {
-                    const py = spawn('python', [pyScript, localFilePath, outputFilePath]);
-                    py.stdout.on('data', (data) => console.log(`PY stdout: ${data}`));
-                    py.stderr.on('data', (data) => console.error(`PY stderr: ${data}`));
-                    py.on('close', (code) => {
-                        if (code === 0) resolve();
-                        else reject(new Error(`Python script exited with code ${code}`));
-                    });
-                    py.on('error', (err) => reject(err));
-                });
-            } catch (pyErr) {
-                console.warn("Python conversion failed, falling back to PowerShell:", pyErr);
-                // Fallback to PowerShell
-                const scriptPath = path.resolve(__dirname, '../../scripts/convert_office.ps1');
-                await runPowerShell(scriptPath, localFilePath, outputFilePath);
-            }
-
-        } else if (ext === '.pdf' && targetFormat === 'pptx') {
-            // PDF -> DOCX (Python) -> PPTX (PS)
-            const tempDocx = path.resolve(req.file.path + '_temp.docx');
+        // 🟢 METHOD A: PDF to DOCX/PPTX (Uses Python's pdf2docx)
+        if (ext === '.pdf' && (targetFormat === 'docx' || targetFormat === 'pptx')) {
+            const pythonCmd = process.env.NODE_ENV === 'production' ? 'python3' : 'python';
             const pyScript = path.resolve(__dirname, '../../scripts/pdf_to_docx_py.py');
 
             // Step 1: PDF -> DOCX
+            const tempDocx = targetFormat === 'docx' ? outputFilePath : path.resolve(req.file.path + '_temp.docx');
+
             await new Promise((resolve, reject) => {
-                const py = spawn('python', [pyScript, localFilePath, tempDocx]);
-                py.stdout.on('data', (data) => console.log(`PY stdout: ${data}`));
-                py.stderr.on('data', (data) => console.error(`PY stderr: ${data}`));
-                py.on('close', (code) => {
-                    if (code === 0) resolve();
-                    else reject(new Error(`Python (PDF->DOCX) failed with code ${code}`));
-                });
-                py.on('error', (err) => reject(err));
+                const py = spawn(pythonCmd, [pyScript, localFilePath, tempDocx]);
+                py.on('close', (code) => code === 0 ? resolve() : reject(new Error(`Python failed: ${code}`)));
+                py.on('error', reject);
             });
 
-            // Step 2: DOCX -> PPTX
-            const scriptPath = path.resolve(__dirname, '../../scripts/convert_office.ps1');
-            await runPowerShell(scriptPath, tempDocx, outputFilePath);
-
-            // Cleanup temp intermediate
-            if (fs.existsSync(tempDocx)) fs.unlinkSync(tempDocx);
-
-        } else {
-            // Standard PowerShell Conversion
-            const scriptPath = path.resolve(__dirname, '../../scripts/convert_office.ps1');
-            await runPowerShell(scriptPath, localFilePath, outputFilePath);
+            // Step 2: DOCX -> PPTX (If requested)
+            if (targetFormat === 'pptx') {
+                if (process.env.NODE_ENV === 'production') {
+                    // ☁️ Production (Linux): Use Google Drive for DOCX -> PPTX (Indirect)
+                    const uploaded = await driveService.uploadFile(tempDocx, null, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.google-apps.document');
+                    const buffer = await driveService.convertFile(uploaded.id, 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+                    fs.writeFileSync(outputFilePath, buffer);
+                    await driveService.deleteFile(uploaded.id);
+                } else {
+                    // 💻 Local (Windows): Use PowerShell
+                    const psScript = path.resolve(__dirname, '../../scripts/convert_office.ps1');
+                    await runPowerShell(psScript, tempDocx, outputFilePath);
+                }
+            }
         }
 
-        // 2. Check and Send Result
+        // 🟢 METHOD B: Office to PDF/Other
+        else {
+            if (process.env.NODE_ENV === 'production') {
+                // ☁️ Production (Linux): Use Google Drive API
+                console.log("☁️ Using Google Drive for cloud conversion...");
+
+                // Map local MIME to Google Apps MIME for auto-conversion on upload
+                let uploadMime = 'application/octet-stream';
+                let googleAppsMime = null;
+
+                if (ext === '.docx' || ext === '.doc') {
+                    uploadMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                    googleAppsMime = 'application/vnd.google-apps.document';
+                } else if (ext === '.pptx' || ext === '.ppt') {
+                    uploadMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+                    googleAppsMime = 'application/vnd.google-apps.presentation';
+                }
+
+                // Upload & Convert to Google Doc/Slide
+                const uploaded = await driveService.uploadFile(localFilePath, null, uploadMime, googleAppsMime);
+
+                // Export as PDF
+                const exportMime = 'application/pdf';
+                const buffer = await driveService.convertFile(uploaded.id, exportMime);
+
+                fs.writeFileSync(outputFilePath, buffer);
+
+                // Cleanup Drive
+                await driveService.deleteFile(uploaded.id);
+
+            } else {
+                // 💻 Local (Windows): Use PowerShell + MS Office
+                console.log("💻 Using Local MS Office via PowerShell...");
+                const psScript = path.resolve(__dirname, '../../scripts/convert_office.ps1');
+                await runPowerShell(psScript, localFilePath, outputFilePath);
+            }
+        }
+
+        // --------------------------------------------------------------------------
+        // 2. SEND THE CONVERTED FILE
+        // --------------------------------------------------------------------------
         if (fs.existsSync(outputFilePath)) {
             const fileData = fs.readFileSync(outputFilePath);
             res.setHeader('Content-Type', mimeType);
             res.setHeader('Content-Disposition', `attachment; filename="${path.basename(originalName, path.extname(originalName))}${outputExtension}"`);
             res.send(fileData);
 
-            // Cleanup Output
+            // Housekeeping
             setTimeout(() => {
                 if (fs.existsSync(outputFilePath)) fs.unlinkSync(outputFilePath);
-            }, 1000);
+                const tempDocxFallback = path.resolve(req.file.path + '_temp.docx');
+                if (fs.existsSync(tempDocxFallback)) fs.unlinkSync(tempDocxFallback);
+            }, 2000);
         } else {
-            throw new Error("Output file was not created.");
+            throw new Error("Conversion engine failed to produce output.");
         }
 
     } catch (err) {

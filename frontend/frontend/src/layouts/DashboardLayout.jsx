@@ -25,6 +25,7 @@ import {
   Send,
   Instagram,
   Scissors,
+  Eraser,
   BarChart2,
   Music,
   TrendingUp,
@@ -44,11 +45,7 @@ import {
 
 // 🧭 Navigation Items (Organized by Category)
 const NAV_ITEMS = [
-  // Core
-  { label: "Dashboard", icon: <LayoutDashboard size={20} />, path: "/dashboard" },
-  { type: "divider" },
-
-  // Downloaders (Most Used - Top Priority)
+  // ✅ Working Tools (Top Priority)
   { type: "header", label: "Downloaders" },
   { label: "TikTok", icon: <Download size={20} />, path: "/tools/tiktok" },
   { label: "YouTube", icon: <Video size={20} />, path: "/tools/youtube" },
@@ -59,50 +56,41 @@ const NAV_ITEMS = [
   { label: "CapCut", icon: <Scissors size={20} />, path: "/tools/capcut" },
   { type: "divider" },
 
-  // AI Tools
-  { type: "header", label: "AI Tools" },
-  { label: "Doc Converter", icon: <FileText size={20} />, path: "/tools/document-converter" }, // ✅ Added
-  { label: "AI Script Writer", icon: <FileText size={20} />, path: "/tools/script-writer" },
-  { label: "AI Thumbnails", icon: <ImagePlus size={20} />, path: "/tools/thumbnail-generator" },
-  { label: "Auto Censorship", icon: <EyeOff size={20} />, path: "/tools/censorship" },
-  { label: "Label Swap", icon: <Repeat size={20} />, path: "/tools/label-swap" },
-  { label: "Magic Motion", icon: <Wand2 size={20} />, path: "/tools/magic-motion" },
-  { label: "AI Magic Tools", icon: <Sparkles size={20} />, path: "/tools/ai" },
+  { type: "header", label: "Active AI Tools" },
+  { label: "Watermark Remover", icon: <Eraser size={20} />, path: "/tools/ai" },
+  { label: "Doc Converter", icon: <FileText size={20} />, path: "/tools/document-converter" },
   { type: "divider" },
 
-  // Content Tools
-  { type: "header", label: "Content Tools" },
-  { label: "Video Creator", icon: <Film size={20} />, path: "/tools/video-creator" },
-  { label: "Khmer Subtitles", icon: <Languages size={20} />, path: "/tools/subtitle-generator" },
+  { type: "header", label: "Discovery" },
   { label: "Viral Finder", icon: <TrendingUp size={20} />, path: "/tools/viral-finder" },
   { label: "Trending Sounds", icon: <Music size={20} />, path: "/tools/tiktok/trends" },
   { type: "divider" },
 
-  // Posting
-  { type: "header", label: "Posting" },
-  { label: "Single Video", icon: <Video size={20} />, path: "/post" },
-  { label: "Bulk Upload 30+", icon: <UploadCloud size={20} />, path: "/bulk-upload" },
-  { label: "Scheduled Posts", icon: <Calendar size={20} />, path: "/posts" },
+  // 🚀 Coming Soon Sections (Moved to Bottom)
+  { type: "header", label: "Core (Coming Soon)" },
+  { label: "Dashboard", icon: <LayoutDashboard size={20} />, path: "/dashboard" },
+  { label: "Posting", icon: <UploadCloud size={20} />, path: "/post" },
+  { label: "Auto-Boost", icon: <Zap size={20} />, path: "/boost-settings" },
+  { label: "Analytics", icon: <BarChart2 size={20} />, path: "/analytics" },
   { type: "divider" },
 
-  // Auto-Boost
-  { type: "header", label: "Auto-Boost" },
-  { label: "Boost Settings", icon: <Zap size={20} />, path: "/boost-settings" },
-  { label: "Boost Analytics", icon: <TrendingUp size={20} />, path: "/boost-analytics" },
-  { label: "Boost Accounts", icon: <Users size={20} />, path: "/boost-accounts" },
-  { label: "Buy Credits", icon: <Coins size={20} />, path: "/buy-credits" },
+  { type: "header", label: "Creator Tools (Coming Soon)" },
+  { label: "Video Creator", icon: <Film size={20} />, path: "/tools/video-creator" },
+  { label: "AI Script Writer", icon: <FileText size={20} />, path: "/tools/script-writer" },
+  { label: "AI Thumbnails", icon: <ImagePlus size={20} />, path: "/tools/thumbnail-generator" },
+  { label: "Magic Motion", icon: <Wand2 size={20} />, path: "/tools/magic-motion" },
+  { label: "Auto Censorship", icon: <EyeOff size={20} />, path: "/tools/censorship" },
+  { label: "Label Swap", icon: <Repeat size={20} />, path: "/tools/label-swap" },
+  { label: "Khmer Subtitles", icon: <Languages size={20} />, path: "/tools/subtitle-generator" },
   { type: "divider" },
 
-  // Advanced
-  { type: "header", label: "Advanced" },
+  { type: "header", label: "Advanced (Coming Soon)" },
   { label: "Cloud Farm", icon: <Users size={20} />, path: "/tools/farm" },
-  { label: "Cloud → Telegram", icon: <Cloud size={20} />, path: "/tools/telegram-cloud" },
+  { label: "Telegram Cloud", icon: <Cloud size={20} />, path: "/tools/telegram-cloud" },
   { label: "Dropship Center", icon: <ShoppingBag size={20} />, path: "/tools/dropship-center" },
   { type: "divider" },
 
-  // System
-  { type: "header", label: "System" },
-  { label: "Analytics", icon: <BarChart2 size={20} />, path: "/analytics" },
+  { type: "header", label: "System (Coming Soon)" },
   { label: "Connections", icon: <LinkIcon size={20} />, path: "/connections" },
   { label: "Auto-Reply Bot", icon: <MessageSquare size={20} />, path: "/bot" },
   { label: "Settings", icon: <Settings size={20} />, path: "/settings" },

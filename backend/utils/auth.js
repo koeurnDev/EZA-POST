@@ -105,7 +105,8 @@ async function requireAuth(req, res, next) {
 
     if (!user) {
       console.warn("⚠️ requireAuth: User not found for token:", decoded.id);
-      return res.status(404).json({ error: "User not found" });
+      clearAuthCookie(res);
+      return res.status(401).json({ error: "User no longer exists. Please log in again." });
     }
 
     req.user = user;

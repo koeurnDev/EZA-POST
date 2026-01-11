@@ -194,8 +194,8 @@ export default function ViralFinder() {
                                             <Send size={18} />
                                         </button>
                                         <a
-                                            href={video.playUrl}
-                                            download
+                                            href={apiUtils.getFullUrl(`/tools/tiktok/proxy?url=${encodeURIComponent(video.playUrl)}&web_url=${encodeURIComponent(video.web_url)}&filename=${encodeURIComponent(video.title)}&type=video/mp4`)}
+                                            download={`${video.title}.mp4`}
                                             target="_blank"
                                             onClick={(e) => e.stopPropagation()}
                                             className="w-10 h-10 rounded-full bg-white/90 backdrop-blur text-gray-700 shadow-lg flex items-center justify-center hover:bg-gray-900 hover:text-white transition-colors"

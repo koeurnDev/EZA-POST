@@ -49,6 +49,7 @@ const Profile = lazy(() => import("../pages/Profile"));
 const Welcome = lazy(() => import("../pages/Welcome"));
 const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("../pages/ResetPassword"));
+const ComingSoon = lazy(() => import("../pages/ComingSoon"));
 
 // --- Loading Component ---
 const PageLoader = () => (
@@ -71,7 +72,7 @@ export default function AppRouter() {
           <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Redirect /dashboard to /post */}
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* ==================== Protected Routes ==================== */}
@@ -79,7 +80,7 @@ export default function AppRouter() {
             path="/post"
             element={
               <ProtectedRoute redirectPath="/welcome">
-                <Post />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -87,7 +88,7 @@ export default function AppRouter() {
             path="/bulk-upload"
             element={
               <ProtectedRoute>
-                <BulkPost />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -120,7 +121,7 @@ export default function AppRouter() {
             path="/posts"
             element={
               <ProtectedRoute>
-                <ScheduledPosts />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -128,7 +129,7 @@ export default function AppRouter() {
             path="/bot"
             element={
               <ProtectedRoute>
-                <BotSettingsPage />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -136,7 +137,7 @@ export default function AppRouter() {
             path="/settings"
             element={
               <ProtectedRoute>
-                <Settings />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -200,7 +201,7 @@ export default function AppRouter() {
             path="/tools/video-creator"
             element={
               <ProtectedRoute>
-                <VideoCreator />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -208,7 +209,7 @@ export default function AppRouter() {
             path="/tools/dropship-center"
             element={
               <ProtectedRoute>
-                <DropshipCenter />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -224,7 +225,7 @@ export default function AppRouter() {
             path="/tools/subtitle-generator"
             element={
               <ProtectedRoute>
-                <SubtitleGenerator />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -232,7 +233,7 @@ export default function AppRouter() {
             path="/tools/magic-motion"
             element={
               <ProtectedRoute>
-                <MagicMotion />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -240,7 +241,7 @@ export default function AppRouter() {
             path="/tools/censorship"
             element={
               <ProtectedRoute>
-                <CensorshipTool />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -248,7 +249,7 @@ export default function AppRouter() {
             path="/tools/label-swap"
             element={
               <ProtectedRoute>
-                <LabelSwapTool />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -256,7 +257,7 @@ export default function AppRouter() {
             path="/tools/script-writer"
             element={
               <ProtectedRoute>
-                <ScriptWriter />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -264,7 +265,7 @@ export default function AppRouter() {
             path="/tools/thumbnail-generator"
             element={
               <ProtectedRoute>
-                <ThumbnailGenerator />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -272,7 +273,7 @@ export default function AppRouter() {
             path="/tools/telegram-cloud"
             element={
               <ProtectedRoute>
-                <TelegramCloud />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -280,7 +281,7 @@ export default function AppRouter() {
             path="/tools/farm"
             element={
               <ProtectedRoute>
-                <FarmControl />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -288,7 +289,7 @@ export default function AppRouter() {
             path="/connections"
             element={
               <ProtectedRoute>
-                <Connections />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -296,7 +297,7 @@ export default function AppRouter() {
             path="/buy-credits"
             element={
               <ProtectedRoute>
-                <BuyCredits />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -304,7 +305,7 @@ export default function AppRouter() {
             path="/analytics"
             element={
               <ProtectedRoute>
-                <Analytics />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -312,7 +313,7 @@ export default function AppRouter() {
             path="/viral-posts"
             element={
               <ProtectedRoute>
-                <ViralPosts />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -320,7 +321,7 @@ export default function AppRouter() {
             path="/boost-campaigns"
             element={
               <ProtectedRoute>
-                <BoostCampaigns />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -328,7 +329,7 @@ export default function AppRouter() {
             path="/boost-settings"
             element={
               <ProtectedRoute>
-                <BoostSettings />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -336,7 +337,7 @@ export default function AppRouter() {
             path="/boost-analytics"
             element={
               <ProtectedRoute>
-                <BoostAnalytics />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -344,7 +345,7 @@ export default function AppRouter() {
             path="/boost-accounts"
             element={
               <ProtectedRoute>
-                <BoostAccounts />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />

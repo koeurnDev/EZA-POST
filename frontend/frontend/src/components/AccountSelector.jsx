@@ -285,7 +285,7 @@ const AccountSelector = React.memo(function AccountSelector({
                 <div className="text-3xl">🔍</div>
                 <p>No accounts found.</p>
                 <button
-                  onClick={() => window.location.href = `${(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "")}/api/auth/facebook`}
+                  onClick={() => window.location.href = `${(import.meta.env.VITE_API_BASE_URL || "https://eza-post-backend.onrender.com/api").replace(/\/api$/, "")}/api/auth/facebook`}
                   className="mt-2 px-4 py-2 bg-[#1877f2] hover:bg-[#166fe5] text-white rounded-lg font-medium text-sm flex items-center gap-2 transition-colors shadow-sm"
                 >
                   <span>📘</span> Connect Facebook

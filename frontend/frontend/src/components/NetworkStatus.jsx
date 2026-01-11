@@ -19,10 +19,10 @@ const NetworkStatus = ({
     setIsChecking(true);
 
     try {
-      const API_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000");
+      const API_URL = (import.meta.env.VITE_API_BASE_URL || "https://eza-post-backend.onrender.com/api");
       const endpoints = [
         `${API_URL}/health`, // ✅ Check Backend Health
-        "/favicon.ico",      // ✅ Check Frontend Connectivity
+        "/manifest.json",    // ✅ Check Frontend Connectivity
       ];
 
       let success = false;

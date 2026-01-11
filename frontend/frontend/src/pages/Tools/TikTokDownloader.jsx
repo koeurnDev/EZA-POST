@@ -1,8 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import { Search, Download, Check, AlertCircle, Play, Save, User, Grid, CheckSquare, Square } from "lucide-react";
-import api from "../../utils/api";
+import { Search, Download, Check, Play, User, X, ChevronRight, Loader2, Image as ImageIcon, Video, Music, Layers } from "lucide-react";
 import toast from "react-hot-toast";
+import api, { API_CONFIG } from "../../utils/api";
+
+// 🛠️ Helper for clean API URLs
+// 🛠️ Helper for clean API URLs
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.MODE === 'development' ? "" : "https://eza-post-backend.onrender.com/api")).replace(/\/api$/, "");
+
+// 🛡️ Robust Proxy Helper
+const getProxyUrl = (url, options = {}) => {
+    if (!url) return "";
+    const { filename = "file", type = "" } = options;
+    let proxyUrl = `${API_BASE}/api/tools/tiktok/proxy?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
+    if (type) proxyUrl += `&type=${encodeURIComponent(type)}`;
+    if (options.web_url) proxyUrl += `&web_url=${encodeURIComponent(options.web_url)}`;
+    return proxyUrl;
+};
 
 export default function TikTokDownloader() {
     const [activeTab, setActiveTab] = useState("single"); // 'single' | 'profile'
@@ -12,107 +26,111 @@ export default function TikTokDownloader() {
     const [loading, setLoading] = useState(false);
     const [videoData, setVideoData] = useState(null);
     const [saving, setSaving] = useState(false);
-    const [downloadHistory, setDownloadHistory] = useState([]);
+
+    // Download Progress State
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
 
     // Profile Bulk State
     const [profileInput, setProfileInput] = useState("");
     const [profileLoading, setProfileLoading] = useState(false);
-    const [profileData, setProfileData] = useState(null); // { profile, videos }
+    const [profileData, setProfileData] = useState(null);
     const [selectedVideos, setSelectedVideos] = useState(new Set());
+    const [sortMode, setSortMode] = useState("date"); // 'date' | 'plays'
 
-    // 🔍 Step 1: Single Video Lookup
+    // Sort Videos
+    const sortedVideos = React.useMemo(() => {
+        if (!profileData?.videos) return [];
+        const videos = [...profileData.videos];
+        if (sortMode === "date") {
+            return videos.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        } else {
+            return videos.sort((a, b) => b.stats.plays - a.stats.plays);
+        }
+    }, [profileData, sortMode]);
+
+    // Helper: Select Top N
+    const selectTop = (n) => {
+        const newSet = new Set();
+        sortedVideos.slice(0, n).forEach(v => newSet.add(v.id));
+        setSelectedVideos(newSet);
+    };
+
+    // Helper: Format Date
+    const formatTimeAgo = (ts) => {
+        if (!ts) return "";
+        const diff = Date.now() - (ts * 1000);
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        if (days === 0) return "Today";
+        if (days === 1) return "Yesterday";
+        if (days < 30) return `${days} days ago`;
+        return new Date(ts * 1000).toLocaleDateString();
+    };
+
+    // Animation trigger
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+
+    // 🔍 Single Video Lookup
     const handleLookup = async () => {
         if (!url.includes("tiktok.com")) return toast.error("Please enter a valid TikTok URL");
         setLoading(true);
         setVideoData(null);
-        const toastId = toast.loading("Fetching video info...");
         try {
             const res = await api.post("/tools/tiktok/lookup", { url });
             if (res.data.success) {
                 setVideoData(res.data.video);
-                toast.success(
-                    (t) => (
-                        <div className="flex flex-col gap-2">
-                            <p className="font-semibold">✅ Video found!</p>
-                            <button
-                                onClick={() => {
-                                    handleDownloadAnother();
-                                    toast.dismiss(t.id);
-                                }}
-                                className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
-                            >
-                                🔄 Download Another
-                            </button>
-                        </div>
-                    ),
-                    { id: toastId, duration: 5000 }
-                );
+                setUrl(""); // Clear input for next download
+                toast.success("Video found!");
             }
         } catch (err) {
-            toast.error(err.response?.data?.error || "Failed to find video", { id: toastId });
+            toast.error(err.response?.data?.error || "Failed to find video");
         } finally {
             setLoading(false);
         }
     };
 
-    // 👤 Step 1: Profile Lookup
+    // 👤 Profile Lookup
     const handleProfileLookup = async () => {
-        if (!profileInput) return toast.error("Enter a username or URL");
+        if (!profileInput) return toast.error("Enter a username");
         setProfileLoading(true);
         setProfileData(null);
         setSelectedVideos(new Set());
-        const toastId = toast.loading("Fetching profile videos...");
         try {
-            const res = await api.post("/tools/tiktok/profile", { username: profileInput });
+            const res = await api.post("/tools/tiktok/profile", { username: profileInput }, { timeout: 90000 });
             if (res.data.success) {
                 setProfileData(res.data);
-                toast.success(`Found ${res.data.videos.length} videos!`, { id: toastId });
+                toast.success(`Found ${res.data.videos.length} videos`);
             }
         } catch (err) {
-            toast.error(err.response?.data?.error || "Failed to fetch profile", { id: toastId });
+            console.error("Profile Lookp Error:", err);
+            const msg = err.message?.includes("timeout")
+                ? "Profile lookup took too long. TikTok might be slow, please try again."
+                : (err.response?.data?.error || err.message || "Failed to fetch profile");
+            toast.error(msg);
         } finally {
             setProfileLoading(false);
         }
     };
 
-    // 📥 Step 2: Download Single (Save to App)
+    // 📥 Download to App
     const handleSaveToApp = async () => {
         if (!videoData) return;
         setSaving(true);
-        const toastId = toast.loading("Downloading to library...");
         try {
             const res = await api.post("/tools/tiktok/download", {
                 url: videoData.no_watermark_url,
                 title: videoData.title
             });
-            if (res.data.success) toast.success("Saved to Library! Ready for post.", { id: toastId });
+            if (res.data.success) toast.success("Saved to Library!");
         } catch (err) {
-            toast.error("Failed to save video", { id: toastId });
+            toast.error("Failed to save video");
         } finally {
             setSaving(false);
         }
     };
 
-    // 🔄 Download Another Handler
-    const handleDownloadAnother = () => {
-        if (videoData) {
-            setDownloadHistory(prev => [{
-                id: Date.now(),
-                title: videoData.title,
-                thumbnail: videoData.thumbnail,
-                url: videoData.no_watermark_url,
-                timestamp: new Date().toLocaleTimeString()
-            }, ...prev]);
-        }
-        setUrl('');
-        setVideoData(null);
-        // Focus input after short delay
-        setTimeout(() => {
-            document.querySelector('input[type="text"]')?.focus();
-        }, 100);
-    };
-
-    // ☑️ Selection Logic
+    // 📦 Bulk Logic
     const toggleSelect = (id) => {
         const newSet = new Set(selectedVideos);
         if (newSet.has(id)) newSet.delete(id);
@@ -123,354 +141,570 @@ export default function TikTokDownloader() {
     const toggleSelectAll = () => {
         if (!profileData) return;
         if (selectedVideos.size === profileData.videos.length) {
-            setSelectedVideos(new Set()); // Deselect all
+            setSelectedVideos(new Set());
         } else {
-            const allIds = new Set(profileData.videos.map(v => v.id));
-            setSelectedVideos(allIds);
+            setSelectedVideos(new Set(profileData.videos.map(v => v.id)));
         }
     };
 
-    // 📦 Bulk Download
-    const handleBulkDownload = () => {
+    const handleBulkDownload = async () => {
         const videosToDownload = profileData.videos.filter(v => selectedVideos.has(v.id));
         if (videosToDownload.length === 0) return toast.error("Select videos first");
 
-        toast((t) => (
-            <div>
-                <p className="font-bold">Starting {videosToDownload.length} downloads...</p>
-                <p className="text-xs mt-1">⚠️ If only 1 downloads, check your browser address bar for "Pop-ups blocked" and allow them!</p>
-            </div>
-        ), { duration: 5000, icon: '🚀' });
+        setIsDownloading(true);
+        setDownloadProgress({ current: 0, total: videosToDownload.length });
 
-        videosToDownload.forEach((v, idx) => {
-            setTimeout(() => {
-                const targetUrl = v.no_watermark_url || v.images[0];
-                const safeFilename = `tiktok-${v.id}`;
-                // Use Proxy to force download
-                const proxyUrl = `http://localhost:5000/api/tools/tiktok/proxy?url=${encodeURIComponent(targetUrl)}&filename=${safeFilename}`;
+        toast.custom((t) => (
+            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
+                <div className="flex-1 w-0 p-4">
+                    <div className="flex items-start">
+                        <div className="flex-shrink-0 pt-0.5">
+                            <Download className="h-10 w-10 text-pink-500" />
+                        </div>
+                        <div className="ml-3 flex-1">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                Starting {videosToDownload.length} items...
+                            </p>
+                            <p className="mt-1 text-sm text-gray-500">
+                                Please click <span className="font-bold">"Allow"</span> if browser asks to download multiple files.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        ), { duration: 5000 });
+
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        let currentCount = 0;
+        for (const v of videosToDownload) {
+            currentCount++;
+            setDownloadProgress(prev => ({ ...prev, current: currentCount }));
+
+            const isSlideshow = v.type === 'slideshow';
+            const isPhoto = v.type === 'photo';
+
+            if (isSlideshow || isPhoto) {
+                // 📸 For Slideshows/Photos: Download images individually
+                if (v.images && v.images.length > 0) {
+                    for (let i = 0; i < v.images.length; i++) {
+                        const imgUrl = v.images[i];
+                        const safeFilename = `tiktok-${v.id}-${i + 1}.jpg`;
+                        const proxyUrl = getProxyUrl(imgUrl, { filename: safeFilename, type: 'image/jpeg' });
+
+                        const link = document.createElement('a');
+                        link.href = proxyUrl;
+                        link.setAttribute('download', safeFilename);
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        await delay(1000); // 1s between images
+                    }
+                } else {
+                    console.warn("Slideshow missing images:", v.id);
+                    toast.error(`Images missing for post ${v.id}. Skipping.`);
+                }
+            } else {
+                // 🎬 For Video: Download MP4
+                const targetUrl = v.no_watermark_url;
+                const safeFilename = `tiktok-${v.id}.mp4`;
+                const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: v.web_url });
 
                 const link = document.createElement('a');
                 link.href = proxyUrl;
-                // link.download is ignored by some browsers on cross-origin, but Proxy Content-Disposition fixes it.
+                link.setAttribute('download', safeFilename);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-            }, idx * 1000); // 1s stagger to be gentle
-        });
+
+                await delay(1500); // 1.5s between videos
+            }
+        }
+
+        toast.success("Bulk download finished!");
+        setIsDownloading(false);
+        setDownloadProgress({ current: 0, total: 0 });
+    };
+
+    const clearResult = () => {
+        setVideoData(null);
+        setUrl("");
     };
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto px-4 py-4 md:py-8">
-                <div className="text-center mb-8">
-                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
-                        TikTok <span className="text-pink-500">Master Tool</span>
+            {/* Ambient Background Blobs */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-pink-500/30 rounded-full blur-[120px] opacity-50 animate-blob" />
+                <div className="absolute top-[20%] right-[-10%] w-[30%] h-[30%] bg-purple-500/30 rounded-full blur-[120px] opacity-50 animate-blob animation-delay-2000" />
+                <div className="absolute bottom-[-10%] left-[20%] w-[35%] h-[35%] bg-blue-500/30 rounded-full blur-[120px] opacity-50 animate-blob animation-delay-4000" />
+            </div>
+
+            <div className={`relative z-10 p-6 max-w-5xl mx-auto transition-opacity duration-700 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
+
+                {/* Header */}
+                <div className="text-center mb-6 space-y-2">
+                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                        TikTok <span className="text-pink-600">Saver</span>
                     </h1>
-                    <p className="text-gray-500">Download Single Videos (No Watermark) or Bulk User Profiles.</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-base">
+                        Download videos and profiles without watermarks.
+                    </p>
                 </div>
 
-                {/* 📑 Tabs */}
-                <div className="flex justify-center gap-4 mb-8">
+                {/* Tabs */}
+                <div className="flex justify-center mb-8 gap-2 p-1.5 bg-gray-100/50 dark:bg-gray-800/50 backdrop-blur-md rounded-2xl mx-auto w-fit border border-white/20">
                     <button
                         onClick={() => setActiveTab("single")}
-                        className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all ${activeTab === "single"
-                            ? "bg-gray-900 text-white dark:bg-white dark:text-black shadow-lg"
-                            : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                            }`}
+                        className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === "single"
+                            ? "bg-white dark:bg-white/10 shadow-sm text-gray-900 dark:text-white backdrop-blur-sm"
+                            : "text-gray-500 hover:bg-black/5 dark:hover:bg-white/5 dark:text-gray-400"}`}
                     >
-                        <Play size={18} /> Single Video
+                        Single Video
                     </button>
                     <button
                         onClick={() => setActiveTab("profile")}
-                        className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all ${activeTab === "profile"
-                            ? "bg-gray-900 text-white dark:bg-white dark:text-black shadow-lg"
-                            : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                            }`}
+                        className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === "profile"
+                            ? "bg-white dark:bg-white/10 shadow-sm text-gray-900 dark:text-white backdrop-blur-sm"
+                            : "text-gray-500 hover:bg-black/5 dark:hover:bg-white/5 dark:text-gray-400"}`}
                     >
-                        <User size={18} /> Bulk Profile
+                        Profile & Bulk
                     </button>
                 </div>
 
-                {/* ==================== SINGLE VIDEO TAB ==================== */}
-                {activeTab === "single" && (
-                    <div className="animate-in fade-in slide-in-from-left-4 duration-300">
-                        {/* 🔍 Search Box */}
-                        <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 flex items-center gap-2 mb-8 transform transition-all hover:scale-[1.005]">
-                            <input
-                                type="text"
-                                value={url}
-                                onChange={(e) => setUrl(e.target.value)}
-                                onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-                                placeholder="Paste TikTok link here (e.g., https://vt.tiktok.com/...)"
-                                className="flex-1 bg-transparent p-4 outline-none text-lg text-gray-700 dark:text-gray-200"
-                            />
-                            <button
-                                onClick={handleLookup}
-                                disabled={loading}
-                                className="bg-pink-600 hover:bg-pink-700 text-white px-8 py-4 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2"
-                            >
-                                {loading ? "Searching..." : <><Search size={20} /> Search</>}
-                            </button>
-                        </div>
+                {/* Content Area */}
+                <div className="relative min-h-[400px]">
 
-                        {/* 🎥 Result Card */}
-                        {videoData && (
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl overflow-hidden shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col md:flex-row animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {/* === Single Video View === */}
+                    {activeTab === "single" && (
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
 
-                                {/* 🖼️ Preview Area (Video OR Image Grid) */}
-                                <div className="w-full md:w-1/3 bg-black/5 md:bg-black relative group overflow-y-auto max-h-[600px] border-r border-gray-100 dark:border-gray-700">
-                                    {videoData.images && videoData.images.length > 0 ? (
-                                        <div className="grid grid-cols-2 gap-1 p-1">
-                                            {videoData.images.map((img, idx) => (
-                                                <div key={idx} className="relative group/img aspect-[3/4] overflow-hidden rounded-sm">
-                                                    <img src={img} className="w-full h-full object-cover" alt={`Slide ${idx}`} />
-                                                    <a
-                                                        href={img}
-                                                        download={`tiktok-slide-${idx}.jpg`}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity"
-                                                    >
-                                                        <Download className="text-white" size={24} />
-                                                    </a>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="aspect-[9/16] md:aspect-auto h-full bg-black flex items-center justify-center">
-                                            <video
-                                                src={videoData.no_watermark_url}
-                                                className="w-full h-full object-contain"
-                                                controls
-                                            />
-                                        </div>
+                            {/* Input Field (Always Visible) */}
+                            <div className="max-w-xl mx-auto space-y-4">
+                                {/* Input Container */}
+                                <div className="relative flex items-center bg-white/60 dark:bg-black/40 backdrop-blur-xl rounded-xl border border-white/20 dark:border-white/10 shadow-xl shadow-black/5 overflow-hidden transition-all">
+                                    <div className="pl-5 pr-3 text-gray-400">
+                                        <Search size={22} />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={url}
+                                        onChange={(e) => setUrl(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && handleLookup()}
+                                        placeholder="Paste TikTok Link..."
+                                        className="w-full bg-transparent py-3 pr-4 text-sm md:text-base text-gray-900 dark:text-white placeholder:text-gray-400 border-none shadow-none appearance-none"
+                                        style={{
+                                            boxShadow: 'none',
+                                            borderColor: 'transparent',
+                                            outline: 'none',
+                                            caretColor: '#ec4899'
+                                        }}
+                                    />
+                                    {url && (
+                                        <button onClick={() => setUrl("")} className="p-2 mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                                            <X size={20} />
+                                        </button>
                                     )}
                                 </div>
+                            </div>
+                            {!videoData && (
+                                <button
+                                    onClick={handleLookup}
+                                    disabled={!url || loading}
+                                    className={`w-full md:w-auto md:px-12 md:min-w-[200px] mx-auto block py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2 ${loading ? 'animate-pulse' : ''}`}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <Loader2 className="animate-spin" size={20} />
+                                            <span>Processing...</span>
+                                        </>
+                                    ) : "Download Video"}
+                                </button>
+                            )}
 
-                                {/* Info & Actions */}
-                                <div className="w-full md:w-2/3 p-4 md:p-8 flex flex-col">
-                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-2 mb-2">
-                                        {videoData.title || "Untitled TikTok"}
-                                    </h3>
-                                    <div className="flex items-center gap-2 text-gray-500 mb-6">
-                                        <span className="font-semibold text-pink-500">@{videoData.author}</span>
-                                        <span>•</span>
-                                        {videoData.images?.length > 0 ? (
-                                            <span className="flex items-center gap-1"><Check size={14} /> {videoData.images.length} Images</span>
-                                        ) : (
-                                            <span>No Watermark Video</span>
-                                        )}
-                                    </div>
+                            {/* Result Card */}
+                            {videoData && (
+                                <div className="max-w-4xl mx-auto bg-white/40 dark:bg-black/40 backdrop-blur-2xl rounded-2xl p-6 border border-white/20 dark:border-white/10 shadow-2xl shadow-black/5 animate-in fade-in zoom-in-95 duration-200 relative">
+                                    <button
+                                        onClick={clearResult}
+                                        className="absolute top-4 right-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                        title="Clear Result"
+                                    >
+                                        <X size={20} className="text-gray-500 dark:text-gray-300" />
+                                    </button>
 
-                                    <div className="mt-auto space-y-3">
-                                        {videoData.images?.length > 0 ? (
-                                            <button
-                                                onClick={() => {
-                                                    videoData.images.forEach((img, idx) => {
-                                                        setTimeout(() => {
+                                    <div className="flex flex-col md:flex-row gap-8">
+                                        {/* Media Preview */}
+                                        <div className="w-full md:w-1/3 shrink-0 relative">
+                                            {videoData.type === 'slideshow' || videoData.type === 'photo' ? (
+                                                <div className="aspect-[3/4] rounded-2xl overflow-hidden relative group bg-gray-100 dark:bg-gray-900 border border-white/10 shadow-lg">
+                                                    <img src={videoData.images?.[0] || videoData.cover} alt="cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                    <div className="absolute top-3 left-3 px-3 py-1 bg-amber-500/90 backdrop-blur-md rounded-lg text-black text-[10px] font-black border border-amber-400/50 shadow-xl tracking-tighter flex items-center gap-1">
+                                                        {videoData.type === 'slideshow' ? <><Layers size={10} /> SLIDESHOW ({videoData.images.length} PHOTOS)</> : "PHOTO (SINGLE IMAGE)"}
+                                                    </div>
+                                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <span className="text-white font-medium flex items-center gap-2">
+                                                            {videoData.type === 'slideshow' ? <><Layers size={20} /> Slideshow Post</> : <><ImageIcon size={20} /> Photo Post</>}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="aspect-[3/4] rounded-2xl overflow-hidden relative bg-black shadow-lg border border-white/10 group">
+                                                    <video
+                                                        src={getProxyUrl(videoData.no_watermark_url, { filename: `preview-${videoData.id}`, web_url: url, type: 'video/mp4' })}
+                                                        className="w-full h-full object-cover"
+                                                        controls
+                                                        autoPlay
+                                                        muted
+                                                        loop
+                                                        playsInline
+                                                    />
+                                                    <div className="absolute top-3 left-3 px-3 py-1 bg-sky-500/90 backdrop-blur-md rounded-lg text-white text-[10px] font-black border border-sky-400/50 shadow-xl tracking-tighter">
+                                                        VIDEO (MP4)
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Actions */}
+                                        <div className="flex-1 flex flex-col">
+                                            <div className="mb-6">
+                                                <span className="inline-block px-3 py-1 rounded-full bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 text-xs font-bold mb-2 tracking-wide uppercase">
+                                                    @{videoData.author}
+                                                </span>
+                                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight mb-4">
+                                                    {videoData.title || "Untitled Video"}
+                                                </h2>
+
+                                                <div className="flex flex-wrap gap-2 items-center">
+                                                    {['100% Original Quality', 'Ultra Clear', 'No Watermark'].map(tag => (
+                                                        <span key={tag} className="px-3 py-1 rounded-lg bg-white/40 dark:bg-white/5 backdrop-blur-md text-gray-700 dark:text-gray-300 text-xs font-semibold border border-white/20">
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-auto space-y-3">
+                                                {videoData.type === 'slideshow' || videoData.type === 'photo' ? (
+                                                    <>
+                                                        {videoData.images?.length > 0 ? (
+                                                            <button
+                                                                disabled={isDownloading}
+                                                                onClick={async () => {
+                                                                    const images = videoData.images;
+                                                                    setIsDownloading(true);
+                                                                    setDownloadProgress({ current: 0, total: images.length });
+
+                                                                    toast.custom((t) => (
+                                                                        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
+                                                                            <div className="flex-1 w-0 p-4">
+                                                                                <div className="flex items-start">
+                                                                                    <Download className="h-10 w-10 text-pink-500" />
+                                                                                    <div className="ml-3 flex-1">
+                                                                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                                                                            Downloading {images.length} photos...
+                                                                                        </p>
+                                                                                        <p className="mt-1 text-sm text-gray-500">
+                                                                                            Please click <span className="font-bold text-gray-900 dark:text-white">"Allow"</span> if browser asks to download multiple files.
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    ), { duration: 5000 });
+
+                                                                    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+                                                                    for (let i = 0; i < images.length; i++) {
+                                                                        try {
+                                                                            const img = images[i];
+                                                                            const safeFilename = `tiktok-${videoData.id}-${i + 1}.jpg`;
+                                                                            const proxyUrl = getProxyUrl(img, { filename: safeFilename, type: 'image/jpeg' });
+
+                                                                            const link = document.createElement('a');
+                                                                            link.href = proxyUrl;
+                                                                            link.setAttribute('download', safeFilename);
+                                                                            document.body.appendChild(link);
+                                                                            link.click();
+                                                                            document.body.removeChild(link);
+
+                                                                            setDownloadProgress(prev => ({ ...prev, current: i + 1 }));
+                                                                            if (i < images.length - 1) await delay(1000);
+                                                                        } catch (err) {
+                                                                            console.error("Index failed:", i, err);
+                                                                        }
+                                                                    }
+                                                                    toast.success("All photos downloaded!");
+                                                                    setIsDownloading(false);
+                                                                    setDownloadProgress({ current: 0, total: 0 });
+                                                                }}
+                                                                className="relative w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 overflow-hidden shadow-lg shadow-pink-500/20"
+                                                            >
+                                                                {isDownloading ? (
+                                                                    <>
+                                                                        <div className="absolute inset-0 bg-white/20" style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%`, transition: 'width 0.5s ease' }} />
+                                                                        <span className="relative z-10 flex items-center gap-2">
+                                                                            <Loader2 className="animate-spin" size={20} />
+                                                                            {downloadProgress.current} / {downloadProgress.total} Photos
+                                                                        </span>
+                                                                    </>
+                                                                ) : (
+                                                                    <><ImageIcon size={20} /> Download All Photos ({videoData.images.length})</>
+                                                                )}
+                                                            </button>
+                                                        ) : (
+                                                            <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl">
+                                                                <p className="text-xs text-amber-800 dark:text-amber-400 font-medium text-center">
+                                                                    ⚠️ HD Photos could not be extracted individually for this slideshow. You can still download the background video below.
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        <button
+                                                            onClick={async () => {
+                                                                const targetUrl = videoData.no_watermark_url;
+                                                                const safeFilename = `tiktok-slideshow-${videoData.id}`;
+                                                                const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: videoData.web_url });
+                                                                window.open(proxyUrl, '_blank');
+                                                            }}
+                                                            className="w-full py-3 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 text-gray-600 dark:text-gray-300 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm"
+                                                        >
+                                                            <Music size={16} /> Download {videoData.type === 'slideshow' ? 'SlideShow' : 'Photo'} Background (MP4)
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            const targetUrl = videoData.no_watermark_url;
+                                                            const safeFilename = `tiktok-${videoData.id}`;
+                                                            const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: videoData.web_url });
+
                                                             const link = document.createElement('a');
-                                                            link.href = img;
-                                                            link.download = `tiktok-slide-${idx}-${Date.now()}.jpg`;
+                                                            link.href = proxyUrl;
+                                                            link.setAttribute('download', `${safeFilename}.mp4`);
                                                             document.body.appendChild(link);
                                                             link.click();
                                                             document.body.removeChild(link);
-                                                        }, idx * 300); // Stagger downloads
-                                                    });
-                                                    toast.success(`Downloading ${videoData.images.length} images...`);
-                                                }}
-                                                className="w-full py-4 border-2 border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10 text-pink-600 dark:text-pink-400 font-bold rounded-xl flex items-center justify-center gap-2 transition-all"
-                                            >
-                                                <Download size={20} /> Download All Images ({videoData.images.length})
-                                            </button>
-                                        ) : (
-                                            <a
-                                                href={videoData.no_watermark_url}
-                                                target="_blank"
-                                                download
-                                                className="w-full py-4 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-900 dark:hover:border-white text-gray-700 dark:text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all"
-                                            >
-                                                <Download size={20} /> Download Video
-                                            </a>
-                                        )}
+                                                            toast.success("Video download started");
+                                                        }}
+                                                        className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20"
+                                                    >
+                                                        <Download size={20} /> Download Full Video (HD - MP4)
+                                                    </button>
+                                                )}
 
-                                        {!videoData.images?.length && (
-                                            <button
-                                                onClick={handleSaveToApp}
-                                                disabled={saving}
-                                                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 transition-all disabled:opacity-50"
-                                            >
-                                                {saving ? "Saving..." : <><Save size={20} /> Save to Library (For Scheduling)</>}
-                                            </button>
-                                        )}
-
-                                        <p className="text-center text-xs text-gray-400 mt-2">
-                                            {videoData.images?.length > 0
-                                                ? "Images will be downloaded individually."
-                                                : "Saved videos can be found in your 'Bulk Upload' local files."}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* 📜 Download History */}
-                        {downloadHistory.length > 0 && (
-                            <div className="mt-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 md:p-6 rounded-2xl border border-blue-100 dark:border-gray-700">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                        📜 Download History ({downloadHistory.length})
-                                    </h3>
-                                    <button
-                                        onClick={() => setDownloadHistory([])}
-                                        className="px-3 py-1.5 text-sm bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 rounded-lg transition-colors"
-                                    >
-                                        Clear All
-                                    </button>
-                                </div>
-                                <div className="space-y-3 max-h-96 overflow-y-auto">
-                                    {downloadHistory.map((item) => (
-                                        <div key={item.id} className="flex items-center gap-3 bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-700">
-                                            <img src={item.thumbnail} alt="" className="w-16 h-16 rounded-lg object-cover" />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-gray-900 dark:text-white truncate">{item.title}</p>
-                                                <p className="text-xs text-gray-500">{item.timestamp}</p>
+                                                {!videoData.images?.length && (
+                                                    <button
+                                                        onClick={handleSaveToApp}
+                                                        disabled={saving}
+                                                        className="w-full py-4 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-900 dark:hover:border-white text-gray-700 dark:text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        {saving ? <Loader2 className="animate-spin" /> : <><Check size={20} /> Save to Library</>}
+                                                    </button>
+                                                )}
                                             </div>
-                                            <a
-                                                href={item.url}
-                                                download
-                                                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                                            >
-                                                <Download size={16} /> Download
-                                            </a>
                                         </div>
-                                    ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* ==================== BULK PROFILE TAB ==================== */}
-                {activeTab === "profile" && (
-                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                        {/* 🔍 Profile Search */}
-                        <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 flex items-center gap-2 mb-8 max-w-2xl mx-auto">
-                            <span className="pl-4 text-gray-400 font-bold select-none">@</span>
-                            <input
-                                type="text"
-                                value={profileInput}
-                                onChange={(e) => setProfileInput(e.target.value.replace('@', ''))}
-                                onKeyDown={(e) => e.key === "Enter" && handleProfileLookup()}
-                                placeholder="username (e.g. khabylame)"
-                                className="flex-1 bg-transparent p-4 outline-none text-lg text-gray-700 dark:text-gray-200"
-                            />
-                            <button
-                                onClick={handleProfileLookup}
-                                disabled={profileLoading}
-                                className="bg-black hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black px-6 py-3 md:px-8 md:py-4 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2"
-                            >
-                                {profileLoading ? "Loading..." : "Get Videos"}
-                            </button>
+                            )}
                         </div>
+                    )}
 
-                        {/* 📊 Profile Results */}
-                        {profileData && (
-                            <div>
-                                <div className="flex justify-between items-center mb-6">
-                                    <div>
-                                        <h2 className="text-2xl font-bold dark:text-white">Uploaded Videos</h2>
-                                        <p className="text-gray-500">Found {profileData.videos.length} latest videos from @{profileData.profile.username}</p>
-                                    </div>
-                                    <div className="flex gap-3">
+                    {/* === Profile View === */}
+                    {activeTab === "profile" && (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                            {!profileData && !profileLoading ? (
+                                <div className="max-w-xl mx-auto">
+                                    <div className="relative flex items-center bg-white/60 dark:bg-black/40 backdrop-blur-xl rounded-xl border border-white/20 dark:border-white/10 shadow-xl shadow-black/5 overflow-hidden transition-all">
+                                        <span className="pl-5 text-gray-400 font-bold text-lg select-none">@</span>
+                                        <input
+                                            type="text"
+                                            value={profileInput}
+                                            onChange={(e) => setProfileInput(e.target.value)}
+                                            onKeyDown={(e) => e.key === "Enter" && handleProfileLookup()}
+                                            placeholder="username (e.g. khabylame)"
+                                            className="w-full bg-transparent p-5 text-lg outline-none text-gray-900 dark:text-white placeholder:text-gray-400 border-none shadow-none appearance-none"
+                                            style={{
+                                                boxShadow: 'none',
+                                                borderColor: 'transparent',
+                                                outline: 'none',
+                                                caretColor: '#ec4899'
+                                            }}
+                                        />
                                         <button
-                                            onClick={toggleSelectAll}
-                                            className="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                            onClick={handleProfileLookup}
+                                            disabled={profileLoading || !profileInput}
+                                            className="mr-2 px-6 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black rounded-lg font-bold transition-all disabled:opacity-50"
                                         >
-                                            {selectedVideos.size === profileData.videos.length ? "Deselect All" : "Select All"}
+                                            <ChevronRight size={20} />
                                         </button>
-                                        {selectedVideos.size > 0 && (
-                                            <button
-                                                onClick={handleBulkDownload}
-                                                className="px-6 py-2 text-sm font-bold bg-pink-600 text-white rounded-lg hover:bg-pink-700 shadow-lg shadow-pink-500/30 transition-all animate-bounce-short"
-                                            >
-                                                Download ({selectedVideos.size})
-                                            </button>
-                                        )}
                                     </div>
+                                    <p className="text-center text-gray-500 mt-4 text-sm">Download all latest videos from a public profile.</p>
                                 </div>
-
-                                {/* 🖼️ Video Grid */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                    {profileData.videos.map((video) => {
-                                        const isSelected = selectedVideos.has(video.id);
-                                        return (
-                                            <div
-                                                key={video.id}
-                                                onClick={() => toggleSelect(video.id)}
-                                                className={`relative group cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-200 ${isSelected ? "border-pink-500 ring-2 ring-pink-500/20" : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
-                                                    }`}
-                                            >
-                                                <div className="aspect-[3/4] bg-gray-100 relative">
-                                                    <img src={video.cover} className="w-full h-full object-cover" alt="Cover" />
-                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                                                    {video.images.length > 0 && (
-                                                        <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
-                                                            <Grid size={10} /> Slideshow
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Checkbox Overlay */}
-                                                <div className="absolute top-2 left-2">
-                                                    <div className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isSelected ? "bg-pink-500 text-white" : "bg-black/40 text-transparent border border-white/50"
-                                                        }`}>
-                                                        <Check size={16} />
-                                                    </div>
-                                                </div>
-
-                                                <div className="p-3 bg-white dark:bg-gray-800">
-                                                    <p className="text-sm font-medium line-clamp-2 h-10 text-gray-800 dark:text-gray-200">{video.title}</p>
-                                                    <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
-                                                        <span>{video.stats.plays} plays</span>
-                                                        <span>{video.duration}s</span>
+                            ) : (
+                                <div className="space-y-6">
+                                    {profileLoading ? (
+                                        <div>
+                                            {/* Skeleton Loader */}
+                                            <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
+                                                <div className="flex gap-3 animate-pulse">
+                                                    <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full" />
+                                                    <div className="space-y-2">
+                                                        <div className="w-32 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                                                        <div className="w-20 h-3 bg-gray-200 dark:bg-gray-700 rounded" />
                                                     </div>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 px-1">
+                                                {[...Array(10)].map((_, i) => (
+                                                    <div key={i} className="aspect-[3/4] bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 sticky top-4 z-20">
+                                                <div className="flex items-center gap-4 mb-8 p-4 bg-white/40 dark:bg-black/40 backdrop-blur-xl rounded-2xl border border-white/20 dark:border-white/10 shadow-lg">
+                                                    <button onClick={() => setProfileData(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"><X size={20} /></button>
+                                                    {profileData.profile.avatar && (
+                                                        <img
+                                                            src={getProxyUrl(profileData.profile.avatar, { filename: `avatar-${profileData.profile.username}`, type: 'image/jpeg' })}
+                                                            alt={profileData.profile.username}
+                                                            className="w-16 h-16 rounded-full border-2 border-white dark:border-gray-700 shadow-md"
+                                                            referrerPolicy="no-referrer"
+                                                            onError={(e) => {
+                                                                console.error("Avatar Load Failed:", e.target.src);
+                                                                e.target.onerror = null;
+                                                                e.target.src = `https://ui-avatars.com/api/?name=${profileData.profile.username}&background=random`;
+                                                            }}
+                                                        />
+                                                    )}
+                                                    <div>
+                                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">@{profileData.profile.username}</h2>
+                                                        <p className="text-xs text-gray-500">{selectedVideos.size} selected</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto items-end sm:items-center">
+                                                    <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+                                                        <span className="text-xs font-bold text-gray-500 px-2">Select:</span>
+                                                        <button onClick={() => selectTop(5)} className="px-2 py-1 text-xs font-bold hover:bg-white dark:hover:bg-gray-600 rounded">Top 5</button>
+                                                        <button onClick={() => selectTop(10)} className="px-2 py-1 text-xs font-bold hover:bg-white dark:hover:bg-gray-600 rounded">Top 10</button>
+                                                        <button onClick={toggleSelectAll} className="px-2 py-1 text-xs font-bold hover:bg-white dark:hover:bg-gray-600 rounded">All</button>
+                                                    </div>
 
-                {/* ✨ Features Grid */}
-                {!videoData && activeTab === "single" && ( // Only show features for single tab when no video is found
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 text-center opacity-50">
-                        <div className="p-4">
-                            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <Check size={24} />
-                            </div>
-                            <h3 className="font-bold mb-1">No Watermark</h3>
-                            <p className="text-sm">Get the clean original video.</p>
+                                                    <select
+                                                        value={sortMode}
+                                                        onChange={(e) => setSortMode(e.target.value)}
+                                                        className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm font-bold outline-none border-none cursor-pointer"
+                                                    >
+                                                        <option value="date">📅 Newest</option>
+                                                        <option value="plays">🔥 Most Played</option>
+                                                    </select>
+
+                                                    <button
+                                                        onClick={handleBulkDownload}
+                                                        disabled={selectedVideos.size === 0 || isDownloading}
+                                                        className="relative px-4 py-2 text-sm font-bold bg-pink-600 text-white hover:bg-pink-700 rounded-lg shadow-lg shadow-pink-500/20 transition-all disabled:opacity-50 disabled:shadow-none ml-2 overflow-hidden flex items-center justify-center min-w-[140px]"
+                                                    >
+                                                        {isDownloading ? (
+                                                            <>
+                                                                <div className="absolute inset-0 bg-green-500/30" style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%`, transition: 'width 0.5s ease' }} />
+                                                                <span className="relative z-10 flex items-center gap-2">
+                                                                    <Loader2 className="animate-spin" size={14} />
+                                                                    {downloadProgress.current} / {downloadProgress.total}
+                                                                </span>
+                                                            </>
+                                                        ) : (
+                                                            <>Download Selected ({selectedVideos.size})</>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 px-1">
+                                                {sortedVideos.map((video) => {
+                                                    const isSelected = selectedVideos.has(video.id);
+                                                    return (
+                                                        <div
+                                                            key={video.id}
+                                                            onClick={() => toggleSelect(video.id)}
+                                                            className={`cursor-pointer group relative aspect-[3/4] rounded-xl overflow-hidden bg-gray-100 transition-all duration-200 ${isSelected ? 'ring-4 ring-pink-500 ring-offset-2 dark:ring-offset-gray-900' : 'hover:opacity-90'}`}
+                                                        >
+                                                            {video.cover && (
+                                                                <img
+                                                                    src={getProxyUrl(video.cover, { filename: `cover-${video.id}`, type: 'image/jpeg' })}
+                                                                    className="w-full h-full object-cover absolute inset-0 transition-opacity duration-300 group-hover:opacity-0"
+                                                                    loading="lazy"
+                                                                    referrerPolicy="no-referrer"
+                                                                    onError={(e) => {
+                                                                        console.error(`Cover Load Failed for ${video.id}:`, e.target.src);
+                                                                        e.target.onerror = null;
+                                                                        e.target.parentElement.classList.add('bg-gray-200');
+                                                                    }}
+                                                                />
+                                                            )}
+                                                            {video.dynamic_cover && (
+                                                                <img
+                                                                    src={getProxyUrl(video.dynamic_cover, { filename: `dynamic-${video.id}`, type: 'image/webp' })}
+                                                                    className="w-full h-full object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                                                    loading="lazy"
+                                                                    referrerPolicy="no-referrer"
+                                                                    onError={(e) => {
+                                                                        console.warn(`Dynamic cover failed for ${video.id}`);
+                                                                        e.target.style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            )}
+                                                            <div className={`absolute inset-0 bg-black/20 ${isSelected ? 'bg-pink-500/20' : ''}`} />
+
+                                                            {/* Selection Circle */}
+                                                            <div className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-pink-500 border-pink-500 scale-110' : 'border-white/80 bg-black/20'}`}>
+                                                                {isSelected && <Check size={14} className="text-white" />}
+                                                            </div>
+
+                                                            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent pt-8">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center text-white/90 text-[10px] md:text-xs">
+                                                                        {video.type === 'slideshow' || video.type === 'photo' ? (
+                                                                            <><ImageIcon size={12} className="mr-1" /> {video.images?.length || 1}</>
+                                                                        ) : (
+                                                                            <><Play size={12} className="mr-1 fill-white" /> {video.stats?.plays || 0}</>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="px-2 py-0.5 bg-black/50 backdrop-blur-md rounded text-[9px] md:text-[10px] text-white font-medium">
+                                                                        {formatTimeAgo(video.timestamp)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* 🏷️ Type Badge */}
+                                                            <div className="absolute top-2 left-2 flex flex-col gap-1 pointer-events-none">
+                                                                {video.type === 'slideshow' ? (
+                                                                    <span className="px-1.5 py-0.5 bg-amber-500 text-black text-[9px] font-black rounded shadow-sm border border-amber-400 flex items-center gap-1">
+                                                                        <Layers size={10} /> SLIDESHOW
+                                                                    </span>
+                                                                ) : video.type === 'photo' ? (
+                                                                    <span className="px-1.5 py-0.5 bg-amber-500 text-black text-[9px] font-black rounded shadow-sm border border-amber-400 flex items-center gap-1">
+                                                                        <ImageIcon size={10} /> PHOTO
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="px-1.5 py-0.5 bg-sky-600 text-white text-[9px] font-black rounded shadow-sm border border-sky-400 flex items-center gap-1">
+                                                                        <Video size={10} /> VIDEO
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        <div className="p-4">
-                            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <Play size={24} />
-                            </div>
-                            <h3 className="font-bold mb-1">Full HD & 4K</h3>
-                            <p className="text-sm">Best available quality (1080p/4K).</p>
-                        </div>
-                        <div className="p-4">
-                            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <Save size={24} />
-                            </div>
-                            <h3 className="font-bold mb-1">Instant Schedule</h3>
-                            <p className="text-sm">Save directly to app to post.</p>
-                        </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
-        </DashboardLayout>
+        </DashboardLayout >
     );
 }

@@ -47,12 +47,25 @@ router.post("/lookup", requireAuth, async (req, res) => {
             );
 
             if (response.data.code === 0) {
+                const rawImages = response.data.data.images || response.data.data.image_post_info?.images || [];
+                // 🧹 Normalize: Ensure images is always an array of simple URL strings
+                const images = rawImages.map(img => {
+                    if (typeof img === 'string') return img;
+                    if (img.display_image?.url_list?.[0]) return img.display_image.url_list[0];
+                    if (img.url_list?.[0]) return img.url_list[0];
+                    return null;
+                }).filter(Boolean);
+
+                const isSlideshow = response.data.data.aweme_type === 150 || response.data.data.aweme_type === 51 || !!response.data.data.image_post_info || (images.length > 1);
+                const isPhoto = !isSlideshow && (images.length === 1 || response.data.data.duration === 0);
+
                 videoData = {
                     title: response.data.data.title,
                     cover: response.data.data.cover,
                     author: response.data.data.author.nickname,
-                    no_watermark_url: response.data.data.play,
-                    images: response.data.data.images || [],
+                    no_watermark_url: response.data.data.hdplay || response.data.data.play, // Prioritize HD
+                    images: images,
+                    type: isSlideshow ? 'slideshow' : (isPhoto ? 'photo' : 'video'),
                     duration: response.data.data.duration,
                     id: response.data.data.id
                 };
@@ -78,7 +91,8 @@ router.post("/lookup", requireAuth, async (req, res) => {
                     cover: output.thumbnail,
                     author: output.uploader,
                     no_watermark_url: output.url, // Direct stream
-                    images: [], // yt-dlp slideshow support varies, assume video for now
+                    images: [],
+                    type: (output.vcodec === 'none' || output.duration === 0) ? 'photo' : 'video',
                     duration: output.duration,
                     id: output.id
                 };
@@ -137,26 +151,66 @@ router.post("/profile", requireAuth, async (req, res) => {
                 }),
                 {
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                         'Accept': 'application/json, text/javascript, */*; q=0.01',
                         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                         'Origin': 'https://www.tikwm.com',
-                        'Referer': 'https://www.tikwm.com/'
+                        'Referer': 'https://www.tikwm.com/',
+                        'Sec-Fetch-Dest': 'empty',
+                        'Sec-Fetch-Mode': 'cors',
+                        'Sec-Fetch-Site': 'same-origin'
                     },
-                    timeout: 5000 // 5s timeout
+                    timeout: 10000 // Increased to 10s for stability
                 }
             );
 
             if (response.data.code === 0) {
-                videos = response.data.data.videos.map(v => ({
-                    id: v.video_id,
-                    title: v.title,
-                    cover: v.cover,
-                    no_watermark_url: v.play,
-                    images: v.images || [],
-                    duration: v.duration,
-                    stats: { plays: v.play_count, likes: v.digg_count, shares: v.share_count }
-                }));
+                // 🔍 DIAGNOSTIC: Log raw data to a fixed path
+                try {
+                    const logPath = 'd:/kr_post/tiktok_debug.log';
+                    const sample = response.data.data.videos.slice(0, 5).map(v => ({
+                        id: v.video_id,
+                        aweme_type: v.aweme_type,
+                        duration: v.duration,
+                        has_images: !!v.images,
+                        img_count: v.images?.length || 0,
+                        has_ip_info: !!v.image_post_info,
+                        video_type: v.video_type,
+                        is_ad: v.is_ad
+                    }));
+                    fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] Profile: ${uniqueId}\nSample: ${JSON.stringify(sample, null, 2)}\nFull [0]: ${JSON.stringify(response.data.data.videos[0], null, 2)}\n`);
+                } catch (e) {
+                    console.error("Log failed", e);
+                }
+                videos = response.data.data.videos.map(v => {
+                    const rawImages = v.images || v.image_post_info?.images || [];
+                    const images = rawImages.map(img => {
+                        if (typeof img === 'string') return img;
+                        if (img.display_image?.url_list?.[0]) return img.display_image.url_list[0];
+                        if (img.url_list?.[0]) return img.url_list[0];
+                        return null;
+                    }).filter(Boolean);
+
+                    const isSlideshow = v.aweme_type === 150 || v.aweme_type === 51 || !!v.image_post_info || (images.length > 1);
+                    const isPhoto = !isSlideshow && (images.length === 1 || v.duration === 0);
+
+                    return {
+                        id: v.video_id,
+                        title: v.title,
+                        cover: v.cover,
+                        dynamic_cover: v.dynamic_cover, // Animated Preview
+                        no_watermark_url: v.hdplay || v.play, // Prioritize HD
+                        web_url: `https://www.tiktok.com/@${uniqueId}/video/${v.video_id}`,
+                        images: images,
+                        type: isSlideshow ? 'slideshow' : (isPhoto ? 'photo' : 'video'),
+                        duration: v.duration,
+                        timestamp: v.create_time || 0,
+                        stats: { plays: v.play_count, likes: v.digg_count, shares: v.share_count }
+                    };
+                });
+
+                // Enforce Newest First (TikWM usually returns newest, but good to ensure)
+                videos.sort((a, b) => b.timestamp - a.timestamp);
                 authorAvatar = response.data.data.author.avatar;
 
                 return res.json({
@@ -165,7 +219,8 @@ router.post("/profile", requireAuth, async (req, res) => {
                     videos
                 });
             }
-            console.warn("⚠️ TikWM API response code not 0. Falling back...");
+            console.warn("⚠️ TikWM API response code:", response.data.code, "Message:", response.data.msg || "No message");
+            console.log("🔍 TikWM Full Response:", JSON.stringify(response.data).substring(0, 500));
 
         } catch (tikErr) {
             console.warn(`⚠️ TikWM failed (${tikErr.message}), falling back to yt-dlp...`);
@@ -178,10 +233,11 @@ router.post("/profile", requireAuth, async (req, res) => {
         try {
             const output = await youtubedl(profileUrl, {
                 dumpSingleJson: true,
-                playlistEnd: 30, // Increased limit to 30
+                playlistEnd: 20, // Reduced to 20 for faster fallback
                 noWarnings: true,
                 noCheckCertificate: true,
-                flatPlaylist: false // Need full details for urls
+                flatPlaylist: true, // CRITICAL: Fast listing mode
+                quiet: true
             });
 
             videos = (output.entries || []).map(v => {
@@ -196,10 +252,12 @@ router.post("/profile", requireAuth, async (req, res) => {
 
                 return {
                     id: v.id,
-                    title: v.title || v.description || "No Title",
-                    cover: v.thumbnail,
-                    no_watermark_url: v.url, // Direct link
+                    title: v.title || v.description || "TikTok Video",
+                    cover: v.thumbnail || v.thumbnails?.[0]?.url || "",
+                    no_watermark_url: v.url || `https://www.tiktok.com/@${uniqueId}/video/${v.id}`, // Fallback to web_url
+                    web_url: `https://www.tiktok.com/@${uniqueId}/video/${v.id}`,
                     images: [],
+                    type: (v.duration === 0 || !v.duration) ? 'image' : 'video',
                     duration: v.duration,
                     timestamp: ts || 0,
                     upload_date: v.upload_date,
@@ -232,7 +290,17 @@ router.post("/profile", requireAuth, async (req, res) => {
 
         } catch (ytErr) {
             console.error("❌ yt-dlp Fallback Failed:", ytErr.message);
-            throw new Error("Could not fetch profile videos via API or Scraper.");
+
+            // 💡 Specific hint for the "secondary user ID" error
+            if (ytErr.message.includes("Unable to extract secondary user ID")) {
+                return res.status(422).json({
+                    success: false,
+                    code: 'EXTRACT_ERROR',
+                    message: "TikTok updated their profile structure. Please try again with a direct Video Link instead of a Profile Link."
+                });
+            }
+
+            throw new Error(ytErr.message || "Could not fetch profile videos via API or Scraper.");
         }
 
     } catch (err) {
@@ -303,24 +371,195 @@ router.post("/download", requireAuth, async (req, res) => {
 /* -------------------------------------------------------------------------- */
 router.get("/proxy", async (req, res) => {
     try {
-        const { url, filename } = req.query;
-        if (!url) return res.status(400).send("URL required");
+        const { url, web_url, filename, type } = req.query;
+        const contentType = type || 'video/mp4';
 
-        const safeFilename = (filename || `tiktok-${Date.now()}`).replace(/[^a-z0-9\-_]/gi, '_') + '.mp4';
+        // 🎯 FIX: Use web_url (original page) for videos if available, fallback to url (CDN link)
+        // We check contentType instead of 'type' because 'type' might be undefined
+        const targetUrl = (contentType.includes('video') && web_url) ? web_url : url;
 
+        if (!targetUrl) return res.status(400).send("URL required");
+
+        // Ensure filename matches extension if possible (simple heuristic)
+        let safeFilename = (filename || `download-${Date.now()}`).replace(/[^a-z0-9\-_.]/gi, '_');
+
+        // Add extension if missing and we know the type (basic fallback)
+        if (!safeFilename.includes('.')) {
+            if (contentType.includes('image')) safeFilename += '.jpg';
+            else safeFilename += '.mp4';
+        }
+
+        // Set headers for download
         res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
-        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Type', contentType);
+        // The original Content-Type header setting is removed here, as it will be dynamically set by the proxy response.
+        // res.setHeader('Content-Type', contentType);
 
-        https.get(url, (stream) => {
-            stream.pipe(res);
-        }).on('error', (err) => {
-            console.error("Proxy Stream Error:", err.message);
-            res.status(500).end();
+        console.log(`📥 Proxying: ${safeFilename} -> ${targetUrl.substring(0, 50)}...`);
+
+        try {
+            // 🎬 Case A: It's a Video — Use yt-dlp for powerful bypass
+            if (contentType.includes('video')) {
+                console.log(`🎬 Streaming video via yt-dlp using: ${targetUrl.includes('tiktok.com') ? 'Official Extractor' : 'Direct Link'}`);
+
+                // Set headers first
+                res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+                res.setHeader('Content-Type', 'video/mp4');
+
+                const { spawn } = require('child_process');
+                // Use absolute path to yt-dlp in node_modules
+                const ytdlpPath = path.join(__dirname, "../../node_modules/youtube-dl-exec/bin/yt-dlp.exe");
+
+                // Use yt-dlp to stream to stdout
+                // -o - means output to stdout
+                const ytProcess = spawn(ytdlpPath, [
+                    '-o', '-',
+                    '-f', 'best',
+                    '--no-part',
+                    '--no-cache-dir',
+                    '--fixup', 'never',
+                    '--no-check-certificates',
+                    '--no-warnings',
+                    targetUrl
+                ]);
+
+                ytProcess.stdout.pipe(res);
+
+                ytProcess.stderr.on('data', (data) => {
+                    const msg = data.toString();
+                    if (msg.includes('ERROR')) console.error("❌ yt-dlp stream error:", msg);
+                });
+
+                ytProcess.on('close', (code) => {
+                    if (code !== 0) {
+                        console.error(`❌ yt-dlp stream exited with code ${code}`);
+                        if (!res.headersSent) res.status(502).send("Video stream failed");
+                    }
+                });
+
+                // Cleanup on client disconnect
+                req.on('close', () => ytProcess.kill());
+                return;
+            }
+
+            // 📸 Case B: Media (Image/Audio) — Use refined Axios
+            const isAudio = contentType.includes('audio') || contentType.includes('mpeg');
+            const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+            const response = await axios({
+                method: 'get',
+                url: url,
+                responseType: 'stream',
+                timeout: 30000,
+                httpsAgent: httpsAgent,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                    'Accept': isAudio ? 'audio/*,*/*;q=0.8' : 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'identity',
+                    'Referer': 'https://www.tiktok.com/',
+                    'Origin': 'https://www.tiktok.com',
+                    'Sec-Fetch-Dest': isAudio ? 'audio' : 'image',
+                    'Sec-Fetch-Mode': 'no-cors',
+                    'Sec-Fetch-Site': 'cross-site'
+                }
+            });
+
+            const upstreamType = response.headers['content-type'] || contentType;
+            res.setHeader('Content-Type', upstreamType);
+
+            // 🧠 Smart Extension: Match filename to actual content type
+            let finalFilename = safeFilename;
+            if (upstreamType.includes('webp') && !finalFilename.endsWith('.webp')) {
+                finalFilename = finalFilename.replace(/\.[^.]+$/, '') + '.webp';
+            } else if (upstreamType.includes('avif') && !finalFilename.endsWith('.avif')) {
+                finalFilename = finalFilename.replace(/\.[^.]+$/, '') + '.avif';
+            } else if ((upstreamType.includes('mpeg') || upstreamType.includes('mp3')) && !finalFilename.endsWith('.mp3')) {
+                finalFilename = finalFilename.replace(/\.[^.]+$/, '') + '.mp3';
+            } else if (upstreamType.includes('jpeg') && !finalFilename.endsWith('.jpg') && !finalFilename.endsWith('.jpeg')) {
+                finalFilename = finalFilename.replace(/\.[^.]+$/, '') + '.jpg';
+            }
+
+            res.setHeader('Content-Disposition', `attachment; filename="${finalFilename}"`);
+
+            response.data.pipe(res);
+
+        } catch (err) {
+            console.error("❌ Proxy Handler Error:", err.message);
+            if (err.response) {
+                console.error("🔍 Upstream Details:", {
+                    status: err.response.status,
+                    statusText: err.response.statusText,
+                    headers: err.response.headers
+                });
+            }
+            if (!res.headersSent) {
+                const status = err.response?.status || 502;
+                res.status(status).send(`Failed to fetch media: ${err.message}`);
+            }
+        }
+    } catch (err) {
+        console.error("❌ Proxy General Error:", err.message);
+        if (!res.headersSent) res.status(500).send("Server Error");
+    }
+});
+
+/* -------------------------------------------------------------------------- */
+/* 📦 POST /zip-images — Download Multiple Images as ZIP                      */
+/* -------------------------------------------------------------------------- */
+router.post("/zip-images", async (req, res) => {
+    const archiver = require("archiver");
+    try {
+        const { images, filename } = req.body;
+        if (!images || !Array.isArray(images) || images.length === 0) {
+            return res.status(400).json({ error: "No images provided" });
+        }
+
+        const safeFilename = (filename || `tiktok-images-${Date.now()}`).replace(/[^a-z0-9\-_]/gi, '_') + '.zip';
+
+        console.log(`📦 Zipping ${images.length} images to ${safeFilename}`);
+
+        // Set Headers
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        archive.on('error', (err) => {
+            console.error("Archiver Error:", err);
+            if (!res.headersSent) res.status(500).send("Zip Error");
         });
 
+        archive.pipe(res);
+
+        // Process each image
+        for (let i = 0; i < images.length; i++) {
+            try {
+                const imgUrl = images[i];
+                const imgName = `${filename || 'image'}-${i + 1}.jpg`;
+
+                const response = await axios({
+                    method: 'get',
+                    url: imgUrl,
+                    responseType: 'stream',
+                    timeout: 10000,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
+                });
+
+                archive.append(response.data, { name: imgName });
+
+            } catch (imgErr) {
+                console.warn(`⚠️ Failed to zip image ${i}:`, imgErr.message);
+                // Continue to next image instead of failing entirely
+            }
+        }
+
+        await archive.finalize();
+
     } catch (err) {
-        console.error("Proxy Error:", err.message);
-        res.status(500).send("Server Error");
+        console.error("Zip Endpoint Error:", err.message);
+        if (!res.headersSent) res.status(500).json({ error: "Server Error" });
     }
 });
 
@@ -423,22 +662,38 @@ router.post("/trending", requireAuth, async (req, res) => {
                 if (type === 'video') {
                     if (!Array.isArray(response.data.data)) throw new Error("Data is not an array");
                     // Return Raw Videos
-                    const videos = response.data.data.map(v => ({
-                        id: v.video_id,
-                        title: v.title || "",
-                        cover: v.cover,
-                        playUrl: v.play,
-                        author: {
-                            nickname: v.author?.nickname || "Unknown",
-                            avatar: v.author?.avatar || ""
-                        },
-                        stats: {
-                            plays: v.play_count || 0,
-                            likes: v.digg_count || 0,
-                            shares: v.share_count || 0
-                        },
-                        duration: v.duration || 0
-                    }));
+                    const videos = response.data.data.map(v => {
+                        const rawImages = v.images || v.image_post_info?.images || [];
+                        const images = rawImages.map(img => {
+                            if (typeof img === 'string') return img;
+                            if (img.display_image?.url_list?.[0]) return img.display_image.url_list[0];
+                            if (img.url_list?.[0]) return img.url_list[0];
+                            return null;
+                        }).filter(Boolean);
+
+                        const isSlideshow = v.aweme_type === 150 || v.aweme_type === 51 || !!v.image_post_info || (images.length > 1);
+                        const isPhoto = !isSlideshow && (images.length === 1 || v.duration === 0);
+
+                        return {
+                            id: v.video_id,
+                            title: v.title || "",
+                            cover: v.cover,
+                            playUrl: v.play,
+                            images: images,
+                            type: isSlideshow ? 'slideshow' : (isPhoto ? 'photo' : 'video'),
+                            author: {
+                                nickname: v.author?.nickname || "Unknown",
+                                avatar: v.author?.avatar || ""
+                            },
+                            web_url: `https://www.tiktok.com/@${v.author?.unique_id || v.author?.nickname}/video/${v.video_id}`,
+                            stats: {
+                                plays: v.play_count || 0,
+                                likes: v.digg_count || 0,
+                                shares: v.share_count || 0
+                            },
+                            duration: v.duration || 0
+                        };
+                    });
                     // Sort by Likes (Viral)
                     videos.sort((a, b) => b.stats.likes - a.stats.likes);
                     return res.json({ success: true, videos });

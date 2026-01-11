@@ -15,7 +15,7 @@ import { Reorder, motion, AnimatePresence } from "framer-motion";
 import { generateThumbnailFromVideo, dataURLtoFile } from "../utils/videoUtils";
 
 // 🛠️ Helper for clean API URLs
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/api$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://eza-post-backend.onrender.com/api").replace(/\/api$/, "");
 
 export default function Post() {
     useAuth();
