@@ -11,7 +11,7 @@ const router = express.Router();
 const path = require("path");
 const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
-const youtubedl = require("youtube-dl-exec");
+const ytdlp = require("../../utils/ytdlp");
 const axios = require("axios");
 
 // 🗂️ Temp directory
@@ -54,7 +54,7 @@ router.post("/download", requireAuth, async (req, res) => {
         }
 
         try {
-            await youtubedl(cleanUrl, flags);
+            await ytdlp.download(cleanUrl, outputTemplate, flags);
         } catch (e) {
             console.warn("⚠️ Primary download failed (expected for images), proceeding to check/fallback...");
         }
@@ -74,6 +74,17 @@ router.post("/download", requireAuth, async (req, res) => {
                 type: foundFile.endsWith(".mp4") ? "video" : "image"
             };
 
+            // 🕒 Auto-Delete after 5 minutes
+            setTimeout(() => {
+                const filePath = path.join(tempDir, foundFile);
+                if (fs.existsSync(filePath)) {
+                    fs.unlink(filePath, (err) => {
+                        if (err) console.error(`❌ Failed to auto-delete ${foundFile}:`, err);
+                        else console.log(`🗑️ Auto-deleted ${foundFile}`);
+                    });
+                }
+            }, 5 * 60 * 1000);
+
             res.json({
                 success: true,
                 url: `/uploads/temp/instagram/${foundFile}`,
@@ -85,12 +96,10 @@ router.post("/download", requireAuth, async (req, res) => {
 
             let info;
             try {
-                info = await youtubedl(cleanUrl, {
-                    dumpSingleJson: true,
+                info = await ytdlp.lookup(cleanUrl, {
                     noWarnings: true,
                     noCheckCertificate: true,
                     ignoreErrors: true,
-                    userAgent: flags.userAgent,
                     cookies: flags.cookies
                 });
             } catch (e) {
@@ -194,6 +203,16 @@ router.post("/download", requireAuth, async (req, res) => {
                 });
 
                 console.log("✅ Fallback Download Complete:", fallbackFilename);
+
+                // 🕒 Auto-Delete after 5 minutes
+                setTimeout(() => {
+                    if (fs.existsSync(fallbackPath)) {
+                        fs.unlink(fallbackPath, (err) => {
+                            if (err) console.error(`❌ Failed to auto-delete ${fallbackFilename}:`, err);
+                            else console.log(`🗑️ Auto-deleted ${fallbackFilename}`);
+                        });
+                    }
+                }, 5 * 60 * 1000);
 
                 res.json({
                     success: true,

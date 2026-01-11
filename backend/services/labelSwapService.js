@@ -17,7 +17,8 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 const runPythonLabelSwap = (videoPath, logoPath, roi, tempOutputPath) => {
     return new Promise((resolve, reject) => {
         const scriptPath = path.join(__dirname, '../scripts/label_swap.py');
-        const pythonProcess = spawn('python', [scriptPath, videoPath, logoPath, roi, tempOutputPath]);
+        const pythonCmd = process.env.NODE_ENV === 'production' ? 'python3' : 'python';
+        const pythonProcess = spawn(pythonCmd, [scriptPath, videoPath, logoPath, roi, tempOutputPath]);
 
         pythonProcess.stdout.on('data', (data) => {
             console.log(`[LabelSwap Python]: ${data}`);

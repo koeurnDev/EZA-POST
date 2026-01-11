@@ -8,9 +8,8 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
-const youtubedl = require("youtube-dl-exec");
-const path = require("path");
-const fs = require("fs");
+const ytdlp = require("../../utils/ytdlp");
+const path = require("path"); const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
 const https = require("https");
 
@@ -80,11 +79,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
         if (!videoData) {
             console.log("🐢 Running yt-dlp lookup fallback...");
             try {
-                const output = await youtubedl(url, {
-                    dumpSingleJson: true,
-                    noWarnings: true,
-                    noCheckCertificate: true
-                });
+                const output = await ytdlp.lookup(url);
 
                 videoData = {
                     title: output.title || "TikTok Video",
@@ -231,13 +226,9 @@ router.post("/profile", requireAuth, async (req, res) => {
         const profileUrl = `https://www.tiktok.com/@${uniqueId}`;
 
         try {
-            const output = await youtubedl(profileUrl, {
-                dumpSingleJson: true,
-                playlistEnd: 20, // Reduced to 20 for faster fallback
-                noWarnings: true,
-                noCheckCertificate: true,
-                flatPlaylist: true, // CRITICAL: Fast listing mode
-                quiet: true
+            const output = await ytdlp.lookup(profileUrl, {
+                playlistEnd: 20,
+                flatPlaylist: true
             });
 
             videos = (output.entries || []).map(v => {
@@ -341,13 +332,24 @@ router.post("/download", requireAuth, async (req, res) => {
             file.on("finish", () => {
                 file.close(() => {
                     console.log(`✅ Download complete: ${filename}`);
+
+                    // 🕒 Auto-Delete after 5 minutes
+                    setTimeout(() => {
+                        if (fs.existsSync(filePath)) {
+                            fs.unlink(filePath, (err) => {
+                                if (err) console.error(`❌ Failed to auto-delete ${filename}:`, err);
+                                else console.log(`🗑️ Auto-deleted ${filename}`);
+                            });
+                        }
+                    }, 5 * 60 * 1000);
+
                     // Return local path (served via static)
                     res.json({
                         success: true,
                         message: "Downloaded successfully",
                         file: {
                             name: filename,
-                            url: `/uploads/temp/videos/${filename}`, // Needs static serve setup or upload to cloudinary later
+                            url: `/uploads/temp/videos/${filename}`,
                             path: filePath, // Absolute path for internal use (Cloudinary upload)
                             originalName: title || "tiktok-video.mp4"
                         }
@@ -406,36 +408,8 @@ router.get("/proxy", async (req, res) => {
                 res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
                 res.setHeader('Content-Type', 'video/mp4');
 
-                const { spawn } = require('child_process');
-                // Use absolute path to yt-dlp in node_modules
-                const ytdlpPath = path.join(__dirname, "../../node_modules/youtube-dl-exec/bin/yt-dlp.exe");
-
-                // Use yt-dlp to stream to stdout
-                // -o - means output to stdout
-                const ytProcess = spawn(ytdlpPath, [
-                    '-o', '-',
-                    '-f', 'best',
-                    '--no-part',
-                    '--no-cache-dir',
-                    '--fixup', 'never',
-                    '--no-check-certificates',
-                    '--no-warnings',
-                    targetUrl
-                ]);
-
-                ytProcess.stdout.pipe(res);
-
-                ytProcess.stderr.on('data', (data) => {
-                    const msg = data.toString();
-                    if (msg.includes('ERROR')) console.error("❌ yt-dlp stream error:", msg);
-                });
-
-                ytProcess.on('close', (code) => {
-                    if (code !== 0) {
-                        console.error(`❌ yt-dlp stream exited with code ${code}`);
-                        if (!res.headersSent) res.status(502).send("Video stream failed");
-                    }
-                });
+                // Use the new util stream (returns the child process)
+                const ytProcess = ytdlp.stream(targetUrl, res);
 
                 // Cleanup on client disconnect
                 req.on('close', () => ytProcess.kill());

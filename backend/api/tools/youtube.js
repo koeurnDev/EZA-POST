@@ -10,7 +10,7 @@ const router = express.Router();
 const path = require("path");
 const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
-const youtubedl = require("youtube-dl-exec");
+const ytdlp = require("../../utils/ytdlp");
 // const ffmpegPath = require("ffmpeg-static"); // Re-enabled dynamically below or here if needed at top level.
 // Actually let's import it at top level to be safe.
 
@@ -46,7 +46,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
         }
 
         // 1. Fast Check: Is it a playlist/channel?
-        const fastOutput = await youtubedl(url, flags);
+        const fastOutput = await ytdlp.lookup(url, flags);
 
         // 📋 CASE A: Playlist / Channel
         if (fastOutput.entries && Array.isArray(fastOutput.entries) && fastOutput.entries.length > 0) {
@@ -69,7 +69,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
         }
 
         // 🎬 CASE B: Single Video (Full Detail Lookup)
-        const output = await youtubedl(url, { ...flags, flatPlaylist: false });
+        const output = await ytdlp.lookup(url, { ...flags, flatPlaylist: false });
 
         // Parse relevant info
         const formats = output.formats || [];
@@ -180,7 +180,7 @@ router.post("/download", requireAuth, async (req, res) => {
             });
         }
 
-        await youtubedl(url, flags);
+        await ytdlp.download(url, outputTemplate, flags);
 
         // Find the generated file
         // yt-dlp might replace %(ext)s with mp4, mp3, mkv, etc.
@@ -196,6 +196,18 @@ router.post("/download", requireAuth, async (req, res) => {
 
         if (foundFile) {
             console.log("✅ Download Complete:", foundFile);
+
+            // 🕒 Auto-Delete after 5 minutes
+            const filePath = path.join(tempDir, foundFile);
+            setTimeout(() => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlink(filePath, (err) => {
+                        if (err) console.error(`❌ Failed to auto-delete ${foundFile}:`, err);
+                        else console.log(`🗑️ Auto-deleted ${foundFile}`);
+                    });
+                }
+            }, 5 * 60 * 1000);
+
             res.json({ success: true, url: `/uploads/temp/videos/${foundFile}` });
         } else {
             throw new Error("File not found after download. FFmpeg merge might have failed.");

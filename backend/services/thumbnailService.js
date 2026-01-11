@@ -1,8 +1,8 @@
 const OpenAI = require("openai");
 
-const openai = new OpenAI({
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
-});
+}) : null;
 
 /**
  * Generates a YouTube thumbnail based on a topic.
@@ -11,6 +11,11 @@ const openai = new OpenAI({
  */
 exports.generateThumbnail = async (topic) => {
     try {
+        if (!openai) {
+            console.warn("⚠️ OpenAI API Key missing. Skipping thumbnail generation.");
+            return "https://via.placeholder.com/1280x720.png?text=No+OpenAI+Key";
+        }
+
         const prompt = `
             Create a highly clickable, viral YouTube video thumbnail about: "${topic}".
             

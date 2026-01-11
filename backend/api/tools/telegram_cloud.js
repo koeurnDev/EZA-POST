@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const telegramBotService = require('../../services/telegramBotService');
-const { Tikwm } = require('tikwm-api');
+const { Tikwm } = require('../../utils/tikwm');
 
 // Helper to download file from URL to local disk
 const downloadFile = async (url, destPath) => {

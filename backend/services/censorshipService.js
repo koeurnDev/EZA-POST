@@ -15,7 +15,8 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 const runPythonBlur = (inputPath, tempOutputPath) => {
     return new Promise((resolve, reject) => {
         const scriptPath = path.join(__dirname, '../scripts/auto_blur.py');
-        const pythonProcess = spawn('python', [scriptPath, inputPath, tempOutputPath]);
+        const pythonCmd = process.env.NODE_ENV === 'production' ? 'python3' : 'python';
+        const pythonProcess = spawn(pythonCmd, [scriptPath, inputPath, tempOutputPath]);
 
         pythonProcess.stdout.on('data', (data) => {
             console.log(`[AutoBlur Python]: ${data}`);
