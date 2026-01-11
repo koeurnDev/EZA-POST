@@ -26,8 +26,9 @@ router.post("/remove-watermark", requireAuth, upload.single("image"), async (req
         const { exec } = require("child_process");
         const scriptPath = path.join(__dirname, "../../scripts/remove_watermark.py");
 
-        // 🔧 FIX: Use python3 on production/linux
-        const pythonCmd = process.env.NODE_ENV === 'production' ? 'python3' : 'python';
+        // 🔧 FIX: Detect OS to choose python command
+        const isWin = process.platform === "win32";
+        const pythonCmd = isWin ? "python" : "python3";
 
         // 🔧 FIX: Rename file to include extension (OpenCV requires it)
         const originalExt = path.extname(req.file.originalname) || ".png";

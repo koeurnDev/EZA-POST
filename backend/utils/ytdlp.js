@@ -22,6 +22,7 @@ const lookup = async (url, options = {}) => {
         // Handles flatPlaylist mapping
         if (options.flatPlaylist) flags.flatPlaylist = true;
         if (options.playlistEnd) flags.playlistEnd = options.playlistEnd;
+        if (options.userAgent) flags.userAgent = options.userAgent;
 
         const output = await ytDlpExec(url, flags);
         return output;

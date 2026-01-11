@@ -29,13 +29,18 @@ router.post("/lookup", requireAuth, async (req, res) => {
         if (!url) return res.status(400).json({ success: false, error: "URL is required" });
 
         console.log(`🔎 Looking up TikTok: ${url}`);
+
+        // 🧹 Clean URL: Extract https link if user pasted full text
+        const urlMatch = url.match(/https?:\/\/[^\s]+/);
+        const cleanUrl = urlMatch ? urlMatch[0] : url;
+
         let videoData = null;
 
         // 1️⃣ Try TikWM API (HD, No Watermark)
         try {
-            console.log("⚡ Trying TikWM API...");
+            console.log(`⚡ Trying TikWM API with: ${cleanUrl}`);
             const response = await axios.post("https://www.tikwm.com/api/",
-                new URLSearchParams({ url: url, hd: 1 }),
+                new URLSearchParams({ url: cleanUrl, hd: 1 }),
                 {
                     headers: {
                         "Content-Type": "application/x-www-form-urlencoded",
@@ -79,7 +84,9 @@ router.post("/lookup", requireAuth, async (req, res) => {
         if (!videoData) {
             console.log("🐢 Running yt-dlp lookup fallback...");
             try {
-                const output = await ytdlp.lookup(url);
+                const output = await ytdlp.lookup(cleanUrl, {
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                });
 
                 videoData = {
                     title: output.title || "TikTok Video",
@@ -228,7 +235,8 @@ router.post("/profile", requireAuth, async (req, res) => {
         try {
             const output = await ytdlp.lookup(profileUrl, {
                 playlistEnd: 20,
-                flatPlaylist: true
+                flatPlaylist: true,
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             });
 
             videos = (output.entries || []).map(v => {
@@ -321,45 +329,51 @@ router.post("/download", requireAuth, async (req, res) => {
 
         const file = fs.createWriteStream(filePath);
 
-        // Stream download
-        https.get(url, (response) => {
-            if (response.statusCode !== 200) {
-                return res.status(400).json({ success: false, error: "Failed to download stream." });
+        // Stream download with Headers (to avoid 403)
+        const response = await axios({
+            method: 'get',
+            url: url,
+            responseType: 'stream',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://www.tiktok.com/'
             }
+        });
 
-            response.pipe(file);
+        response.data.pipe(file);
 
-            file.on("finish", () => {
-                file.close(() => {
-                    console.log(`✅ Download complete: ${filename}`);
+        file.on("finish", () => {
+            file.close(() => {
+                console.log(`✅ Download complete: ${filename}`);
 
-                    // 🕒 Auto-Delete after 5 minutes
-                    setTimeout(() => {
-                        if (fs.existsSync(filePath)) {
-                            fs.unlink(filePath, (err) => {
-                                if (err) console.error(`❌ Failed to auto-delete ${filename}:`, err);
-                                else console.log(`🗑️ Auto-deleted ${filename}`);
-                            });
-                        }
-                    }, 5 * 60 * 1000);
+                // 🕒 Auto-Delete after 5 minutes
+                setTimeout(() => {
+                    if (fs.existsSync(filePath)) {
+                        fs.unlink(filePath, (err) => {
+                            if (err) console.error(`❌ Failed to auto-delete ${filename}:`, err);
+                            else console.log(`🗑️ Auto-deleted ${filename}`);
+                        });
+                    }
+                }, 5 * 60 * 1000);
 
-                    // Return local path (served via static)
-                    res.json({
-                        success: true,
-                        message: "Downloaded successfully",
-                        file: {
-                            name: filename,
-                            url: `/uploads/temp/videos/${filename}`,
-                            path: filePath, // Absolute path for internal use (Cloudinary upload)
-                            originalName: title || "tiktok-video.mp4"
-                        }
-                    });
+                // Return local path (served via static)
+                res.json({
+                    success: true,
+                    message: "Downloaded successfully",
+                    file: {
+                        name: filename,
+                        url: `/uploads/temp/videos/${filename}`,
+                        path: filePath, // Absolute path for internal use (Cloudinary upload)
+                        originalName: title || "tiktok-video.mp4"
+                    }
                 });
             });
-        }).on("error", (err) => {
-            fs.unlink(filePath, () => { }); // Delete partial
-            console.error("❌ Download Stream Error:", err.message);
-            res.status(500).json({ success: false, error: "Download failed" });
+        });
+
+        file.on("error", (err) => {
+            fs.unlink(filePath, () => { });
+            console.error("❌ File Write Error:", err.message);
+            res.status(500).json({ success: false, error: "File write failed" });
         });
 
     } catch (err) {

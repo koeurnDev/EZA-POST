@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "cross-env NODE_ENV=production node server.js",
-    "build": "pip3 install -r requirements.txt",
+    "build": "./render-build.sh",
     "debug": "nodemon --inspect server.js",
     "test": "echo \"No tests specified\" && exit 0"
   },

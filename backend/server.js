@@ -225,22 +225,22 @@ const routeModules = [
   ["tools/telegram", "./api/tools/telegram"],   // ✅ Telegram Downloader
   ["tools/instagram", "./api/tools/instagram"], // ✅ Instagram Downloader
   ["tools/capcut", "./api/tools/capcut"],       // ✅ CapCut Downloader
-  ["boost", "./api/boost"],                     // ✅ Auto-Boost Posts
-  ["boost-accounts", "./api/boost-accounts"],   // ✅ Boost Account Management
-  ["credits", "./api/credits"],                 // ✅ Credit System
-  ["tools/video-creator", "./api/tools/video_creator"], // ✅ Video Creator (Images -> Reels)
-  ["tools/ecommerce", "./api/tools/ecommerce"],         // ✅ Dropship Scraper (1688/Taobao)
-  ["tools/subtitle", "./api/tools/subtitle"],           // ✅ Auto Khmer Subtitle (Gemini + FFmpeg)
-  ["tools/magic-motion", "./api/tools/magic_motion"],   // ✅ AI Magic Motion (FFmpeg Effects)
-  ["tools/censorship", "./api/tools/censorship"],       // ✅ Censorship Tool
-  ["tools/label-swap", "./api/tools/label_swap"], // ✅ Label Swap Tool
-  ["tools/script", "./api/tools/script"], // ✅ Script Writer Tool
-  ["tools/thumbnail", "./api/tools/thumbnail"], // ✅ Thumbnail Generator Tool
-  ["tools/telegram-cloud", "./api/tools/telegram_cloud"], // ✅ Cloud Download to Telegram
-  ["tools/drive-sync", "./api/tools/drive_sync"], // ✅ Google Drive Sync
-  ["tools/farm", "./api/tools/farm"], // ✅ Cloud Farm Automation
-  ["boost/metrics", "./api/boost/metrics"], // ✅ Boost Metrics API
-  ["boost/campaigns", "./api/boost/campaigns"], // ✅ Boost Campaigns API
+  // ["boost", "./api/boost"],                     // ⏸️ Auto-Boost Posts
+  // ["boost-accounts", "./api/boost-accounts"],   // ⏸️ Boost Account Management
+  // ["credits", "./api/credits"],                 // ⏸️ Credit System
+  // ["tools/video-creator", "./api/tools/video_creator"], // ⏸️ Video Creator (Images -> Reels)
+  // ["tools/ecommerce", "./api/tools/ecommerce"],         // ⏸️ Dropship Scraper (1688/Taobao)
+  // ["tools/subtitle", "./api/tools/subtitle"],           // ⏸️ Auto Khmer Subtitle (Gemini + FFmpeg)
+  // ["tools/magic-motion", "./api/tools/magic_motion"],   // ⏸️ AI Magic Motion (FFmpeg Effects)
+  // ["tools/censorship", "./api/tools/censorship"],       // ⏸️ Censorship Tool
+  // ["tools/label-swap", "./api/tools/label_swap"], // ⏸️ Label Swap Tool
+  // ["tools/script", "./api/tools/script"], // ⏸️ Script Writer Tool
+  // ["tools/thumbnail", "./api/tools/thumbnail"], // ⏸️ Thumbnail Generator Tool
+  // ["tools/telegram-cloud", "./api/tools/telegram_cloud"], // ⏸️ Cloud Download to Telegram
+  // ["tools/drive-sync", "./api/tools/drive_sync"], // ⏸️ Google Drive Sync
+  // ["tools/farm", "./api/tools/farm"], // ⏸️ Cloud Farm Automation
+  // ["boost/metrics", "./api/boost/metrics"], // ⏸️ Boost Metrics API
+  // ["boost/campaigns", "./api/boost/campaigns"], // ⏸️ Boost Campaigns API
 ];
 
 for (const [route, file] of routeModules) {
@@ -348,10 +348,12 @@ const { processScheduledPosts, cleanupOldPosts } = require("./utils/scheduler");
 const botEngine = require("./utils/botEngine");
 const boostEngine = require("./utils/boostEngine");
 
+/*
 setInterval(() => {
   processScheduledPosts();
 
   // Run bot every ~2 minutes (odd minutes) to spread load
+ 
   if (new Date().getMinutes() % 2 !== 0) {
     botEngine.run();
   }
@@ -360,23 +362,27 @@ setInterval(() => {
   if (new Date().getMinutes() % 30 === 0) {
     boostEngine.run();
   }
+ 
 
   // Run cleanup occasionally (e.g., 1% chance or separate interval)
   if (Math.random() < 0.05) cleanupOldPosts();
 }, 60 * 1000);
+*/
 
 // 🔄 Daily Token Refresh Check (Runs every 24 hours)
 const { checkAndRefreshTokens } = require("./utils/tokenRefresher");
+/*
 setInterval(() => {
   checkAndRefreshTokens();
 }, 24 * 60 * 60 * 1000); // 24 hours
 // Run once on startup to catch up
 setTimeout(checkAndRefreshTokens, 10000);
+*/
 
 // 📊 Metrics Sync Scheduler (Runs every 15 minutes)
 const { startMetricsScheduler, startCampaignMetricsScheduler } = require("./utils/metricsScheduler");
-startMetricsScheduler();
-startCampaignMetricsScheduler();
+// startMetricsScheduler();
+// startCampaignMetricsScheduler();
 
 // ------------------------------------------------------------
 // ✅ Start Server
