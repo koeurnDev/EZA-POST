@@ -27,30 +27,11 @@ router.post("/remove-watermark", requireAuth, upload.single("image"), async (req
         const scriptPath = path.join(__dirname, "../../scripts/remove_watermark.py");
 
         // 🔧 FIX: Detect OS to choose python command
+        // Standard Python Execution
         const isWin = process.platform === "win32";
-        let pythonCmd = isWin ? "python" : "python3";
-        let env = { ...process.env };
-
-        if (!isWin) {
-            try {
-                // 1. Get location of python3
-                const whichPython = require("child_process").execSync("which python3").toString().trim();
-
-                // 2. Set PYTHONPATH to local pylibs folder (Relative to this file: api/tools -> backend -> pylibs)
-                const localPyLibs = path.join(__dirname, "../../pylibs");
-
-                console.log(`🐍 System Python Path: ${whichPython}`);
-                console.log(`📦 Local PyLibs Path: ${localPyLibs}`);
-
-                // Prepend to ensure it takes precedence
-                env.PYTHONPATH = localPyLibs + ":" + (process.env.PYTHONPATH || "");
-
-                if (whichPython) pythonCmd = whichPython;
-
-            } catch (e) {
-                console.warn("⚠️ Failed to detect Python environment:", e.message);
-            }
-        }
+        const pythonCmd = isWin ? "python" : "python3";
+        // No custom env or PYTHONPATH needed if installed correctly via requirements.txt
+        const env = { ...process.env };
 
         // 🔧 FIX: Rename file to include extension (OpenCV requires it)
         const originalExt = path.extname(req.file.originalname) || ".png";

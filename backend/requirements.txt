@@ -1,4 +1,5 @@
 opencv-python-headless
 numpy
-pdf2docx
+pillow
 yt-dlp
+pdf2docx
