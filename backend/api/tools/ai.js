@@ -30,6 +30,19 @@ router.post("/remove-watermark", requireAuth, upload.single("image"), async (req
         const isWin = process.platform === "win32";
         const pythonCmd = isWin ? "python" : "python3";
 
+        // 🔍 FIX: Explicitly find user site-packages for Render/Linux
+        let env = { ...process.env };
+        if (!isWin) {
+            try {
+                // Get the user site-packages path dynamically
+                const sitePackages = require("child_process").execSync("python3 -m site --user-site").toString().trim();
+                console.log(`🐍 Python Site Packages: ${sitePackages}`);
+                env.PYTHONPATH = sitePackages + ":" + (process.env.PYTHONPATH || "");
+            } catch (e) {
+                console.warn("⚠️ Failed to detect Python site-packages:", e.message);
+            }
+        }
+
         // 🔧 FIX: Rename file to include extension (OpenCV requires it)
         const originalExt = path.extname(req.file.originalname) || ".png";
         const imagePath = req.file.path + originalExt;
@@ -41,7 +54,7 @@ router.post("/remove-watermark", requireAuth, upload.single("image"), async (req
         const command = `${pythonCmd} "${scriptPath}" "${imagePath}" "${position}"`;
         console.log("🚀 Executing:", command);
 
-        exec(command, (error, stdout, stderr) => {
+        exec(command, { env: env }, (error, stdout, stderr) => {
             if (error) {
                 console.error(`❌ Python Script Error: ${error.message}`);
                 console.error(`❌ Stderr: ${stderr}`);
