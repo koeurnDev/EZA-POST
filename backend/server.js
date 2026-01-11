@@ -118,7 +118,7 @@ app.use(
 app.options('*', cors());
 
 // ✅ Ensure Temp Directories Exist (Critical for Render)
-const fs = require('fs'); // Ensure fs is required if not already top-level (it is)
+// fs is already required at the top
 const tempUploadsPath = path.join(__dirname, "temp", "uploads");
 if (!fs.existsSync(tempUploadsPath)) fs.mkdirSync(tempUploadsPath, { recursive: true });
 
