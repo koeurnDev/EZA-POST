@@ -401,8 +401,10 @@ router.get("/proxy", async (req, res) => {
 
         try {
             // 🎬 Case A: It's a Video — Use yt-dlp for powerful bypass
-            if (contentType.includes('video')) {
-                console.log(`🎬 Streaming video via yt-dlp using: ${targetUrl.includes('tiktok.com') ? 'Official Extractor' : 'Direct Link'}`);
+            // 🎬 Case A: It's a Video — Use yt-dlp ONLY if we have a Web URL to resolve
+            // If we only have 'url' (CDN link), yt-dlp often fails on signatures, so we fall through to Axios.
+            if (contentType.includes('video') && targetUrl.includes('tiktok.com')) {
+                console.log(`🎬 Streaming video via yt-dlp using: ${targetUrl}`);
 
                 // Set headers first
                 res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
@@ -427,12 +429,12 @@ router.get("/proxy", async (req, res) => {
                 httpsAgent: httpsAgent,
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                    'Accept': isAudio ? 'audio/*,*/*;q=0.8' : 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                    'Accept': isAudio ? 'audio/*,*/*;q=0.8' : 'video/*,image/*,*/*;q=0.8',
                     'Accept-Language': 'en-US,en;q=0.9',
                     'Accept-Encoding': 'identity',
                     'Referer': 'https://www.tiktok.com/',
                     'Origin': 'https://www.tiktok.com',
-                    'Sec-Fetch-Dest': isAudio ? 'audio' : 'image',
+                    'Sec-Fetch-Dest': isAudio ? 'audio' : (contentType.includes('video') ? 'video' : 'image'),
                     'Sec-Fetch-Mode': 'no-cors',
                     'Sec-Fetch-Site': 'cross-site'
                 }
