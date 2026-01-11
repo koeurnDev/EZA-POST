@@ -61,7 +61,8 @@
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "qrcode": "^1.5.4",
-    "xss-clean": "^0.1.4"
+    "xss-clean": "^0.1.4",
+    "youtube-dl-exec": "^3.0.29"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

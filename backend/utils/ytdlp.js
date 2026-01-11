@@ -1,121 +1,80 @@
-const { spawn } = require('child_process');
+const ytDlpExec = require('youtube-dl-exec');
 const path = require('path');
+const fs = require('fs');
 
-// Helper to get binary (assumes system installed 'yt-dlp' on Linux, or local on Dev)
-// On Render, user MUST install yt-dlp via build command: apt-get update && apt-get install -y yt-dlp
-const getBinary = () => {
-    return 'yt-dlp'; // Simple and clean. Relies on PATH.
-};
+// 🛠️ Wrapper to unify usage
+// youtube-dl-exec returns a promise that resolves to the output (stdout or formatted object)
 
 /**
  * Executes yt-dlp with arguments and returns JSON output (Promisified)
- * Equivalent to: yt-dlp --dump-single-json ...
  */
-const lookup = (url, options = {}) => {
-    return new Promise((resolve, reject) => {
-        const args = [
-            url,
-            '--dump-single-json',
-            '--no-warnings',
-            '--no-check-certificates',
-            '--prefer-free-formats',
-            '--no-playlist' // Default to single video unless specified
-        ];
+const lookup = async (url, options = {}) => {
+    try {
+        const flags = {
+            dumpSingleJson: true,
+            noWarnings: true,
+            noCheckCertificates: true,
+            preferFreeFormats: true,
+            noPlaylist: true,
+            ...options
+        };
 
-        // Add extra options
-        if (options.flatPlaylist) args.push('--flat-playlist');
-        if (options.playlistEnd) args.push('--playlist-end', options.playlistEnd);
+        // Handles flatPlaylist mapping
+        if (options.flatPlaylist) flags.flatPlaylist = true;
+        if (options.playlistEnd) flags.playlistEnd = options.playlistEnd;
 
-        // Construct process
-        const process = spawn(getBinary(), args);
-
-        let stdout = '';
-        let stderr = '';
-
-        process.stdout.on('data', (data) => stdout += data.toString());
-        process.stderr.on('data', (data) => stderr += data.toString());
-
-        process.on('close', (code) => {
-            if (code === 0) {
-                try {
-                    const json = JSON.parse(stdout);
-                    resolve(json);
-                } catch (e) {
-                    reject(new Error('Failed to parse yt-dlp JSON: ' + e.message));
-                }
-            } else {
-                reject(new Error(`yt-dlp exited with code ${code}: ${stderr}`));
-            }
-        });
-
-        process.on('error', (err) => {
-            reject(new Error(`Failed to spawn yt-dlp: ${err.message}. Is it installed?`));
-        });
-    });
+        const output = await ytDlpExec(url, flags);
+        return output;
+    } catch (err) {
+        throw new Error(`yt-dlp lookup failed: ${err.message}`);
+    }
 };
 
 /**
- * Streams video content to a writable stream (usually res)
+ * Streams video content.
+ * Note: youtube-dl-exec is a promise wrapper, but it exposes the child process via .exec()
+ * However, simpler to use raw spawn for streaming if we know where the binary is.
+ * youtube-dl-exec downloads the binary to node_modules/youtube-dl-exec/bin/yt-dlp
  */
 const stream = (url, res) => {
-    const args = [
-        url,
-        '-o', '-',             // Output to stdout
-        '-f', 'best',           // Best format
-        '--no-part',
-        '--no-cache-dir',
-        '--no-check-certificates',
-        '--no-warnings'
-    ];
+    // We need to find the binary path that youtube-dl-exec uses
+    const ytDlpBinary = require('youtube-dl-exec/src/constants').YOUTUBE_DL_PATH || 'yt-dlp';
 
-    const process = spawn(getBinary(), args);
+    // Fallback to searching in node_modules if the constant isn't exposed (it varies by version)
+    // Actually, asking youtube-dl-exec to stream to stdout is effectively just running it.
 
-    process.stdout.pipe(res);
+    // Let's use the 'exec' method which gives us the process
+    const subprocess = ytDlpExec.exec(url, {
+        output: '-',
+        format: 'best',
+        noPart: true,
+        noCacheDir: true,
+        noCheckCertificates: true,
+        noWarnings: true
+    });
 
-    process.stderr.on('data', (data) => {
-        // Log errors but don't crash stream instantly unless critical
+    subprocess.stdout.pipe(res);
+
+    subprocess.stderr.on('data', (data) => {
         const msg = data.toString();
         if (msg.includes('ERROR')) console.error("❌ yt-dlp stream stderr:", msg);
     });
 
-    process.on('close', (code) => {
-        if (code !== 0) {
-            console.error(`❌ yt-dlp stream exited with code ${code}`);
-            // If headers aren't sent, we can send error
-            if (!res.headersSent) res.status(502).send('Stream failed');
-        }
-    });
-
-    // Return process to allow caller to kill it if needed
-    return process;
+    return subprocess;
 };
 
 /**
  * Downloads file to local path
  */
 const download = (url, outputPath, options = {}) => {
-    return new Promise((resolve, reject) => {
-        const args = [
-            url,
-            '-o', outputPath,
-            '--no-warnings',
-            '--no-check-certificates'
-        ];
-
-        if (options.format) args.push('-f', options.format);
-        if (options.cookies) args.push('--cookies', options.cookies);
-
-        const process = spawn(getBinary(), args);
-
-        process.stderr.on('data', d => console.log(`[yt-dlp] ${d}`)); // Verbose logging for download
-
-        process.on('close', (code) => {
-            if (code === 0) resolve(outputPath);
-            else reject(new Error(`Download failed with code ${code}`));
-        });
+    return ytDlpExec(url, {
+        output: outputPath,
+        noWarnings: true,
+        noCheckCertificates: true,
+        format: options.format,
+        cookies: options.cookies
     });
 };
-
 
 module.exports = {
     lookup,
