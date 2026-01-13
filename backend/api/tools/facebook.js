@@ -10,7 +10,6 @@ const router = express.Router();
 const path = require("path");
 const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
-const youtubedl = require("youtube-dl-exec");
 const axios = require("axios");
 const cheerio = require("cheerio");
 
@@ -20,6 +19,13 @@ if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
 const cookiesPath = path.join(__dirname, "../../cookies.txt");
 const DEFAULT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36";
+
+// ⚙️ Helper: Get Binary Path for Render
+const getBinaryPath = () => {
+    return process.env.NODE_ENV === 'production'
+        ? path.join(__dirname, '../../bin/yt-dlp')
+        : undefined;
+};
 
 /* -------------------------------------------------------------------------- */
 /* 🔍 POST /lookup — Get Video or Image Info                                  */
@@ -39,7 +45,6 @@ router.post("/lookup", requireAuth, async (req, res) => {
         // Check for Stories (requires cookies usually)
         const isStory = url.includes("/stories/");
         if (isStory && !fs.existsSync(cookiesPath)) {
-            // We won't block it, but we log a warning. yt-dlp might fail.
             console.warn("⚠️ Facebook Story detected but no cookies.txt found. Download may fail.");
         }
 
@@ -48,21 +53,23 @@ router.post("/lookup", requireAuth, async (req, res) => {
             const flags = {
                 dumpSingleJson: true,
                 noWarnings: true,
-                noCallHome: true,
                 noCheckCertificate: true,
                 userAgent: DEFAULT_UA,
+                ffmpegLocation: require('ffmpeg-static')
             };
 
             if (fs.existsSync(cookiesPath)) {
                 flags.cookies = cookiesPath;
             }
 
-            let output = await youtubedl(url, flags);
+            const youtubedl = require("youtube-dl-exec"); // 🔄 Lazy Load
+
+            // ⚙️ Use Helper for Binary Path
+            let output = await youtubedl(url, flags, { execPath: getBinaryPath() });
 
             // 🔄 Handle Playlists (Stories often return a playlist)
             if (output._type === 'playlist' || (output.entries && output.entries.length > 0)) {
                 console.log("📂 Playlist/Story detected, using first entry...");
-                // Find the first valid video entry
                 const firstEntry = output.entries.find(e => e.url) || output.entries[0];
                 if (firstEntry) {
                     output = firstEntry;
@@ -90,7 +97,6 @@ router.post("/lookup", requireAuth, async (req, res) => {
             try {
                 console.log("🕷️ Scraping Facebook page for metadata...");
 
-                // Parse cookies if available
                 let cookieHeader = '';
                 if (fs.existsSync(cookiesPath)) {
                     const cookieContent = fs.readFileSync(cookiesPath, 'utf8');
@@ -107,21 +113,12 @@ router.post("/lookup", requireAuth, async (req, res) => {
                 const html = await axios.get(url, {
                     headers: {
                         'User-Agent': DEFAULT_UA,
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.5',
-                        'Sec-Fetch-Dest': 'document',
-                        'Sec-Fetch-Mode': 'navigate',
-                        'Sec-Fetch-Site': 'none',
-                        'Sec-Fetch-User': '?1',
-                        'Upgrade-Insecure-Requests': '1',
                         'Cookie': cookieHeader
                     },
                     timeout: 15000
                 });
 
                 const $ = cheerio.load(html.data);
-
-                // Try multiple selectors
                 const ogImage = $('meta[property="og:image"]').attr('content') || $('link[rel="image_src"]').attr('href');
                 const ogTitle = $('meta[property="og:title"]').attr('content') || $('title').text();
                 const ogDesc = $('meta[property="og:description"]').attr('content');
@@ -145,7 +142,6 @@ router.post("/lookup", requireAuth, async (req, res) => {
                 console.error("⚠️ Scraper failed:", scrapeErr.message);
             }
 
-            // Specific error message for stories/private paths
             if (isStory || url.includes("php")) {
                 throw new Error("Could not download story. Ensure cookies.txt is updated.");
             }
@@ -154,11 +150,17 @@ router.post("/lookup", requireAuth, async (req, res) => {
 
     } catch (err) {
         console.error("❌ Facebook Lookup Error:", err.message);
+
+        let errorMessage = "Failed to fetch content.";
+        if (err.message.includes("cookies") || err.message.includes("registered users")) {
+            errorMessage = "This content is private or restricted. Only public content can be downloaded.";
+        } else if (err.message.includes("ext") || err.message.includes("format")) {
+            errorMessage = "Could not extract media. It might be private or deleted.";
+        }
+
         res.status(500).json({
             success: false,
-            error: err.message.includes("cookies")
-                ? "Login required (Cookies missing/expired)"
-                : "Failed to fetch content. (Private post or unsupported format)"
+            error: errorMessage
         });
     }
 });
@@ -173,12 +175,12 @@ router.post("/download", requireAuth, async (req, res) => {
 
         const isRawUrl = url.includes("fbcdn.net") || url.includes("googlevideo.com") || url.startsWith("blob:");
         const safeTitle = `fb-${Date.now()}`;
-        const outputTemplate = path.join(tempDir, `${safeTitle}.mp4`); // Default to mp4
+        const outputTemplate = path.join(tempDir, `${safeTitle}.mp4`);
 
         console.log(`📥 Downloading Facebook Video (${isRawUrl ? 'Raw URL' : 'yt-dlp'})...`);
 
         if (isRawUrl) {
-            // 🌟 Direct Download Stream (No yt-dlp needed)
+            // 🌟 Direct Download Stream
             const writer = fs.createWriteStream(outputTemplate);
             const response = await axios({
                 url,
@@ -194,7 +196,17 @@ router.post("/download", requireAuth, async (req, res) => {
                 writer.on('error', reject);
             });
 
-            console.log("✅ Direct Download Complete:", safeTitle);
+            // ... (Auto-delete logic) ...
+
+            // 🕒 Auto-Delete after 5 minutes
+            setTimeout(() => {
+                if (fs.existsSync(outputTemplate)) {
+                    fs.unlink(outputTemplate, (err) => {
+                        if (err) console.error(`❌ Failed to auto-delete ${safeTitle}:`, err);
+                    });
+                }
+            }, 5 * 60 * 1000);
+
             return res.json({ success: true, url: `/uploads/temp/videos/${safeTitle}.mp4` });
 
         } else {
@@ -202,20 +214,23 @@ router.post("/download", requireAuth, async (req, res) => {
             const outputTemplateYt = path.join(tempDir, `${safeTitle}.%(ext)s`);
             const dlFlags = {
                 noWarnings: true,
-                noCallHome: true,
                 noCheckCertificate: true,
                 output: outputTemplateYt,
-                format: 'bestvideo+bestaudio/best', // Attempt merge for best quality
-                mergeOutputFormat: 'mp4', // ⭐️ Force MP4 container
+                format: 'bestvideo+bestaudio/best',
+                mergeOutputFormat: 'mp4',
                 userAgent: DEFAULT_UA,
-                playlistItems: '1' // ⭐️ Only download the first item if it's a playlist (Story)
+                playlistItems: '1',
+                ffmpegLocation: require('ffmpeg-static')
             };
 
             if (fs.existsSync(cookiesPath)) {
                 dlFlags.cookies = cookiesPath;
             }
 
-            await youtubedl(url, dlFlags);
+            const youtubedl = require("youtube-dl-exec");
+
+            // ⚙️ Use Helper for Binary Path
+            await youtubedl(url, dlFlags, { execPath: getBinaryPath() });
 
             // Find file
             const files = fs.readdirSync(tempDir);
@@ -223,6 +238,15 @@ router.post("/download", requireAuth, async (req, res) => {
 
             if (found) {
                 console.log("✅ Facebook Download Complete:", found);
+
+                // 🕒 Auto-Delete after 5 minutes
+                setTimeout(() => {
+                    const filePath = path.join(tempDir, found);
+                    if (fs.existsSync(filePath)) {
+                        fs.unlink(filePath, (err) => { });
+                    }
+                }, 5 * 60 * 1000);
+
                 res.json({ success: true, url: `/uploads/temp/videos/${found}` });
             } else {
                 throw new Error("File not found after download");
@@ -231,7 +255,13 @@ router.post("/download", requireAuth, async (req, res) => {
 
     } catch (err) {
         console.error("❌ FB Download Error:", err.message);
-        res.status(500).json({ success: false, error: err.message || "Server Error" });
+
+        let errorMessage = "Download failed. Ensure content is Public.";
+        if (err.message.includes("cookies") || err.message.includes("registered users")) {
+            errorMessage = "This content is private or restricted. Only public content can be downloaded.";
+        }
+
+        res.status(500).json({ success: false, error: errorMessage });
     }
 });
 

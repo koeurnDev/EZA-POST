@@ -126,21 +126,33 @@ if (!fs.existsSync(tempUploadsPath)) fs.mkdirSync(tempUploadsPath, { recursive: 
 app.set("trust proxy", 1);
 
 // ✅ Session setup (stored in MongoDB)
+// ✅ Session setup (with Fallback to MemoryStore)
+let sessionStore;
+
+try {
+  sessionStore = MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/mongkul",
+    collectionName: "sessions",
+    ttl: 24 * 60 * 60, // 1 day in seconds
+    autoRemove: "native"
+  });
+  console.log("✅ MongoDB Session Store Initialized");
+} catch (err) {
+  console.error("⚠️ MongoDB Session Store Failed, falling back to MemoryStore:", err.message);
+  sessionStore = new session.MemoryStore();
+}
+
 app.use(
   session({
-    store: MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/mongkul",
-      collectionName: "sessions",
-      ttl: 24 * 60 * 60, // 1 day in seconds
-    }),
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || "eza_post_secret_key_2024",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.RENDER === "true", // ✅ Only force Secure on Render (allows localhost to work)
+      secure: process.env.RENDER === "true", // ✅ Only force Secure on Render
       httpOnly: true,
-      sameSite: process.env.RENDER === "true" ? "none" : "lax", // ✅ Lax for localhost, None for Render
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      sameSite: process.env.RENDER === "true" ? "none" : "lax",
+      maxAge: 24 * 60 * 60 * 1000,
     },
   })
 );

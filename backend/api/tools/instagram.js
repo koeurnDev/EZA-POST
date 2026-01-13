@@ -56,7 +56,8 @@ router.post("/download", requireAuth, async (req, res) => {
         try {
             await ytdlp.download(cleanUrl, outputTemplate, flags);
         } catch (e) {
-            console.warn("⚠️ Primary download failed (expected for images), proceeding to check/fallback...");
+            console.warn(`⚠️ Primary download failed: ${e.message}`);
+            console.warn("Proceeding to check/fallback...");
         }
 
         // Find the generated file
@@ -103,6 +104,7 @@ router.post("/download", requireAuth, async (req, res) => {
                     cookies: flags.cookies
                 });
             } catch (e) {
+                console.warn(`⚠️ yt-dlp lookup failed: ${e.message}`);
                 // Attempt 1: Check stdout for JSON
                 if (e.stdout) {
                     try { info = JSON.parse(e.stdout); } catch (err) { }
@@ -231,7 +233,13 @@ router.post("/download", requireAuth, async (req, res) => {
 
     } catch (err) {
         console.error("❌ Instagram Download Error:", err.message);
-        res.status(500).json({ success: false, error: "Failed to download. Ensure content is Public. " + err.message });
+
+        let errorMessage = "Failed to download. Ensure content is Public.";
+        if (err.message.includes("cookies") || err.message.includes("registered users")) {
+            errorMessage = "This content is private or restricted. Only public content can be downloaded.";
+        }
+
+        res.status(500).json({ success: false, error: errorMessage });
     }
 });
 

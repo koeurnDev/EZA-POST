@@ -10,7 +10,9 @@ import { getUserData, saveUserData, clearUserData } from "../utils/apiUtils";
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  console.log("🔐 AuthProvider Loaded: v2025-11-28-FIXED");
+  useEffect(() => {
+    console.log("🔐 AuthProvider Mounted");
+  }, []);
   const [user, setUser] = useState(() => {
     try {
       return getUserData();

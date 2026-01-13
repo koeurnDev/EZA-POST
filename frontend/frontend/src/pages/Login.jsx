@@ -14,7 +14,7 @@ export default function Login() {
   // ------------------------------------------------------------
   useEffect(() => {
     if (!authLoading && user) {
-      navigate("/dashboard", { replace: true });
+      navigate("/tools/tiktok", { replace: true });
     }
   }, [user, authLoading, navigate]);
 
@@ -35,10 +35,10 @@ export default function Login() {
       setAuthUser(user); // ✅ Update global auth state immediately
       showNotification(
         "success",
-        `✅ Welcome back, ${user.name || "User"}! Redirecting...`,
+        `✅ Welcome back, ${user.name || "User"}! Redirecting to TikTok Tool...`,
         1000
       );
-      setTimeout(() => navigate("/dashboard", { replace: true }), 1200);
+      setTimeout(() => navigate("/tools/tiktok", { replace: true }), 1200);
     } catch (err) {
       console.error("❌ Login success handler error:", err);
       showNotification("error", "Login session failed to initialize.");

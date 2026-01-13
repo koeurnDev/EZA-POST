@@ -50,7 +50,7 @@ router.get("/", async (req, res) => {
           );
           console.log("✅ Token Verified. User ID:", decoded.id);
 
-          // ✅ CRITICAL FIX: Fetch fresh user data from DB instead of using stale token data
+          // Fetch fresh user data from DB
           const foundUser = await User.findOne({ id: decoded.id }).select(
             "id email name facebookId facebookName avatar connectedPages"
           );
@@ -83,9 +83,11 @@ router.get("/", async (req, res) => {
     res.json({ authenticated, user });
   } catch (err) {
     console.error("❌ Auth status error:", err.message);
-    res.status(500).json({
-      success: false,
-      error: "Internal server error while checking auth status",
+    // If DB is down, return not authenticated instead of 500 to prevent frontend crash
+    res.json({
+      authenticated: false,
+      user: null,
+      error: "Auth check failed (likely DB connection)",
     });
   }
 });

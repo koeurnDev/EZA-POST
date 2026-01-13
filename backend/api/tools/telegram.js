@@ -11,8 +11,6 @@ const router = express.Router();
 const path = require("path");
 const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
-const youtubedl = require("youtube-dl-exec");
-const ffmpegPath = require("ffmpeg-static");
 
 // 🗂️ Temp directory
 const tempDir = path.join(__dirname, "../../temp/telegram");
@@ -31,29 +29,33 @@ router.post("/download", requireAuth, async (req, res) => {
         console.log(`✈️ Downloading Telegram Media: ${url}`);
 
         const safeId = `tg-${Date.now()}`;
+        // Note: %(ext)s automatically detects the extension (mp4, jpg, etc)
         const outputTemplate = path.join(tempDir, `${safeId}.%(ext)s`);
 
         // Flags for yt-dlp to work with Telegram
         const flags = {
             noWarnings: true,
-            noCallHome: true,
             noCheckCertificate: true,
             output: outputTemplate,
             maxDownloads: 1, // Focus on single file for now
-            // Telegram specific might allow auto-detect
         };
 
-        const output = await youtubedl(url, {
-            ...flags,
-            dumpSingleJson: true // To get metadata first? No, just download.
-        });
+        // 🔄 Lazy Load & Configure Path
+        const youtubedl = require("youtube-dl-exec");
 
-        // Actually, let's just run download and find file.
-        // But running with dumpSingleJson doesn't download.
-        // So standard run:
-        await youtubedl(url, flags);
+        // ⚙️ VITAL FOR RENDER: Point to the custom binary path
+        // Locally it uses default; In production it uses the ./bin folder
+        const isProduction = process.env.NODE_ENV === 'production';
+        const binaryPath = isProduction
+            ? path.join(__dirname, '../../bin/yt-dlp')
+            : undefined;
 
-        // Find the generated file
+        console.log(`🔍 Using yt-dlp binary at: ${binaryPath || 'Global System Path'}`);
+
+        // Execute Download
+        await youtubedl(url, flags, { execPath: binaryPath });
+
+        // Find the generated file (since we don't know the extension yet)
         const files = fs.readdirSync(tempDir);
         const foundFile = files.find(f => f.startsWith(safeId));
 
@@ -78,7 +80,7 @@ router.post("/download", requireAuth, async (req, res) => {
 
     } catch (err) {
         console.error("❌ Telegram Download Error:", err.message);
-        res.status(500).json({ success: false, error: "Failed to download. Ensure connection is Public. " + err.message });
+        res.status(500).json({ success: false, error: "Failed to download. " + err.message });
     }
 });
 

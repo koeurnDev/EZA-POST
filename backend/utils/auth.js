@@ -71,7 +71,13 @@ function verifyToken(req, res, next) {
 /* -------------------------------------------------------------------------- */
 async function getUserById(userId) {
   try {
+    // console.log(`🔍 helper: getUserById searching for: ${userId}`);
     const user = await User.findOne({ id: userId }).select("id email name");
+
+    if (!user) {
+      console.warn(`⚠️ getUserById: User not found in DB for ID: ${userId}`);
+    }
+
     return user ? { id: user.id, email: user.email, name: user.name } : null;
   } catch (err) {
     console.error("❌ Database lookup failed:", err.message);

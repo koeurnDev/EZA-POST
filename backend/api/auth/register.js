@@ -19,12 +19,11 @@ router.post("/", async (req, res) => {
     });
   }
 
-  // 🔒 Strong Password Policy (Min 12 chars, Upper, Lower, Number, Special)
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/;
-  if (!passwordRegex.test(password)) {
+  // 🔒 Standard Password Policy (Min 6 chars)
+  if (password.length < 6) {
     return res.status(400).json({
       success: false,
-      error: "Password must be at least 12 characters long and include uppercase, lowercase, number, and special character.",
+      error: "Password must be at least 6 characters long.",
     });
   }
 
@@ -92,6 +91,15 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Register error:", err);
+
+    // Check for DB connection errors
+    if (err.name === 'MongoServerSelectionError' || err.name === 'MongooseServerSelectionError') {
+      return res.status(503).json({
+        success: false,
+        error: "Database unavailable. Please check your connection or IP whitelist.",
+      });
+    }
+
     return res.status(500).json({
       success: false,
       error: "Registration failed. Please try again later.",

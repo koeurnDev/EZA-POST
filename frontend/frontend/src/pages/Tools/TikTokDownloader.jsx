@@ -100,6 +100,7 @@ export default function TikTokDownloader() {
             const res = await api.post("/tools/tiktok/profile", { username: profileInput }, { timeout: 90000 });
             if (res.data.success) {
                 setProfileData(res.data);
+                console.log("🔍 Check Data:", res.data.videos); // Debugging
                 toast.success(`Found ${res.data.videos.length} videos`);
             }
         } catch (err) {
@@ -337,7 +338,7 @@ export default function TikTokDownloader() {
                                     <div className="flex flex-col md:flex-row gap-8">
                                         {/* Media Preview */}
                                         <div className="w-full md:w-1/3 shrink-0 relative">
-                                            {videoData.type === 'slideshow' || videoData.type === 'photo' ? (
+                                            {(videoData.type === 'slideshow' || videoData.type === 'photo' || (videoData.images && videoData.images.length > 0)) ? (
                                                 <div className="aspect-[3/4] rounded-2xl overflow-hidden relative group bg-gray-100 dark:bg-gray-900 border border-white/10 shadow-lg">
                                                     <img src={videoData.images?.[0] || videoData.cover} alt="cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                                     <div className="absolute top-3 left-3 px-3 py-1 bg-amber-500/90 backdrop-blur-md rounded-lg text-black text-[10px] font-black border border-amber-400/50 shadow-xl tracking-tighter flex items-center gap-1">
@@ -370,14 +371,18 @@ export default function TikTokDownloader() {
                                         <div className="flex-1 flex flex-col">
                                             <div className="mb-6">
                                                 <span className="inline-block px-3 py-1 rounded-full bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 text-xs font-bold mb-2 tracking-wide uppercase">
-                                                    @{videoData.author}
+                                                    @{videoData.author.nickname || videoData.author.unique_id}
                                                 </span>
                                                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight mb-4">
                                                     {videoData.title || "Untitled Video"}
                                                 </h2>
 
                                                 <div className="flex flex-wrap gap-2 items-center">
-                                                    {['100% Original Quality', 'Ultra Clear', 'No Watermark'].map(tag => (
+                                                    {[
+                                                        (videoData.type === 'slideshow' || videoData.type === 'photo') ? 'រូប គុណភាពដើម 100%' : 'Video គុណភាពដើម 100%',
+                                                        'Ultra Clear (ច្បាស់)',
+                                                        'No Watermark (គ្មាន)'
+                                                    ].map(tag => (
                                                         <span key={tag} className="px-3 py-1 rounded-lg bg-white/40 dark:bg-white/5 backdrop-blur-md text-gray-700 dark:text-gray-300 text-xs font-semibold border border-white/20">
                                                             {tag}
                                                         </span>
@@ -677,10 +682,9 @@ export default function TikTokDownloader() {
                                                                 </div>
                                                             </div>
 
-                                                            {/* 🏷️ Type Badge */}
                                                             <div className="absolute top-2 left-2 flex flex-col gap-1 pointer-events-none">
-                                                                {video.type === 'slideshow' ? (
-                                                                    <span className="px-1.5 py-0.5 bg-amber-500 text-black text-[9px] font-black rounded shadow-sm border border-amber-400 flex items-center gap-1">
+                                                                {(video.type === 'slideshow' || (video.images && video.images.length > 1)) ? (
+                                                                    <span className="px-1.5 py-0.5 bg-yellow-500 text-black text-[9px] font-black rounded shadow-sm border border-yellow-400 flex items-center gap-1">
                                                                         <Layers size={10} /> SLIDESHOW
                                                                     </span>
                                                                 ) : video.type === 'photo' ? (

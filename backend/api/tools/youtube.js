@@ -2,7 +2,7 @@
  * ============================================================
  * 📺 /api/tools/youtube — YouTube Downloader (yt-dlp)
  * ============================================================
- * Uses youtube-dl-exec (yt-dlp wrapper) for reliable downloads.
+ * Uses youtube-dl-exec directly with robust Render configuration.
  */
 
 const express = require("express");
@@ -10,10 +10,8 @@ const router = express.Router();
 const path = require("path");
 const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
-const ytdlp = require("../../utils/ytdlp");
-// const ffmpegPath = require("ffmpeg-static"); // Re-enabled dynamically below or here if needed at top level.
-// Actually let's import it at top level to be safe.
-
+const youtubedl = require("youtube-dl-exec");
+const ffmpegPath = require("ffmpeg-static"); // ✅ Required for merging 1080p+ Video & Audio
 
 // 🗂️ Temp directory
 const tempDir = path.join(__dirname, "../../temp/videos");
@@ -21,6 +19,13 @@ if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
 // 🍪 Cookies File (for Age-Gated / Premium content)
 const cookiesPath = path.join(__dirname, "../../cookies.txt");
+
+// ⚙️ Helper: Get Binary Path for Render
+const getBinaryPath = () => {
+    return process.env.NODE_ENV === 'production'
+        ? path.join(__dirname, '../../bin/yt-dlp')
+        : undefined;
+};
 
 /* -------------------------------------------------------------------------- */
 /* 🔍 POST /lookup — Get Video Info & Formats                                 */
@@ -40,13 +45,12 @@ router.post("/lookup", requireAuth, async (req, res) => {
             userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         };
 
-        // Inject cookies if file exists
         if (fs.existsSync(cookiesPath)) {
             flags.cookies = cookiesPath;
         }
 
         // 1. Fast Check: Is it a playlist/channel?
-        const fastOutput = await ytdlp.lookup(url, flags);
+        const fastOutput = await youtubedl(url, flags, { execPath: getBinaryPath() });
 
         // 📋 CASE A: Playlist / Channel
         if (fastOutput.entries && Array.isArray(fastOutput.entries) && fastOutput.entries.length > 0) {
@@ -69,12 +73,11 @@ router.post("/lookup", requireAuth, async (req, res) => {
         }
 
         // 🎬 CASE B: Single Video (Full Detail Lookup)
-        const output = await ytdlp.lookup(url, { ...flags, flatPlaylist: false });
+        // We run lookup again without flatPlaylist to get format details
+        const output = await youtubedl(url, { ...flags, flatPlaylist: false }, { execPath: getBinaryPath() });
 
         // Parse relevant info
         const formats = output.formats || [];
-
-        // Simple heuristic for available qualities
         const resolutions = new Set();
         formats.forEach(f => {
             if (f.vcodec !== 'none' && f.height) {
@@ -95,16 +98,13 @@ router.post("/lookup", requireAuth, async (req, res) => {
             duration: output.duration,
             author: output.uploader,
             resolutions: availableResolutions,
-            audioBitrates: [320, 256, 192, 128] // ✅ Supported MP3 Bitrates
+            audioBitrates: [320, 256, 192, 128]
         };
 
         res.json({ success: true, isPlaylist: false, video: metadata });
 
     } catch (err) {
-        console.error("❌ YouTube Lookup Error Details:", {
-            message: err.message,
-            stderr: err.stderr,
-        });
+        console.error("❌ YouTube Lookup Error Details:", { message: err.message });
         res.status(500).json({ success: false, error: "Failed to fetch info: " + err.message });
     }
 });
@@ -114,32 +114,28 @@ router.post("/lookup", requireAuth, async (req, res) => {
 /* -------------------------------------------------------------------------- */
 router.post("/download", requireAuth, async (req, res) => {
     try {
-        const { url, quality, format } = req.body; // format: 'mp4' | 'mp3', quality: number (height or bitrate)
+        const { url, quality, format } = req.body; // format: 'mp4' | 'mp3'
         if (!url) return res.status(400).json({ success: false, error: "No URL provided" });
 
         const isAudio = format === 'mp3';
         const safeTitle = `youtube-${Date.now()}`;
         const outputTemplate = path.join(tempDir, `${safeTitle}.%(ext)s`);
 
-        // Log the user's choice
         const qualityLabel = isAudio
             ? (quality ? `${quality}kbps` : 'Best Audio')
             : (quality ? `${quality}p` : 'Best Video');
 
-        console.log(`📥 Downloading YouTube (${qualityLabel}) as ${isAudio ? 'MP3' : 'MP4'} (Prefix: ${safeTitle})...`);
-
-        const ffmpegPath = require("ffmpeg-static");
+        console.log(`📥 Downloading YouTube (${qualityLabel}) as ${isAudio ? 'MP3' : 'MP4'}...`);
 
         const flags = {
             noWarnings: true,
             noCheckCertificate: true,
             output: outputTemplate,
-            ffmpegLocation: ffmpegPath,
+            ffmpegLocation: ffmpegPath, // ✅ Critical for merging
             concurrentFragments: 4,
             userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         };
 
-        // Inject cookies if file exists
         if (fs.existsSync(cookiesPath)) {
             flags.cookies = cookiesPath;
         }
@@ -149,44 +145,33 @@ router.post("/download", requireAuth, async (req, res) => {
             Object.assign(flags, {
                 extractAudio: true,
                 audioFormat: 'mp3',
-                // Use explicit bitrate (e.g. '320K') or default to '0' (Best VBR)
                 audioQuality: quality ? `${quality}K` : '0',
             });
         } else {
             // 🎥 Video (Smart Selection)
-            // Goal: Avoid slow merging if a good enough single file exists (e.g. 720p mp4)
-
             let formatSelector;
 
             if (quality && quality <= 720) {
-                // ⚡ Fast Path: Try to find a pre-merged MP4 at the exact quality first.
-                // "best[ext=mp4][height=...]" guarantees a single file (no merge).
+                // ⚡ Fast Path: Try to find a pre-merged MP4 first
                 formatSelector = `best[ext=mp4][height=${quality}]/bestvideo[height=${quality}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height=${quality}]+bestaudio/best[height<=${quality}]`;
             } else if (quality) {
-                // 💎 High Quality (1080p+): Usually implies creating a merge.
-                // Prefer MP4 video (H.264) + M4A audio (AAC) to avoid re-encoding.
+                // 💎 High Quality (1080p+): Force Merge
                 formatSelector = `bestvideo[height=${quality}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height=${quality}][ext=mp4]+bestaudio/bestvideo[height=${quality}]+bestaudio`;
             } else {
                 // 🌟 Best Available
-                // Try to get H.264/AAC first for speed, otherwise fall back to best quality (likely VP9)
                 formatSelector = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best';
             }
 
-            console.log(`🎯 Strategy: ${formatSelector}`);
-
             Object.assign(flags, {
                 format: formatSelector,
-                mergeOutputFormat: 'mp4', // Ensure final container is mp4 if valid
+                mergeOutputFormat: 'mp4',
             });
         }
 
-        await ytdlp.download(url, outputTemplate, flags);
+        // EXECUTE DOWNLOAD
+        await youtubedl(url, flags, { execPath: getBinaryPath() });
 
         // Find the generated file
-        // yt-dlp might replace %(ext)s with mp4, mp3, mkv, etc.
-        const expectedExt = isAudio ? '.mp3' : '.mp4';
-
-        // We look for files starting with safeTitle
         const files = fs.readdirSync(tempDir);
         const foundFile = files.find(f =>
             f.startsWith(safeTitle) &&

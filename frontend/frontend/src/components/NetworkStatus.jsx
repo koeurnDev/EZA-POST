@@ -80,10 +80,17 @@ const NetworkStatus = ({
     };
   }, [checkNetworkStatus, onStatusChange]);
 
-  // 🔁 Auto-check interval
+  // 🔁 Auto-check interval (Pauses when hidden to prevent violations)
   useEffect(() => {
     if (autoCheckInterval <= 0) return;
-    const id = setInterval(() => !isChecking && checkNetworkStatus(), autoCheckInterval);
+
+    const tick = () => {
+      if (!document.hidden && !isChecking) {
+        checkNetworkStatus();
+      }
+    };
+
+    const id = setInterval(tick, autoCheckInterval);
     return () => clearInterval(id);
   }, [autoCheckInterval, isChecking, checkNetworkStatus]);
 

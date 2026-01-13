@@ -68,7 +68,8 @@ const lookup = async (url, options = {}) => {
             '--no-warnings',
             '--no-check-certificates',
             '--prefer-free-formats',
-            '--no-playlist'
+            '--no-playlist',
+            '--ffmpeg-location', require('ffmpeg-static')
         ];
 
         // Handles options
@@ -99,7 +100,8 @@ const stream = (url, res) => {
         '--no-cache-dir',
         '--no-check-certificates',
         '--no-warnings',
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        '--ffmpeg-location', require('ffmpeg-static')
     ];
 
     const subprocess = spawn(command, args);
@@ -119,11 +121,13 @@ const stream = (url, res) => {
  * Downloads file to local path
  */
 const download = (url, outputPath, options = {}) => {
+    const ffmpegPath = require('ffmpeg-static');
     const args = [
         url,
         '-o', outputPath,
         '--no-warnings',
-        '--no-check-certificates'
+        '--no-check-certificates',
+        '--ffmpeg-location', ffmpegPath
     ];
 
     if (options.format) args.push('-f', options.format);
