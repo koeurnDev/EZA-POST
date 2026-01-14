@@ -9,7 +9,7 @@ services:
     region: singapore
     branch: main
     rootDir: backend
-    buildCommand: npm install && pip install -r requirements.txt
+    buildCommand: npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
