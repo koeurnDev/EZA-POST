@@ -56,7 +56,7 @@ const formatTikTokVideo = (v) => {
     let noWatermark = v.hdplay || v.play || v.download_addr || v.web_url || "";
 
     return {
-        id: v.video_id,
+        id: v.video_id || v.id,
         title: v.title || "",
         cover: v.cover,
         no_watermark_url: noWatermark, // ✅ Guaranteed to have a value (web_url at least)
@@ -318,7 +318,7 @@ router.post("/download", requireAuth, async (req, res) => {
 router.get("/stream", async (req, res) => {
     try {
         const { id, url, filename } = req.query;
-        if (!id || !url) return res.status(400).send("Missing parameters");
+        if (!id || id === 'undefined' || !url) return res.status(400).send("Missing parameters: id or url");
 
         const safeId = id.replace(/[^a-z0-9]/gi, "_");
         const cacheFilename = `tiktok-${safeId}.mp4`;

@@ -1,60 +1,14 @@
-// 🛠️ Simple wrapper to use system installed yt-dlp (via pip)
-// avoiding youtube-dl-exec npm package issues on Render
-
-const { spawn, execFile } = require('child_process');
+// 🛠️ Wrapper for youtube-dl-exec to ensure consistent binary usage
+const youtubedl = require('youtube-dl-exec');
 const path = require('path');
+const fs = require('fs');
 
-// Helper to run yt-dlp with arguments
-const runYtDlp = (args, options = {}) => {
-    return new Promise((resolve, reject) => {
-        // Detect OS and command
-        const command = 'yt-dlp'; // Assumes it's in PATH (installed via pip)
-
-        const child = spawn(command, args, {
-            maxBuffer: 1024 * 1024 * 50, // 50MB buffer
-            ...options
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        child.stdout.on('data', (data) => {
-            stdout += data;
-        });
-
-        child.stderr.on('data', (data) => {
-            stderr += data;
-        });
-
-        child.on('close', (code) => {
-            if (code !== 0) {
-                // If it fails, reject with stderr
-                reject(new Error(stderr || `yt-dlp process exited with code ${code}`));
-            } else {
-                // Try to parse JSON if requested
-                try {
-                    if (args.includes('--dump-json') || args.includes('-j')) {
-                        // Sometimes yt-dlp outputs warnings before JSON, so we look for the last valid JSON line or trim
-                        const lines = stdout.trim().split('\n');
-                        const jsonLine = lines.find(l => l.startsWith('{'));
-                        if (jsonLine) {
-                            resolve(JSON.parse(jsonLine));
-                        } else {
-                            resolve(stdout);
-                        }
-                    } else {
-                        resolve(stdout);
-                    }
-                } catch (e) {
-                    resolve(stdout);
-                }
-            }
-        });
-
-        child.on('error', (err) => {
-            reject(new Error(`Failed to start yt-dlp: ${err.message}`));
-        });
-    });
+// Helper to get binary path (useful for production/Render)
+const getBinaryPath = () => {
+    // Check for explicit local binary override or production path
+    return process.env.NODE_ENV === 'production'
+        ? path.join(__dirname, '../bin/yt-dlp')
+        : undefined; // Local dev: use node_modules binary from youtube-dl-exec
 };
 
 /**
@@ -62,22 +16,23 @@ const runYtDlp = (args, options = {}) => {
  */
 const lookup = async (url, options = {}) => {
     try {
-        const args = [
-            url,
-            '--dump-json',
-            '--no-warnings',
-            '--no-check-certificates',
-            '--prefer-free-formats',
-            '--no-playlist',
-            '--ffmpeg-location', require('ffmpeg-static')
-        ];
+        const flags = {
+            dumpSingleJson: true,
+            noWarnings: true,
+            noCheckCertificates: true,
+            preferFreeFormats: true,
+            noPlaylist: true,
+            ffmpegLocation: require('ffmpeg-static')
+        };
 
         // Handles options
-        if (options.flatPlaylist) args.push('--flat-playlist');
-        if (options.playlistEnd) args.push('--playlist-end', options.playlistEnd);
-        if (options.userAgent) args.push('--user-agent', options.userAgent);
+        if (options.flatPlaylist) flags.flatPlaylist = true;
+        if (options.playlistEnd) flags.playlistEnd = options.playlistEnd;
+        if (options.userAgent) flags.userAgent = options.userAgent;
+        if (options.cookies) flags.cookies = options.cookies;
+        if (options.ignoreErrors) flags.ignoreErrors = true;
 
-        const output = await runYtDlp(args);
+        const output = await youtubedl(url, flags, { execPath: getBinaryPath() });
         return output;
     } catch (err) {
         throw new Error(`yt-dlp lookup failed: ${err.message}`);
@@ -89,28 +44,27 @@ const lookup = async (url, options = {}) => {
  * Returns the child process.
  */
 const stream = (url, res) => {
-    const command = 'yt-dlp';
+    // For streaming, we use .exec() to get the subprocess
+    const flags = {
+        output: '-',
+        format: 'best',
+        noPart: true,
+        noCacheDir: true,
+        noCheckCertificates: true,
+        noWarnings: true,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        ffmpegLocation: require('ffmpeg-static')
+    };
 
-    // Arguments for streaming to stdout
-    const args = [
-        url,
-        '-o', '-',
-        '-f', 'best',
-        '--no-part', // Write directly, no .part files
-        '--no-cache-dir',
-        '--no-check-certificates',
-        '--no-warnings',
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        '--ffmpeg-location', require('ffmpeg-static')
-    ];
+    // Direct stream
+    const subprocess = youtubedl.exec(url, flags, { execPath: getBinaryPath() });
 
-    const subprocess = spawn(command, args);
-
+    // Pipe stdout to response
     subprocess.stdout.pipe(res);
 
     subprocess.stderr.on('data', (data) => {
         const msg = data.toString();
-        // Ignore progress bars or small info
+        // Ignore progress bars
         if (msg.includes('ERROR')) console.error("❌ yt-dlp stream stderr:", msg);
     });
 
@@ -121,20 +75,21 @@ const stream = (url, res) => {
  * Downloads file to local path
  */
 const download = (url, outputPath, options = {}) => {
-    const ffmpegPath = require('ffmpeg-static');
-    const args = [
-        url,
-        '-o', outputPath,
-        '--no-warnings',
-        '--no-check-certificates',
-        '--ffmpeg-location', ffmpegPath
-    ];
+    const flags = {
+        output: outputPath,
+        noWarnings: true,
+        noCheckCertificates: true,
+        ffmpegLocation: require('ffmpeg-static')
+    };
 
-    if (options.format) args.push('-f', options.format);
-    if (options.cookies) args.push('--cookies', options.cookies);
-    if (options.userAgent) args.push('--user-agent', options.userAgent);
+    if (options.format) flags.format = options.format;
+    if (options.cookies) flags.cookies = options.cookies;
+    if (options.userAgent) flags.userAgent = options.userAgent;
+    if (options.noPlaylist) flags.noPlaylist = true;
+    if (options.ignoreErrors) flags.ignoreErrors = true;
 
-    return runYtDlp(args);
+    // Returns Promise
+    return youtubedl(url, flags, { execPath: getBinaryPath() });
 };
 
 module.exports = {

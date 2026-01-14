@@ -11,21 +11,7 @@ const path = require("path");
 const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
 const axios = require("axios");
-const cheerio = require("cheerio");
-
-// 🗂️ Temp directory
-const tempDir = path.join(__dirname, "../../temp/videos");
-if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-
-const cookiesPath = path.join(__dirname, "../../cookies.txt");
-const DEFAULT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36";
-
-// ⚙️ Helper: Get Binary Path for Render
-const getBinaryPath = () => {
-    return process.env.NODE_ENV === 'production'
-        ? path.join(__dirname, '../../bin/yt-dlp')
-        : undefined;
-};
+const ytdlp = require("../../utils/ytdlp");
 
 /* -------------------------------------------------------------------------- */
 /* 🔍 POST /lookup — Get Video or Image Info                                  */
@@ -62,10 +48,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
                 flags.cookies = cookiesPath;
             }
 
-            const youtubedl = require("youtube-dl-exec"); // 🔄 Lazy Load
-
-            // ⚙️ Use Helper for Binary Path
-            let output = await youtubedl(url, flags, { execPath: getBinaryPath() });
+            const output = await ytdlp.lookup(url, flags);
 
             // 🔄 Handle Playlists (Stories often return a playlist)
             if (output._type === 'playlist' || (output.entries && output.entries.length > 0)) {
@@ -227,10 +210,8 @@ router.post("/download", requireAuth, async (req, res) => {
                 dlFlags.cookies = cookiesPath;
             }
 
-            const youtubedl = require("youtube-dl-exec");
-
             // ⚙️ Use Helper for Binary Path
-            await youtubedl(url, dlFlags, { execPath: getBinaryPath() });
+            await ytdlp.download(url, outputTemplateYt, dlFlags);
 
             // Find file
             const files = fs.readdirSync(tempDir);

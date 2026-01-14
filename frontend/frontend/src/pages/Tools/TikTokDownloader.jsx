@@ -233,7 +233,8 @@ export default function TikTokDownloader() {
                 const safeFilename = `tiktok-${title.replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50)}.mp4`;
 
                 // Use the robust /stream endpoint
-                const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${v.id}&url=${encodeURIComponent(targetUrl)}&filename=${encodeURIComponent(safeFilename)}`;
+                const videoId = v.id || `video_${Date.now()}`;
+                const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${encodeURIComponent(targetUrl)}&filename=${encodeURIComponent(safeFilename)}`;
 
                 const link = document.createElement('a');
                 link.href = downloadUrl;
@@ -374,7 +375,7 @@ export default function TikTokDownloader() {
                                             ) : (
                                                 <div className="aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden relative bg-black shadow-lg border border-white/10 group">
                                                     <video
-                                                        src={`${API_BASE}/api/tools/tiktok/stream?id=${videoData.id}&url=${encodeURIComponent(videoData.no_watermark_url)}`}
+                                                        src={`${API_BASE}/api/tools/tiktok/stream?id=${videoData.id || 'preview'}&url=${encodeURIComponent(videoData.no_watermark_url)}`}
                                                         className="w-full h-full object-cover"
                                                         controls
                                                         autoPlay
@@ -509,7 +510,8 @@ export default function TikTokDownloader() {
                                                             // Use /stream endpoint with deleteAfter=true
                                                             // Note: We encodeURIComponent twice for the URL parameter to be safe, 
                                                             // but here just encoding the value is enough.
-                                                            const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoData.id}&url=${encodeURIComponent(videoData.no_watermark_url)}&filename=${encodeURIComponent(safeFilename + '.mp4')}`;
+                                                            const videoId = videoData.id || `video_${Date.now()}`;
+                                                            const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${encodeURIComponent(videoData.no_watermark_url)}&filename=${encodeURIComponent(safeFilename + '.mp4')}`;
 
                                                             const link = document.createElement('a');
                                                             link.href = downloadUrl;
