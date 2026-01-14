@@ -4,26 +4,18 @@
 
 const express = require('express');
 const router = express.Router();
-const BoostCampaign = require('../../models/BoostCampaign');
-const Post = require('../../models/Post');
-const User = require('../../models/User');
+const prisma = require('../../utils/prisma');
+const { decrypt } = require('../../utils/crypto');
+const { requireAuth } = require('../../utils/auth');
 const { createBoostCampaign, updateCampaignStatus, getCampaignMetrics, validateAdAccount } = require('../../services/facebookAds');
-
-// Middleware to check authentication
-const requireAuth = (req, res, next) => {
-    if (!req.session?.user) {
-        return res.status(401).json({ error: 'Authentication required' });
-    }
-    next();
-};
 
 /**
  * POST /api/boost/campaigns/create
  * Create a new boost campaign
  */
-router.post('/campaigns/create', requireAuth, async (req, res) => {
+router.post('/create', requireAuth, async (req, res) => {
     try {
-        const userId = req.session.user.id;
+        const userId = req.user.id;
         const { postId, budget, duration, targeting } = req.body;
 
         // Validation
@@ -40,7 +32,7 @@ router.post('/campaigns/create', requireAuth, async (req, res) => {
         }
 
         // Verify post ownership
-        const post = await Post.findById(postId);
+        const post = await prisma.post.findUnique({ where: { id: postId } });
         if (!post) {
             return res.status(404).json({ error: 'Post not found' });
         }
@@ -49,20 +41,33 @@ router.post('/campaigns/create', requireAuth, async (req, res) => {
         }
 
         // Get Facebook post ID
-        const fbPlatform = post.platforms?.find(p => p.name === 'facebook' && p.status === 'published');
+        let platforms = post.platforms;
+        if (typeof platforms === 'string') {
+            try { platforms = JSON.parse(platforms); } catch (e) { platforms = []; }
+        }
+        if (!Array.isArray(platforms)) platforms = [];
+
+        const fbPlatform = platforms.find(p => p.name === 'facebook' && p.status === 'published');
         if (!fbPlatform || !fbPlatform.postId) {
             return res.status(400).json({ error: 'Post not published to Facebook' });
         }
 
         // Get user and page token
-        const user = await User.findOne({ id: userId });
-        const pageId = post.accounts[0];
-        const page = user.connectedPages.find(p => p.id === pageId);
-        if (!page) {
-            return res.status(400).json({ error: 'Page not found' });
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+
+        let accounts = post.accounts;
+        if (typeof accounts === 'string') {
+            try { accounts = JSON.parse(accounts); } catch (e) { accounts = []; }
+        }
+        const pageId = accounts[0];
+
+        // Find page record in FacebookPage table
+        const pageRecord = await prisma.facebookPage.findUnique({ where: { id: pageId } });
+        if (!pageRecord || pageRecord.userId !== userId) {
+            return res.status(400).json({ error: 'Page not found or unauthorized' });
         }
 
-        const pageToken = user.getDecryptedPageToken(pageId);
+        const pageToken = decrypt(pageRecord.accessToken);
         const adAccountId = process.env.FB_AD_ACCOUNT_ID;
 
         if (!adAccountId) {
@@ -87,20 +92,20 @@ router.post('/campaigns/create', requireAuth, async (req, res) => {
         const endDate = new Date();
         endDate.setDate(endDate.getDate() + duration);
 
-        const campaign = new BoostCampaign({
-            userId,
-            postId: post._id,
-            facebookPostId: fbPlatform.postId,
-            pageId,
-            budget,
-            duration,
-            startDate,
-            endDate,
-            targeting: targeting || {},
-            status: 'draft'
+        const campaign = await prisma.boostCampaign.create({
+            data: {
+                userId,
+                postId: post.id,
+                facebookPostId: fbPlatform.postId,
+                pageId,
+                budget: parseFloat(budget),
+                duration: parseInt(duration),
+                startDate,
+                endDate,
+                targeting: targeting || {},
+                status: 'draft'
+            }
         });
-
-        await campaign.save();
 
         // Create campaign on Facebook
         try {
@@ -116,36 +121,36 @@ router.post('/campaigns/create', requireAuth, async (req, res) => {
             });
 
             // Update campaign with Facebook IDs
-            campaign.campaignId = fbCampaign.campaignId;
-            campaign.adSetId = fbCampaign.adSetId;
-            campaign.adId = fbCampaign.adId;
-            campaign.status = 'active';
-            await campaign.save();
+            const updatedCampaign = await prisma.boostCampaign.update({
+                where: { id: campaign.id },
+                data: {
+                    campaignId: fbCampaign.campaignId,
+                    adSetId: fbCampaign.adSetId,
+                    adId: fbCampaign.adId,
+                    status: 'active'
+                }
+            });
 
             // Update post
-            await Post.findByIdAndUpdate(postId, {
-                isBoosted: true,
-                $push: { boostCampaigns: campaign._id }
+            await prisma.post.update({
+                where: { id: postId },
+                data: { isBoosted: true }
             });
 
             res.json({
                 success: true,
-                campaign: {
-                    _id: campaign._id,
-                    campaignId: campaign.campaignId,
-                    status: campaign.status,
-                    budget: campaign.budget,
-                    duration: campaign.duration,
-                    startDate: campaign.startDate,
-                    endDate: campaign.endDate
-                },
+                campaign: updatedCampaign,
                 message: 'Campaign created successfully! It will start shortly.'
             });
         } catch (error) {
             // Update campaign status to failed
-            campaign.status = 'failed';
-            campaign.error = error.message;
-            await campaign.save();
+            await prisma.boostCampaign.update({
+                where: { id: campaign.id },
+                data: {
+                    status: 'failed',
+                    error: error.message
+                }
+            });
 
             throw error;
         }
@@ -159,29 +164,31 @@ router.post('/campaigns/create', requireAuth, async (req, res) => {
  * GET /api/boost/campaigns
  * Get all campaigns for current user
  */
-router.get('/campaigns', requireAuth, async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
     try {
-        const userId = req.session.user.id;
+        const userId = req.user.id;
         const { status, limit = 20 } = req.query;
 
-        const query = { userId };
+        const where = { userId };
         if (status && status !== 'all') {
-            query.status = status;
+            where.status = status;
         }
 
-        const campaigns = await BoostCampaign.find(query)
-            .sort({ createdAt: -1 })
-            .limit(parseInt(limit))
-            .populate('postId');
+        const campaigns = await prisma.boostCampaign.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: parseInt(limit),
+            include: { post: true }
+        });
 
-        // Format response with post data
+        // Format response
         const formattedCampaigns = campaigns.map(campaign => {
-            const post = campaign.postId;
+            const post = campaign.post;
             return {
-                _id: campaign._id,
+                id: campaign.id,
                 campaignId: campaign.campaignId,
                 post: post ? {
-                    _id: post._id,
+                    id: post.id,
                     caption: post.caption,
                     videoUrl: post.videoUrl,
                     createdAt: post.createdAt
@@ -210,14 +217,17 @@ router.get('/campaigns', requireAuth, async (req, res) => {
 
 /**
  * GET /api/boost/campaigns/:campaignId
- * Get specific campaign details
  */
-router.get('/campaigns/:campaignId', requireAuth, async (req, res) => {
+router.get('/:campaignId', requireAuth, async (req, res) => {
     try {
         const { campaignId } = req.params;
-        const userId = req.session.user.id;
+        const userId = req.user.id;
 
-        const campaign = await BoostCampaign.findById(campaignId).populate('postId');
+        const campaign = await prisma.boostCampaign.findUnique({
+            where: { id: campaignId },
+            include: { post: true }
+        });
+
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
@@ -228,35 +238,25 @@ router.get('/campaigns/:campaignId', requireAuth, async (req, res) => {
         // Sync latest metrics from Facebook
         if (campaign.campaignId && campaign.status === 'active') {
             try {
-                const user = await User.findOne({ id: userId });
-                const pageToken = user.getDecryptedPageToken(campaign.pageId);
+                const pageRecord = await prisma.facebookPage.findUnique({ where: { id: campaign.pageId } });
+                const pageToken = decrypt(pageRecord.accessToken);
 
                 const metrics = await getCampaignMetrics(campaign.campaignId, pageToken);
+
+                await prisma.boostCampaign.update({
+                    where: { id: campaign.id },
+                    data: {
+                        metrics: metrics || {},
+                        lastSyncedAt: new Date()
+                    }
+                });
                 campaign.metrics = metrics;
-                campaign.lastSyncedAt = new Date();
-                await campaign.save();
             } catch (error) {
                 console.error('⚠️ Failed to sync campaign metrics:', error.message);
             }
         }
 
-        res.json({
-            campaign: {
-                _id: campaign._id,
-                campaignId: campaign.campaignId,
-                post: campaign.postId,
-                budget: campaign.budget,
-                duration: campaign.duration,
-                startDate: campaign.startDate,
-                endDate: campaign.endDate,
-                status: campaign.status,
-                metrics: campaign.metrics,
-                targeting: campaign.targeting,
-                error: campaign.error,
-                createdAt: campaign.createdAt,
-                lastSyncedAt: campaign.lastSyncedAt
-            }
-        });
+        res.json({ campaign });
     } catch (error) {
         console.error('❌ Error fetching campaign:', error);
         res.status(500).json({ error: error.message });
@@ -267,17 +267,17 @@ router.get('/campaigns/:campaignId', requireAuth, async (req, res) => {
  * PATCH /api/boost/campaigns/:campaignId/status
  * Update campaign status (pause/resume)
  */
-router.patch('/campaigns/:campaignId/status', requireAuth, async (req, res) => {
+router.patch('/:campaignId/status', requireAuth, async (req, res) => {
     try {
         const { campaignId } = req.params;
-        const userId = req.session.user.id;
+        const userId = req.user.id;
         const { status } = req.body;
 
         if (!['active', 'paused'].includes(status)) {
             return res.status(400).json({ error: 'Invalid status. Use "active" or "paused"' });
         }
 
-        const campaign = await BoostCampaign.findById(campaignId);
+        const campaign = await prisma.boostCampaign.findUnique({ where: { id: campaignId } });
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
@@ -286,19 +286,20 @@ router.patch('/campaigns/:campaignId/status', requireAuth, async (req, res) => {
         }
 
         // Update on Facebook
-        const user = await User.findOne({ id: userId });
-        const pageToken = user.getDecryptedPageToken(campaign.pageId);
+        const pageRecord = await prisma.facebookPage.findUnique({ where: { id: campaign.pageId } });
+        const pageToken = decrypt(pageRecord.accessToken);
 
         await updateCampaignStatus(campaign.campaignId, status, pageToken);
 
         // Update in database
-        campaign.status = status;
-        await campaign.save();
+        const updated = await prisma.boostCampaign.update({
+            where: { id: campaignId },
+            data: { status }
+        });
 
         res.json({
             success: true,
-            campaignId: campaign._id,
-            status: campaign.status,
+            campaign: updated,
             message: `Campaign ${status === 'active' ? 'resumed' : 'paused'} successfully`
         });
     } catch (error) {
@@ -309,14 +310,13 @@ router.patch('/campaigns/:campaignId/status', requireAuth, async (req, res) => {
 
 /**
  * DELETE /api/boost/campaigns/:campaignId
- * Cancel/delete a campaign
  */
-router.delete('/campaigns/:campaignId', requireAuth, async (req, res) => {
+router.delete('/:campaignId', requireAuth, async (req, res) => {
     try {
         const { campaignId } = req.params;
-        const userId = req.session.user.id;
+        const userId = req.user.id;
 
-        const campaign = await BoostCampaign.findById(campaignId);
+        const campaign = await prisma.boostCampaign.findUnique({ where: { id: campaignId } });
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
@@ -326,16 +326,18 @@ router.delete('/campaigns/:campaignId', requireAuth, async (req, res) => {
 
         // Pause campaign on Facebook first
         try {
-            const user = await User.findOne({ id: userId });
-            const pageToken = user.getDecryptedPageToken(campaign.pageId);
+            const pageRecord = await prisma.facebookPage.findUnique({ where: { id: campaign.pageId } });
+            const pageToken = decrypt(pageRecord.accessToken);
             await updateCampaignStatus(campaign.campaignId, 'paused', pageToken);
         } catch (error) {
             console.error('⚠️ Failed to pause campaign on Facebook:', error.message);
         }
 
-        // Update status to completed
-        campaign.status = 'completed';
-        await campaign.save();
+        // Update status to completed (don't delete hard record for history)
+        await prisma.boostCampaign.update({
+            where: { id: campaignId },
+            data: { status: 'completed' }
+        });
 
         res.json({
             success: true,
@@ -346,5 +348,7 @@ router.delete('/campaigns/:campaignId', requireAuth, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+module.exports = router;
 
 module.exports = router;

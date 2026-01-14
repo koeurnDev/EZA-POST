@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const User = require("../../models/User");
+const prisma = require("../../utils/prisma");
 const bcrypt = require("bcrypt");
 
 // ✅ POST /api/auth/reset-password
@@ -17,9 +17,11 @@ router.post("/", async (req, res) => {
         }
 
         // Find user with valid token
-        const user = await User.findOne({
-            resetPasswordToken: token,
-            resetPasswordExpires: { $gt: Date.now() }, // Token must not be expired
+        const user = await prisma.user.findFirst({
+            where: {
+                resetPasswordToken: token,
+                resetPasswordExpires: { gt: new Date() }, // Token must not be expired
+            }
         });
 
         if (!user) {
@@ -28,13 +30,17 @@ router.post("/", async (req, res) => {
 
         // Hash new password
         const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(password, salt);
+        const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Clear reset fields
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpires = undefined;
-
-        await user.save();
+        // Update user: Clear reset fields & set new password
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                password: hashedPassword,
+                resetPasswordToken: null,
+                resetPasswordExpires: null
+            }
+        });
 
         res.json({
             success: true,

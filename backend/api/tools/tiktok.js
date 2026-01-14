@@ -9,6 +9,7 @@ const router = express.Router();
 const axios = require("axios");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto"); // 🔐 Added for Cache Hashing
 const { requireAuth } = require("../../utils/auth");
 
 // 🗂️ Temp directory
@@ -240,16 +241,15 @@ router.post("/trending", requireAuth, async (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* 📥 POST /download — Download (Slideshow = Separate Images)                 */
+/* 📥 POST /download — Unify with /stream (Redirect/JSON)                     */
 /* -------------------------------------------------------------------------- */
 router.post("/download", requireAuth, async (req, res) => {
     try {
-        const { url, title, type, images } = req.body;
+        const { url, title, type, images, id } = req.body;
         if (!url && (!images || images.length === 0)) return res.status(400).json({ error: "No content" });
 
-        // 📸 SLIDESHOW (Images) - No changes needed, already downloads to temp
+        // 📸 SLIDESHOW (Images) - Keep existing logic for now (it works well)
         if (type === 'slideshow' && images && images.length > 0) {
-            // ... (Existing slideshow logic) ...
             console.log(`📥 Downloading Slideshow (${images.length} images)...`);
             const safeTitle = (title || "slide").replace(/[^a-z0-9]/gi, "_").substring(0, 30);
             const folderName = `${safeTitle}_${Date.now()}`;
@@ -268,43 +268,27 @@ router.post("/download", requireAuth, async (req, res) => {
                 } catch (e) { }
             }
 
+            // Auto-delete slideshow folder after 10 mins
             setTimeout(() => fs.rm(targetFolder, { recursive: true, force: true }, () => { }), 600000);
             return res.json({ success: true, type: 'slideshow', files: downloadedFiles });
         }
 
-        // 🎥 VIDEO (MP4) - Updated for Caching
-        console.log(`📥 Downloading Video...`);
-        const safeTitle = (title || "tiktok").replace(/[^a-z0-9]/gi, "_").substring(0, 50);
+        // 🎥 VIDEO: Unify with /stream logic
+        // Instead of downloading here, we return the robust stream URL
+        // This ensures One Source of Truth
+        const safeId = (id || `video_${Date.now()}`).replace(/[^a-z0-9]/gi, "_");
+        const safeTitle = (title || "tiktok").replace(/[^a-z0-9\u0080-\uffff]/gi, "_").substring(0, 50);
+        const filename = `${safeTitle}.mp4`;
 
-        // 1️⃣ CHECK CACHE
-        if (req.body.id) {
-            const cacheFilename = `tiktok-${req.body.id.replace(/[^a-z0-9]/gi, "_")}.mp4`;
-            const cachePath = path.join(tempDir, cacheFilename);
-            if (fs.existsSync(cachePath)) {
-                console.log("✅ Serving from Cache!");
-                // Return the cached file directly
-                // We need to COPY it to a user-friendly name if we want to preserve the "nice" filename, 
-                // OR just serve the cache file but tell frontend to name it nicely.
-                // Backend /download endpoint (general) handles serving. 
-                // Here we return the URL to the cached file.
-                return res.json({ success: true, type: 'video', file: { name: `${title}.mp4`, url: `/uploads/temp/videos/${cacheFilename}` } });
-            }
-        }
+        // Construct Stream URL
+        const streamUrl = `/api/tools/tiktok/stream?id=${safeId}&url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
 
-        // 2️⃣ FALLBACK DOWNLOAD (If not cached)
-        const filename = `tiktok-${safeTitle}-${Date.now()}.mp4`;
-        const filePath = path.join(tempDir, filename);
-        const writer = fs.createWriteStream(filePath);
-        const downloadUrl = url;
-
-        const response = await axios({ method: 'get', url: downloadUrl, responseType: 'stream', headers: { 'Referer': 'https://www.tiktok.com/' } });
-        response.data.pipe(writer);
-        await new Promise((resolve) => writer.on('finish', resolve));
-
-        // Timeout to delete only for non-cached custom downloads
-        setTimeout(() => { if (fs.existsSync(filePath)) fs.unlink(filePath, () => { }); }, 600000);
-
-        return res.json({ success: true, type: 'video', file: { name: filename, url: `/uploads/temp/videos/${filename}` } });
+        return res.json({
+            success: true,
+            type: 'video',
+            file: { name: filename, url: streamUrl },
+            isStream: true
+        });
 
     } catch (err) {
         console.error(err);
@@ -313,138 +297,150 @@ router.post("/download", requireAuth, async (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* 🔄 GET /stream — Smart Caching Stream                                      */
+/* 🔄 GET /stream — Smart Caching Stream & Download                           */
 /* -------------------------------------------------------------------------- */
 router.get("/stream", async (req, res) => {
     try {
         const { id, url, filename } = req.query;
         if (!id || id === 'undefined' || !url) return res.status(400).send("Missing parameters: id or url");
 
+        // 🔐 Security: Domain Allowlist
+        if (!url.match(/(tiktokcdn|bytevc1|tikwm|douyin|muscdn|akamaized)/i)) {
+            return res.status(403).send("Forbidden Source");
+        }
+
         const safeId = id.replace(/[^a-z0-9]/gi, "_");
-        const cacheFilename = `tiktok-${safeId}.mp4`;
+
+        // 🔒 Cache Poisoning Fix: Hash the URL
+        const urlHash = crypto.createHash("md5").update(url).digest("hex").slice(0, 8);
+        const cacheFilename = `tiktok-${safeId}-${urlHash}.mp4`;
         const cachePath = path.join(tempDir, cacheFilename);
+
+        // 🛡️ Header Setup
+        const isDownload = !!filename;
+        const setHeaders = (size) => {
+            const rawName = filename || `tiktok_${safeId}.mp4`;
+            // RFC 5987 Compliance
+            const utf8Name = encodeURIComponent(rawName);
+
+            res.setHeader('Cache-Control', 'no-store'); // 🚫 Prevent Mobile Caching
+            res.setHeader('Accept-Ranges', 'bytes');
+
+            if (isDownload) {
+                // ⬇️ Force Download Mode
+                res.setHeader('Content-Type', 'application/octet-stream');
+                res.setHeader('Content-Disposition', `attachment; filename="${rawName.replace(/"/g, "")}"; filename*=UTF-8''${utf8Name}`);
+            } else {
+                // 🎥 Preview Mode
+                res.setHeader('Content-Type', 'video/mp4');
+                res.setHeader('Content-Disposition', 'inline');
+            }
+            if (size) res.setHeader('Content-Length', size);
+        };
 
         // 1️⃣ CACHE HIT: Serve from disk
         if (fs.existsSync(cachePath)) {
             const stat = fs.statSync(cachePath);
             const fileSize = stat.size;
 
-            // 🗑️ CORRUPTION CHECK: If file is < 5KB, it's likely an error page or empty.
             if (fileSize < 5 * 1024) {
-                console.warn(`⚠️ [Stream] Corrupt cache detected (${fileSize} bytes). Deleting: ${safeId}`);
-                try { fs.unlinkSync(cachePath); } catch (e) { }
-                // Proceed to download (Cache Miss)
+                try { fs.unlinkSync(cachePath); } catch (e) { } // Corrupt
             } else {
-                // ✅ VALID CACHE: Serve it
+                // Range Request Support
                 const range = req.headers.range;
-
                 if (range) {
                     const parts = range.replace(/bytes=/, "").split("-");
                     const start = parseInt(parts[0], 10);
                     const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
                     const chunksize = (end - start) + 1;
                     const file = fs.createReadStream(cachePath, { start, end });
-                    const head = {
+
+                    res.writeHead(206, {
                         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
                         'Accept-Ranges': 'bytes',
                         'Content-Length': chunksize,
-                        'Content-Type': 'video/mp4',
-                        'Content-Disposition': filename ? `attachment; filename="${filename}"` : 'inline',
-                    };
-                    res.writeHead(206, head);
+                        'Content-Type': isDownload ? 'application/octet-stream' : 'video/mp4',
+                        'Cache-Control': 'no-store'
+                    });
                     file.pipe(res);
                 } else {
-                    const head = {
-                        'Content-Length': fileSize,
-                        'Content-Type': 'video/mp4',
-                        'Content-Disposition': filename ? `attachment; filename="${filename}"` : 'inline',
-                    };
-                    res.writeHead(200, head);
-                    const stream = fs.createReadStream(cachePath);
-                    stream.pipe(res);
+                    setHeaders(fileSize);
+                    res.status(200);
+                    fs.createReadStream(cachePath).pipe(res);
                 }
                 return;
             }
-
         }
 
-        // 2️⃣ CACHE MISS: Download & Stream
-        console.log(`📥 [Stream] Caching new video: ${safeId}`);
-        const writer = fs.createWriteStream(cachePath);
+        // 2️⃣ CACHE MISS: Download & Stream (PassThrough)
+        console.log(`📥 [Stream] Caching new video: ${safeId} [${urlHash}]`);
+
+        // Setup Streams
+        const { PassThrough } = require('stream');
+        const passThrough = new PassThrough();
+
+        // Temp Write Stream (prevent race conditions)
+        const tempFilename = `tiktok-${safeId}-${urlHash}-${Date.now()}.tmp`;
+        const tempFilePath = path.join(tempDir, tempFilename);
+        const fileWriter = fs.createWriteStream(tempFilePath);
 
         try {
             const headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             };
-
-            // 🧠 Smart Referer Logic
-            // Official TikTok CDNs REQUIRE the Referer.
-            // 3rd Party APIs (like TikWM) often REJECT the Referer.
-            const needsReferer = /tiktokcdn\.com|bytevc1\.com|tiktokv\.com|akamaized\.net/i.test(url);
-
-            if (needsReferer) {
+            if (/tiktokcdn\.com|bytevc1\.com|tiktokv\.com|akamaized\.net/i.test(url)) {
                 headers['Referer'] = 'https://www.tiktok.com/';
             }
 
-            console.log(`🔗 [Stream] Fetching: ${url}`);
+            const response = await axios({
+                method: 'get',
+                url: url,
+                responseType: 'stream',
+                headers: headers,
+                timeout: 15000,
+                validateStatus: (status) => status < 400
+            });
 
-            try {
-                const response = await axios({
-                    method: 'get',
-                    url: url,
-                    responseType: 'stream',
-                    headers: headers,
-                    timeout: 10000,
-                    validateStatus: (status) => status < 400
-                });
+            // Set Headers immediately
+            setHeaders(response.headers['content-length']);
 
-                // Check Content-Type (Make sure we are getting a video)
-                const contentType = response.headers['content-type'];
-                if (contentType && !contentType.includes('video/') && !contentType.includes('application/octet-stream')) {
-                    console.error(`❌ [Stream] Invalid Content-Type: ${contentType} for URL: ${url}`);
-                    res.status(400).send("Invalid video source");
-                    writer.close();
-                    fs.unlink(cachePath, () => { });
-                    return;
+            // 🚿 Pipe Logic: Response -> PassThrough -> (Res + File)
+            response.data.pipe(passThrough);
+            passThrough.pipe(res);
+            passThrough.pipe(fileWriter);
+
+            // 🛑 Client Abort Handling (Memory Leak Fix)
+            req.on("close", () => {
+                if (!res.writableEnded) {
+                    // Client disconnected early
+                    passThrough.destroy();
+                    fileWriter.destroy();
+                    // Optional: Delete partial temp file if we want strict atomic only
+                    // fs.unlink(tempFilePath, () => {}); 
                 }
-
-                // Pipe to FILE and to RESPONSE (Passthrough)
-                response.data.pipe(writer);
-
-                // For response, we just pipe the stream directly. 
-                // Note: Range requests won't work perfectly on first load, but playability should be fine.
-                res.writeHead(200, {
-                    'Content-Type': 'video/mp4',
-                    'Content-Disposition': filename ? `attachment; filename="${filename}"` : 'inline',
-                });
-                response.data.pipe(res);
-
-            } catch (err) {
-                console.error(`❌ [Stream] Fetch Failed: ${err.message} | URL: ${url}`);
-                res.status(502).send("Upstream Download Failed");
-                writer.close();
-                fs.unlink(cachePath, () => { });
-                return;
-            }
-
-            // Handle Writer Errors
-            writer.on('error', (err) => {
-                console.error(`❌ [Stream] File Write Error:`, err);
-                // Try to delete corrupt file
-                fs.unlink(cachePath, () => { });
             });
 
-            // Cleanup Cache after 1 hour (Optional)
-            writer.on('finish', () => {
-                // console.log("✅ [Stream] Cached successfully");
-                setTimeout(() => { if (fs.existsSync(cachePath)) fs.unlink(cachePath, () => { }); }, 60 * 60 * 1000);
+            // Cleanup on finish
+            fileWriter.on('finish', () => {
+                setTimeout(() => {
+                    if (fs.existsSync(tempFilePath)) {
+                        try {
+                            // Atomic Rename
+                            if (!fs.existsSync(cachePath)) fs.renameSync(tempFilePath, cachePath);
+                            else fs.unlinkSync(tempFilePath);
+                        } catch (e) { fs.unlink(tempFilePath, () => { }); }
+                    }
+                }, 100);
             });
+
+            // Cleanup on Error
+            fileWriter.on('error', () => fs.unlink(tempFilePath, () => { }));
 
         } catch (err) {
-            console.error("Stream Error:", err.message);
-            // Clean up partial file
-            if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
+            console.error(`❌ [Stream] Fetch Failed: ${err.message}`);
             if (!res.headersSent) res.status(502).send("Upstream Error");
+            fileWriter.close();
+            fs.unlink(tempFilePath, () => { });
         }
 
     } catch (e) {
@@ -493,5 +489,24 @@ router.get("/proxy", async (req, res) => {
         if (!res.headersSent) res.status(502).send("Proxy Error");
     }
 });
+
+/* -------------------------------------------------------------------------- */
+/* 🧹 Auto Cache Cleanup (Disk-safe)                                          */
+/* -------------------------------------------------------------------------- */
+setInterval(() => {
+    fs.readdir(tempDir, (err, files) => {
+        if (err) return;
+        files.forEach(f => {
+            const p = path.join(tempDir, f);
+            fs.stat(p, (err, stats) => {
+                if (err) return;
+                // Delete files older than 30 minutes
+                if (Date.now() - stats.mtimeMs > 30 * 60 * 1000) {
+                    fs.unlink(p, () => { });
+                }
+            });
+        });
+    });
+}, 10 * 60 * 1000); // Check every 10 mins
 
 module.exports = router;

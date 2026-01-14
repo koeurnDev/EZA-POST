@@ -12,7 +12,7 @@ const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
 const { requireAuth } = require("../../utils/auth");
-const { capcut } = require("btch-downloader");
+const ytdlp = require("../../utils/ytdlp");
 
 // 🗂️ Temp directory
 const tempDir = path.join(__dirname, "../../temp/capcut");
@@ -30,27 +30,26 @@ router.post("/download", requireAuth, async (req, res) => {
 
         console.log(`🎬 Downloading CapCut Media: ${url}`);
 
-        // 1. Get Direct Link
-        const data = await capcut(url);
-        // btch-downloader usually returns { title, video, cover... } or similar.
-        // Let's log to be safe in dev, but trust structure for now.
-        // Assuming data.video contains the url.
+        // 1. Get Direct Link via yt-dlp
+        const info = await ytdlp.lookup(url);
 
-        if (!data || !data.video) {
-            throw new Error("Failed to parse CapCut link. Verify it is public.");
+        if (!info || !info.url) {
+            throw new Error("Failed to parse CapCut link. Video might be private or deleted.");
         }
 
-        const videoUrl = data.video;
+        const videoUrl = info.url;
         const safeId = `cc-${Date.now()}`;
         const outputFilename = `${safeId}.mp4`;
         const outputPath = path.join(tempDir, outputFilename);
 
         // 2. Download Media Stream
+        // We use axios to stream the file from the direct URL to our temp folder
         const writer = fs.createWriteStream(outputPath);
         const response = await axios({
             url: videoUrl,
             method: 'GET',
-            responseType: 'stream'
+            responseType: 'stream',
+            headers: info.http_headers // Pass headers from yt-dlp (User-Agent, etc.)
         });
 
         response.data.pipe(writer);
@@ -64,7 +63,7 @@ router.post("/download", requireAuth, async (req, res) => {
 
         // Generate metadata
         const metadata = {
-            title: data.title || `CapCut Video ${safeId}`,
+            title: info.title || `CapCut Video ${safeId}`,
             filename: outputFilename,
             type: "video"
         };

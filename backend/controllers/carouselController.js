@@ -5,11 +5,31 @@
 
 const fs = require("fs");
 const path = require("path");
-const PostLog = require("../models/PostLog");
-const FacebookPage = require("../models/FacebookPage");
-const User = require("../models/User");
+const prisma = require('../utils/prisma');
 const fb = require("../utils/fb");
 const axios = require("axios");
+
+// Decryption helper
+const crypto = require('crypto');
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || "default_secret_key_must_be_32_bytes_long";
+function getEncryptionKey() {
+    return crypto.createHash('sha256').update(String(ENCRYPTION_KEY)).digest('base64').substr(0, 32);
+}
+function decrypt(text) {
+    if (!text) return text;
+    const textParts = text.split(':');
+    if (textParts.length !== 2) return text;
+    const iv = Buffer.from(textParts[0], 'hex');
+    const encryptedText = Buffer.from(textParts[1], 'hex');
+    try {
+        const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(getEncryptionKey()), iv);
+        let decrypted = decipher.update(encryptedText);
+        decrypted = Buffer.concat([decrypted, decipher.final()]);
+        return decrypted.toString();
+    } catch (err) {
+        return text;
+    }
+}
 
 exports.processAndPostCarousel = async (req, accountsArray, userId, caption, scheduleTime) => {
     let tempFiles = []; // Track temp files for cleanup
@@ -70,18 +90,32 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
         for (const accountId of accountsArray) {
             try {
                 // Fetch Page & Token
-                const page = await FacebookPage.findOne({ pageId: accountId, userId: userId });
-                let pageToken = page ? page.getDecryptedAccessToken() : null;
-                let pageName = page ? page.pageName : null;
+                const page = await prisma.facebookPage.findUnique({
+                    where: { id: accountId }
+                });
 
+                let pageToken = page ? decrypt(page.accessToken) : null;
+                let pageName = page ? page.name : null;
+
+                // Fallback to User's connectedPages if not in FacebookPage table
                 if (!pageToken) {
-                    const user = await User.findOne({ id: userId });
-                    const connectedPage = user?.connectedPages?.find(p => p.id === accountId);
+                    const user = await prisma.user.findUnique({
+                        where: { id: userId },
+                        select: { connectedPages: true }
+                    });
+
+                    let connectedPages = user?.connectedPages;
+                    if (typeof connectedPages === 'string') {
+                        try { connectedPages = JSON.parse(connectedPages) } catch (e) { }
+                    }
+
+                    const connectedPage = Array.isArray(connectedPages) ? connectedPages.find(p => p.id === accountId) : null;
                     if (connectedPage) {
-                        pageToken = user.getDecryptedPageToken(accountId);
+                        pageToken = decrypt(connectedPage.access_token);
                         pageName = connectedPage.name;
                     }
                 }
+
                 if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
 
                 console.log(`🚀 Starting Native Carousel for ${pageName} (${accountId})...`);
@@ -192,13 +226,15 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
 
                 if (feedRes.successCount > 0) {
                     const fbPostId = feedRes.details[0].postId;
-                    await PostLog.create({
-                        userId,
-                        pageId: accountId,
-                        fbPostId: fbPostId,
-                        type: "carousel",
-                        status: scheduleTime ? "scheduled" : "published",
-                        scheduledTime: scheduleTime ? new Date(scheduleTime) : null
+                    await prisma.postLog.create({
+                        data: {
+                            userId,
+                            pageId: accountId,
+                            fbPostId: fbPostId,
+                            type: "carousel",
+                            status: scheduleTime ? "scheduled" : "published",
+                            scheduledTime: scheduleTime ? new Date(scheduleTime) : null
+                        }
                     });
                     results.successCount++;
                     results.details.push({ accountId, status: "success", postId: fbPostId });
@@ -259,3 +295,4 @@ exports.createMixedCarousel = async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 };
+

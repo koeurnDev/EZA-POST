@@ -2,7 +2,7 @@
  * 🔴 YouTube Service - Handles Shorts Uploads
  */
 const { google } = require('googleapis');
-const PlatformConfig = require('../../models/PlatformConfig');
+const prisma = require('../../utils/prisma');
 
 // 🔐 OAuth2 Client Setup
 const getOAuthClient = () => {
@@ -18,19 +18,30 @@ exports.uploadVideo = async (userId, videoPath, title, description) => {
     try {
         console.log(`🔴 [YouTube] Starting upload for user: ${userId}`);
 
-        // 1. Get User Tokens
-        const config = await PlatformConfig.findOne({ userId, platform: 'youtube' });
-        if (!config || !config.accessToken) {
+        // 1. Get User Tokens from Prisma
+        const config = await prisma.platformConfig.findFirst({
+            where: { userId, platform: 'youtube' }
+        });
+
+        if (!config || !config.settings) {
             throw new Error("YouTube not connected");
+        }
+
+        // Unpack settings from JSON
+        let settings = config.settings;
+        if (typeof settings === 'string') {
+            try { settings = JSON.parse(settings); } catch (e) { settings = {}; }
+        }
+
+        if (!settings.accessToken) {
+            throw new Error("YouTube Access Token missing");
         }
 
         const oauth2Client = getOAuthClient();
         oauth2Client.setCredentials({
-            access_token: config.accessToken,
-            refresh_token: config.refreshToken
+            access_token: settings.accessToken,
+            refresh_token: settings.refreshToken
         });
-
-        // 🔄 Auto-Refresh Token if needed (Google library handles this usually, but good to know)
 
         const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
@@ -72,7 +83,11 @@ exports.getAuthUrl = () => {
     const oauth2Client = getOAuthClient();
     return oauth2Client.generateAuthUrl({
         access_type: 'offline', // Crucial for refresh token
-        scope: ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/userinfo.profile']
+        scope: [
+            'https://www.googleapis.com/auth/youtube.upload',
+            'https://www.googleapis.com/auth/userinfo.profile'
+        ],
+        include_granted_scopes: true
     });
 };
 
@@ -81,17 +96,32 @@ exports.handleCallback = async (code, userId) => {
     const oauth2Client = getOAuthClient();
     const { tokens } = await oauth2Client.getToken(code);
 
-    // Save to DB
-    await PlatformConfig.findOneAndUpdate(
-        { userId, platform: 'youtube' },
-        {
-            accessToken: tokens.access_token,
-            refreshToken: tokens.refresh_token, // Only sent on first consent!
-            tokenExpiresAt: new Date(tokens.expiry_date),
-            isConnected: true
-        },
-        { upsert: true, new: true }
-    );
+    const config = await prisma.platformConfig.findFirst({
+        where: { userId, platform: 'youtube' }
+    });
+
+    const settings = {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token || (config?.settings?.refreshToken), // Refresh token only sent once
+        tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+        isConnected: true
+    };
+
+    if (config) {
+        await prisma.platformConfig.update({
+            where: { id: config.id },
+            data: { settings }
+        });
+    } else {
+        await prisma.platformConfig.create({
+            data: {
+                userId,
+                platform: 'youtube',
+                isEnabled: true,
+                settings
+            }
+        });
+    }
 
     return tokens;
 };

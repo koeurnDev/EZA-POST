@@ -2,8 +2,8 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const User = require("../../models/User");
-const { sendEmail } = require("../../services/emailService"); // ✅ Import Email Service
+const prisma = require('../../utils/prisma');
+const { sendEmail } = require("../../services/emailService");
 
 // ============================================================
 // ✅ Register Route
@@ -29,7 +29,10 @@ router.post("/", async (req, res) => {
 
   try {
     // 🔍 Check if user already exists
-    const existing = await User.findOne({ email });
+    const existing = await prisma.user.findUnique({
+      where: { email },
+    });
+
     if (existing) {
       return res.status(409).json({
         success: false,
@@ -39,34 +42,41 @@ router.post("/", async (req, res) => {
 
     // 🔐 Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    const id = `user_${Date.now()}`;
 
-    // 💾 Create new user in MongoDB
-    const newUser = await User.create({
-      id,
-      email,
-      password: hashedPassword,
-      name: name || "User",
+    // 💾 Create new user in PostgreSQL
+    // Prisma handles ID generation (UUID) via @default(uuid()) in schema
+    const newUser = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name: name || "User",
+        plan: "free",
+        role: "user",
+      },
     });
 
     console.log(`✅ Registered new user: ${email}`);
 
     // 📧 Send Welcome Email
-    await sendEmail({
-      to: newUser.email,
-      subject: "Welcome to EZA_POST! 🚀",
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-          <h1 style="color: #2563eb;">Welcome to EZA_POST!</h1>
-          <p>Hi <strong>${newUser.name}</strong>,</p>
-          <p>Thank you for joining EZA_POST. We're excited to have you on board!</p>
-          <p>You can now log in and start scheduling your posts.</p>
-          <br>
-          <p>Best regards,</p>
-          <p><strong>The EZA_POST Team</strong></p>
-        </div>
-      `,
-    });
+    try {
+      await sendEmail({
+        to: newUser.email,
+        subject: "Welcome to EZA_POST! 🚀",
+        html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h1 style="color: #2563eb;">Welcome to EZA_POST!</h1>
+            <p>Hi <strong>${newUser.name}</strong>,</p>
+            <p>Thank you for joining EZA_POST. We're excited to have you on board!</p>
+            <p>You can now log in and start scheduling your posts.</p>
+            <br>
+            <p>Best regards,</p>
+            <p><strong>The EZA_POST Team</strong></p>
+            </div>
+        `,
+      });
+    } catch (emailErr) {
+      console.warn("⚠️ Failed to send welcome email:", emailErr.message);
+    }
 
     // 🎫 Create JWT token for instant login
     const token = jwt.sign(
@@ -91,20 +101,13 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Register error:", err);
-
-    // Check for DB connection errors
-    if (err.name === 'MongoServerSelectionError' || err.name === 'MongooseServerSelectionError') {
-      return res.status(503).json({
-        success: false,
-        error: "Database unavailable. Please check your connection or IP whitelist.",
-      });
-    }
-
     return res.status(500).json({
       success: false,
       error: "Registration failed. Please try again later.",
+      details: err.message
     });
   }
 });
 
 module.exports = router;
+

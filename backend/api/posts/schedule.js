@@ -6,7 +6,7 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const ScheduledPost = require("../../models/ScheduledPost"); // ✅ MongoDB Model
+const prisma = require('../../utils/prisma');
 const { requireAuth } = require("../../utils/auth");
 const { uploadFile } = require("../../utils/cloudinary"); // ✅ Cloudinary
 const router = express.Router();
@@ -36,9 +36,6 @@ const upload = multer({
   },
 });
 
-/* -------------------------------------------------------------------------- */
-/* ✅ POST /api/posts/schedule — Schedule a new post                          */
-/* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* ✅ POST /api/posts/schedule — Schedule a new post                          */
 /* -------------------------------------------------------------------------- */
@@ -88,19 +85,23 @@ router.post("/", requireAuth, upload.array("mediaFiles", 10), async (req, res) =
     const results = await Promise.all(uploadPromises);
     const mediaUrls = results.map(r => r.url);
     const videoUrl = postType === "single" ? mediaUrls[0] : undefined;
+    const thumbnail = postType === "single" ? (results[0].thumbnail_url || videoUrl) : mediaUrls[0];
 
-    // 💾 Store scheduled post (MongoDB)
-    const newPost = await ScheduledPost.create({
-      id: `post_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, // Generate ID
-      user_id: userId, // Match schema
-      caption,
-      postType,
-      video_url: videoUrl, // Only for single video posts
-      mediaFiles: mediaUrls, // All files
-      thumbnail_url: postType === "single" ? results[0].thumbnail_url || videoUrl : mediaUrls[0], // Simple thumbnail logic
-      accounts: accountsList,
-      schedule_time: scheduleDate, // Match schema
-      status: "scheduled",
+    // 💾 Store scheduled post (Prisma)
+    const newPost = await prisma.scheduledPost.create({
+      data: {
+        userId: userId,
+        caption,
+        postType,
+        videoUrl: videoUrl || null, // Optional in schema
+        mediaFiles: mediaUrls,
+        thumbnailUrl: thumbnail || null, // Optional in schema
+        accounts: accountsList,
+        scheduleTime: scheduleDate,
+        status: "scheduled",
+        publishedIds: [], // Default empty array (since it's JSON in schema, we pass array/object directly if handled by Prisma, 
+        // but for Json type it's best to pass literal JS object/array)
+      }
     });
 
     console.log(`📅 Post scheduled by ${userId} for ${scheduleDate}`);

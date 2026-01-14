@@ -3,10 +3,11 @@
  * Handles scheduled posting queue, retries, cleanup, and analytics
  */
 
-const ScheduledPost = require("../models/ScheduledPost");
+const prisma = require("../utils/prisma");
 const { downloadTiktokVideo } = require("./tiktokDownloader");
 const fb = require("./fb");
 const { deleteFile, softDeleteAsset, deleteExpiredAssets } = require("./cloudinary"); // ✅ Import deleteFile
+const { decrypt } = require("./crypto");
 
 // ============================================================
 // 🧠 Main Queue Processor
@@ -14,12 +15,14 @@ const { deleteFile, softDeleteAsset, deleteExpiredAssets } = require("./cloudina
 exports.processScheduledPosts = async () => {
   try {
     // 1. Fetch posts ready to be processed
-    const posts = await ScheduledPost.find({
-      status: "scheduled",
-      schedule_time: { $lte: new Date() },
-    })
-      .sort({ schedule_time: 1 })
-      .limit(5);
+    const posts = await prisma.scheduledPost.findMany({
+      where: {
+        status: "scheduled",
+        schedule_time: { lte: new Date() },
+      },
+      orderBy: { schedule_time: 'asc' },
+      take: 5
+    });
 
     if (posts.length === 0) return;
 
@@ -38,8 +41,10 @@ async function processSinglePost(post) {
     console.log(`🚀 Running post ${post.id}: ${post.caption?.slice(0, 60)}...`);
 
     // Mark as processing
-    post.status = "processing";
-    await post.save();
+    await prisma.scheduledPost.update({
+      where: { id: post.id },
+      data: { status: "processing" }
+    });
 
     // 📥 Handle Video Source
     let videoInput = post.video_url;
@@ -57,34 +62,31 @@ async function processSinglePost(post) {
         console.warn(`⚠️ Local file not found: ${post.video_url}. Trying as URL...`);
       }
     } else if (!post.video_url.startsWith("http")) {
-      // If it's not local /uploads and not http, assume it's a TikTok URL that needs downloading?
-      // But wait, create.js now saves Cloudinary URL.
-      // If it is a TikTok URL that wasn't uploaded to Cloudinary (legacy?), we might need to download.
-      // But for now, let's assume it's a URL we can pass to FB or a Cloudinary URL.
       console.log(`ℹ️ Using video URL: ${post.video_url}`);
     }
 
-    // If it's a TikTok URL that needs downloading (legacy behavior where we didn't upload to Cloudinary first?)
-    // The new create.js uploads to Cloudinary first, so video_url will be http...cloudinary...
-    // So we can just pass videoInput (which is the URL) to fb.postToFB.
-
-    // ... (User check logic) ...
-    const User = require("../models/User");
-
-    // ✅ Fix: Use user_id from the post record
-    const user = await User.findOne({ id: post.user_id });
+    // ✅ Fix: Use user_id from the post record (Prisma model)
+    const user = await prisma.user.findFirst({ where: { id: post.user_id } });
 
     if (!user) throw new Error(`User not found (ID: ${post.user_id})`);
 
-    // Check Page Settings (Check first account for now)
-    const accountId = post.accounts[0];
+    // Check Page Settings
+    const accountId = post.accounts[0]; // Assuming array of strings (legacy Mongoose pattern saved as array)
 
-    const pageSettings = user.pageSettings?.find(s => s.pageId === accountId);
-    if (pageSettings && pageSettings.enableSchedule === false) {
+    // Parse pageSettings if stored as string (legacy)
+    let pageSettings = user.pageSettings;
+    if (typeof pageSettings === 'string') {
+      try { pageSettings = JSON.parse(pageSettings); } catch (e) { }
+    }
+    if (!Array.isArray(pageSettings)) pageSettings = [];
+
+    const settings = pageSettings.find(s => s.pageId === accountId);
+    if (settings && settings.enableSchedule === false) {
       throw new Error("Scheduled posting is disabled for this page");
     }
 
-    const fbToken = user.getDecryptedAccessToken();
+    // Get Token
+    const fbToken = decrypt(user.facebookAccessToken);
     if (!fbToken) throw new Error("User has no Facebook Access Token");
 
     console.log(`📤 Uploading to Facebook (User: ${user.name})...`);
@@ -99,18 +101,23 @@ async function processSinglePost(post) {
       post.caption
     );
 
-    // Mark as completed
-    post.status = "completed";
-    post.posted_at = new Date();
-
     // Save published IDs
+    let publishedIds = [];
     if (results.details && results.details.length > 0) {
-      post.publishedIds = results.details
+      publishedIds = results.details
         .filter(r => r.status === 'success' && r.postId)
         .map(r => ({ accountId: r.accountId, postId: r.postId }));
     }
 
-    await post.save();
+    // Mark as completed
+    await prisma.scheduledPost.update({
+      where: { id: post.id },
+      data: {
+        status: "completed",
+        posted_at: new Date(),
+        publishedIds: publishedIds // Prisma handles JSON if mapped correctly in schema or passed as object
+      }
+    });
 
     console.log(`✅ Published post ${post.id}`);
 
@@ -130,9 +137,13 @@ async function processSinglePost(post) {
     console.error(`❌ Post ${post.id} failed:`, error.message);
 
     // Retry logic
-    post.status = "failed";
-    post.attempts = (post.attempts || 0) + 1;
-    await post.save();
+    await prisma.scheduledPost.update({
+      where: { id: post.id },
+      data: {
+        status: "failed",
+        attempts: (post.attempts || 0) + 1
+      }
+    });
   }
 }
 
@@ -147,9 +158,11 @@ exports.cleanupOldPosts = async () => {
     const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
     // 1. Find posts to delete first (to get file paths)
-    const postsToDelete = await ScheduledPost.find({
-      status: { $in: ["completed", "failed", "cancelled", "expired"] },
-      updatedAt: { $lt: twoDaysAgo },
+    const postsToDelete = await prisma.scheduledPost.findMany({
+      where: {
+        status: { in: ["completed", "failed", "cancelled", "expired"] },
+        updatedAt: { lt: twoDaysAgo },
+      }
     });
 
     if (postsToDelete.length > 0) {
@@ -160,7 +173,6 @@ exports.cleanupOldPosts = async () => {
         const getPublicId = (url) => {
           if (!url || !url.includes("cloudinary.com")) return null;
           try {
-            // Matches everything after 'upload/' (and optional version) up to extension
             const matches = url.match(/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
             return matches ? matches[1] : null;
           } catch (e) {
@@ -171,42 +183,37 @@ exports.cleanupOldPosts = async () => {
         // Delete Video
         if (post.video_url) {
           const publicId = getPublicId(post.video_url);
-          if (publicId) {
-            await deleteFile(publicId, "video");
-          }
+          if (publicId) await deleteFile(publicId, "video");
         }
 
         // Delete Thumbnail
         if (post.thumbnail_url) {
           const publicId = getPublicId(post.thumbnail_url);
-          if (publicId) {
-            await deleteFile(publicId, "image");
-          }
+          if (publicId) await deleteFile(publicId, "image");
         }
       }
 
       // Now delete from DB
-      const result = await ScheduledPost.deleteMany({
-        _id: { $in: postsToDelete.map(p => p._id) }
+      const result = await prisma.scheduledPost.deleteMany({
+        where: {
+          id: { in: postsToDelete.map(p => p.id) }
+        }
       });
 
-      console.log(`🧹 Cleaned ${result.deletedCount} old posts & Cloudinary files`);
+      console.log(`🧹 Cleaned ${result.count} old posts & Cloudinary files`);
     }
 
     // 2. Mark "scheduled" posts as "expired" if they are past due by 48 hours
-    // This handles cases where the scheduler might have missed them or they got stuck
-    const expiredResult = await ScheduledPost.updateMany(
-      {
+    const expiredResult = await prisma.scheduledPost.updateMany({
+      where: {
         status: "scheduled",
-        schedule_time: { $lt: twoDaysAgo },
+        schedule_time: { lt: twoDaysAgo },
       },
-      {
-        $set: { status: "expired" },
-      }
-    );
+      data: { status: "expired" },
+    });
 
-    if (expiredResult.modifiedCount > 0) {
-      console.log(`⚠️ Marked ${expiredResult.modifiedCount} posts as expired`);
+    if (expiredResult.count > 0) {
+      console.log(`⚠️ Marked ${expiredResult.count} posts as expired`);
     }
 
   } catch (err) {

@@ -3,69 +3,83 @@
 // ============================================================
 
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
 const express = require("express");
+const app = express();
 const session = require("express-session");
-const MongoStore = require("connect-mongo");
+// const MongoStore = require("connect-mongo"); // REMOVED
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
-const mongoSanitize = require("express-mongo-sanitize");
+// const mongoSanitize = require("express-mongo-sanitize"); // REMOVED
 const xss = require("xss-clean");
 const hpp = require("hpp");
-const { connectDB } = require("./config/mongodb");
-const User = require("./models/User");
-const path = require("path");
-const fs = require("fs");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-
-// ------------------------------------------------------------
-// ✅ Global Crash Handlers (Must be first)
-// ------------------------------------------------------------
-process.on('uncaughtException', (err) => {
-  console.error('💥 UNCAUGHT EXCEPTION! Shutting down...');
-  console.error(err.name, err.message, err.stack);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (err) => {
-  console.error('💥 UNHANDLED REJECTION! Shutting down...');
-  console.error(err.name, err.message, err.stack);
-  process.exit(1);
-});
-
-// ------------------------------------------------------------
-// ✅ Initialize Express
-// ------------------------------------------------------------
-const app = express();
-
-// ------------------------------------------------------------
-// ✅ MongoDB Connection
-// ------------------------------------------------------------
-connectDB();
+const prisma = require('./utils/prisma');
 
 // ------------------------------------------------------------
 // ✅ Middleware & Security
 // ------------------------------------------------------------
 app.use(morgan("dev"));
 // app.use(express.json()); // REMOVED DUPLICATE
-app.use(cookieParser(process.env.SESSION_SECRET || "eza_post_secret_key_2024")); // ✅ Added Secret for Signed Cookies
+// app.use(cookieParser(process.env.SESSION_SECRET || "eza_post_secret_key_2024")); 
+// Simplified Session (MemoryStore for now, ideally Redis or Postgres Store later)
+app.use(cookieParser(process.env.SESSION_SECRET || "eza_post_secret_key_2024"));
+
 app.use(
   helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: { policy: "cross-origin" }, // ✅ Allow images to be loaded from different origin
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // 🛡️ Security Middlewares
-app.use(mongoSanitize()); // Prevent NoSQL Injection
-app.use(xss()); // Prevent XSS
-app.use(hpp()); // Prevent HTTP Parameter Pollution
+// app.use(mongoSanitize()); // REMOVED (Not needed for SQL)
+app.use(xss());
+app.use(hpp());
+
+// ... [Keep CORS and other middleware] ...
+
+// ✅ Session setup (MemoryStore for migration simplicity)
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "eza_post_secret_key_2024",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.RENDER === "true",
+      httpOnly: true,
+      sameSite: process.env.RENDER === "true" ? "none" : "lax",
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  })
+);
+
+// ... [Keep Rate Limit, CSRF, etc.] ...
+
+// ✅ Health Check
+app.get("/api/health", async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`; // Simple query to check connection
+    res.json({
+      status: "OK",
+      database: "Connected (PostgreSQL)",
+      time: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "ERROR",
+      database: "Disconnected",
+      error: err.message,
+    });
+  }
+});
+
 
 // 🔍 Debug Middleware: Log Cookies & Origin
 app.use((req, res, next) => {
@@ -105,8 +119,8 @@ app.use(
       // ✅ Allow all Vercel deployments (Preview & Production)
       if (origin.endsWith(".vercel.app")) return callback(null, true);
 
-      console.warn(`⚠️ CORS blocked origin: ${origin}`);
-      return callback(new Error("CORS not allowed for this origin"));
+      console.warn(`⚠️ CORS blocked origin: '${origin}'`); // Log with quotes to see whitespace
+      return callback(new Error(`CORS not allowed for this origin: ${origin}`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -126,21 +140,9 @@ if (!fs.existsSync(tempUploadsPath)) fs.mkdirSync(tempUploadsPath, { recursive: 
 app.set("trust proxy", 1);
 
 // ✅ Session setup (stored in MongoDB)
-// ✅ Session setup (with Fallback to MemoryStore)
-let sessionStore;
-
-try {
-  sessionStore = MongoStore.create({
-    mongoUrl: process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/mongkul",
-    collectionName: "sessions",
-    ttl: 24 * 60 * 60, // 1 day in seconds
-    autoRemove: "native"
-  });
-  console.log("✅ MongoDB Session Store Initialized");
-} catch (err) {
-  console.error("⚠️ MongoDB Session Store Failed, falling back to MemoryStore:", err.message);
-  sessionStore = new session.MemoryStore();
-}
+// ✅ Session setup (Simplified for Migration)
+let sessionStore = new session.MemoryStore();
+console.log("✅ Session Store Initialized (MemoryStore)");
 
 app.use(
   session({
@@ -219,54 +221,38 @@ app.use("/api/auth", require("./api/auth"));
 // ------------------------------------------------------------
 // ✅ Modular Routes (Posts, Uploads, etc.)
 // ------------------------------------------------------------
+// ✅ Enable Download Tools Only (Non-essential routes commented out for now)
 const routeModules = [
-  ["posts", "./routes/postRoutes"],
-  ["posts/bulk", "./api/posts/bulk"],
-  ["posts/schedule", "./api/posts/schedule"],
-  ["posts/queue", "./api/posts/queue"],
-  ["upload/video", "./api/upload/videoUpload"],
-  ["upload/thumbnail", "./api/upload/uploadThumbnail"],
+  // ["posts", "./routes/postRoutes"],
+  // ["posts/bulk", "./api/posts/bulk"],
+  // ["posts/schedule", "./api/posts/schedule"],
+  // ["posts/queue", "./api/posts/queue"],
+  // ["upload/video", "./api/upload/videoUpload"],
+  // ["upload/thumbnail", "./api/upload/uploadThumbnail"],
   ["upload/cover", "./api/upload/cover"],
   ["upload/avatar", "./api/upload/avatar"],
-  ["upload/error-log", "./api/upload/error-log"],
-  ["upload/bot-image", "./api/upload/botImage"],
-  ["bot", "./routes/bot"],
-  ["tiktok", "./api/tiktok"],
+  // ["upload/error-log", "./api/upload/error-log"],
+  // ["upload/bot-image", "./api/upload/botImage"],
+  // ["bot", "./routes/bot"],
+  ["tiktok", "./api/tiktok"], // Keep for downloader preview if needed
   ["user/pages", "./api/user/pages"],
   ["user/update", "./api/user/update"],
   ["user/stats", "./api/user/stats"],
-  ["user/connections", "./api/user/connections"], // ✅ Connections Check
-  ["analytics", "./api/analytics"],               // ✅ Analytics & Stats
+  ["user/connections", "./api/user/connections"],
+  // ["analytics", "./api/analytics"],               
   ["tools/tiktok", "./api/tools/tiktok"],
-  ["auth/youtube", "./api/auth/youtube"], // ✅ YouTube Auth
-  ["auth/tiktok", "./api/auth/tiktok"],   // ✅ TikTok Auth
-  ["auth/instagram", "./api/auth/instagram"], // ✅ Instagram Auth
-  // ["tools/ai", "./api/tools/ai"],         // ⏸️ AI Tools (Watermark Remover - Coming Soon)
-  ["tools/pinterest", "./api/tools/pinterest"], // ✅ Pinterest Downloader
-  ["tools/youtube", "./api/tools/youtube"],     // ✅ YouTube Downloader
-  ["webhooks/facebook", "./api/webhooks/facebook"], // ✅ Added Webhook
-  // ["tools/document-converter", "./api/tools/document_converter"], // ⏸️ Document Converter (Coming Soon)
-  ["tools/facebook", "./api/tools/facebook"],   // ✅ Facebook Downloader
-  ["tools/telegram", "./api/tools/telegram"],   // ✅ Telegram Downloader
-  ["tools/instagram", "./api/tools/instagram"], // ✅ Instagram Downloader
-  ["tools/capcut", "./api/tools/capcut"],       // ✅ CapCut Downloader
-  // ["boost", "./api/boost"],                     // ⏸️ Auto-Boost Posts
-  // ["boost-accounts", "./api/boost-accounts"],   // ⏸️ Boost Account Management
-  // ["credits", "./api/credits"],                 // ⏸️ Credit System
-  // ["tools/video-creator", "./api/tools/video_creator"], // ⏸️ Video Creator (Images -> Reels)
-  // ["tools/ecommerce", "./api/tools/ecommerce"],         // ⏸️ Dropship Scraper (1688/Taobao)
-  // ["tools/subtitle", "./api/tools/subtitle"],           // ⏸️ Auto Khmer Subtitle (Gemini + FFmpeg)
-  // ["tools/magic-motion", "./api/tools/magic_motion"],   // ⏸️ AI Magic Motion (FFmpeg Effects)
-  // ["tools/censorship", "./api/tools/censorship"],       // ⏸️ Censorship Tool
-  // ["tools/label-swap", "./api/tools/label_swap"], // ⏸️ Label Swap Tool
-  // ["tools/script", "./api/tools/script"], // ⏸️ Script Writer Tool
-  // ["tools/thumbnail", "./api/tools/thumbnail"], // ⏸️ Thumbnail Generator Tool
-  // ["tools/telegram-cloud", "./api/tools/telegram_cloud"], // ⏸️ Cloud Download to Telegram
-  // ["tools/drive-sync", "./api/tools/drive_sync"], // ⏸️ Google Drive Sync
-  // ["tools/farm", "./api/tools/farm"], // ⏸️ Cloud Farm Automation
-  // ["boost/metrics", "./api/boost/metrics"], // ⏸️ Boost Metrics API
-  ["boost/campaigns", "./api/boost/campaigns"], // ⏸️ Boost Campaigns API
-  ["debug", "./api/debug_python"], // ✅ Debug Python Route
+  // ["auth/youtube", "./api/auth/youtube"], 
+  // ["auth/tiktok", "./api/auth/tiktok"],   
+  // ["auth/instagram", "./api/auth/instagram"], 
+  ["tools/pinterest", "./api/tools/pinterest"],
+  ["tools/youtube", "./api/tools/youtube"],
+  // ["webhooks/facebook", "./api/webhooks/facebook"], 
+  ["tools/facebook", "./api/tools/facebook"],
+  ["tools/instagram", "./api/tools/instagram"],
+  ["tools/capcut", "./api/tools/capcut"],
+  ["tools/ecommerce", "./api/tools/ecommerce"],
+  // ["boost/campaigns", "./api/boost/campaigns"], 
+  ["debug", "./api/debug_python"],
 ];
 
 for (const [route, file] of routeModules) {
@@ -315,13 +301,13 @@ app.get("/api/download", (req, res) => {
 // ------------------------------------------------------------
 app.get("/api/health", async (req, res) => {
   try {
-    const { mongoose } = require("./config/mongodb");
-    const dbStatus = mongoose.connection.readyState === 1 ? "Connected" : "Disconnected";
+    // const { mongoose } = require("./config/mongodb"); // REMOVED
+    const dbStatus = "Connected (PostgreSQL)"; // Placeholder until real check is robust
 
     res.json({
       status: "OK",
       database: dbStatus,
-      dbName: "mongkul",
+      dbName: "postgres",
       time: new Date().toISOString(),
     });
   } catch (err) {
@@ -364,15 +350,18 @@ app.use((err, req, res, next) => {
   }
 
   console.error("💥 Global Error:", err.stack);
-  res.status(500).json({ error: "Internal Server Error", details: err.message });
+  if (err.message.includes("CORS")) {
+    return res.status(500).json({ error: "CORS Error", details: err.message });
+  }
+  res.status(500).json({ error: "Internal Server Error", details: err.message, stack: process.env.NODE_ENV === 'development' ? err.stack : undefined });
 });
 
 // ------------------------------------------------------------
 // ✅ Scheduler & Bot Loop (Runs every 60 seconds)
 // ------------------------------------------------------------
 const { processScheduledPosts, cleanupOldPosts } = require("./utils/scheduler");
-const botEngine = require("./utils/botEngine");
-const boostEngine = require("./utils/boostEngine");
+// const botEngine = require("./utils/botEngine");
+// const boostEngine = require("./utils/boostEngine");
 
 /*
 setInterval(() => {
@@ -396,7 +385,7 @@ setInterval(() => {
 */
 
 // 🔄 Daily Token Refresh Check (Runs every 24 hours)
-const { checkAndRefreshTokens } = require("./utils/tokenRefresher");
+// const { checkAndRefreshTokens } = require("./utils/tokenRefresher");
 /*
 setInterval(() => {
   checkAndRefreshTokens();
@@ -405,8 +394,8 @@ setInterval(() => {
 setTimeout(checkAndRefreshTokens, 10000);
 */
 
-// 📊 Metrics Sync Scheduler (Runs every 15 minutes)
-const { startMetricsScheduler, startCampaignMetricsScheduler } = require("./utils/metricsScheduler");
+// 📊 Metrics Sync Scheduler (Disabled for Downloader Focus)
+// const { startMetricsScheduler, startCampaignMetricsScheduler } = require("./utils/metricsScheduler");
 // startMetricsScheduler();
 // startCampaignMetricsScheduler();
 

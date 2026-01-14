@@ -19,7 +19,6 @@ const TikTokDownloader = lazy(() => import("../pages/Tools/TikTokDownloader"));
 const PinterestDownloader = lazy(() => import("../pages/Tools/PinterestDownloader"));
 const YoutubeDownloader = lazy(() => import("../pages/Tools/YoutubeDownloader"));
 const FacebookDownloader = lazy(() => import("../pages/Tools/FacebookDownloader")); // ✅ New
-const TelegramDownloader = lazy(() => import("../pages/Tools/TelegramDownloader")); // ✅ New
 const InstagramDownloader = lazy(() => import("../pages/Tools/InstagramDownloader")); // ✅ New
 const CapCutDownloader = lazy(() => import("../pages/Tools/CapCutDownloader")); // ✅ New
 const VideoCreator = lazy(() => import("../pages/Tools/VideoCreator")); // ✅ New
@@ -145,7 +144,7 @@ export default function AppRouter() {
             path="/tools/ai"
             element={
               <ProtectedRoute>
-                <AiTools />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />
@@ -170,14 +169,6 @@ export default function AppRouter() {
             element={
               <ProtectedRoute>
                 <FacebookDownloader />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tools/telegram"
-            element={
-              <ProtectedRoute>
-                <TelegramDownloader />
               </ProtectedRoute>
             }
           />
@@ -209,7 +200,7 @@ export default function AppRouter() {
             path="/tools/dropship-center"
             element={
               <ProtectedRoute>
-                <ComingSoon />
+                <DropshipCenter />
               </ProtectedRoute>
             }
           />
@@ -217,7 +208,7 @@ export default function AppRouter() {
             path="/tools/document-converter"
             element={
               <ProtectedRoute>
-                <DocumentConverter />
+                <ComingSoon />
               </ProtectedRoute>
             }
           />

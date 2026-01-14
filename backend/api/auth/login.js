@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const User = require("../../models/User");
+const prisma = require('../../utils/prisma');
 const { authenticator } = require('otplib');
 const { decrypt2FASecret } = require('../../libs/crypto2fa');
 
@@ -22,7 +22,10 @@ router.post("/", async (req, res) => {
 
   try {
     // 🔍 Find user by email
-    const user = await User.findOne({ email });
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -48,14 +51,16 @@ router.post("/", async (req, res) => {
       );
       return res.json({
         success: true,
-        requires2FA: true, // User requested 'requires2FA' (plural)
+        requires2FA: true,
         tempToken
       });
     }
 
     // Update last login
-    user.last_login = new Date();
-    await user.save();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() }
+    });
 
     // 🎫 Generate JWT (valid for 1 day)
     const token = jwt.sign(
@@ -82,6 +87,8 @@ router.post("/", async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        plan: user.plan,
+        role: user.role
       },
     });
   } catch (err) {
@@ -89,6 +96,7 @@ router.post("/", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Internal server error during login",
+      details: err.message
     });
   }
 });
@@ -108,7 +116,8 @@ router.post("/2fa", async (req, res) => {
     const decoded = jwt.verify(tempToken, process.env.JWT_SECRET || "supersecretkey");
     if (decoded.scope !== '2fa_pending') throw new Error('Invalid token scope');
 
-    const user = await User.findOne({ id: decoded.id });
+    // Find User
+    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) throw new Error('User not found');
 
     // Verify TOTP
@@ -117,9 +126,11 @@ router.post("/2fa", async (req, res) => {
 
     if (!isValid) return res.status(401).json({ success: false, error: "Invalid 2FA Code" });
 
-    // ✅ Success - Issue Full Token
-    user.last_login = new Date();
-    await user.save();
+    // ✅ Success - Update login time & Issue Full Token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() }
+    });
 
     const token = jwt.sign(
       { id: user.id, email: user.email },
@@ -147,3 +158,4 @@ router.post("/2fa", async (req, res) => {
 });
 
 module.exports = router;
+

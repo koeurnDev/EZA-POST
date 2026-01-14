@@ -12,6 +12,26 @@ const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
 const axios = require("axios");
 const ytdlp = require("../../utils/ytdlp");
+const cheerio = require("cheerio"); // ✅ Required for scraper
+
+// 📂 Constants & Paths
+const tempDir = path.join(__dirname, "../../temp/videos");
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+const cookiesPath = path.join(__dirname, "../../cookies.txt");
+
+const DEFAULT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+/* -------------------------------------------------------------------------- */
+/* 🔍 POST /lookup — Get Video or Image Info                                  */
+/* -------------------------------------------------------------------------- */
+// ⚙️ Helper: Check if Public (Basic)
+const isPublicFacebook = (url) => {
+    return /(facebook\.com|fb\.watch|fb\.me)/.test(url)
+        && !url.includes('/stories/')
+        && !url.includes('/groups/')
+        && !url.includes('pfbid'); // User posts often have this ID but are usually private if not pages
+};
 
 /* -------------------------------------------------------------------------- */
 /* 🔍 POST /lookup — Get Video or Image Info                                  */
@@ -28,10 +48,12 @@ router.post("/lookup", requireAuth, async (req, res) => {
 
         console.log(`📘 Lookup Facebook: ${url}`);
 
-        // Check for Stories (requires cookies usually)
-        const isStory = url.includes("/stories/");
-        if (isStory && !fs.existsSync(cookiesPath)) {
-            console.warn("⚠️ Facebook Story detected but no cookies.txt found. Download may fail.");
+        // 🔒 Public-Only Check
+        if (!isPublicFacebook(url)) {
+            return res.status(400).json({
+                success: false,
+                error: "Private Facebook content is not supported. Only public posts, reels, and images can be downloaded."
+            });
         }
 
         // 1️⃣ Try Video (yt-dlp)
@@ -125,7 +147,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
                 console.error("⚠️ Scraper failed:", scrapeErr.message);
             }
 
-            if (isStory || url.includes("php")) {
+            if (url.includes("stories") || url.includes("php")) {
                 throw new Error("Could not download story. Ensure cookies.txt is updated.");
             }
             throw new Error("Could not extract video or image.");
@@ -134,11 +156,9 @@ router.post("/lookup", requireAuth, async (req, res) => {
     } catch (err) {
         console.error("❌ Facebook Lookup Error:", err.message);
 
-        let errorMessage = "Failed to fetch content.";
-        if (err.message.includes("cookies") || err.message.includes("registered users")) {
-            errorMessage = "This content is private or restricted. Only public content can be downloaded.";
-        } else if (err.message.includes("ext") || err.message.includes("format")) {
-            errorMessage = "Could not extract media. It might be private or deleted.";
+        let errorMessage = "Failed to fetch content. Ensure the link is Public.";
+        if (err.message.includes("cookies") || err.message.includes("registered users") || err.message.includes("Private")) {
+            errorMessage = "Private Facebook content is not supported. Only public posts, reels, and images can be downloaded.";
         }
 
         res.status(500).json({
@@ -238,11 +258,18 @@ router.post("/download", requireAuth, async (req, res) => {
         console.error("❌ FB Download Error:", err.message);
 
         let errorMessage = "Download failed. Ensure content is Public.";
-        if (err.message.includes("cookies") || err.message.includes("registered users")) {
-            errorMessage = "This content is private or restricted. Only public content can be downloaded.";
+        let statusCode = 500;
+
+        // 🔒 Public Only Logic: Catch private/restricted errors
+        if (err.message.includes("cookies") || err.message.includes("registered users") || err.message.includes("formats")) {
+            errorMessage = "This video appears to be Private or Restricted. Only Public content is supported.";
+            statusCode = 400;
+        } else if (err.message.includes("format")) {
+            errorMessage = "Could not extract video. Ensure the link is valid and Public.";
+            statusCode = 400;
         }
 
-        res.status(500).json({ success: false, error: errorMessage });
+        res.status(statusCode).json({ success: false, error: errorMessage });
     }
 });
 

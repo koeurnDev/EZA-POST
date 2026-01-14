@@ -1,0 +1,373 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                     String    @id @default(uuid())
+  email                  String    @unique
+  password               String
+  name                   String    @default("User")
+  plan                   String    @default("free") // enum: free, pro
+  lastLogin              DateTime? @map("last_login")
+  
+  // Facebook Auth
+  facebookId             String?   @unique
+  facebookAccessToken    String?
+  facebookName           String?
+  facebookTokenExpiresAt DateTime?
+
+  // Pages & Settings (Stored as JSON to match Mongoose flexibility)
+  selectedPages          String[]  @default([])
+  connectedPages         Json?     @default("[]") // Array of objects
+  pageSettings           Json?     @default("[]") // Array of objects
+  
+  // Profile
+  avatar                 String?
+  coverImage             String?
+  role                   String    @default("user") // enum: user, admin
+  
+  // Security
+  resetPasswordToken     String?
+  resetPasswordExpires   DateTime?
+  twoFactorSecret        String?
+  twoFactorEnabled       Boolean   @default(false)
+  twoFactorVerified      Boolean   @default(false)
+  
+  // Credits
+  credits                Int       @default(0)
+  totalCreditsSpent      Int       @default(0)
+  totalCreditsPurchased  Int       @default(0)
+
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  // Relations
+  scheduledPosts         ScheduledPost[]
+  posts                  Post[]
+  facebookPages          FacebookPage[]
+
+  @@map("users")
+}
+
+model Post {
+  id              String   @id @default(uuid()) @map("_id") // Mongoose used _id, mapping for compatibility if needed, or just new id
+  userId          String
+  caption         String
+  videoUrl        String
+  accounts        String[]
+  scheduleTime    DateTime?
+  status          String   @default("created") // enum: created, scheduled, processing, published, failed
+  
+  platforms       Json?    @default("[]") // Array of objects
+  mediaType       String   @default("video") // enum: video, image, carousel
+  
+  // Legacy
+  platformStatus  Json?
+  
+  // Boost
+  isBoosted       Boolean  @default(false)
+  viralScore      Int      @default(0)
+  lastMetricsSync DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@map("posts")
+}
+
+model ScheduledPost {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  postType      String   @default("single")
+  videoUrl      String?  @map("video_url")
+  mediaFiles    String[] @default([])
+  thumbnailUrl  String?  @map("thumbnail_url")
+  caption       String   @default("")
+  accounts      String[] @default([])
+  status        String   @default("scheduled")
+  scheduleTime  DateTime @map("schedule_time")
+  postedAt      DateTime? @map("posted_at")
+  attempts      Int      @default(0)
+  publishedIds  Json?    @default("[]")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([status, scheduleTime])
+  @@map("scheduled_posts")
+}
+
+model FacebookPage {
+  id              String   @id @unique // Page ID from FB
+  userId          String   @map("user_id")
+  name            String
+  accessToken     String   @map("access_token")
+  category        String?
+  tasks           String[] @default([])
+  picture         String?
+  followersCount  Int?     @default(0)
+  
+  isConnected     Boolean  @default(true)
+  lastSync        DateTime @default(now())
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@map("facebook_pages")
+}
+
+
+// Placeholders for other models (Mapped as basic tables with JSON for flexibility)
+
+model BoostCampaign {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  postId          String   @map("post_id")
+  facebookPostId  String   @map("facebook_post_id")
+  pageId          String   @map("page_id")
+
+  campaignId      String?  @unique @map("campaign_id")
+  adSetId         String?  @map("ad_set_id")
+  adId            String?  @map("ad_id")
+
+  budget          Float
+  duration        Int
+  startDate       DateTime @map("start_date")
+  endDate         DateTime @map("end_date")
+
+  targeting       Json     @default("{}")
+  status          String   @default("draft") // draft, active, paused, completed, failed
+  metrics         Json     @default("{}")
+  error           String?
+  lastSyncedAt    DateTime? @map("last_synced_at")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, status])
+  @@map("boost_campaigns")
+}
+
+model BoostAccount {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  platform      String   @default("tiktok") // tiktok, facebook, instagram
+  username      String
+  password      String   // stored encrypted
+  cookies       Json     @default("[]")
+  cookiesUpdated DateTime @default(now()) @map("cookies_updated")
+  status        String   @default("active") // active, banned, cooldown, error
+  lastUsed      DateTime? @map("last_used")
+  totalActions  Int      @default(0) @map("total_actions")
+  dailyLimit    Int      @default(25) @map("daily_limit")
+  actionsToday  Int      @default(0) @map("actions_today")
+  lastResetDate DateTime @default(now()) @map("last_reset_date")
+  cooldownUntil DateTime? @map("cooldown_until")
+
+  createdAt     DateTime @default(now())
+
+  @@index([userId, platform])
+  @@map("boost_accounts")
+}
+
+model BoostRule {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  enabled       Boolean  @default(true)
+  rules         Json     @default("[]") // Array of rule objects
+  realBoost     Json     @default("{}") // Settings for real boost
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("boost_rules")
+}
+
+model BoostedPost {
+  id            String   @id @default(uuid())
+  postId        String   @unique @map("post_id")
+  userId        String   @map("user_id")
+  boostStarted  DateTime @default(now()) @map("boost_started")
+  boostEnded    DateTime? @map("boost_ended")
+  metrics       Json     @default("{}")
+  status        String   @default("active") // active, completed, paused
+  ruleTriggered String?  @map("rule_triggered")
+  realBoost     Json     @default("{}")
+
+  @@index([userId, status])
+  @@map("boosted_posts")
+}
+
+model BotRule {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  keyword       String
+  reply         String
+  attachmentUrl String?  @map("attachment_url")
+  ruleType      String   @default("KEYWORD") // KEYWORD, REGEX
+  scope         String   @default("ALL") // ALL, SPECIFIC
+  postId        String?  @map("post_id")
+  enabled       Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@map("bot_rules")
+}
+
+model BotStatus {
+  id            String   @id @default(uuid())
+  enabled       Boolean  @default(true)
+  lastRun       DateTime? @map("last_run")
+  totalReplies  Int      @default(0) @map("total_replies")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("bot_status")
+}
+
+model BotHistory {
+  id            String   @id @default(uuid())
+  commentId     String   @map("comment_id")
+  replyMessage  String   @map("reply_message")
+  pageName      String?  @map("page_name")
+  pageId        String?  @map("page_id")
+  status        String   // success, failed
+  error         String?
+  timestamp     DateTime @default(now())
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("bot_history")
+}
+
+model PendingReply {
+  id            String   @id @default(uuid())
+  commentId     String   @unique @map("comment_id")
+  replyMessage  String   @map("reply_message")
+  attachmentUrl String?  @map("attachment_url")
+  pageId        String   @map("page_id")
+  accessToken   String   @map("access_token")
+  sendAt        DateTime @map("send_at")
+  status        String   @default("pending") // pending, processing, failed, completed
+  attempts      Int      @default(0)
+  error         String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([sendAt, status])
+  @@map("pending_replies")
+}
+
+model PostMetrics {
+  id              String   @id @default(uuid())
+  postId          String   @unique @map("post_id")
+  facebookPostId  String   @unique @map("facebook_post_id")
+  pageId          String   @map("page_id")
+  userId          String   @map("user_id")
+
+  likes           Int      @default(0)
+  comments        Int      @default(0)
+  shares          Int      @default(0)
+  reactions       Json     @default("{}") // Object mapping reaction types to counts
+  reach           Int      @default(0)
+  impressions     Int      @default(0)
+  engagement      Int      @default(0)
+
+  viralScore      Int      @default(0) @map("viral_score")
+  viralTier       String   @default("low") @map("viral_tier") // low, medium, high, viral
+
+  lastSyncedAt    DateTime @default(now()) @map("last_synced_at")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, viralScore])
+  @@index([pageId])
+  @@map("post_metrics")
+}
+
+model CreditPackage {
+  id            String   @id @default(uuid())
+  name          String
+  credits       Int
+  price         Float    // in USD
+  priceKHR      Float    @map("price_khr")
+  discount      Float    @default(0)
+  popular       Boolean  @default(false)
+  active        Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("credit_packages")
+}
+
+model CreditTransaction {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  type          String   // purchase, spend, refund, bonus
+  amount        Int
+  balance       Int
+  description   String?
+  relatedId     String?  @map("related_id") // Order ID or Boost ID
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@map("credit_transactions")
+}
+
+model PostLog {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  pageId            String   @map("page_id")
+  fbPostId          String?  @unique @map("fb_post_id")
+  type              String   // carousel, video, tiktok
+  status            String   @default("processing") // published, scheduled, failed, processing
+  scheduledTime     DateTime? @map("scheduled_time")
+  cloudinaryVideoId String?  @map("cloudinary_video_id")
+  cloudinaryImageIds String[] @default([]) @map("cloudinary_image_ids")
+  error             String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("post_logs")
+}
+
+model RepliedComment {
+  id        String   @id @default(uuid())
+  commentId String   @unique @map("comment_id")
+  postId    String   @map("post_id")
+  userId    String   @map("user_id") // Inferred requirement from stats.js
+  repliedAt DateTime @default(now()) @map("replied_at")
+
+  @@map("replied_comments")
+}
+
+model PlatformConfig {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id") // Added for efficient filtering
+  platform        String    // youtube, tiktok, instagram
+  isEnabled       Boolean   @default(true) @map("is_enabled") // Mongoose default true
+  settings        Json      // flexible settings: accessToken, refreshToken, tokenExpiresAt, profileName, picture, isConnected, externalId
+  updatedAt       DateTime  @updatedAt
+
+  @@map("platform_configs")
+}

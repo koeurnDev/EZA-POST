@@ -65,10 +65,12 @@ router.post("/scrape", requireAuth, async (req, res) => {
             }
 
             let price = document.querySelector('.price-text')?.innerText || // 1688
-                document.querySelector('.tb-promo-price .tb-rmb-num')?.innerText ||
+                document.querySelector('.tb-promo-price .tb-rmb-num')?.innerText || // Taobao
+                document.querySelector('.price-num')?.innerText || // Tmall
+                document.querySelector('.promotion-price')?.innerText ||
                 document.querySelector('.price')?.innerText;
 
-            return { title: title?.trim(), images: images.slice(0, 8), price };
+            return { title: title?.trim(), images: images.slice(0, 8), price: price?.trim() };
         });
 
         console.log("✅ Puppeteer Success");
@@ -94,7 +96,7 @@ router.post("/scrape", requireAuth, async (req, res) => {
             const $ = cheerio.load(response.data);
 
             const title = $('h1').text() || $('meta[property="og:title"]').attr('content') || $('title').text();
-            const price = $('.price-text').text() || $('.tb-rmb-num').text() || 'Ask';
+            const price = $('.price-text').text() || $('.tb-rmb-num').text() || $('.price-num').text() || 'Ask';
 
             let images = [];
             $('img').each((i, el) => {
@@ -133,7 +135,7 @@ router.post("/scrape", requireAuth, async (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* 🗣️ POST /translate — Translate Text (CN -> KH) using Gemini                */
+/* 🗣️ POST /translate — Translate Text (Any -> KH) using Gemini               */
 /* -------------------------------------------------------------------------- */
 router.post("/translate", requireAuth, async (req, res) => {
     try {
@@ -147,7 +149,13 @@ router.post("/translate", requireAuth, async (req, res) => {
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        const prompt = `Translate the following E-commerce product title from Chinese to Khmer (Cambodian). Keep it professional, concise, and attractive for sales. Do not add quotes or explanations, just the Khmer text.\n\nSource: "${text}"`;
+        const prompt = `Translate this E-commerce product title to Khmer (Cambodian). 
+        Source text: "${text}"
+        Guidelines:
+        1. Keep it professional and attractive for sales.
+        2. Do not include quotes, explanations, or the original text.
+        3. If the title is already in Khmer, return it as is.
+        4. Focus on clarity and common marketplace terms in Cambodia.`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;

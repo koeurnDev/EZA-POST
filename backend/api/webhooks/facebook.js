@@ -6,9 +6,9 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
-const User = require("../../models/User");
-const botEngine = require("../../utils/botEngine");
-const { BotRule } = require("../../models/BotRule");
+const { decrypt } = require("../../utils/crypto");
+const prisma = require("../../utils/prisma");
+
 
 // ============================================================
 // ✅ GET /api/webhooks/facebook
@@ -86,23 +86,36 @@ router.post("/", async (req, res) => {
  */
 async function handleWebhookComment(pageId, commentId, message, senderId, senderName) {
     try {
-        // 1️⃣ Find User & Page
-        const user = await User.findOne({
-            "connectedPages.id": pageId,
-            "pageSettings.pageId": pageId,
-            "pageSettings.enableBot": true
+        const prisma = require("../../utils/prisma");
+
+        // 1️⃣ Find User & Page via FacebookPage table
+        const pageRecord = await prisma.facebookPage.findUnique({
+            where: { id: pageId },
+            include: { user: true }
         });
 
-        if (!user) return;
+        if (!pageRecord || !pageRecord.user) return;
 
-        const page = user.connectedPages.find(p => p.id === pageId);
-        if (!page || !page.access_token) return;
+        const user = pageRecord.user;
+
+        // Check Page Settings for Bot Enablement
+        let pageSettings = user.pageSettings;
+        if (typeof pageSettings === 'string') {
+            try { pageSettings = JSON.parse(pageSettings); } catch (e) { pageSettings = []; }
+        }
+        if (!Array.isArray(pageSettings)) pageSettings = [];
+
+        const settings = pageSettings.find(s => s.pageId === pageId);
+        if (!settings || !settings.enableBot) return;
+
+        const pageToken = decrypt(pageRecord.accessToken);
+        if (!pageToken) return;
 
         // 2️⃣ Get Rules
-        const rules = await BotRule.find({ enabled: true });
+        const rules = await prisma.botRule.findMany({ where: { enabled: true } });
         if (rules.length === 0) return;
 
-        // 3️⃣ Construct Comment Object (Mocking FB API structure expected by botEngine)
+        // 3️⃣ Construct Comment Object
         const commentObj = {
             id: commentId,
             message: message,
@@ -112,8 +125,14 @@ async function handleWebhookComment(pageId, commentId, message, senderId, sender
             }
         };
 
-        // 4️⃣ Process via Engine (Queues reply if matched)
-        await botEngine.processComment(commentObj, page, rules);
+        // 4️⃣ Process via Engine
+        const pageForEngine = {
+            id: pageId,
+            access_token: pageToken,
+            name: pageRecord.name
+        };
+
+        await botEngine.processComment(commentObj, pageForEngine, rules);
         console.log(`🔄 Webhook comment processed by Bot Engine: ${commentId}`);
 
     } catch (err) {

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const User = require("../../models/User");
+const prisma = require('../../utils/prisma');
 const { requireAuth } = require("../../utils/auth");
 
 // ✅ PUT /api/user/update
@@ -21,24 +21,25 @@ router.put("/", requireAuth, async (req, res) => {
 
         // Check if email is taken (if changed)
         if (email) {
-            const existingUser = await User.findOne({ email: email.toLowerCase() });
+            const existingUser = await prisma.user.findUnique({
+                where: { email: email.toLowerCase() }
+            });
             if (existingUser && existingUser.id !== userId) {
                 return res.status(400).json({ error: "Email is already in use by another account." });
             }
         }
 
         // Update User
-        const updateFields = {};
-        if (name) updateFields.name = name.trim();
-        if (email) updateFields.email = email.toLowerCase().trim();
-        if (req.body.avatar) updateFields.avatar = req.body.avatar;
-        if (req.body.coverImage) updateFields.coverImage = req.body.coverImage;
+        const updateData = {};
+        if (name) updateData.name = name.trim();
+        if (email) updateData.email = email.toLowerCase().trim();
+        if (req.body.avatar) updateData.avatar = req.body.avatar;
+        if (req.body.coverImage) updateData.coverImage = req.body.coverImage;
 
-        const updatedUser = await User.findOneAndUpdate(
-            { id: userId },
-            { $set: updateFields },
-            { new: true, select: "-password" } // Return updated doc, exclude password
-        );
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: updateData
+        });
 
         if (!updatedUser) {
             return res.status(404).json({ error: "User not found." });
@@ -54,7 +55,7 @@ router.put("/", requireAuth, async (req, res) => {
                 avatar: updatedUser.avatar,
                 coverImage: updatedUser.coverImage, // ✅ Include coverImage
                 role: updatedUser.role,
-                isDemo: false,
+                isDemo: false, // Assuming demo default is false or handled elsewhere
             },
         });
     } catch (err) {

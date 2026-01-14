@@ -539,6 +539,14 @@ export default function YoutubeDownloader() {
                                         </button>
                                     </div>
 
+                                    {/* Action Buttons */}
+                                    <button
+                                        onClick={clearLookup}
+                                        className="w-full py-4 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 transform active:scale-[0.98]"
+                                    >
+                                        <Search size={20} /> Download Another Video
+                                    </button>
+
                                     {/* Progress Banner */}
                                     {(downloadingMp4 || downloadingMp3) && (
                                         <div className="mt-4 p-4 bg-red-600/10 dark:bg-red-500/5 border border-red-500/20 rounded-2xl animate-in fade-in duration-300">

@@ -161,6 +161,13 @@ export default function InstagramDownloader() {
                                         >
                                             <Download size={20} /> Save to Device
                                         </a>
+
+                                        <button
+                                            onClick={clearResult}
+                                            className="w-full py-4 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 transform active:scale-[0.98]"
+                                        >
+                                            <Search size={20} /> Download Another
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -187,6 +194,6 @@ export default function InstagramDownloader() {
                     </div>
                 )}
             </div>
-        </DashboardLayout>
+        </DashboardLayout >
     );
 }

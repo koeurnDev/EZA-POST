@@ -2,8 +2,9 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const jwt = require("jsonwebtoken");
-const User = require("../../models/User");
-const FacebookPage = require("../../models/FacebookPage");
+const prisma = require("../../utils/prisma");
+const { encrypt } = require("../../utils/crypto");
+const { setAuthCookie } = require("../../utils/auth");
 
 // ============================================================
 // 📘 Facebook OAuth (Connect Account)
@@ -26,10 +27,6 @@ const CALLBACK_URL = `${BASE_URL.replace(/\/$/, "")}/api/auth/facebook/callback`
  * Redirects user to Facebook Login dialog
  */
 router.get("/", (req, res) => {
-    console.log("🔍 Debug FB Auth:");
-    console.log("   👉 FB_APP_ID:", !!FB_APP_ID ? "Set" : "Missing");
-    console.log("   👉 FB_APP_SECRET:", !!FB_APP_SECRET ? "Set" : "Missing");
-
     if (!FB_APP_ID || !FB_APP_SECRET) {
         return res.status(500).json({
             error: "Facebook App ID/Secret not configured on server.",
@@ -54,7 +51,7 @@ router.get("/", (req, res) => {
         CALLBACK_URL
     )}&scope=${scopes.join(",")}&state=connect_account`;
 
-    console.log(`🔄 Redirecting to Facebook: ${authUrl}`);
+    // console.log(`🔄 Redirecting to Facebook: ${authUrl}`);
     res.redirect(authUrl);
 });
 
@@ -83,7 +80,7 @@ router.get("/callback", async (req, res) => {
     try {
         // 1️⃣ Exchange Code for Access Token
         currentStep = "ExchangeCode";
-        console.log("🔄 Step 1: Exchanging code for short-lived token...");
+        // console.log("🔄 Step 1: Exchanging code for short-lived token...");
         const tokenRes = await axios.get(
             "https://graph.facebook.com/v19.0/oauth/access_token",
             {
@@ -97,11 +94,10 @@ router.get("/callback", async (req, res) => {
         );
         const { access_token: shortLivedToken } = tokenRes.data;
         if (!shortLivedToken) throw new Error("FB did not return a short-lived token.");
-        console.log("✅ Short-lived token obtained");
 
         // 1.5️⃣ Exchange for Long-Lived Token
         currentStep = "ExchangeLongLived";
-        console.log("🔄 Step 1.5: Exchanging for long-lived token...");
+        // console.log("🔄 Step 1.5: Exchanging for long-lived token...");
         const longLivedTokenRes = await axios.get(
             "https://graph.facebook.com/v19.0/oauth/access_token",
             {
@@ -115,7 +111,6 @@ router.get("/callback", async (req, res) => {
         );
         const { access_token, expires_in } = longLivedTokenRes.data;
         if (!access_token) throw new Error("FB did not return a long-lived token.");
-        console.log("✅ Long-lived token obtained");
 
         // Calculate Expiration
         const expiresInSeconds = expires_in || 5184000; // 60 days
@@ -123,7 +118,7 @@ router.get("/callback", async (req, res) => {
 
         // 2️⃣ Get User Profile
         currentStep = "FetchProfile";
-        console.log("🔄 Step 2: Fetching user profile...");
+        // console.log("🔄 Step 2: Fetching user profile...");
         const profileRes = await axios.get("https://graph.facebook.com/me", {
             params: {
                 access_token,
@@ -135,29 +130,23 @@ router.get("/callback", async (req, res) => {
 
         // 3️⃣ Find Current User
         currentStep = "FindLocalUser";
-        console.log("🔄 Step 3: Identifying local user...");
         let userId = req.session?.user?.id;
 
         if (!userId && req.cookies?.token) {
             try {
-                // NOTE: Using the fallback key here is a potential source of error if JWT_SECRET is inconsistent
                 const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET || "supersecretkey");
                 userId = decoded.id;
-                console.log(`✅ User identified via JWT: ${userId}`);
-            } catch (err) {
-                console.warn("⚠️ Invalid JWT (Session may have expired or JWT_SECRET mismatch):", err.message);
-            }
+            } catch (err) { }
         }
 
         if (!userId) {
             console.error("❌ No authenticated user found (Session or JWT missing)");
-            // Redirect to login, not server_error
             return res.redirect(`${process.env.FRONTEND_URL}/login?error=session_expired`);
         }
 
         // 4️⃣ Fetch Pages
         currentStep = "FetchPages";
-        console.log("🔄 Step 4: Fetching Facebook Pages...");
+        // console.log("🔄 Step 4: Fetching Facebook Pages...");
         const pagesRes = await axios.get("https://graph.facebook.com/v19.0/me/accounts", {
             params: {
                 access_token,
@@ -173,39 +162,57 @@ router.get("/callback", async (req, res) => {
             picture: p.picture?.data?.url,
             category: p.category
         }));
-        console.log(`✅ Fetched ${myPages.length} pages`);
 
         // 5️⃣ Update Database
         currentStep = "UpdateDB";
         console.log(`🔄 Step 5: Updating User ${userId} in DB...`);
-        // FIX: Use findOne({ id: userId }) instead of findById(userId) because userId is a custom string, not an ObjectId
-        const user = await User.findOne({ id: userId });
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+
         if (user) {
-            user.facebookId = fbUser.id;
-            user.facebookAccessToken = access_token;
-            user.facebookTokenExpiresAt = expiresAt;
-            user.facebookName = fbUser.name;
-            user.connectedPages = myPages; // ⚠️ Legacy Support (Keep for now)
+            // Update User Profile with FB details
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    facebookId: fbUser.id,
+                    facebookAccessToken: access_token,
+                    facebookTokenExpiresAt: expiresAt,
+                    facebookName: fbUser.name,
+                    connectedPages: myPages // Storing raw JSON as backup
+                }
+            });
 
-            await user.save();
-
-            // ✅ Save to FacebookPage Model (New Architecture)
-            console.log("🔄 Syncing pages to FacebookPage collection...");
+            // Sync to FacebookPage Table
+            console.log("🔄 Syncing pages to FacebookPage table...");
             for (const p of myPages) {
                 try {
-                    let fbPage = await FacebookPage.findOne({ userId: userId, pageId: p.id });
-                    if (!fbPage) {
-                        fbPage = new FacebookPage({
-                            userId: userId,
-                            pageId: p.id
+                    // Check if page exists (upsert logic manually to handle explicit updates)
+                    const existingPage = await prisma.facebookPage.findFirst({
+                        where: { userId: userId, id: p.id }
+                    });
+
+                    const pageData = {
+                        userId: userId,
+                        id: p.id,
+                        name: p.name,
+                        accessToken: encrypt(p.access_token), // 🔒 Encrypt!
+                        picture: p.picture,
+                        category: p.category,
+                        isConnected: true,
+                        updatedAt: new Date()
+                    };
+
+                    if (existingPage) {
+                        await prisma.facebookPage.update({
+                            where: { id: p.id }, // ID is unique per page globally usually, but standard here is page ID
+                            data: pageData
+                        });
+                    } else {
+                        await prisma.facebookPage.create({
+                            data: pageData
                         });
                     }
-                    fbPage.pageName = p.name;
-                    fbPage.pageAccessToken = p.access_token; // 🔒 Will be encrypted by pre-save hook
-                    fbPage.pictureUrl = p.picture;
-                    fbPage.updatedAt = new Date();
 
-                    await fbPage.save();
                 } catch (pageErr) {
                     console.error(`❌ Failed to save page ${p.name}:`, pageErr.message);
                 }
@@ -216,41 +223,24 @@ router.get("/callback", async (req, res) => {
             throw new Error("User not found in database");
         }
 
-        const { setAuthCookie } = require("../../utils/auth"); // Import helper
-
         // 6️⃣ Refresh JWT
         currentStep = "RefreshJWT";
-        console.log("🔄 Step 6: Refreshing JWT...");
 
-        // Use the centralized helper to ensure consistent cookie attributes
         setAuthCookie(res, {
             id: user.id,
             email: user.email,
             name: user.name
         });
 
-        console.log("✅ Callback complete. Redirecting...");
         res.redirect(`${process.env.FRONTEND_URL}/settings?success=facebook_connected`);
 
     } catch (err) {
         console.error("❌ CRITICAL FAILURE IN FB CALLBACK ❌");
-        console.error(`🚨 Error occurred at Step: ${currentStep}`);
 
         if (currentStep === "FetchPages" && err.response?.status === 400) {
-            console.error(" Likely Cause: Missing `pages_show_list` permission (user declined in the dialog).");
-        } else if (currentStep === "UpdateDB" && err.name === 'ValidationError') {
-            console.error("🛑 Likely Cause: Mongoose Validation Error. Check User model schema for 'connectedPages'.");
-            console.error("👉 Validation Errors:", err.errors);
+            // likely missing perm
         }
 
-        if (err.response) {
-            console.error("👉 API Error Status:", err.response.status);
-            console.error("👉 API Error Data:", JSON.stringify(err.response.data, null, 2));
-        } else {
-            console.error("👉 Error Message:", err.message);
-            // Log stack trace for non-API errors (like Mongoose or coding errors)
-            console.error("👉 Stack:", err.stack);
-        }
         res.redirect(`${process.env.FRONTEND_URL}/settings?error=server_error`);
     }
 });
@@ -260,42 +250,34 @@ router.get("/callback", async (req, res) => {
  * Disconnects the user's Facebook account
  */
 router.delete("/", async (req, res) => {
-    // NOTE: This delete route relies on req.session.user.id, which might be stale.
-    // You should rely on JWT data (req.user.id, if using an auth middleware) or req.cookies.token.
-    // Assuming you have middleware that puts user on req.session for consistency:
-    if (!req.session?.user?.id) {
-        // Fallback check using JWT from cookies (similar to step 3 in callback)
-        let userId = null;
-        if (req.cookies?.token) {
-            try {
-                const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET || "supersecretkey");
-                userId = decoded.id;
-            } catch (err) {
-                console.warn("⚠️ Invalid JWT on Disconnect:", err.message);
-            }
-        }
-        if (!userId) {
-            return res.status(401).json({ error: "Unauthorized or session expired." });
-        }
-        req.session = req.session || {};
-        req.session.user = { id: userId };
+    let userId = req.session?.user?.id;
+
+    if (!userId && req.cookies?.token) {
+        try {
+            const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET || "supersecretkey");
+            userId = decoded.id;
+        } catch (err) { }
     }
 
+    if (!userId) {
+        return res.status(401).json({ error: "Unauthorized or session expired." });
+    }
 
     try {
-        await User.findByIdAndUpdate(req.session.user.id, {
-            $unset: {
-                facebookId: "",
-                facebookAccessToken: "",
-                facebookName: "",
-                connectedPages: "",
-                pageSettings: "",
-                selectedPages: ""
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                facebookId: null,
+                facebookAccessToken: null,
+                facebookName: null,
+                connectedPages: [], // reset to empty array
+                pageSettings: [],
+                selectedPages: []
             }
         });
 
         // ✅ Also remove FacebookPage entries
-        await FacebookPage.deleteMany({ userId: req.session.user.id });
+        await prisma.facebookPage.deleteMany({ where: { userId: userId } });
 
         // Update session
         if (req.session.user) {

@@ -3,11 +3,12 @@
  */
 
 const fs = require("fs");
-const PostLog = require("../models/PostLog");
-const FacebookPage = require("../models/FacebookPage");
-const User = require("../models/User");
+const prisma = require('../utils/prisma');
 const { uploadFile } = require("../utils/cloudinary");
 const fb = require("../utils/fb");
+// Decryption helper local or imported if centralized
+const { decrypt } = require("../utils/crypto");
+
 
 exports.createPost = async (req, res) => {
     // ✅ Increase timeout for this route to 10 minutes
@@ -42,9 +43,21 @@ exports.createPost = async (req, res) => {
         // ✅ Auto-Select All Pages if accounts is missing/empty
         if (!accountsArray || accountsArray.length === 0) {
             console.log("⚠️ No accounts provided. Auto-selecting all connected pages.");
-            const user = await User.findOne({ id: userId });
-            if (user && user.connectedPages && user.connectedPages.length > 0) {
-                accountsArray = user.connectedPages.map(p => p.id);
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { connectedPages: true }
+            });
+
+            // Prisma stores JSON. We need to cast or ensure it's iterable.
+            // If default is "[]" string, we might get a string or object depending on Prisma version/DB handling.
+            // Usually Json type in Prisma returns an Object/Array in JS.
+            let connectedPages = user?.connectedPages;
+            if (typeof connectedPages === 'string') {
+                try { connectedPages = JSON.parse(connectedPages) } catch (e) { }
+            }
+
+            if (Array.isArray(connectedPages) && connectedPages.length > 0) {
+                accountsArray = connectedPages.map(p => p.id);
             } else {
                 return res.status(400).json({ success: false, error: "No connected pages found. Please connect a page first." });
             }
@@ -120,19 +133,33 @@ exports.createPost = async (req, res) => {
                 for (let i = 0; i < accountsArray.length; i++) {
                     const accountId = accountsArray[i];
                     try {
-                        const page = await FacebookPage.findOne({ pageId: accountId, userId: userId });
-                        let pageToken = page ? page.getDecryptedAccessToken() : null;
-                        let pageName = page ? page.pageName : 'Unknown Page';
+                        // 1. Try finding in FacebookPage table
+                        const page = await prisma.facebookPage.findUnique({
+                            where: { id: accountId }
+                        });
 
+                        let pageToken = page ? decrypt(page.accessToken) : null;
+                        let pageName = page ? page.name : 'Unknown Page';
+
+                        // 2. Fallback: User's connectedPages JSON
                         if (!pageToken) {
-                            const user = await User.findOne({ id: userId });
-                            const connectedPage = user?.connectedPages?.find(p => p.id === accountId);
+                            const user = await prisma.user.findUnique({
+                                where: { id: userId },
+                                select: { connectedPages: true }
+                            });
+
+                            let connectedPages = user?.connectedPages;
+                            if (typeof connectedPages === 'string') {
+                                try { connectedPages = JSON.parse(connectedPages) } catch (e) { }
+                            }
+
+                            const connectedPage = Array.isArray(connectedPages) ? connectedPages.find(p => p.id === accountId) : null;
+
                             if (connectedPage) {
-                                pageToken = user.getDecryptedPageToken(accountId);
+                                pageToken = decrypt(connectedPage.access_token);
                                 pageName = connectedPage.name;
                             }
                         }
-                        if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
 
                         if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
 
@@ -175,14 +202,16 @@ exports.createPost = async (req, res) => {
                             if (videoPublicId) await softDeleteAsset(videoPublicId);
                             // if (thumbnailPublicId) await softDeleteAsset(thumbnailPublicId);
 
-                            await PostLog.create({
-                                userId,
-                                pageId: accountId,
-                                fbPostId: fbPostId,
-                                type: tiktokUrl ? "tiktok" : "video",
-                                status: finalScheduleTime ? "scheduled" : "published",
-                                scheduledTime: finalScheduleTime,
-                                cloudinaryVideoId: videoPublicId
+                            await prisma.postLog.create({
+                                data: {
+                                    userId,
+                                    pageId: accountId,
+                                    fbPostId: fbPostId,
+                                    type: tiktokUrl ? "tiktok" : "video",
+                                    status: finalScheduleTime ? "scheduled" : "published",
+                                    scheduledTime: finalScheduleTime || null,
+                                    cloudinaryVideoId: videoPublicId
+                                }
                             });
                             results.successCount++;
                             results.details.push({ accountId, status: "success", postId: fbPostId });
@@ -192,13 +221,15 @@ exports.createPost = async (req, res) => {
 
                     } catch (err) {
                         console.error(`❌ Failed for ${accountId}:`, err.message);
-                        await PostLog.create({
-                            userId,
-                            pageId: accountId,
-                            type: tiktokUrl ? "tiktok" : "video",
-                            status: "failed",
-                            error: err.message,
-                            cloudinaryVideoId: videoPublicId
+                        await prisma.postLog.create({
+                            data: {
+                                userId,
+                                pageId: accountId,
+                                type: tiktokUrl ? "tiktok" : "video",
+                                status: "failed",
+                                error: err.message,
+                                cloudinaryVideoId: videoPublicId
+                            }
                         });
                         results.failedCount++;
                         results.details.push({ accountId, status: "failed", error: err.message });
@@ -221,18 +252,34 @@ exports.createPost = async (req, res) => {
                 for (let i = 0; i < accountsArray.length; i++) {
                     const accountId = accountsArray[i];
                     try {
-                        const page = await FacebookPage.findOne({ pageId: accountId, userId: userId });
-                        let pageToken = page ? page.getDecryptedAccessToken() : null;
-                        let pageName = page ? page.pageName : 'Unknown Page';
+                        // 1. Try finding in FacebookPage table
+                        const page = await prisma.facebookPage.findUnique({
+                            where: { id: accountId }
+                        });
 
+                        let pageToken = page ? decrypt(page.accessToken) : null;
+                        let pageName = page ? page.name : 'Unknown Page';
+
+                        // 2. Fallback: User's connectedPages JSON
                         if (!pageToken) {
-                            const user = await User.findOne({ id: userId });
-                            const connectedPage = user?.connectedPages?.find(p => p.id === accountId);
+                            const user = await prisma.user.findUnique({
+                                where: { id: userId },
+                                select: { connectedPages: true }
+                            });
+
+                            let connectedPages = user?.connectedPages;
+                            if (typeof connectedPages === 'string') {
+                                try { connectedPages = JSON.parse(connectedPages) } catch (e) { }
+                            }
+
+                            const connectedPage = Array.isArray(connectedPages) ? connectedPages.find(p => p.id === accountId) : null;
+
                             if (connectedPage) {
-                                pageToken = user.getDecryptedPageToken(accountId);
+                                pageToken = decrypt(connectedPage.access_token);
                                 pageName = connectedPage.name;
                             }
                         }
+
                         if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
 
                         // 🕒 Stagger Calculation
@@ -265,14 +312,16 @@ exports.createPost = async (req, res) => {
                                 await fb.postComment(pageToken, fbPostId, req.body.autoComment);
                             }
 
-                            await PostLog.create({
-                                userId,
-                                pageId: accountId,
-                                fbPostId: fbPostId,
-                                type: tiktokUrl ? "tiktok" : "video",
-                                status: finalScheduleTime ? "scheduled" : "published",
-                                scheduledTime: finalScheduleTime,
-                                cloudinaryVideoId: videoPublicId
+                            await prisma.postLog.create({
+                                data: {
+                                    userId,
+                                    pageId: accountId,
+                                    fbPostId: fbPostId,
+                                    type: tiktokUrl ? "tiktok" : "video",
+                                    status: finalScheduleTime ? "scheduled" : "published",
+                                    scheduledTime: finalScheduleTime || null,
+                                    cloudinaryVideoId: videoPublicId
+                                }
                             });
                             results.successCount++;
                             results.details.push({ accountId, status: "success", postId: fbPostId });
@@ -282,13 +331,15 @@ exports.createPost = async (req, res) => {
 
                     } catch (err) {
                         console.error(`❌ Failed for ${accountId}:`, err.message);
-                        await PostLog.create({
-                            userId,
-                            pageId: accountId,
-                            type: tiktokUrl ? "tiktok" : "video",
-                            status: "failed",
-                            error: err.message,
-                            cloudinaryVideoId: videoPublicId
+                        await prisma.postLog.create({
+                            data: {
+                                userId,
+                                pageId: accountId,
+                                type: tiktokUrl ? "tiktok" : "video",
+                                status: "failed",
+                                error: err.message,
+                                cloudinaryVideoId: videoPublicId
+                            }
                         });
                         results.failedCount++;
                         results.details.push({ accountId, status: "failed", error: err.message });
@@ -327,9 +378,6 @@ exports.createPost = async (req, res) => {
                 }
             });
         }
-        // Manual cleanup for processed file if exists
-        // We can't access 'processedVideoPath' easily here due to scope. 
-        // Best practice: collect filesToDelete array in scope.
-        // For now, let's rely on OS temp cleanup or improve this later.
     }
 };
+

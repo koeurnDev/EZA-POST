@@ -2,45 +2,40 @@ const express = require('express');
 const router = express.Router();
 const { authenticator } = require('otplib');
 const qrcode = require('qrcode');
-const User = require('../../models/User');
+const prisma = require('../../utils/prisma');
 const { requireAuth } = require('../../utils/auth');
 const { encrypt2FASecret, decrypt2FASecret } = require('../../libs/crypto2fa');
 
 // Step 1 — Generate TOTP + QR
 router.post("/setup", requireAuth, async (req, res) => {
     try {
-        console.log("🔐 Starting 2FA Setup for user:", req.user);
-        const userId = req.user.id || req.user._id; // Handle both cases
-        console.log("   👉 User ID:", userId);
+        // console.log("🔐 Starting 2FA Setup for user:", req.user);
+        const userId = req.user.id;
+        // console.log("   👉 User ID:", userId);
 
         if (!userId) {
             throw new Error("User ID not found in request");
         }
 
         const secret = authenticator.generateSecret();
-        console.log("   👉 Generated Secret");
+        // console.log("   👉 Generated Secret");
 
         const encrypted = encrypt2FASecret(secret);
-        console.log("   👉 Encrypted Secret");
+        // console.log("   👉 Encrypted Secret");
 
         const otpURI = authenticator.keyuri(req.user.email, "EZA_POST", secret);
         const qr = await qrcode.toDataURL(otpURI);
-        console.log("   👉 Generated QR Code");
+        // console.log("   👉 Generated QR Code");
 
-        const updatedUser = await User.findOneAndUpdate({ id: userId }, {
-            twoFactorSecret: encrypted,
-            twoFactorVerified: false,
-        }, { new: true });
-
-        if (!updatedUser) {
-            // Try finding by _id if custom id failed
-            await User.findByIdAndUpdate(userId, {
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
                 twoFactorSecret: encrypted,
                 twoFactorVerified: false,
-            });
-        }
+            }
+        });
 
-        console.log("   ✅ 2FA Secret Saved to DB");
+        // console.log("   ✅ 2FA Secret Saved to DB");
 
         res.json({
             success: true,
@@ -60,7 +55,7 @@ router.post("/verify", requireAuth, async (req, res) => {
         const code = token || req.body.code;
         const userId = req.user.id;
 
-        const user = await User.findOne({ id: userId });
+        const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user || !user.twoFactorSecret) {
             return res.status(400).json({ success: false, error: "2FA not initialized." });
         }
@@ -70,9 +65,12 @@ router.post("/verify", requireAuth, async (req, res) => {
 
         if (!isValid) return res.status(400).json({ success: false, error: "Invalid OTP." });
 
-        await User.findOneAndUpdate({ id: userId }, {
-            twoFactorEnabled: true,
-            twoFactorVerified: true,
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                twoFactorEnabled: true,
+                twoFactorVerified: true
+            }
         });
 
         res.json({ success: true, ok: true });
@@ -87,10 +85,13 @@ router.post("/disable", requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
 
-        await User.findOneAndUpdate({ id: userId }, {
-            twoFactorEnabled: false,
-            twoFactorSecret: null,
-            twoFactorVerified: false,
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                twoFactorEnabled: false,
+                twoFactorSecret: null,
+                twoFactorVerified: false
+            }
         });
 
         res.json({ success: true, ok: true });

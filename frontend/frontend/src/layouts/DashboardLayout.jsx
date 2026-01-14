@@ -52,29 +52,17 @@ const NAV_ITEMS = [
   { label: "Instagram", icon: <Instagram size={20} />, path: "/tools/instagram" },
   { label: "Facebook", icon: <Facebook size={20} />, path: "/tools/facebook" },
   { label: "Pinterest", icon: <Images size={20} />, path: "/tools/pinterest" },
-  { label: "Telegram", icon: <Send size={20} />, path: "/tools/telegram" },
   { label: "CapCut", icon: <Scissors size={20} />, path: "/tools/capcut" },
+  { label: "Dropship Center", icon: <ShoppingBag size={20} />, path: "/tools/dropship-center" },
   { type: "divider" },
 
-  { type: "header", label: "Active AI Tools" },
-
-
-  { type: "divider" },
-
-  { type: "header", label: "Discovery" },
+  { type: "header", label: "Discovery & Cloud" },
   { label: "Viral Finder", icon: <TrendingUp size={20} />, path: "/tools/viral-finder" },
   { label: "Trending Sounds", icon: <Music size={20} />, path: "/tools/tiktok/trends" },
   { type: "divider" },
 
-  // 🚀 Coming Soon Sections (Moved to Bottom)
-  { type: "header", label: "Core (Coming Soon)" },
-  { label: "Dashboard", icon: <LayoutDashboard size={20} />, path: "/dashboard" },
-  { label: "Posting", icon: <UploadCloud size={20} />, path: "/post" },
-  { label: "Auto-Boost", icon: <Zap size={20} />, path: "/boost-settings" },
-  { label: "Analytics", icon: <BarChart2 size={20} />, path: "/analytics" },
-  { type: "divider" },
-
-  { type: "header", label: "Creator Tools (Coming Soon)" },
+  // 🚀 Core System (Coming Soon)
+  { type: "header", label: "System (Coming Soon)" },
   { label: "Video Creator", icon: <Film size={20} />, path: "/tools/video-creator" },
   { label: "AI Script Writer", icon: <FileText size={20} />, path: "/tools/script-writer" },
   { label: "AI Thumbnails", icon: <ImagePlus size={20} />, path: "/tools/thumbnail-generator" },
@@ -83,16 +71,13 @@ const NAV_ITEMS = [
   { label: "Label Swap", icon: <Repeat size={20} />, path: "/tools/label-swap" },
   { label: "Khmer Subtitles", icon: <Languages size={20} />, path: "/tools/subtitle-generator" },
   { label: "Doc Converter", icon: <FileText size={20} />, path: "/tools/document-converter" },
-  { label: "Watermark Remover", icon: <Eraser size={20} />, path: "/tools/ai" },
-  { type: "divider" },
-
-  { type: "header", label: "Advanced (Coming Soon)" },
   { label: "Cloud Farm", icon: <Users size={20} />, path: "/tools/farm" },
   { label: "Telegram Cloud", icon: <Cloud size={20} />, path: "/tools/telegram-cloud" },
-  { label: "Dropship Center", icon: <ShoppingBag size={20} />, path: "/tools/dropship-center" },
-  { type: "divider" },
-
-  { type: "header", label: "System (Coming Soon)" },
+  { label: "Watermark Remover", icon: <Eraser size={20} />, path: "/tools/ai" },
+  { label: "Dashboard", icon: <LayoutDashboard size={20} />, path: "/dashboard" },
+  { label: "Posting", icon: <UploadCloud size={20} />, path: "/post" },
+  { label: "Auto-Boost", icon: <Zap size={20} />, path: "/boost-settings" },
+  { label: "Analytics", icon: <BarChart2 size={20} />, path: "/analytics" },
   { label: "Connections", icon: <LinkIcon size={20} />, path: "/connections" },
   { label: "Auto-Reply Bot", icon: <MessageSquare size={20} />, path: "/bot" },
   { label: "Settings", icon: <Settings size={20} />, path: "/settings" },

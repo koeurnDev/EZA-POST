@@ -1,23 +1,18 @@
-const BotStatus = require("../models/BotStatus");
-const User = require("../models/User");
-const { BotRule } = require("../models/BotRule");
-const RepliedComment = require("../models/RepliedComment");
-const PendingReply = require("../models/PendingReply");
-const BotHistory = require("../models/BotHistory");
+const prisma = require("./prisma");
+const { decrypt } = require("./crypto");
 const axios = require("axios");
 const fb = require("./fb");
 
 const botEngine = {
     /**
      * 🚀 Main Bot Loop
-     * Fetches all users, checks their pages, and processes comments.
      */
     run: async () => {
         try {
             console.log("🤖 Bot Engine: Starting run cycle...");
 
             // 1️⃣ Check Global Bot Status
-            const status = await BotStatus.findOne();
+            const status = await prisma.botStatus.findFirst();
             if (!status || !status.enabled) {
                 console.log("🤖 Bot Engine: Globally disabled. Skipping.");
                 return;
@@ -27,7 +22,10 @@ const botEngine = {
             await botEngine.processPendingReplies();
 
             // 3️⃣ Get All Users with Facebook Connected
-            const users = await User.find({ facebookAccessToken: { $exists: true } });
+            // In Prisma, we check if facebookAccessToken is not null
+            const users = await prisma.user.findMany({
+                where: { facebookAccessToken: { not: null } }
+            });
             console.log(`🤖 Bot Engine: Found ${users.length} users with FB tokens.`);
 
             for (const user of users) {
@@ -45,10 +43,13 @@ const botEngine = {
     processPendingReplies: async () => {
         try {
             const now = new Date();
-            const pendingReplies = await PendingReply.find({
-                status: "pending",
-                sendAt: { $lte: now }
-            }).limit(10); // Batch size
+            const pendingReplies = await prisma.pendingReply.findMany({
+                where: {
+                    status: "pending",
+                    sendAt: { lte: now }
+                },
+                take: 10
+            });
 
             if (pendingReplies.length === 0) return;
 
@@ -57,61 +58,78 @@ const botEngine = {
             for (const reply of pendingReplies) {
                 try {
                     // Mark as processing
-                    reply.status = "processing";
-                    await reply.save();
+                    await prisma.pendingReply.update({
+                        where: { id: reply.id },
+                        data: { status: "processing" }
+                    });
 
                     console.log(`      💬 Sending delayed reply to ${reply.commentId}: "${reply.replyMessage}"`);
 
                     await axios.post(`${fb.graph}/${reply.commentId}/comments`, {
                         message: reply.replyMessage,
                         access_token: reply.accessToken,
-                        attachment_url: reply.attachmentUrl || undefined, // ✅ Support Image Attachment
+                        attachment_url: reply.attachmentUrl || undefined,
                     });
 
                     // Success
-                    reply.status = "completed";
-                    await reply.save();
+                    await prisma.pendingReply.update({
+                        where: { id: reply.id },
+                        data: { status: "completed" }
+                    });
 
                     // Log History
-                    await BotHistory.create({
-                        commentId: reply.commentId,
-                        replyMessage: reply.replyMessage,
-                        pageId: reply.pageId,
-                        status: "success",
-                        timestamp: new Date(),
-                        meta: reply.attachmentUrl ? { attachment: reply.attachmentUrl } : undefined // ✅ Log attachment
+                    await prisma.botHistory.create({
+                        data: {
+                            commentId: reply.commentId,
+                            replyMessage: reply.replyMessage,
+                            pageId: reply.pageId,
+                            status: "success",
+                            timestamp: new Date()
+                        }
                     });
 
                     // Persistent Record
-                    await RepliedComment.create({
-                        commentId: reply.commentId,
-                        postId: reply.commentId.split('_')[0],
-                        replyMessage: reply.replyMessage
+                    await prisma.repliedComment.create({
+                        data: {
+                            commentId: reply.commentId,
+                            postId: reply.commentId.split('_')[0],
+                            userId: "system" // Or find actual userId if available
+                        }
                     });
 
                     console.log(`      ✅ Reply sent successfully!`);
 
                 } catch (err) {
                     console.error(`      ❌ Failed to send pending reply:`, err.message);
-                    reply.status = "failed";
-                    reply.error = err.message;
-                    reply.attempts += 1;
 
-                    // Retry logic (optional: reset to pending if attempts < 3)
-                    if (reply.attempts < 3) {
-                        reply.status = "pending";
-                        reply.sendAt = new Date(Date.now() + 5 * 60 * 1000); // Retry in 5 mins
+                    let attempts = reply.attempts + 1;
+                    let status = "failed";
+                    let sendAt = reply.sendAt;
+
+                    if (attempts < 3) {
+                        status = "pending";
+                        sendAt = new Date(Date.now() + 5 * 60 * 1000); // Retry in 5 mins
                     }
 
-                    await reply.save();
+                    await prisma.pendingReply.update({
+                        where: { id: reply.id },
+                        data: {
+                            status,
+                            error: err.message,
+                            attempts,
+                            sendAt
+                        }
+                    });
 
-                    await BotHistory.create({
-                        commentId: reply.commentId,
-                        replyMessage: reply.replyMessage,
-                        pageId: reply.pageId,
-                        status: "failed",
-                        error: err.message,
-                        timestamp: new Date()
+                    await prisma.botHistory.create({
+                        data: {
+                            commentId: reply.commentId,
+                            replyMessage: reply.replyMessage,
+                            pageId: reply.pageId,
+                            status: "failed",
+                            error: err.message,
+                            timestamp: new Date()
+                        }
                     });
                 }
             }
@@ -126,7 +144,7 @@ const botEngine = {
     processUser: async (user) => {
         try {
             // Validate Token
-            const decryptedToken = user.getDecryptedAccessToken();
+            const decryptedToken = decrypt(user.facebookAccessToken);
             const validation = await fb.validateAccessToken(decryptedToken);
             if (!validation.isValid) {
                 console.warn(`⚠️ Invalid token for user ${user.name} (ID: ${user.id})`);
@@ -137,20 +155,28 @@ const botEngine = {
             const allPages = await fb.getFacebookPages(decryptedToken);
 
             // Filter Pages: Must be Selected AND have Bot Enabled
+            let selectedPages = user.selectedPages || [];
+            if (typeof selectedPages === 'string') {
+                try { selectedPages = JSON.parse(selectedPages); } catch (e) { selectedPages = []; }
+            }
+
+            let pageSettings = user.pageSettings;
+            if (typeof pageSettings === 'string') {
+                try { pageSettings = JSON.parse(pageSettings); } catch (e) { pageSettings = []; }
+            }
+            if (!Array.isArray(pageSettings)) pageSettings = [];
+
             const activePages = allPages.filter(page => {
-                const isSelected = user.selectedPages?.includes(page.id);
-                const settings = user.pageSettings?.find(s => s.pageId === page.id);
+                const isSelected = selectedPages.includes(page.id);
+                const settings = pageSettings.find(s => s.pageId === page.id);
                 const isBotEnabled = settings?.enableBot === true;
                 return isSelected && isBotEnabled;
             });
 
-            if (activePages.length === 0) {
-                // console.log(`🤖 User ${user.name}: No active pages for bot.`);
-                return;
-            }
+            if (activePages.length === 0) return;
 
             // Get Rules
-            const rules = await BotRule.find({ enabled: true });
+            const rules = await prisma.botRule.findMany({ where: { enabled: true } });
             if (rules.length === 0) return;
 
             for (const page of activePages) {
@@ -166,7 +192,7 @@ const botEngine = {
      */
     processPage: async (page, rules) => {
         try {
-            // Fetch recent posts (limit 5 for performance)
+            // Fetch recent posts
             const res = await axios.get(`${fb.graph}/${page.id}/feed`, {
                 params: {
                     access_token: page.access_token,
@@ -193,45 +219,45 @@ const botEngine = {
      * 💬 Process a single comment
      */
     processComment: async (comment, page, rules) => {
-        // 🛑 1. Ignore Self (Don't reply to the page itself)
+        // 🛑 1. Ignore Self
         if (comment.from?.id === page.id) return;
 
-        // 🛑 2. Ignore Already Replied (Persistent Check)
-        const alreadyReplied = await RepliedComment.findOne({ commentId: comment.id });
+        // 🛑 2. Ignore Already Replied
+        const alreadyReplied = await prisma.repliedComment.findUnique({
+            where: { commentId: comment.id }
+        });
         if (alreadyReplied) return;
 
         // 🛑 3. Ignore Already Pending
-        const pending = await PendingReply.findOne({ commentId: comment.id });
+        const pending = await prisma.pendingReply.findUnique({
+            where: { commentId: comment.id }
+        });
         if (pending) return;
 
         // 🛑 4. Anti-Spam: Ignore Links
-        if (/(https?:\/\/[^\s]+)/g.test(comment.message)) {
-            return;
-        }
+        if (/(https?:\/\/[^\s]+)/g.test(comment.message)) return;
 
         // 🎯 5. Match Rules
         let replyMessage = null;
         let attachmentUrl = null;
 
-        // Priority 1: ALL_POSTS Rule
-        const allPostsRule = rules.find((r) => r.type === "ALL_POSTS");
+        // Priority 1: ALL Rule (scope: ALL)
+        const allPostsRule = rules.find((r) => r.scope === "ALL");
         if (allPostsRule) {
             replyMessage = allPostsRule.reply;
-            attachmentUrl = allPostsRule.attachmentUrl; // ✅ Capture attachment
+            attachmentUrl = allPostsRule.attachmentUrl;
         } else {
             // Priority 2: Keyword Match
-            const commentText = comment.message.toLowerCase();
+            const commentText = (comment.message || "").toLowerCase();
             const matchedRule = rules.find((r) => {
-                if (r.type !== "KEYWORD") return false;
+                if (r.ruleType !== "KEYWORD") return false;
                 const keyword = r.keyword.toLowerCase();
-                return r.matchType === "EXACT"
-                    ? commentText === keyword
-                    : commentText.includes(keyword);
+                return commentText.includes(keyword);
             });
 
             if (matchedRule) {
                 replyMessage = matchedRule.reply;
-                attachmentUrl = matchedRule.attachmentUrl; // ✅ Capture attachment
+                attachmentUrl = matchedRule.attachmentUrl;
             }
         }
 
@@ -241,16 +267,18 @@ const botEngine = {
                 const delayMs = Math.floor(Math.random() * 60000) + 60000; // 1-2 minutes
                 const sendAt = new Date(Date.now() + delayMs);
 
-                console.log(`      ⏳ Queuing reply to ${comment.from.name} (Delay: ${Math.round(delayMs / 1000)}s)`);
+                console.log(`      ⏳ Queuing reply to ${comment.from?.name || 'Unknown'} (Delay: ${Math.round(delayMs / 1000)}s)`);
 
-                await PendingReply.create({
-                    commentId: comment.id,
-                    replyMessage: replyMessage,
-                    attachmentUrl: attachmentUrl, // ✅ Save attachment to queue
-                    pageId: page.id,
-                    accessToken: page.access_token,
-                    sendAt: sendAt,
-                    status: "pending"
+                await prisma.pendingReply.create({
+                    data: {
+                        commentId: comment.id,
+                        replyMessage: replyMessage,
+                        attachmentUrl: attachmentUrl,
+                        pageId: page.id,
+                        accessToken: page.access_token,
+                        sendAt: sendAt,
+                        status: "pending"
+                    }
                 });
 
             } catch (err) {
@@ -259,6 +287,8 @@ const botEngine = {
         }
     },
 };
+
+module.exports = botEngine;
 
 
 module.exports = botEngine;

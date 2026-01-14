@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import { Search, Download, Check, Play, User, X, ChevronRight, Loader2, Image as ImageIcon, Video, Music, Layers } from "lucide-react";
+import { Search, Download, Check, Play, User, X, ChevronRight, Loader2, Image as ImageIcon, Video, Music, Layers, Info } from "lucide-react";
 import toast from "react-hot-toast";
 import api, { API_CONFIG } from "../../utils/api";
 
@@ -16,6 +16,16 @@ const getProxyUrl = (url, options = {}) => {
     if (type) proxyUrl += `&type=${encodeURIComponent(type)}`;
     if (options.web_url) proxyUrl += `&web_url=${encodeURIComponent(options.web_url)}`;
     return proxyUrl;
+};
+
+// ⬇️ Generic Trigger Download
+const triggerDownload = (url, filename) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 
 export default function TikTokDownloader() {
@@ -79,9 +89,23 @@ export default function TikTokDownloader() {
         try {
             const res = await api.post("/tools/tiktok/lookup", { url });
             if (res.data.success) {
-                setVideoData(res.data.video);
-                setUrl(""); // Clear input for next download
+                const data = res.data.video;
+                setVideoData(data);
+                setUrl(""); // Clear input
                 toast.success("Video found!");
+
+                // ⚡ AUTO-DOWNLOAD TRIGGER (One-Click Experience)
+                // Only for standard videos to avoid spamming multiple files or confusing UX for slideshows
+                if (data.type === 'video' && data.no_watermark_url) {
+                    const rawTitle = data.title || data.desc || data.id || "tiktok_video";
+                    const safeFilename = String(rawTitle).replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50) + '.mp4';
+                    const videoId = data.id || `video_${Date.now()}`;
+
+                    const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${encodeURIComponent(data.no_watermark_url)}&filename=${encodeURIComponent(safeFilename)}`;
+
+                    toast('Starting Download...', { icon: '⬇️' });
+                    triggerDownload(downloadUrl, safeFilename);
+                }
             }
         } catch (err) {
             toast.error(err.response?.data?.error || "Failed to find video");
@@ -156,21 +180,21 @@ export default function TikTokDownloader() {
         setDownloadProgress({ current: 0, total: videosToDownload.length });
 
         toast.custom((t) => (
-            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
-                <div className="flex-1 w-0 p-4">
-                    <div className="flex items-start">
-                        <div className="flex-shrink-0 pt-0.5">
-                            <Download className="h-10 w-10 text-pink-500" />
-                        </div>
-                        <div className="ml-3 flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                Starting {videosToDownload.length} items...
-                            </p>
-                            <p className="mt-1 text-sm text-gray-500">
-                                Please click <span className="font-bold">"Allow"</span> if browser asks to download multiple files.
-                            </p>
-                        </div>
+            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-2xl rounded-2xl pointer-events-auto flex flex-col overflow-hidden ring-1 ring-black/5`}>
+                <div className="p-4 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center shrink-0">
+                        <Download className="h-6 w-6 text-pink-600 dark:text-pink-400 animate-bounce" />
                     </div>
+                    <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 dark:text-white">Downloading {videosToDownload.length} Items</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Starting batch download...
+                        </p>
+                    </div>
+                </div>
+                <div className="bg-pink-50 dark:bg-pink-900/20 px-4 py-2.5 text-xs text-pink-700 dark:text-pink-300 flex items-start gap-2 border-t border-pink-100 dark:border-pink-900/30">
+                    <Info size={14} className="mt-0.5 shrink-0" />
+                    <span>If prompted, please click <b>Allow</b> to save all files automatically.</span>
                 </div>
             </div>
         ), { duration: 5000 });
@@ -192,13 +216,7 @@ export default function TikTokDownloader() {
                         const imgUrl = v.images[i];
                         const safeFilename = `tiktok-${v.id}-${i + 1}.jpg`;
                         const proxyUrl = getProxyUrl(imgUrl, { filename: safeFilename, type: 'image/jpeg' });
-
-                        const link = document.createElement('a');
-                        link.href = proxyUrl;
-                        link.setAttribute('download', safeFilename);
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
+                        triggerDownload(proxyUrl, safeFilename);
 
                         await delay(1000); // 1s between images
                     }
@@ -235,13 +253,7 @@ export default function TikTokDownloader() {
                 // Use the robust /stream endpoint
                 const videoId = v.id || `video_${Date.now()}`;
                 const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${encodeURIComponent(targetUrl)}&filename=${encodeURIComponent(safeFilename)}`;
-
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.setAttribute('download', safeFilename);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                triggerDownload(downloadUrl, safeFilename);
 
                 await delay(1500); // 1.5s between videos
             }
@@ -351,6 +363,10 @@ export default function TikTokDownloader() {
                                 </button>
                             )}
 
+                            {/* Auto-Download Tip */}
+                            {!videoData && url && <p className="text-center text-xs text-gray-400 animate-pulse">Clicking Download will automatically save the video to your device.</p>}
+
+
                             {/* Result Card */}
                             {videoData && (
                                 <div className="max-w-4xl mx-auto bg-white/40 dark:bg-black/40 backdrop-blur-2xl rounded-2xl p-6 border border-white/20 dark:border-white/10 shadow-2xl shadow-black/5 animate-in fade-in zoom-in-95 duration-200 relative">
@@ -424,19 +440,21 @@ export default function TikTokDownloader() {
                                                                     setDownloadProgress({ current: 0, total: images.length });
 
                                                                     toast.custom((t) => (
-                                                                        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
-                                                                            <div className="flex-1 w-0 p-4">
-                                                                                <div className="flex items-start">
-                                                                                    <Download className="h-10 w-10 text-pink-500" />
-                                                                                    <div className="ml-3 flex-1">
-                                                                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                                                                            Downloading {images.length} photos...
-                                                                                        </p>
-                                                                                        <p className="mt-1 text-sm text-gray-500">
-                                                                                            Please click <span className="font-bold text-gray-900 dark:text-white">"Allow"</span> if browser asks to download multiple files.
-                                                                                        </p>
-                                                                                    </div>
+                                                                        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-2xl rounded-2xl pointer-events-auto flex flex-col overflow-hidden ring-1 ring-black/5`}>
+                                                                            <div className="p-4 flex items-center gap-4">
+                                                                                <div className="w-12 h-12 rounded-full bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center shrink-0">
+                                                                                    <Download className="h-6 w-6 text-pink-600 dark:text-pink-400 animate-bounce" />
                                                                                 </div>
+                                                                                <div className="flex-1">
+                                                                                    <h3 className="font-bold text-gray-900 dark:text-white">Downloading {images.length} Photos</h3>
+                                                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                                                        Saving all slides...
+                                                                                    </p>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="bg-pink-50 dark:bg-pink-900/20 px-4 py-2.5 text-xs text-pink-700 dark:text-pink-300 flex items-start gap-2 border-t border-pink-100 dark:border-pink-900/30">
+                                                                                <Info size={14} className="mt-0.5 shrink-0" />
+                                                                                <span>If prompted, please click <b>Allow</b> to save all files automatically.</span>
                                                                             </div>
                                                                         </div>
                                                                     ), { duration: 5000 });
@@ -449,13 +467,7 @@ export default function TikTokDownloader() {
                                                                             const safeFilename = `tiktok-${videoData.id}-${i + 1}.jpg`;
                                                                             const proxyUrl = getProxyUrl(img, { filename: safeFilename, type: 'image/jpeg' });
 
-                                                                            const link = document.createElement('a');
-                                                                            link.href = proxyUrl;
-                                                                            link.setAttribute('download', safeFilename);
-                                                                            document.body.appendChild(link);
-                                                                            link.click();
-                                                                            document.body.removeChild(link);
-
+                                                                            triggerDownload(proxyUrl, safeFilename);
                                                                             setDownloadProgress(prev => ({ ...prev, current: i + 1 }));
                                                                             if (i < images.length - 1) await delay(1000);
                                                                         } catch (err) {
@@ -490,9 +502,11 @@ export default function TikTokDownloader() {
                                                         <button
                                                             onClick={async () => {
                                                                 const targetUrl = videoData.no_watermark_url;
-                                                                const safeFilename = `tiktok-slideshow-${videoData.id}`;
-                                                                const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: videoData.web_url });
-                                                                window.open(proxyUrl, '_blank');
+                                                                const safeFilename = `tiktok-slideshow-${videoData.id}.mp4`; // Ensure extension
+                                                                const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: videoData.web_url, type: 'video/mp4' });
+
+                                                                // ⚡ Fix: Jump to Browser Download directly
+                                                                triggerDownload(proxyUrl, safeFilename);
                                                             }}
                                                             className="w-full py-3 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 text-gray-600 dark:text-gray-300 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm"
                                                         >
@@ -504,29 +518,29 @@ export default function TikTokDownloader() {
                                                         onClick={() => {
                                                             const rawTitle = videoData.title || videoData.desc || videoData.id || "tiktok_video";
                                                             const title = String(rawTitle);
-                                                            // Sanitize filename for client download attrib
                                                             const safeFilename = title.replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50);
-
-                                                            // Use /stream endpoint with deleteAfter=true
-                                                            // Note: We encodeURIComponent twice for the URL parameter to be safe, 
-                                                            // but here just encoding the value is enough.
                                                             const videoId = videoData.id || `video_${Date.now()}`;
                                                             const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${encodeURIComponent(videoData.no_watermark_url)}&filename=${encodeURIComponent(safeFilename + '.mp4')}`;
-
-                                                            const link = document.createElement('a');
-                                                            link.href = downloadUrl;
-                                                            link.setAttribute('download', `${safeFilename}.mp4`);
-                                                            document.body.appendChild(link);
-                                                            link.click();
-                                                            document.body.removeChild(link);
-                                                            toast.success("Saved to device & Cleaned from server!");
+                                                            triggerDownload(downloadUrl, `${safeFilename}.mp4`);
                                                         }}
-                                                        className="w-full py-2.5 md:py-4 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white rounded-lg md:rounded-xl font-bold transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-xl hover:shadow-pink-500/40 flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20 active:scale-95 group/btn text-sm md:text-base"
+                                                        className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20"
                                                     >
-                                                        <Download className="w-4 h-4 md:w-5 md:h-5 group-hover/btn:animate-bounce" />
-                                                        <span>Download Full Video <span className="hidden md:inline">(HD - MP4)</span></span>
+                                                        <>
+                                                            <Video size={20} />
+                                                            <span>Download Full Video <span className="hidden md:inline">(HD - MP4)</span></span>
+                                                        </>
                                                     </button>
                                                 )}
+
+                                                <button
+                                                    onClick={clearResult}
+                                                    className="w-full py-4 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 transform active:scale-[0.98]"
+                                                >
+                                                    <>
+                                                        <Search size={20} />
+                                                        <span>Download Another Video</span>
+                                                    </>
+                                                </button>
 
                                                 {/* Save to Library - Disabled for now */}
                                                 {/* {!videoData.images?.length && (

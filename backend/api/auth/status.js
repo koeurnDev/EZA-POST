@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const User = require("../../models/User");
+const prisma = require('../../utils/prisma');
 
 // ============================================================
 // ✅ GET /api/auth/status
@@ -13,19 +13,20 @@ router.get("/", async (req, res) => {
 
     // ✅ 1. Try to verify session-based login
     if (req.session?.userId) {
-      const foundUser = await User.findOne({ id: req.session.userId }).select(
-        "id email name facebookId facebookName avatar connectedPages"
-      );
+      const foundUser = await prisma.user.findUnique({
+        where: { id: req.session.userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          facebookId: true,
+          facebookName: true,
+          avatar: true,
+          connectedPages: true
+        }
+      });
       if (foundUser) {
-        user = {
-          id: foundUser.id,
-          email: foundUser.email,
-          name: foundUser.name,
-          facebookId: foundUser.facebookId,
-          facebookName: foundUser.facebookName,
-          avatar: foundUser.avatar,
-          connectedPages: foundUser.connectedPages,
-        };
+        user = foundUser;
         // Add isDemo flag for demo user
         if (user.id === "demo_user_001") {
           user.isDemo = true;
@@ -43,40 +44,41 @@ router.get("/", async (req, res) => {
         }
 
         if (token) {
-          console.log("🔍 Verifying Token:", token.substring(0, 10) + "...");
+          // console.log("🔍 Verifying Token:", token.substring(0, 10) + "...");
           const decoded = jwt.verify(
             token,
             process.env.JWT_SECRET || "supersecretkey"
           );
-          console.log("✅ Token Verified. User ID:", decoded.id);
+          // console.log("✅ Token Verified. User ID:", decoded.id);
 
           // Fetch fresh user data from DB
-          const foundUser = await User.findOne({ id: decoded.id }).select(
-            "id email name facebookId facebookName avatar connectedPages"
-          );
+          const foundUser = await prisma.user.findUnique({
+            where: { id: decoded.id },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              facebookId: true,
+              facebookName: true,
+              avatar: true,
+              connectedPages: true
+            }
+          });
 
           if (foundUser) {
-            user = {
-              id: foundUser.id,
-              email: foundUser.email,
-              name: foundUser.name,
-              facebookId: foundUser.facebookId,
-              facebookName: foundUser.facebookName,
-              avatar: foundUser.avatar,
-              connectedPages: foundUser.connectedPages,
-            };
+            user = foundUser;
             authenticated = true;
           } else {
             console.warn("⚠️ User found in token but not in DB");
           }
         } else {
-          console.log("⚠️ No token found in cookie or header");
+          // console.log("⚠️ No token found in cookie or header");
         }
       } catch (err) {
         console.warn("⚠️ Invalid JWT:", err.message);
       }
     } else {
-      console.log("⚠️ No session or token found for request");
+      // console.log("⚠️ No session or token found for request");
     }
 
     // ✅ Respond with user data or not authenticated
@@ -93,3 +95,4 @@ router.get("/", async (req, res) => {
 });
 
 module.exports = router;
+

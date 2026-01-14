@@ -4,27 +4,18 @@
 
 const express = require("express");
 const router = express.Router();
-const { BotRule } = require("../models/BotRule");
-const BotStatus = require("../models/BotStatus");
+const prisma = require("../utils/prisma");
 const ai = require("../utils/ai");
-const { requireAuth } = require("../utils/auth"); // ✅ Added Auth Middleware
-
-// 🔍 Debug Imports
-console.log("🔍 BotRule Import Type:", typeof BotRule, BotRule ? "Defined" : "Undefined");
-console.log("🔍 BotStatus Import Type:", typeof BotStatus, BotStatus ? "Defined" : "Undefined");
+const { requireAuth } = require("../utils/auth"); // ✅ Auth Middleware
 
 // ============================================================
 // 🧠 Initialize bot_status (if missing)
 // ============================================================
 (async () => {
   try {
-    if (!BotStatus) {
-      console.error("❌ BotStatus model is undefined!");
-      return;
-    }
-    const count = await BotStatus.countDocuments();
+    const count = await prisma.botStatus.count();
     if (count === 0) {
-      await BotStatus.create({ enabled: true });
+      await prisma.botStatus.create({ data: { enabled: true } });
       console.log("✅ bot_status initialized");
     }
   } catch (err) {
@@ -39,11 +30,11 @@ console.log("🔍 BotStatus Import Type:", typeof BotStatus, BotStatus ? "Define
 // ✅ Get all bot rules for the logged-in user
 router.get("/rules", requireAuth, async (req, res) => {
   try {
-    if (!BotRule) throw new Error("BotRule model is undefined");
-    if (!BotStatus) throw new Error("BotStatus model is undefined");
-
-    const rules = await BotRule.find({ userId: req.user.id }).sort({ createdAt: -1 });
-    const status = await BotStatus.findOne();
+    const rules = await prisma.botRule.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' }
+    });
+    const status = await prisma.botStatus.findFirst();
     res.json({
       success: true,
       rules,
@@ -54,8 +45,7 @@ router.get("/rules", requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error",
-      error: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      error: err.message
     });
   }
 });
@@ -79,16 +69,17 @@ router.post("/rules", requireAuth, async (req, res) => {
     return res.status(400).json({ success: false, message: "Keyword and reply required" });
 
   try {
-    const rule = await BotRule.create({
-      userId: req.user.id,
-      keyword,
-      reply,
-      ruleType: ruleType || "KEYWORD",
-      scope: scope || "ALL",
-      scope: scope || "ALL",
-      postId: postId || undefined,
-      attachmentUrl: attachmentUrl || null,
-      enabled: true
+    const rule = await prisma.botRule.create({
+      data: {
+        userId: req.user.id,
+        keyword,
+        reply,
+        ruleType: ruleType || "KEYWORD",
+        scope: scope || "ALL",
+        postId: postId || null,
+        attachmentUrl: attachmentUrl || null,
+        enabled: true
+      }
     });
     res.json({ success: true, rule });
   } catch (err) {
@@ -103,18 +94,24 @@ router.put("/rules/:id", requireAuth, async (req, res) => {
   const { keyword, reply, ruleType, scope, postId, attachmentUrl } = req.body;
   try {
     // Ensure user owns the rule
-    const rule = await BotRule.findOne({ _id: id, userId: req.user.id });
+    const rule = await prisma.botRule.findFirst({
+      where: { id: id, userId: req.user.id }
+    });
     if (!rule) return res.status(404).json({ success: false, message: "Rule not found" });
 
-    rule.keyword = keyword;
-    rule.reply = reply;
-    rule.ruleType = ruleType;
-    rule.scope = scope;
-    rule.postId = postId;
-    rule.attachmentUrl = attachmentUrl;
+    const updatedRule = await prisma.botRule.update({
+      where: { id: id },
+      data: {
+        keyword,
+        reply,
+        ruleType: ruleType || "KEYWORD",
+        scope: scope || "ALL",
+        postId: postId || null,
+        attachmentUrl: attachmentUrl || null
+      }
+    });
 
-    await rule.save();
-    res.json({ success: true, message: "Rule updated" });
+    res.json({ success: true, message: "Rule updated", rule: updatedRule });
   } catch (err) {
     console.error("❌ PUT /rules error:", err.message);
     res.status(500).json({ success: false, message: "Failed to update rule" });
@@ -126,11 +123,16 @@ router.patch("/rules/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { enabled } = req.body;
   try {
-    const rule = await BotRule.findOne({ _id: id, userId: req.user.id });
+    const rule = await prisma.botRule.findFirst({
+      where: { id: id, userId: req.user.id }
+    });
     if (!rule) return res.status(404).json({ success: false, message: "Rule not found" });
 
-    rule.enabled = enabled;
-    await rule.save();
+    await prisma.botRule.update({
+      where: { id: id },
+      data: { enabled: enabled }
+    });
+
     res.json({ success: true, message: "Rule toggled" });
   } catch (err) {
     console.error("❌ PATCH /rules error:", err.message);
@@ -142,8 +144,13 @@ router.patch("/rules/:id", requireAuth, async (req, res) => {
 router.delete("/rules/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await BotRule.deleteOne({ _id: id, userId: req.user.id });
-    if (result.deletedCount === 0) return res.status(404).json({ success: false, message: "Rule not found" });
+    // Check ownership first
+    const rule = await prisma.botRule.findFirst({
+      where: { id: id, userId: req.user.id }
+    });
+    if (!rule) return res.status(404).json({ success: false, message: "Rule not found" });
+
+    await prisma.botRule.delete({ where: { id: id } });
 
     res.json({ success: true, message: "Rule deleted" });
   } catch (err) {
@@ -156,7 +163,15 @@ router.delete("/rules/:id", requireAuth, async (req, res) => {
 router.put("/settings", requireAuth, async (req, res) => {
   const { enabled } = req.body;
   try {
-    await BotStatus.findOneAndUpdate({}, { enabled }, { upsert: true });
+    const status = await prisma.botStatus.findFirst();
+    if (status) {
+      await prisma.botStatus.update({
+        where: { id: status.id },
+        data: { enabled }
+      });
+    } else {
+      await prisma.botStatus.create({ data: { enabled } });
+    }
     res.json({ success: true, message: "Bot settings updated" });
   } catch (err) {
     console.error("❌ PUT /settings error:", err.message);

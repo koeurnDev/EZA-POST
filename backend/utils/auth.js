@@ -4,14 +4,14 @@
  * ============================================================
  * ✅ JWT-based session management
  * ✅ Facebook OAuth verification
- * ✅ MongoDB user lookup
+ * ✅ PostgreSQL user lookup (Prisma)
  * ✅ Secure cookie handling
  * ✅ Demo login route for testing
  */
 
 const express = require("express");
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const prisma = require('./prisma');
 const axios = require("axios");
 
 const router = express.Router();
@@ -72,7 +72,10 @@ function verifyToken(req, res, next) {
 async function getUserById(userId) {
   try {
     // console.log(`🔍 helper: getUserById searching for: ${userId}`);
-    const user = await User.findOne({ id: userId }).select("id email name");
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true }
+    });
 
     if (!user) {
       console.warn(`⚠️ getUserById: User not found in DB for ID: ${userId}`);
@@ -102,7 +105,7 @@ async function requireAuth(req, res, next) {
     }
 
     if (!token) {
-      console.warn("⚠️ requireAuth: No token or session found.");
+      // console.warn("⚠️ requireAuth: No token or session found.");
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -236,3 +239,4 @@ module.exports = {
   getFacebookUserData,
   router, // ✅ export router for server.js
 };
+

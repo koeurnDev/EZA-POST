@@ -1,49 +1,38 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
-const User = require("../../models/User");
-const FacebookPage = require("../../models/FacebookPage");
+const prisma = require('../../utils/prisma');
 const { requireAuth } = require("../../utils/auth");
+
+const { decrypt } = require("../../utils/crypto");
 
 // ✅ GET /api/user/pages
 router.get("/", requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
-        const user = await User.findOne({ id: userId });
+        const user = await prisma.user.findUnique({ where: { id: userId } });
 
-        if (!user || !user.facebookAccessToken) {
+        if (!user || (!user.facebookAccessToken && !user.connectedPages)) {
             return res.json({ success: true, accounts: [] });
         }
 
         // ✅ Return Saved Pages from DB (Fast & Reliable)
         // 1. Try fetching from new FacebookPage model
-        let dbPages = await FacebookPage.find({ userId: userId });
+        let dbPages = await prisma.facebookPage.findMany({ where: { userId: userId } });
         let pages = [];
+
+        // Helper to parse JSON fields
+        let pageSettings = user.pageSettings;
+        if (typeof pageSettings === 'string') try { pageSettings = JSON.parse(pageSettings) } catch (e) { }
+        if (!Array.isArray(pageSettings)) pageSettings = [];
 
         if (dbPages.length > 0) {
             pages = dbPages.map(page => {
-                const settings = user.pageSettings?.find(s => s.pageId === page.pageId) || {};
-                return {
-                    id: page.pageId,
-                    name: page.pageName,
-                    access_token: page.pageAccessToken, // Encrypted
-                    picture: page.pictureUrl,
-                    isSelected: user.selectedPages?.includes(page.pageId) || false,
-                    settings: {
-                        enableBot: settings.enableBot || false,
-                        enableSchedule: settings.enableSchedule !== false, // Default true
-                        enableInbox: settings.enableInbox || false
-                    }
-                };
-            });
-        } else if (user.connectedPages?.length > 0) {
-            // 2. Fallback to Legacy User.connectedPages
-            pages = user.connectedPages.map(page => {
-                const settings = user.pageSettings?.find(s => s.pageId === page.id) || {};
+                const settings = pageSettings.find(s => s.pageId === page.id) || {};
                 return {
                     id: page.id,
                     name: page.name,
-                    access_token: page.access_token,
+                    access_token: decrypt(page.accessToken), // Encrypted
                     picture: page.picture,
                     isSelected: user.selectedPages?.includes(page.id) || false,
                     settings: {
@@ -53,6 +42,28 @@ router.get("/", requireAuth, async (req, res) => {
                     }
                 };
             });
+        } else {
+            // 2. Fallback to Legacy User.connectedPages
+            let connectedPages = user.connectedPages;
+            if (typeof connectedPages === 'string') try { connectedPages = JSON.parse(connectedPages) } catch (e) { }
+
+            if (Array.isArray(connectedPages) && connectedPages.length > 0) {
+                pages = connectedPages.map(page => {
+                    const settings = pageSettings.find(s => s.pageId === page.id) || {};
+                    return {
+                        id: page.id,
+                        name: page.name,
+                        access_token: page.access_token, // Legacy might be raw or encrypted, assume raw if not migrated yet
+                        picture: page.picture,
+                        isSelected: user.selectedPages?.includes(page.id) || false,
+                        settings: {
+                            enableBot: settings.enableBot || false,
+                            enableSchedule: settings.enableSchedule !== false, // Default true
+                            enableInbox: settings.enableInbox || false
+                        }
+                    };
+                });
+            }
         }
 
         res.json({ success: true, accounts: pages });
@@ -71,11 +82,22 @@ router.post("/toggle", requireAuth, async (req, res) => {
 
         if (!pageId) return res.status(400).json({ error: "Page ID required" });
 
-        const update = isSelected
-            ? { $addToSet: { selectedPages: pageId } } // Add if ON
-            : { $pull: { selectedPages: pageId } };    // Remove if OFF
+        // Prisma doesn't have native atomic $addToSet for scalar lists in update 
+        // (unless using Postgres specific raw query or atomic Push, but remove is harder).
+        // Best approach: Fetch, Modify, Save.
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { selectedPages: true } });
+        let selectedPages = user.selectedPages || [];
 
-        await User.findOneAndUpdate({ id: userId }, update);
+        if (isSelected) {
+            if (!selectedPages.includes(pageId)) selectedPages.push(pageId);
+        } else {
+            selectedPages = selectedPages.filter(id => id !== pageId);
+        }
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { selectedPages: selectedPages }
+        });
 
         res.json({ success: true, message: isSelected ? "Page Enabled" : "Page Disabled" });
     } catch (err) {
@@ -83,8 +105,6 @@ router.post("/toggle", requireAuth, async (req, res) => {
         res.status(500).json({ success: false, error: "Failed to update page selection" });
     }
 });
-
-
 
 // ✅ POST /api/user/pages/settings
 // Update settings for a specific page
@@ -95,20 +115,22 @@ router.post("/settings", requireAuth, async (req, res) => {
 
         if (!pageId || !settings) return res.status(400).json({ error: "Page ID and settings required" });
 
-        // Update specific page settings in the array
-        await User.findOneAndUpdate(
-            { id: userId },
-            {
-                $pull: { pageSettings: { pageId: pageId } } // Remove existing
-            }
-        );
+        // Fetch user to get current settings
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { pageSettings: true } });
 
-        await User.findOneAndUpdate(
-            { id: userId },
-            {
-                $push: { pageSettings: { pageId, ...settings } } // Add new
-            }
-        );
+        let pageSettings = user.pageSettings;
+        if (typeof pageSettings === 'string') try { pageSettings = JSON.parse(pageSettings) } catch (e) { }
+        if (!Array.isArray(pageSettings)) pageSettings = [];
+
+        // Remove existing
+        pageSettings = pageSettings.filter(s => s.pageId !== pageId);
+        // Add new
+        pageSettings.push({ pageId, ...settings });
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { pageSettings: pageSettings } // Pass array/object directly
+        });
 
         res.json({ success: true, message: "Settings updated" });
     } catch (err) {

@@ -1,21 +1,24 @@
 
 const express = require("express");
 const router = express.Router();
-const Post = require("../models/Post");
+const prisma = require("../utils/prisma");
 const { requireAuth } = require("../utils/auth");
 
 // 📊 GET / — Dashboard Analytics
 router.get("/", requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
-        const now = new Date();
-        const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30));
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
         // 1. Fetch Posts (Last 30 Days)
-        const posts = await Post.find({
-            userId,
-            createdAt: { $gte: thirtyDaysAgo }
-        }).sort({ createdAt: 1 });
+        const posts = await prisma.post.findMany({
+            where: {
+                userId,
+                createdAt: { gte: thirtyDaysAgo }
+            },
+            orderBy: { createdAt: 'asc' }
+        });
 
         // 2. Aggregate Stats
         let totalPosts = posts.length;
@@ -36,11 +39,20 @@ router.get("/", requireAuth, async (req, res) => {
             else if (post.status === 'scheduled') scheduled++;
 
             // Platform Counts
-            post.platforms.forEach(p => {
-                if (platformCounts[p.name] !== undefined) {
-                    platformCounts[p.name]++;
-                }
-            });
+            // Prisma returns Json fields as Objects/Arrays. 
+            let platforms = post.platforms;
+            if (typeof platforms === 'string') {
+                try { platforms = JSON.parse(platforms); } catch (e) { platforms = []; }
+            }
+
+            if (Array.isArray(platforms)) {
+                platforms.forEach(p => {
+                    const name = p.name ? p.name.toLowerCase() : null;
+                    if (name && platformCounts[name] !== undefined) {
+                        platformCounts[name]++;
+                    }
+                });
+            }
 
             // Date Grouping (YYYY-MM-DD)
             const dateKey = post.createdAt.toISOString().split('T')[0];
@@ -53,9 +65,6 @@ router.get("/", requireAuth, async (req, res) => {
             posts: dailyActivity[date]
         }));
 
-        // 3. Best Time Calculation (Simplified Heuristic based on *scheduled* times if available, or random mock for now as we lack engagement data)
-        // In a real app, this would correlate 'publishedAt' with 'likes'. 
-        // For MVP, we'll suggest times based on general industry standards adjusted slightly by user's timezone offset
         const bestTimes = [
             { day: 'Mon', time: '10:00 AM' },
             { day: 'Wed', time: '02:00 PM' },
@@ -63,8 +72,6 @@ router.get("/", requireAuth, async (req, res) => {
             { day: 'Sun', time: '09:00 PM' }
         ];
 
-        // 4. Mock Engagement (Since we don't sync live likes yet)
-        // We add this to show the UI potential. 
         const engagementStats = {
             views: totalPosts * 1250 + Math.floor(Math.random() * 500),
             likes: totalPosts * 120 + Math.floor(Math.random() * 50),
@@ -90,5 +97,7 @@ router.get("/", requireAuth, async (req, res) => {
         res.status(500).json({ success: false, error: "Failed to fetch analytics" });
     }
 });
+
+module.exports = router;
 
 module.exports = router;

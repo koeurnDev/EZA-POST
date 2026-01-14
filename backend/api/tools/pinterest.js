@@ -93,9 +93,21 @@ router.post("/lookup", requireAuth, async (req, res) => {
         const title = $('meta[property="og:title"]').attr('content') || "Pinterest Pin";
 
         // Upgrade Image Quality (736x -> originals)
-        let hdUrl = imageUrl;
+        let finalUrl = imageUrl;
         if (imageUrl && imageUrl.match(/\/\d+x\//)) {
-            hdUrl = imageUrl.replace(/\/\d+x\//, "/originals/");
+            const hdUrl = imageUrl.replace(/\/\d+x\//, "/originals/");
+            try {
+                // Verify if the HD URL actually exists and is an image
+                const head = await axios.head(hdUrl);
+                if (head.status === 200 && head.headers['content-type']?.startsWith('image')) {
+                    finalUrl = hdUrl;
+                    console.log("    ✅ Upgraded to HD Image:", finalUrl);
+                } else {
+                    console.warn("    ⚠️ HD Image check failed (Status/Type), reverting to SD.");
+                }
+            } catch (e) {
+                console.warn("    ⚠️ HD Image not found, reverting to SD:", e.message);
+            }
         }
 
         return res.json({
@@ -103,7 +115,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
             media: {
                 title: title,
                 type: videoUrl ? 'video' : 'image',
-                url: videoUrl || hdUrl,
+                url: videoUrl || finalUrl,
                 preview: imageUrl,
                 original_url: url
             }
@@ -141,7 +153,8 @@ router.post("/download", requireAuth, async (req, res) => {
             method: 'GET',
             responseType: 'stream',
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Referer': 'https://www.pinterest.com/'
             }
         });
 

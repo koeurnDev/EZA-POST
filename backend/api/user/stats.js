@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const ScheduledPost = require("../../models/ScheduledPost");
-const RepliedComment = require("../../models/RepliedComment");
+const prisma = require('../../utils/prisma');
 const { requireAuth } = require("../../utils/auth");
 
 // ✅ GET /api/user/stats
@@ -10,10 +9,15 @@ router.get("/", requireAuth, async (req, res) => {
         const userId = req.user.id;
 
         // Count Scheduled Posts (all time or just scheduled? let's do all created by user)
-        const postsCount = await ScheduledPost.countDocuments({ user_id: userId });
+        const postsCount = await prisma.scheduledPost.count({
+            where: { userId: userId }
+        });
 
         // Count Auto-Replies
-        const repliesCount = await RepliedComment.countDocuments({ userId: userId });
+        // RepliedComment needs to have userId field as per my schema update
+        const repliesCount = await prisma.repliedComment.count({
+            where: { userId: userId }
+        });
 
         res.json({
             success: true,

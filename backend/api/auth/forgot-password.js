@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const User = require("../../models/User");
+const prisma = require("../../utils/prisma");
 const crypto = require("crypto");
 const { sendEmail } = require("../../services/emailService"); // ✅ Import Email Service
 
@@ -15,7 +15,9 @@ router.post("/", async (req, res) => {
             return res.status(400).json({ error: "Email is required." });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        // Standardize email
+        const normalizedEmail = email.toLowerCase().trim();
+        const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
         if (!user) {
             // 🛡️ Security: Don't reveal if user exists
@@ -29,11 +31,13 @@ router.post("/", async (req, res) => {
         const token = crypto.randomBytes(20).toString("hex");
 
         // Set Expiration (1 hour)
-        user.resetPasswordToken = token;
-        user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
-
-        await user.save();
-
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                resetPasswordToken: token,
+                resetPasswordExpires: new Date(Date.now() + 3600000) // 1 hour
+            }
+        });
         // 📧 In a real app, send this via email (SendGrid, Nodemailer, etc.)
         // For now, we log it to the console for testing.
         const frontendUrl = process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5173";

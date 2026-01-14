@@ -7,7 +7,7 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth } = require("../../utils/auth");
-const Post = require("../../models/Post");
+const prisma = require('../../utils/prisma');
 
 /* -------------------------------------------------------------------------- */
 /* ✅ POST /api/posts/bulk — Create multiple posts                            */
@@ -27,22 +27,24 @@ router.post("/", requireAuth, async (req, res) => {
             userId: req.user.id,
             caption: post.caption,
             videoUrl: post.videoUrl,
-            accounts: post.accounts, // Array of page IDs
+            accounts: post.accounts, // String[]
             scheduleTime: post.scheduleTime || null,
             status: post.scheduleTime ? "scheduled" : "created",
             createdAt: new Date(),
         }));
 
         // Bulk Insert
-        const createdPosts = await Post.insertMany(postsToInsert);
+        const result = await prisma.post.createMany({
+            data: postsToInsert
+        });
 
-        console.log(`✅ Successfully created ${createdPosts.length} posts.`);
+        console.log(`✅ Successfully created ${result.count} posts.`);
 
         res.status(201).json({
             success: true,
-            message: `Successfully scheduled ${createdPosts.length} posts.`,
-            count: createdPosts.length,
-            posts: createdPosts
+            message: `Successfully scheduled ${result.count} posts.`,
+            count: result.count,
+            posts: postsToInsert // Prisma createMany doesn't return created objects, so we return payload
         });
 
     } catch (err) {

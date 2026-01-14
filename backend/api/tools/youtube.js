@@ -193,7 +193,16 @@ router.post("/download", requireAuth, async (req, res) => {
 
     } catch (err) {
         console.error("❌ YT Download Error:", err.message);
-        res.status(500).json({ success: false, error: err.message || "Server Error" });
+
+        let errorMessage = "Download failed. Server Error.";
+        let statusCode = 500;
+
+        if (err.message.includes("Sign in") || err.message.includes("restricted") || err.message.includes("private") || err.message.includes("members-only")) {
+            errorMessage = "This video is Age-Restricted or Private. Only Public content is supported.";
+            statusCode = 400;
+        }
+
+        res.status(statusCode).json({ success: false, error: errorMessage });
     }
 });
 
