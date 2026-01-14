@@ -51,7 +51,7 @@ connectDB();
 // ------------------------------------------------------------
 app.use(morgan("dev"));
 // app.use(express.json()); // REMOVED DUPLICATE
-app.use(cookieParser()); // Changed: Moved up
+app.use(cookieParser(process.env.SESSION_SECRET || "eza_post_secret_key_2024")); // ✅ Added Secret for Signed Cookies
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -184,7 +184,12 @@ app.use((req, res, next) => {
 
 // 🔑 CSRF Token Endpoint
 app.get('/api/csrf-token', (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
+  try {
+    res.json({ csrfToken: req.csrfToken() });
+  } catch (err) {
+    console.error("❌ CSRF Token Generation Failed:", err.message);
+    res.status(500).json({ error: "CSRF Generation Error" });
+  }
 });
 
 
@@ -404,6 +409,10 @@ setTimeout(checkAndRefreshTokens, 10000);
 const { startMetricsScheduler, startCampaignMetricsScheduler } = require("./utils/metricsScheduler");
 // startMetricsScheduler();
 // startCampaignMetricsScheduler();
+
+// 🧹 Start Temp Cleaner (Runs every 5 mins, deletes files older than 15 mins)
+const { startTempCleanupJob } = require("./utils/tempCleaner");
+startTempCleanupJob();
 
 // ------------------------------------------------------------
 // ✅ Start Server

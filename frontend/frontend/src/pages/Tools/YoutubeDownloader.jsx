@@ -116,7 +116,8 @@ export default function YoutubeDownloader() {
                 setProgressStatus("Ready!");
                 setFinalUrl(res.data.url);
                 toast.success("Ready! Download starting.", { id: toastId });
-                triggerDownload(res.data.url, `youtube-${Date.now()}.${format}`);
+                const safeName = videoData?.title?.replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50) || `youtube-${Date.now()}`;
+                triggerDownload(res.data.url, `${safeName}.${format}`);
             }
         } catch (err) {
             toast.error("Download failed or timed out.", { id: toastId });
@@ -229,7 +230,14 @@ export default function YoutubeDownloader() {
                         <input
                             type="text"
                             value={url}
-                            onChange={(e) => setUrl(e.target.value)}
+                            onChange={(e) => {
+                                setUrl(e.target.value);
+                                if (videoData || isPlaylist) {
+                                    setVideoData(null);
+                                    setIsPlaylist(false);
+                                    setPlaylistVideos([]);
+                                }
+                            }}
                             onKeyDown={(e) => e.key === "Enter" && handleLookup()}
                             placeholder="Paste Channel, Playlist or Video link..."
                             className="w-full bg-transparent py-4 pr-4 text-base text-gray-900 dark:text-white placeholder:text-gray-400 border-none shadow-none outline-none font-medium"

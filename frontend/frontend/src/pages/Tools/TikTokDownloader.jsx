@@ -6,7 +6,7 @@ import api, { API_CONFIG } from "../../utils/api";
 
 // 🛠️ Helper for clean API URLs
 // 🛠️ Helper for clean API URLs
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.MODE === 'development' ? "" : "https://eza-post-backend.onrender.com/api")).replace(/\/api$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.MODE === 'development' ? "http://localhost:5000" : "https://eza-post-backend.onrender.com")).replace(/\/api$/, "");
 
 // 🛡️ Robust Proxy Helper
 const getProxyUrl = (url, options = {}) => {
@@ -208,12 +208,35 @@ export default function TikTokDownloader() {
                 }
             } else {
                 // 🎬 For Video: Download MP4
-                const targetUrl = v.no_watermark_url;
-                const safeFilename = `tiktok-${v.id}.mp4`;
-                const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: v.web_url });
+                // Fallback to playUrl or regular url if no_watermark_url is missing
+                let targetUrl = v.no_watermark_url || v.playUrl || v.url;
+
+                // 🔄 Fallback: If no direct URL, try to resolve via web_url
+                if (!targetUrl && v.web_url) {
+                    try {
+                        const res = await api.post("/tools/tiktok/lookup", { url: v.web_url });
+                        if (res.data.success && res.data.video?.no_watermark_url) {
+                            targetUrl = res.data.video.no_watermark_url;
+                        }
+                    } catch (err) {
+                        console.error("❌ Failed to resolve missing URL for:", v.id);
+                    }
+                }
+
+                if (!targetUrl) {
+                    console.error("❌ Skipping video due to missing URL:", v);
+                    continue;
+                }
+
+                const rawTitle = v.title || v.desc || v.id || "tiktok_video";
+                const title = String(rawTitle);
+                const safeFilename = `tiktok-${title.replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50)}.mp4`;
+
+                // Use the robust /stream endpoint
+                const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${v.id}&url=${encodeURIComponent(targetUrl)}&filename=${encodeURIComponent(safeFilename)}`;
 
                 const link = document.createElement('a');
-                link.href = proxyUrl;
+                link.href = downloadUrl;
                 link.setAttribute('download', safeFilename);
                 document.body.appendChild(link);
                 link.click();
@@ -291,7 +314,10 @@ export default function TikTokDownloader() {
                                     <input
                                         type="text"
                                         value={url}
-                                        onChange={(e) => setUrl(e.target.value)}
+                                        onChange={(e) => {
+                                            setUrl(e.target.value);
+                                            if (videoData) setVideoData(null);
+                                        }}
                                         onKeyDown={(e) => e.key === "Enter" && handleLookup()}
                                         placeholder="Paste TikTok Link..."
                                         className="w-full bg-transparent py-3 pr-4 text-sm md:text-base text-gray-900 dark:text-white placeholder:text-gray-400 border-none shadow-none appearance-none"
@@ -335,25 +361,20 @@ export default function TikTokDownloader() {
                                         <X size={20} className="text-gray-500 dark:text-gray-300" />
                                     </button>
 
-                                    <div className="flex flex-col md:flex-row gap-8">
+                                    <div className="flex flex-row gap-3 md:gap-8">
                                         {/* Media Preview */}
-                                        <div className="w-full md:w-1/3 shrink-0 relative">
+                                        <div className="w-[35%] md:w-1/3 shrink-0 relative">
                                             {(videoData.type === 'slideshow' || videoData.type === 'photo' || (videoData.images && videoData.images.length > 0)) ? (
-                                                <div className="aspect-[3/4] rounded-2xl overflow-hidden relative group bg-gray-100 dark:bg-gray-900 border border-white/10 shadow-lg">
+                                                <div className="aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden relative group bg-gray-100 dark:bg-gray-900 border border-white/10 shadow-lg">
                                                     <img src={videoData.images?.[0] || videoData.cover} alt="cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                                    <div className="absolute top-3 left-3 px-3 py-1 bg-amber-500/90 backdrop-blur-md rounded-lg text-black text-[10px] font-black border border-amber-400/50 shadow-xl tracking-tighter flex items-center gap-1">
-                                                        {videoData.type === 'slideshow' ? <><Layers size={10} /> SLIDESHOW ({videoData.images.length} PHOTOS)</> : "PHOTO (SINGLE IMAGE)"}
-                                                    </div>
-                                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <span className="text-white font-medium flex items-center gap-2">
-                                                            {videoData.type === 'slideshow' ? <><Layers size={20} /> Slideshow Post</> : <><ImageIcon size={20} /> Photo Post</>}
-                                                        </span>
+                                                    <div className="absolute top-2 left-2 right-2 md:top-3 md:left-3 md:right-auto px-1.5 py-0.5 md:px-3 md:py-1 bg-amber-500/90 backdrop-blur-md rounded md:rounded-lg text-black text-[8px] md:text-[10px] font-black border border-amber-400/50 shadow-xl tracking-tighter flex items-center justify-center md:justify-start gap-1">
+                                                        {videoData.type === 'slideshow' ? <><Layers size={10} /> {videoData.images.length}</> : "PHOTO"}
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="aspect-[3/4] rounded-2xl overflow-hidden relative bg-black shadow-lg border border-white/10 group">
+                                                <div className="aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden relative bg-black shadow-lg border border-white/10 group">
                                                     <video
-                                                        src={getProxyUrl(videoData.no_watermark_url, { filename: `preview-${videoData.id}`, web_url: url, type: 'video/mp4' })}
+                                                        src={`${API_BASE}/api/tools/tiktok/stream?id=${videoData.id}&url=${encodeURIComponent(videoData.no_watermark_url)}`}
                                                         className="w-full h-full object-cover"
                                                         controls
                                                         autoPlay
@@ -361,29 +382,29 @@ export default function TikTokDownloader() {
                                                         loop
                                                         playsInline
                                                     />
-                                                    <div className="absolute top-3 left-3 px-3 py-1 bg-sky-500/90 backdrop-blur-md rounded-lg text-white text-[10px] font-black border border-sky-400/50 shadow-xl tracking-tighter">
-                                                        VIDEO (MP4)
+                                                    <div className="absolute top-2 left-2 right-2 md:top-3 md:left-3 md:right-auto px-1.5 py-0.5 md:px-3 md:py-1 bg-sky-500/90 backdrop-blur-md rounded md:rounded-lg text-white text-[8px] md:text-[10px] font-black border border-sky-400/50 shadow-xl tracking-tighter text-center md:text-left">
+                                                        MP4
                                                     </div>
                                                 </div>
                                             )}
                                         </div>
                                         {/* Actions */}
-                                        <div className="flex-1 flex flex-col">
-                                            <div className="mb-6">
-                                                <span className="inline-block px-3 py-1 rounded-full bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 text-xs font-bold mb-2 tracking-wide uppercase">
+                                        <div className="flex-1 flex flex-col min-w-0">
+                                            <div className="mb-2 md:mb-6">
+                                                <span className="inline-block px-2 py-0.5 md:px-3 md:py-1 rounded-full bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 text-[10px] md:text-xs font-bold mb-1 md:mb-2 tracking-wide uppercase truncate max-w-full">
                                                     @{videoData.author.nickname || videoData.author.unique_id}
                                                 </span>
-                                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight mb-4">
+                                                <h2 className="text-sm md:text-2xl font-bold text-gray-900 dark:text-white leading-tight mb-2 md:mb-4 line-clamp-2 md:line-clamp-none">
                                                     {videoData.title || "Untitled Video"}
                                                 </h2>
 
-                                                <div className="flex flex-wrap gap-2 items-center">
+                                                <div className="flex flex-wrap gap-1.5 md:gap-2 items-center">
                                                     {[
                                                         (videoData.type === 'slideshow' || videoData.type === 'photo') ? 'រូប គុណភាពដើម 100%' : 'Video គុណភាពដើម 100%',
                                                         'Ultra Clear (ច្បាស់)',
                                                         'No Watermark (គ្មាន)'
                                                     ].map(tag => (
-                                                        <span key={tag} className="px-3 py-1 rounded-lg bg-white/40 dark:bg-white/5 backdrop-blur-md text-gray-700 dark:text-gray-300 text-xs font-semibold border border-white/20">
+                                                        <span key={tag} className="px-2 py-0.5 md:px-3 md:py-1 rounded-lg bg-white/40 dark:bg-white/5 backdrop-blur-md text-gray-700 dark:text-gray-300 text-[9px] md:text-xs font-semibold border border-white/20 whitespace-nowrap">
                                                             {tag}
                                                         </span>
                                                     ))}
@@ -480,25 +501,33 @@ export default function TikTokDownloader() {
                                                 ) : (
                                                     <button
                                                         onClick={() => {
-                                                            const targetUrl = videoData.no_watermark_url;
-                                                            const safeFilename = `tiktok-${videoData.id}`;
-                                                            const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: videoData.web_url });
+                                                            const rawTitle = videoData.title || videoData.desc || videoData.id || "tiktok_video";
+                                                            const title = String(rawTitle);
+                                                            // Sanitize filename for client download attrib
+                                                            const safeFilename = title.replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50);
+
+                                                            // Use /stream endpoint with deleteAfter=true
+                                                            // Note: We encodeURIComponent twice for the URL parameter to be safe, 
+                                                            // but here just encoding the value is enough.
+                                                            const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoData.id}&url=${encodeURIComponent(videoData.no_watermark_url)}&filename=${encodeURIComponent(safeFilename + '.mp4')}`;
 
                                                             const link = document.createElement('a');
-                                                            link.href = proxyUrl;
+                                                            link.href = downloadUrl;
                                                             link.setAttribute('download', `${safeFilename}.mp4`);
                                                             document.body.appendChild(link);
                                                             link.click();
                                                             document.body.removeChild(link);
-                                                            toast.success("Video download started");
+                                                            toast.success("Saved to device & Cleaned from server!");
                                                         }}
-                                                        className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20"
+                                                        className="w-full py-2.5 md:py-4 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white rounded-lg md:rounded-xl font-bold transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-xl hover:shadow-pink-500/40 flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20 active:scale-95 group/btn text-sm md:text-base"
                                                     >
-                                                        <Download size={20} /> Download Full Video (HD - MP4)
+                                                        <Download className="w-4 h-4 md:w-5 md:h-5 group-hover/btn:animate-bounce" />
+                                                        <span>Download Full Video <span className="hidden md:inline">(HD - MP4)</span></span>
                                                     </button>
                                                 )}
 
-                                                {!videoData.images?.length && (
+                                                {/* Save to Library - Disabled for now */}
+                                                {/* {!videoData.images?.length && (
                                                     <button
                                                         onClick={handleSaveToApp}
                                                         disabled={saving}
@@ -506,7 +535,7 @@ export default function TikTokDownloader() {
                                                     >
                                                         {saving ? <Loader2 className="animate-spin" /> : <><Check size={20} /> Save to Library</>}
                                                     </button>
-                                                )}
+                                                )} */}
                                             </div>
                                         </div>
                                     </div>

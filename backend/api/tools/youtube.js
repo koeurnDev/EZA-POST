@@ -183,15 +183,8 @@ router.post("/download", requireAuth, async (req, res) => {
             console.log("✅ Download Complete:", foundFile);
 
             // 🕒 Auto-Delete after 5 minutes
-            const filePath = path.join(tempDir, foundFile);
-            setTimeout(() => {
-                if (fs.existsSync(filePath)) {
-                    fs.unlink(filePath, (err) => {
-                        if (err) console.error(`❌ Failed to auto-delete ${foundFile}:`, err);
-                        else console.log(`🗑️ Auto-deleted ${foundFile}`);
-                    });
-                }
-            }, 5 * 60 * 1000);
+            // 🕒 Auto-Delete handled by global tempCleaner.js
+            // setTimeout removed to avoid file finding race conditions
 
             res.json({ success: true, url: `/uploads/temp/videos/${foundFile}` });
         } else {
