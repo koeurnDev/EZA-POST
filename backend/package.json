@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "start": "cross-env NODE_ENV=production node server.js",
     "build": "./render-build.sh",
+    "postinstall": "prisma generate",
     "debug": "nodemon --inspect server.js",
     "test": "echo \"No tests specified\" && exit 0"
   },

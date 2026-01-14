@@ -8,11 +8,12 @@ echo "Pip Version:"
 pip3 --version
 
 # Standard Render Build Script
-# 1. Install Node dependencies
+# 1. Install Node dependencies (Triggers prisma generate via postinstall)
 npm install
 
-# 2. Generate Prisma Client
-npx prisma generate
+# 2. Debug: Check if Prisma Client was generated
+echo "Checking for Prisma Client..."
+ls -R node_modules/.prisma || echo "Prisma Client NOT FOUND in node_modules/.prisma"
 
-# 3. Install Python dependencies (Global/System install for Render)
+# 3. Install Python dependencies
 pip3 install -r requirements.txt
