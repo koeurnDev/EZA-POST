@@ -10,5 +10,8 @@ pip3 --version
 # 1. Install Node dependencies
 npm install
 
-# 2. Install Python dependencies (Global/System install for Render)
+# 2. Generate Prisma Client
+npx prisma generate
+
+# 3. Install Python dependencies (Global/System install for Render)
 pip3 install -r requirements.txt
