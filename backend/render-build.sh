@@ -11,7 +11,11 @@ pip3 --version
 # 1. Install Node dependencies (Triggers prisma generate via postinstall)
 npm install
 
-# 2. Debug: Check if Prisma Client was generated
+# 2. Sync Database Schema
+echo "Synchronizing database schema..."
+npx prisma db push --accept-data-loss
+
+# 3. Debug: Check if Prisma Client was generated
 echo "Checking for Prisma Client..."
 ls -R node_modules/.prisma || echo "Prisma Client NOT FOUND in node_modules/.prisma"
 
