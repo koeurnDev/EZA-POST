@@ -416,5 +416,6 @@ app.listen(PORT, () => {
   console.log("   👉 CLOUDINARY_CLOUD_NAME:", process.env.CLOUDINARY_CLOUD_NAME ? "Set" : "Missing");
   console.log("   👉 CLOUDINARY_API_KEY:", process.env.CLOUDINARY_API_KEY ? "Set" : "Missing");
   console.log("   👉 CLOUDINARY_API_SECRET:", process.env.CLOUDINARY_API_SECRET ? `Set (Starts with ${process.env.CLOUDINARY_API_SECRET.substring(0, 4)}...)` : "Missing");
-  console.log("   👉 JWT_SECRET:", process.env.JWT_SECRET ? "Set" : "Using Default");
+  console.log(`    👉 JWT_SECRET: ${process.env.JWT_SECRET ? "Set" : "NOT SET"}`);
+  console.log(`    👉 DATABASE_URL: ${process.env.DATABASE_URL ? "Set (Starts with " + process.env.DATABASE_URL.substring(0, 10) + "...)" : "NOT SET"}`);
 });
