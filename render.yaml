@@ -18,6 +18,8 @@ services:
         value: 20.11.0
       - key: PORT
         value: 10000
+      - key: YOUTUBE_DL_SKIP_DOWNLOAD
+        value: true
       - key: MONGO_URI
         sync: false
       - key: JWT_SECRET
