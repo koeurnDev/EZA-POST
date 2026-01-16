@@ -40,7 +40,8 @@ import {
   Cloud,
   Users,
   Zap,
-  Coins
+  Coins,
+  AtSign
 } from "lucide-react";
 
 // 🧭 Navigation Items (Organized by Category)
@@ -50,6 +51,7 @@ const NAV_ITEMS = [
   { label: "TikTok", icon: <Download size={20} />, path: "/tools/tiktok" },
   { label: "YouTube", icon: <Video size={20} />, path: "/tools/youtube" },
   { label: "Instagram", icon: <Instagram size={20} />, path: "/tools/instagram" },
+  { label: "Threads", icon: <AtSign size={20} />, path: "/tools/threads" },
   { label: "Facebook", icon: <Facebook size={20} />, path: "/tools/facebook" },
   { label: "Pinterest", icon: <Images size={20} />, path: "/tools/pinterest" },
   { label: "CapCut", icon: <Scissors size={20} />, path: "/tools/capcut" },

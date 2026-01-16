@@ -120,7 +120,10 @@ router.post('/convert', upload.single('file'), async (req, res) => {
         if (fs.existsSync(outputFilePath)) {
             const fileData = fs.readFileSync(outputFilePath);
             res.setHeader('Content-Type', mimeType);
-            res.setHeader('Content-Disposition', `attachment; filename="${path.basename(originalName, path.extname(originalName))}${outputExtension}"`);
+            const finalFilename = `${path.basename(originalName, path.extname(originalName))}${outputExtension}`;
+            const utf8Name = encodeURIComponent(finalFilename);
+            const asciiName = finalFilename.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
+            res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`);
             res.send(fileData);
 
             // Housekeeping

@@ -23,9 +23,6 @@ const prisma = require('./utils/prisma');
 // ✅ Middleware & Security
 // ------------------------------------------------------------
 app.use(morgan("dev"));
-// app.use(express.json()); // REMOVED DUPLICATE
-// app.use(cookieParser(process.env.SESSION_SECRET || "eza_post_secret_key_2024")); 
-// Simplified Session (MemoryStore for now, ideally Redis or Postgres Store later)
 app.use(cookieParser(process.env.SESSION_SECRET || "eza_post_secret_key_2024"));
 
 app.use(
@@ -45,40 +42,9 @@ app.use(hpp());
 
 // ... [Keep CORS and other middleware] ...
 
-// ✅ Session setup (MemoryStore for migration simplicity)
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "eza_post_secret_key_2024",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.RENDER === "true",
-      httpOnly: true,
-      sameSite: process.env.RENDER === "true" ? "none" : "lax",
-      maxAge: 24 * 60 * 60 * 1000,
-    },
-  })
-);
 
 // ... [Keep Rate Limit, CSRF, etc.] ...
 
-// ✅ Health Check
-app.get("/api/health", async (req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`; // Simple query to check connection
-    res.json({
-      status: "OK",
-      database: "Connected (PostgreSQL)",
-      time: new Date().toISOString(),
-    });
-  } catch (err) {
-    res.status(500).json({
-      status: "ERROR",
-      database: "Disconnected",
-      error: err.message,
-    });
-  }
-});
 
 
 // 🔍 Debug Middleware: Log Cookies & Origin
@@ -203,9 +169,6 @@ app.get('/api/csrf-token', (req, res) => {
 app.get('/api/debug/session', (req, res) => {
   console.log("🔍 Debug Session Check:", req.session);
   res.json({
-    loggedIn: !!req.session?.user,
-    user: req.session?.user || null,
-    sessionID: req.sessionID,
     user: req.session?.user || null,
     sessionID: req.sessionID,
     cookie: req.session?.cookie,
@@ -250,6 +213,7 @@ const routeModules = [
   ["tools/facebook", "./api/tools/facebook"],
   ["tools/instagram", "./api/tools/instagram"],
   ["tools/capcut", "./api/tools/capcut"],
+  ["tools/threads", "./api/tools/threads"],
   ["tools/ecommerce", "./api/tools/ecommerce"],
   // ["boost/campaigns", "./api/boost/campaigns"], 
   ["debug", "./api/debug_python"],

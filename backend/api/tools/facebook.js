@@ -117,7 +117,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
 
                 const html = await axios.get(url, {
                     headers: {
-                        'User-Agent': DEFAULT_UA,
+                        'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
                         'Cookie': cookieHeader
                     },
                     timeout: 15000

@@ -20,6 +20,7 @@ const PinterestDownloader = lazy(() => import("../pages/Tools/PinterestDownloade
 const YoutubeDownloader = lazy(() => import("../pages/Tools/YoutubeDownloader"));
 const FacebookDownloader = lazy(() => import("../pages/Tools/FacebookDownloader")); // ✅ New
 const InstagramDownloader = lazy(() => import("../pages/Tools/InstagramDownloader")); // ✅ New
+const ThreadsDownloader = lazy(() => import("../pages/Tools/ThreadsDownloader")); // ✅ New
 const CapCutDownloader = lazy(() => import("../pages/Tools/CapCutDownloader")); // ✅ New
 const VideoCreator = lazy(() => import("../pages/Tools/VideoCreator")); // ✅ New
 const DropshipCenter = lazy(() => import("../pages/Tools/DropshipCenter")); // ✅ New
@@ -177,6 +178,14 @@ export default function AppRouter() {
             element={
               <ProtectedRoute>
                 <InstagramDownloader />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/threads"
+            element={
+              <ProtectedRoute>
+                <ThreadsDownloader />
               </ProtectedRoute>
             }
           />

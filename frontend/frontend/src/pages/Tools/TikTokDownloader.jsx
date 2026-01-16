@@ -94,18 +94,7 @@ export default function TikTokDownloader() {
                 setUrl(""); // Clear input
                 toast.success("Video found!");
 
-                // ⚡ AUTO-DOWNLOAD TRIGGER (One-Click Experience)
-                // Only for standard videos to avoid spamming multiple files or confusing UX for slideshows
-                if (data.type === 'video' && data.no_watermark_url) {
-                    const rawTitle = data.title || data.desc || data.id || "tiktok_video";
-                    const safeFilename = String(rawTitle).replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50) + '.mp4';
-                    const videoId = data.id || `video_${Date.now()}`;
-
-                    const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${encodeURIComponent(data.no_watermark_url)}&filename=${encodeURIComponent(safeFilename)}`;
-
-                    toast('Starting Download...', { icon: '⬇️' });
-                    triggerDownload(downloadUrl, safeFilename);
-                }
+                // Auto-download disabled per user request
             }
         } catch (err) {
             toast.error(err.response?.data?.error || "Failed to find video");
@@ -363,8 +352,7 @@ export default function TikTokDownloader() {
                                 </button>
                             )}
 
-                            {/* Auto-Download Tip */}
-                            {!videoData && url && <p className="text-center text-xs text-gray-400 animate-pulse">Clicking Download will automatically save the video to your device.</p>}
+
 
 
                             {/* Result Card */}
@@ -429,7 +417,7 @@ export default function TikTokDownloader() {
                                             </div>
 
                                             <div className="mt-auto space-y-3">
-                                                {videoData.type === 'slideshow' || videoData.type === 'photo' ? (
+                                                {(videoData.type === 'slideshow' || videoData.type === 'photo' || (videoData.images && videoData.images.length > 0)) ? (
                                                     <>
                                                         {videoData.images?.length > 0 ? (
                                                             <button
@@ -489,7 +477,7 @@ export default function TikTokDownloader() {
                                                                         </span>
                                                                     </>
                                                                 ) : (
-                                                                    <><ImageIcon size={20} /> Download All Photos ({videoData.images.length})</>
+                                                                    <><ImageIcon size={20} /> {videoData.images.length === 1 ? 'Download Photo' : `Download All Photos (${videoData.images.length})`}</>
                                                                 )}
                                                             </button>
                                                         ) : (
@@ -499,37 +487,67 @@ export default function TikTokDownloader() {
                                                                 </p>
                                                             </div>
                                                         )}
-                                                        <button
-                                                            onClick={async () => {
-                                                                const targetUrl = videoData.no_watermark_url;
-                                                                const safeFilename = `tiktok-slideshow-${videoData.id}.mp4`; // Ensure extension
-                                                                const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: videoData.web_url, type: 'video/mp4' });
+                                                        <div className="flex flex-col gap-2">
+                                                            {/* 📥 1. Slideshow/Video Background (Only if exists) */}
+                                                            {videoData.no_watermark_url && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const targetUrl = videoData.no_watermark_url;
+                                                                        const safeFilename = `tiktok-slideshow-video-${videoData.id}.mp4`;
+                                                                        const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: videoData.web_url, type: 'video/mp4' });
+                                                                        triggerDownload(proxyUrl, safeFilename);
+                                                                    }}
+                                                                    className="w-full py-3 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 text-gray-600 dark:text-gray-300 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm"
+                                                                >
+                                                                    <Video size={16} /> Download Slideshow Video (MP4)
+                                                                </button>
+                                                            )}
 
-                                                                // ⚡ Fix: Jump to Browser Download directly
-                                                                triggerDownload(proxyUrl, safeFilename);
-                                                            }}
-                                                            className="w-full py-3 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 text-gray-600 dark:text-gray-300 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm"
-                                                        >
-                                                            <Music size={16} /> Download {videoData.type === 'slideshow' ? 'SlideShow' : 'Photo'} Background (MP4)
-                                                        </button>
+                                                            {/* 🎵 2. Audio Only (New Button) */}
+                                                            {videoData.music && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const targetUrl = videoData.music;
+                                                                        const safeFilename = `tiktok-audio-${videoData.id}.mp3`;
+                                                                        const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: videoData.web_url, type: 'audio/mpeg' });
+                                                                        triggerDownload(proxyUrl, safeFilename);
+                                                                    }}
+                                                                    className="w-full py-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm"
+                                                                >
+                                                                    <Music size={16} /> Download Audio (MP3)
+                                                                </button>
+                                                            )}
+
+                                                            {!videoData.no_watermark_url && !videoData.music && (
+                                                                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-xl text-center">
+                                                                    <p className="text-xs text-gray-400 dark:text-gray-500">No Background Video or Audio Available</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </>
                                                 ) : (
-                                                    <button
-                                                        onClick={() => {
-                                                            const rawTitle = videoData.title || videoData.desc || videoData.id || "tiktok_video";
-                                                            const title = String(rawTitle);
-                                                            const safeFilename = title.replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50);
-                                                            const videoId = videoData.id || `video_${Date.now()}`;
-                                                            const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${encodeURIComponent(videoData.no_watermark_url)}&filename=${encodeURIComponent(safeFilename + '.mp4')}`;
-                                                            triggerDownload(downloadUrl, `${safeFilename}.mp4`);
-                                                        }}
-                                                        className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20"
-                                                    >
-                                                        <>
-                                                            <Video size={20} />
-                                                            <span>Download Full Video <span className="hidden md:inline">(HD - MP4)</span></span>
-                                                        </>
-                                                    </button>
+                                                    videoData.no_watermark_url ? (
+                                                        <button
+                                                            onClick={() => {
+                                                                const rawTitle = videoData.title || videoData.desc || videoData.id || "tiktok_video";
+                                                                const title = String(rawTitle);
+                                                                const safeFilename = title.replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50);
+                                                                const videoId = videoData.id || `video_${Date.now()}`;
+                                                                const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${encodeURIComponent(videoData.no_watermark_url)}&filename=${encodeURIComponent(safeFilename + '.mp4')}`;
+                                                                triggerDownload(downloadUrl, `${safeFilename}.mp4`);
+                                                            }}
+                                                            className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20"
+                                                        >
+                                                            <>
+                                                                <Video size={20} />
+                                                                <span>Download Full Video <span className="hidden md:inline">(HD - MP4)</span></span>
+                                                            </>
+                                                        </button>
+                                                    ) : (
+                                                        <div className="p-4 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-center">
+                                                            <p className="text-gray-500 dark:text-gray-400 font-medium">Video Not Available for this Post</p>
+                                                        </div>
+                                                    )
                                                 )}
 
                                                 <button

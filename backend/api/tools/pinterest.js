@@ -34,21 +34,19 @@ router.post("/lookup", requireAuth, async (req, res) => {
         if (!url || !url.includes("pinterest")) return res.status(400).json({ success: false, error: "Invalid Pinterest URL" });
 
         console.log(`📌 Lookup Pinterest: ${url}`);
+        let output;
 
         // 1. Try yt-dlp first (Best for HD Videos)
         try {
             console.log("    👉 Attempting yt-dlp for Video...");
-            const youtubedl = require("youtube-dl-exec"); // 🔄 Lazy Load
+            const ytdlp = require("../../utils/ytdlp");
 
-            const output = await youtubedl(url, {
-                dumpSingleJson: true,
-                noWarnings: true,
-                noCheckCertificate: true,
-                ffmpegLocation: require('ffmpeg-static')
-            }, { execPath: getBinaryPath() }); // ✅ FIX APPLIED
+            output = await ytdlp.lookup(url, {
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            });
 
-            // If yt-dlp finds a video
-            if (output.url || (output.formats && output.formats.length > 0)) {
+            // If yt-dlp returns valid data
+            if (output && (output.url || (output.formats && output.formats.length > 0))) {
                 let bestVideo = output.url;
 
                 if (output.formats) {
@@ -76,13 +74,14 @@ router.post("/lookup", requireAuth, async (req, res) => {
                 });
             }
         } catch (e) {
-            console.log("    ⚠️ yt-dlp failed (likely an image), switching to scraper...");
+            console.log(`    ⚠️ yt-dlp failed (likely an image): ${e.message}`);
+            // Fallthrough to scraper
         }
 
         // 2. Fallback to Cheerio Scraper (Best for Images)
         console.log("    👉 Attempting Cheerio Scraper for Image...");
         const response = await axios.get(url, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36' }
+            headers: { 'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)' }
         });
 
         const $ = cheerio.load(response.data);
@@ -94,11 +93,13 @@ router.post("/lookup", requireAuth, async (req, res) => {
 
         // Upgrade Image Quality (736x -> originals)
         let finalUrl = imageUrl;
+        /* 
+        // ⚠️ DISABLE HD UPGRADE: Causes 403/Corruption issues for now.
         if (imageUrl && imageUrl.match(/\/\d+x\//)) {
             const hdUrl = imageUrl.replace(/\/\d+x\//, "/originals/");
             try {
                 // Verify if the HD URL actually exists and is an image
-                const head = await axios.head(hdUrl);
+                const head = await axios.head(hdUrl, { headers: { 'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)' } });
                 if (head.status === 200 && head.headers['content-type']?.startsWith('image')) {
                     finalUrl = hdUrl;
                     console.log("    ✅ Upgraded to HD Image:", finalUrl);
@@ -109,6 +110,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
                 console.warn("    ⚠️ HD Image not found, reverting to SD:", e.message);
             }
         }
+        */
 
         return res.json({
             success: true,
@@ -151,12 +153,15 @@ router.post("/download", requireAuth, async (req, res) => {
         const response = await axios({
             url,
             method: 'GET',
-            responseType: 'stream',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Referer': 'https://www.pinterest.com/'
-            }
+            responseType: 'stream'
+            // headers: {} // Removed strict headers
         });
+
+        // 🛡️ Content-Type Check: Prevent saving HTML/Error pages as images
+        const contentType = response.headers['content-type'];
+        if (contentType && (contentType.includes('text/html') || contentType.includes('application/json'))) {
+            throw new Error(`Invalid Content-Type received: ${contentType}. Likely an error page.`);
+        }
 
         response.data.pipe(writer);
 
@@ -196,12 +201,16 @@ router.get("/proxy", async (req, res) => {
         const response = await axios({
             method: 'get',
             url: url,
-            responseType: 'stream',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36',
-                'Referer': 'https://www.pinterest.com/'
-            }
+            responseType: 'stream'
+            // headers: {} // Removed strict headers
         });
+
+        const safeFilename = (req.query.filename || `pinterest-${Date.now()}`);
+        const utf8Filename = encodeURIComponent(safeFilename);
+        const asciiFilename = safeFilename.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
+
+        res.setHeader('Content-Disposition', `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`);
+        res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
 
         response.data.pipe(res);
     } catch (err) {

@@ -11,6 +11,7 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto"); // 🔐 Added for Cache Hashing
 const { requireAuth } = require("../../utils/auth");
+const cheerio = require("cheerio"); // ✅ Required for fallback scraper
 
 // 🗂️ Temp directory
 const tempDir = path.join(__dirname, "../../temp/videos");
@@ -53,15 +54,18 @@ const formatTikTokVideo = (v) => {
     const finalType = isSlideshow ? 'slideshow' : 'video';
 
     // ✅ Add fallback for no_watermark_url
-    // This ensures frontend never receives an empty URL for video downloads
-    let noWatermark = v.hdplay || v.play || v.download_addr || v.web_url || "";
+    // NOTE: Removed v.web_url from fallback. Downloading the HTML page as a video results in a "Black Video" / Corrupt file.
+    // If no video URL exists, it should be empty so the frontend knows there is no video track.
+    let noWatermark = v.hdplay || v.play || v.download_addr || "";
 
     return {
         id: v.video_id || v.id,
         title: v.title || "",
         cover: v.cover,
-        no_watermark_url: noWatermark, // ✅ Guaranteed to have a value (web_url at least)
-        playUrl: v.play || v.web_url || "",
+        no_watermark_url: noWatermark,
+        playUrl: v.play || v.hdplay || "", // Preview URL should also be media, not web_url
+        music: v.music || v.music_info?.play || "", // 🎵 NEW: Audio URL
+
         images: images,
         type: finalType, // ✅ Correct Type
         author: {
@@ -121,6 +125,48 @@ router.post("/lookup", requireAuth, async (req, res) => {
             };
         }
 
+        // 3️⃣ Last Resort: LoveTik API (Best for Slideshows/Photos when TikWM is down)
+        // TikWM often fails 403, and yt-dlp doesn't support photos. LoveTik is our savior.
+        if (!videoData) {
+            try {
+                console.log("    👉 Attempting LoveTik API (Slideshow/Video Fallback)...");
+                const loveRes = await axios.post('https://lovetik.com/api/ajax/search',
+                    new URLSearchParams({ query: cleanUrl }).toString(),
+                    {
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        },
+                        timeout: 10000
+                    }
+                );
+
+                if (loveRes.data.status === 'ok') {
+                    const d = loveRes.data;
+                    const isSlideshow = d.images && d.images.length > 0;
+
+                    console.log(`    ✅ LoveTik Success: ${isSlideshow ? 'Slideshow (' + d.images.length + ' imgs)' : 'Video'}`);
+
+                    videoData = {
+                        id: d.vid || `tk_${Date.now()}`,
+                        title: d.desc || "TikTok Media",
+                        cover: d.cover,
+                        no_watermark_url: d.links ? d.links[0].a : "", // Video URL
+                        playUrl: d.links ? d.links[0].a : "",
+                        images: d.images || [], // Full Slideshow Support!
+                        type: isSlideshow ? 'slideshow' : 'video',
+                        author: {
+                            nickname: d.author_name || "Unknown",
+                            avatar: d.author_a || ""
+                        },
+                        stats: { plays: 0, likes: 0 }
+                    };
+                }
+            } catch (e) {
+                console.warn("    ⚠️ LoveTik failed:", e.message);
+            }
+        }
+
         return res.json({ success: true, video: videoData });
     } catch (err) {
         return res.status(500).json({ success: false, error: "Lookup Failed" });
@@ -163,7 +209,7 @@ router.post("/profile", requireAuth, async (req, res) => {
 
                 return res.json({ success: true, profile: { username: uniqueId, avatar: authorAvatar }, videos });
             }
-        } catch (e) { console.warn("TikWM Profile failed"); }
+        } catch (e) { console.warn("⚠️ TikWM Profile API unreachable (403/Down), switching to backup engine (yt-dlp)..."); }
 
         // 2️⃣ yt-dlp Fallback
         const youtubedl = require("youtube-dl-exec");
@@ -322,6 +368,8 @@ router.get("/stream", async (req, res) => {
             const rawName = filename || `tiktok_${safeId}.mp4`;
             // RFC 5987 Compliance
             const utf8Name = encodeURIComponent(rawName);
+            const asciiName = rawName.replace(/[^a-zA-Z0-9_\-\.]/g, "_"); // ✅ Safe ASCII Fallback
+            console.log(`[DEBUG] Stream Header: raw="${rawName}" ascii="${asciiName}" utf8="${utf8Name}"`);
 
             res.setHeader('Cache-Control', 'no-store'); // 🚫 Prevent Mobile Caching
             res.setHeader('Accept-Ranges', 'bytes');
@@ -329,7 +377,7 @@ router.get("/stream", async (req, res) => {
             if (isDownload) {
                 // ⬇️ Force Download Mode
                 res.setHeader('Content-Type', 'application/octet-stream');
-                res.setHeader('Content-Disposition', `attachment; filename="${rawName.replace(/"/g, "")}"; filename*=UTF-8''${utf8Name}`);
+                res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`);
             } else {
                 // 🎥 Preview Mode
                 res.setHeader('Content-Type', 'video/mp4');
@@ -468,8 +516,9 @@ router.get("/proxy", async (req, res) => {
             return res.status(403).send("Forbidden Domain");
         }
 
-        // Simple filename sanitization
-        const safeFilename = (filename || `download-${Date.now()}`).replace(/[^a-z0-9\u0080-\uffff\-_.]/gi, '_');
+        const safeFilename = (filename || `download-${Date.now()}`); // Allow raw for UTF-8 processing
+        const utf8Filename = encodeURIComponent(safeFilename); // Encode for filename*
+        const asciiFilename = safeFilename.replace(/[^a-zA-Z0-9_\-\.]/g, "_"); // Clean for filename
 
         const response = await axios({
             method: 'get',
@@ -481,7 +530,7 @@ router.get("/proxy", async (req, res) => {
             }
         });
 
-        res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`);
         res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
         response.data.pipe(res);
 
