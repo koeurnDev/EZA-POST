@@ -21,9 +21,11 @@ if (!fs.existsSync(slideDir)) fs.mkdirSync(slideDir, { recursive: true });
 
 // ⚙️ Helper: Get Binary Path
 const getBinaryPath = () => {
-    return process.env.NODE_ENV === 'production'
-        ? path.join(__dirname, '../../bin/yt-dlp')
-        : undefined;
+    const prodPath = path.join(__dirname, '../../bin/yt-dlp');
+    if (process.env.NODE_ENV === 'production' && fs.existsSync(prodPath)) {
+        return prodPath;
+    }
+    return undefined; // Falls back to system PATH (e.g. yt-dlp installed via pip)
 };
 
 /* -------------------------------------------------------------------------- */
@@ -108,21 +110,25 @@ router.post("/lookup", requireAuth, async (req, res) => {
 
         // 2️⃣ yt-dlp Fallback
         if (!videoData) {
-            const youtubedl = require("youtube-dl-exec");
-            const output = await youtubedl(cleanUrl, { dumpSingleJson: true, noWarnings: true }, { execPath: getBinaryPath() });
+            try {
+                const youtubedl = require("youtube-dl-exec");
+                const output = await youtubedl(cleanUrl, { dumpSingleJson: true, noWarnings: true }, { execPath: getBinaryPath() });
 
-            const isSlide = output.vcodec === 'none' && (output.thumbnails?.length > 1);
-            videoData = {
-                id: output.id,
-                title: output.title,
-                cover: output.thumbnail,
-                no_watermark_url: output.url,
-                images: [],
-                type: isSlide ? 'slideshow' : 'video',
-                duration: output.duration,
-                author: { nickname: output.uploader },
-                stats: { plays: output.view_count, likes: output.like_count }
-            };
+                const isSlide = output.vcodec === 'none' && (output.thumbnails?.length > 1);
+                videoData = {
+                    id: output.id,
+                    title: output.title,
+                    cover: output.thumbnail,
+                    no_watermark_url: output.url,
+                    images: [],
+                    type: isSlide ? 'slideshow' : 'video',
+                    duration: output.duration,
+                    author: { nickname: output.uploader },
+                    stats: { plays: output.view_count, likes: output.like_count }
+                };
+            } catch (e) {
+                console.warn("yt-dlp fallback failed:", e.message);
+            }
         }
 
         // 3️⃣ Last Resort: LoveTik API (Best for Slideshows/Photos when TikWM is down)
@@ -167,8 +173,13 @@ router.post("/lookup", requireAuth, async (req, res) => {
             }
         }
 
+        if (!videoData) {
+            return res.status(404).json({ success: false, error: "Media not found or unsupported URL" });
+        }
+
         return res.json({ success: true, video: videoData });
     } catch (err) {
+        console.error("Lookup Route Error:", err.message);
         return res.status(500).json({ success: false, error: "Lookup Failed" });
     }
 });
