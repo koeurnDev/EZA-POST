@@ -230,6 +230,13 @@ const apiUtils = {
 
   // 🎵 TikTok Tools
   getTikTokTrending: (region = 'US', count = 20, type = 'music') => axios.post(getFullUrl('/tools/tiktok/trending'), { region, count, type }, { withCredentials: true }),
+
+  // 🔐 Auth Redirects
+  getAuthUrl: (path) => {
+    const base = API_CONFIG.BASE_URL?.replace(/\/+$/, "");
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+    return `${base}${cleanPath}`;
+  }
 };
 
 export default apiUtils;
