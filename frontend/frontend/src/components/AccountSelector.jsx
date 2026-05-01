@@ -155,8 +155,12 @@ const AccountSelector = React.memo(function AccountSelector({
 
   useEffect(() => setFocusedIndex(-1), [filteredAccounts]);
 
-  const getAccountType = (acc) =>
-    acc.custom ? "custom" : acc.category ? "page" : acc.type || "unknown";
+  const getAccountType = (acc) => {
+    if (acc.custom) return "custom";
+    // If it has a category, access_token, or tasks, it's definitely a Facebook Page
+    if (acc.category || acc.access_token || acc.tasks) return "page";
+    return acc.type || "unknown";
+  };
 
   const colorMap = {
     custom: "bg-amber-500",
