@@ -20,12 +20,12 @@ export default defineConfig({
     cors: true,              // allow cross-origin
     proxy: {
       "/api": {
-        target: "http://localhost:5000", // backend server
+        target: "http://localhost:5001", // backend server
         changeOrigin: true,
         secure: false,
       },
       "/uploads": {
-        target: "http://localhost:5000",
+        target: "http://localhost:5001",
         changeOrigin: true,
         secure: false,
       },

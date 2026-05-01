@@ -40,7 +40,10 @@ const formatTikTokVideo = (v) => {
         rawImages = v.display_image.url_list;
     }
 
-    const images = rawImages.map(img => (typeof img === 'string' ? img : img.url_list?.[0])).filter(Boolean);
+    const images = rawImages.map(img => {
+        if (typeof img === 'string') return img;
+        return img.display_image?.url_list?.[0] || img.url_list?.[0] || img.image_url?.url_list?.[0];
+    }).filter(Boolean);
 
     // 2. 🧠 DATA-FIRST DETECTION (Expanded Codes)
     const isSlideshow =
@@ -181,6 +184,44 @@ router.post("/lookup", requireAuth, async (req, res) => {
     } catch (err) {
         console.error("Lookup Route Error:", err.message);
         return res.status(500).json({ success: false, error: "Lookup Failed" });
+    }
+});
+
+/* -------------------------------------------------------------------------- */
+/* 🔧 POST /compatible — Force H.264 / SD Video via LoveTik                   */
+/* -------------------------------------------------------------------------- */
+router.post("/compatible", requireAuth, async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ success: false, error: "URL required" });
+        const cleanUrl = (url.match(/https?:\/\/[^\s]+/) || [url])[0];
+
+        console.log(`    👉 Requesting SD/H.264 version for: ${cleanUrl}`);
+        const loveRes = await axios.post('https://lovetik.com/api/ajax/search',
+            new URLSearchParams({ query: cleanUrl }).toString(),
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                },
+                timeout: 15000
+            }
+        );
+
+        if (loveRes.data && loveRes.data.status === 'ok') {
+            const d = loveRes.data;
+            // Find the 576p or 720p watermarked/non-watermarked MP4 (ft: 1 or type mp4)
+            const links = d.links || [];
+            let mp4Link = links.find(l => String(l.ft) === "1" || String(l.t).toLowerCase().includes('mp4'))?.a;
+
+            if (mp4Link) {
+                return res.json({ success: true, url: mp4Link });
+            }
+        }
+        res.status(404).json({ success: false, error: "Compatible format not found" });
+    } catch (e) {
+        console.warn("    ⚠️ /compatible endpoint failed:", e.message);
+        res.status(500).json({ success: false, error: "Fetch Failed" });
     }
 });
 
@@ -513,7 +554,15 @@ router.get("/stream", async (req, res) => {
 /* -------------------------------------------------------------------------- */
 router.get("/proxy", async (req, res) => {
     try {
-        const { url, web_url, filename, type } = req.query;
+        let { url, web_url, filename, type } = req.query;
+
+        // Handle potentially double-encoded URLs
+        if (url && url.includes('%')) {
+            try {
+                url = decodeURIComponent(url);
+            } catch (e) { }
+        }
+
         // Logic: Trust the passed URL primarily. Only use web_url if it's explicitly requested as a fallback strategy (which we don't really use here).
         // The previous logic was swapping valid video URLs with the HTML page URL (web_url) if the domain wasn't tiktokcdn, which broke previews.
         if (type === 'video/mp4' && req.query.id) {
@@ -522,8 +571,9 @@ router.get("/proxy", async (req, res) => {
         }
 
         const targetUrl = url;
-        // ✅ URL Validation: Allow tiktokcdn, muscdn, douyin, AND tikwm
-        if (!targetUrl || !targetUrl.match(/(tiktokcdn\.com|muscdn\.com|douyin|tikwm\.com|facebook\.com|fbcdn\.net)/)) {
+        // ✅ URL Validation: Allow tiktokcdn (any variation), muscdn, douyin, tikwm, facebook, fbcdn.net, akamaized, bytevc
+        if (!targetUrl || !targetUrl.match(/(tiktokcdn|bytevc1|tikwm|douyin|muscdn|akamaized|facebook\.com|fbcdn\.net)/i)) {
+            console.warn(`⚠️ [Proxy] Forbidden Domain: ${targetUrl}`);
             return res.status(403).send("Forbidden Domain");
         }
 
@@ -537,7 +587,8 @@ router.get("/proxy", async (req, res) => {
             responseType: 'stream',
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://www.tiktok.com/'
+                'Referer': 'https://www.tiktok.com/',
+                'Accept': '*/*'
             }
         });
 

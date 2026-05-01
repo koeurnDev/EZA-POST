@@ -10,9 +10,11 @@ const upload = multer({ dest: 'uploads/' });
 
 const { spawn } = require('child_process');
 
+const { requireAuth } = require('../../utils/auth');
+
 // @route   POST /api/tools/document-converter/convert
 // @desc    Convert document to PDF using Local Microsoft Office
-router.post('/convert', upload.single('file'), async (req, res) => {
+router.post('/convert', requireAuth, upload.single('file'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ success: false, error: 'No file uploaded' });
     }

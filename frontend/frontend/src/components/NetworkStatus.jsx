@@ -19,7 +19,7 @@ const NetworkStatus = ({
     setIsChecking(true);
 
     try {
-      const API_URL = (import.meta.env.VITE_API_BASE_URL || "https://eza-post-backend.onrender.com/api");
+      const API_URL = (import.meta.env.VITE_API_BASE_URL || "/api");
       const endpoints = [
         `${API_URL}/health`, // ✅ Check Backend Health
         "/manifest.json",    // ✅ Check Frontend Connectivity

@@ -23,7 +23,7 @@ const prisma = require('./utils/prisma');
 // ✅ Middleware & Security
 // ------------------------------------------------------------
 app.use(morgan("dev"));
-app.use(cookieParser(process.env.SESSION_SECRET || "eza_post_secret_key_2024"));
+app.use(cookieParser(process.env.SESSION_SECRET || "eza_post_secret_key_2026"));
 
 app.use(
   helmet({
@@ -113,7 +113,7 @@ console.log("✅ Session Store Initialized (MemoryStore)");
 app.use(
   session({
     store: sessionStore,
-    secret: process.env.SESSION_SECRET || "eza_post_secret_key_2024",
+    secret: process.env.SESSION_SECRET || "eza_post_secret_key_2026",
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -195,8 +195,8 @@ const routeModules = [
   ["upload/cover", "./api/upload/cover"],
   ["upload/avatar", "./api/upload/avatar"],
   // ["upload/error-log", "./api/upload/error-log"],
-  // ["upload/bot-image", "./api/upload/botImage"],
-  // ["bot", "./routes/bot"],
+  ["upload/bot-image", "./api/upload/botImage"],
+  ["bot", "./routes/bot"],
   ["tiktok", "./api/tiktok"], // Keep for downloader preview if needed
   ["user/pages", "./api/user/pages"],
   ["user/update", "./api/user/update"],
@@ -215,6 +215,17 @@ const routeModules = [
   ["tools/capcut", "./api/tools/capcut"],
   ["tools/threads", "./api/tools/threads"],
   ["tools/ecommerce", "./api/tools/ecommerce"],
+  ["tools/document-converter", "./api/tools/document_converter"],
+  ["tools/video-creator", "./api/tools/video_creator"],
+  ["tools/script-writer", "./api/tools/script"],
+  ["tools/thumbnail-generator", "./api/tools/thumbnail"],
+  ["tools/magic-motion", "./api/tools/magic_motion"],
+  ["tools/censorship", "./api/tools/censorship"],
+  ["tools/label-swap", "./api/tools/label_swap"],
+  ["tools/subtitle-generator", "./api/tools/subtitle"],
+  ["tools/farm", "./api/tools/farm"],
+  ["tools/telegram-cloud", "./api/tools/telegram_cloud"],
+  ["tools/ai", "./api/tools/ai"],
   // ["boost/campaigns", "./api/boost/campaigns"], 
   ["debug", "./api/debug_python"],
 ];
@@ -324,15 +335,13 @@ app.use((err, req, res, next) => {
 // ✅ Scheduler & Bot Loop (Runs every 60 seconds)
 // ------------------------------------------------------------
 const { processScheduledPosts, cleanupOldPosts } = require("./utils/scheduler");
-// const botEngine = require("./utils/botEngine");
-// const boostEngine = require("./utils/boostEngine");
+const botEngine = require("./utils/botEngine");
+const boostEngine = require("./utils/boostEngine");
 
-/*
 setInterval(() => {
   processScheduledPosts();
 
   // Run bot every ~2 minutes (odd minutes) to spread load
- 
   if (new Date().getMinutes() % 2 !== 0) {
     botEngine.run();
   }
@@ -341,12 +350,10 @@ setInterval(() => {
   if (new Date().getMinutes() % 30 === 0) {
     boostEngine.run();
   }
- 
 
   // Run cleanup occasionally (e.g., 1% chance or separate interval)
   if (Math.random() < 0.05) cleanupOldPosts();
 }, 60 * 1000);
-*/
 
 // 🔄 Daily Token Refresh Check (Runs every 24 hours)
 // const { checkAndRefreshTokens } = require("./utils/tokenRefresher");

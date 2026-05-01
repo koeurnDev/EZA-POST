@@ -4,7 +4,7 @@ import { Search, Download, CheckCircle, X, Loader2, Image as ImageIcon, Video, A
 import toast from "react-hot-toast";
 import api from "../../utils/api";
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.MODE === 'development' ? "http://localhost:5000" : "https://eza-post-backend.onrender.com")).replace(/\/api$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
 
 const getProxyUrl = (url, filename) => {
     return `${API_BASE}/api/tools/threads/proxy?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;

@@ -115,18 +115,18 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
             <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
               🛡️
             </div>
-            <h3 className="text-xl font-bold text-gray-900">Two-Factor Authentication</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Two-Factor Authentication</h3>
             <p className="text-sm text-gray-500">Enter the code from your authenticator app.</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Authentication Code</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Authentication Code</label>
             <input
               type="text"
               value={twoFactorCode}
               onChange={(e) => setTwoFactorCode(e.target.value)}
               placeholder="123456"
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg outline-none text-center text-2xl tracking-widest focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg outline-none text-center text-2xl tracking-widest focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-900 dark:text-white"
               autoFocus
             />
           </div>
@@ -147,7 +147,7 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
         <>
           {/* Email Input */}
           <div>
-            <label htmlFor={emailId} className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor={emailId} className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">
               Email Address
             </label>
             <input
@@ -159,15 +159,15 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
               placeholder="you@example.com"
               autoComplete="email"
               disabled={loading}
-              className={`w-full px-4 py-3 bg-white border rounded-lg outline-none text-slate-900 placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 ${errors.email ? "border-red-500 focus:border-red-500" : "border-slate-200 focus:border-blue-500"
-                } ${loading ? "bg-slate-100 cursor-not-allowed" : ""}`}
+              className={`w-full px-4 py-3 bg-white dark:bg-zinc-900 border rounded-lg outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 ${errors.email ? "border-red-500 focus:border-red-500" : "border-slate-200 dark:border-zinc-800 focus:border-blue-500"
+                } ${loading ? "bg-slate-100 dark:bg-zinc-800 cursor-not-allowed" : ""}`}
             />
             {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
           </div>
 
           {/* Password Input */}
           <div>
-            <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">
               Password
             </label>
             <div className="relative">
@@ -180,8 +180,8 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
                 placeholder="••••••••"
                 autoComplete="current-password"
                 disabled={loading}
-                className={`w-full px-4 py-3 bg-white border rounded-lg outline-none text-slate-900 placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 pr-12 ${errors.password ? "border-red-500 focus:border-red-500" : "border-slate-200 focus:border-blue-500"
-                  } ${loading ? "bg-slate-100 cursor-not-allowed" : ""}`}
+                className={`w-full px-4 py-3 bg-white dark:bg-zinc-900 border rounded-lg outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 pr-12 ${errors.password ? "border-red-500 focus:border-red-500" : "border-slate-200 dark:border-zinc-800 focus:border-blue-500"
+                  } ${loading ? "bg-slate-100 dark:bg-zinc-800 cursor-not-allowed" : ""}`}
               />
               <button
                 type="button"

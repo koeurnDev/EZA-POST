@@ -29,7 +29,7 @@ router.get('/', requireAuth, async (req, res) => {
         // For now, I will assume it DOES need userId and I will add it to Schema.
         // But first let's see the file.
         const configs = await prisma.platformConfig.findMany({
-            where: { userId: userId }
+            where: { userId: req.user.id }
         });
 
         const connections = {

@@ -18,9 +18,9 @@ exports.processScheduledPosts = async () => {
     const posts = await prisma.scheduledPost.findMany({
       where: {
         status: "scheduled",
-        schedule_time: { lte: new Date() },
+        scheduleTime: { lte: new Date() },
       },
-      orderBy: { schedule_time: 'asc' },
+      orderBy: { scheduleTime: 'asc' },
       take: 5
     });
 
@@ -47,28 +47,28 @@ async function processSinglePost(post) {
     });
 
     // 📥 Handle Video Source
-    let videoInput = post.video_url;
+    let videoInput = post.videoUrl;
 
     // If it's a local file (legacy support or fallback), read it
-    if (post.video_url.startsWith("/uploads")) {
+    if (post.videoUrl.startsWith("/uploads")) {
       const fs = require('fs');
       const path = require('path');
-      const filePath = path.join(__dirname, "..", post.video_url);
+      const filePath = path.join(__dirname, "..", post.videoUrl);
       if (fs.existsSync(filePath)) {
         videoInput = fs.readFileSync(filePath);
-        console.log(`📂 Loaded local video: ${post.video_url}`);
+        console.log(`📂 Loaded local video: ${post.videoUrl}`);
       } else {
         // If file missing, maybe it's a full URL?
-        console.warn(`⚠️ Local file not found: ${post.video_url}. Trying as URL...`);
+        console.warn(`⚠️ Local file not found: ${post.videoUrl}. Trying as URL...`);
       }
-    } else if (!post.video_url.startsWith("http")) {
-      console.log(`ℹ️ Using video URL: ${post.video_url}`);
+    } else if (!post.videoUrl.startsWith("http")) {
+      console.log(`ℹ️ Using video URL: ${post.videoUrl}`);
     }
 
     // ✅ Fix: Use user_id from the post record (Prisma model)
-    const user = await prisma.user.findFirst({ where: { id: post.user_id } });
+    const user = await prisma.user.findFirst({ where: { id: post.userId } });
 
-    if (!user) throw new Error(`User not found (ID: ${post.user_id})`);
+    if (!user) throw new Error(`User not found (ID: ${post.userId})`);
 
     // Check Page Settings
     const accountId = post.accounts[0]; // Assuming array of strings (legacy Mongoose pattern saved as array)
@@ -114,7 +114,7 @@ async function processSinglePost(post) {
       where: { id: post.id },
       data: {
         status: "completed",
-        posted_at: new Date(),
+        postedAt: new Date(),
         publishedIds: publishedIds // Prisma handles JSON if mapped correctly in schema or passed as object
       }
     });
@@ -122,14 +122,14 @@ async function processSinglePost(post) {
     console.log(`✅ Published post ${post.id}`);
 
     // 🏷️ Soft Delete Cloudinary Assets (1-Day Delay)
-    if (post.video_url && post.video_url.includes("cloudinary.com")) {
+    if (post.videoUrl && post.videoUrl.includes("cloudinary.com")) {
       try {
-        const matches = post.video_url.match(/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+        const matches = post.videoUrl.match(/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
         if (matches && matches[1]) {
           await softDeleteAsset(matches[1]);
         }
       } catch (e) {
-        console.warn("Could not extract publicId for soft delete:", post.video_url);
+        console.warn("Could not extract publicId for soft delete:", post.videoUrl);
       }
     }
 
@@ -181,14 +181,14 @@ exports.cleanupOldPosts = async () => {
         };
 
         // Delete Video
-        if (post.video_url) {
-          const publicId = getPublicId(post.video_url);
+        if (post.videoUrl) {
+          const publicId = getPublicId(post.videoUrl);
           if (publicId) await deleteFile(publicId, "video");
         }
 
         // Delete Thumbnail
-        if (post.thumbnail_url) {
-          const publicId = getPublicId(post.thumbnail_url);
+        if (post.thumbnailUrl) {
+          const publicId = getPublicId(post.thumbnailUrl);
           if (publicId) await deleteFile(publicId, "image");
         }
       }
@@ -207,7 +207,7 @@ exports.cleanupOldPosts = async () => {
     const expiredResult = await prisma.scheduledPost.updateMany({
       where: {
         status: "scheduled",
-        schedule_time: { lt: twoDaysAgo },
+        scheduleTime: { lt: twoDaysAgo },
       },
       data: { status: "expired" },
     });

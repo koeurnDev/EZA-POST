@@ -6,15 +6,23 @@ import api, { API_CONFIG } from "../../utils/api";
 
 // 🛠️ Helper for clean API URLs
 // 🛠️ Helper for clean API URLs
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.MODE === 'development' ? "http://localhost:5000" : "https://eza-post-backend.onrender.com")).replace(/\/api$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
+
+const safeEncode = (str) => {
+    try {
+        return encodeURIComponent(str);
+    } catch {
+        return encodeURIComponent(String(str).replace(/[\uD800-\uDFFF]/g, ''));
+    }
+};
 
 // 🛡️ Robust Proxy Helper
 const getProxyUrl = (url, options = {}) => {
     if (!url) return "";
     const { filename = "file", type = "" } = options;
-    let proxyUrl = `${API_BASE}/api/tools/tiktok/proxy?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
-    if (type) proxyUrl += `&type=${encodeURIComponent(type)}`;
-    if (options.web_url) proxyUrl += `&web_url=${encodeURIComponent(options.web_url)}`;
+    let proxyUrl = `${API_BASE}/api/tools/tiktok/proxy?url=${safeEncode(url)}&filename=${safeEncode(filename)}`;
+    if (type) proxyUrl += `&type=${safeEncode(type)}`;
+    if (options.web_url) proxyUrl += `&web_url=${safeEncode(options.web_url)}`;
     return proxyUrl;
 };
 
@@ -373,7 +381,7 @@ export default function TikTokDownloader() {
                                                 <div className="aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden relative group bg-gray-100 dark:bg-gray-900 border border-white/10 shadow-lg">
                                                     <img src={videoData.images?.[0] || videoData.cover} alt="cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                                     <div className="absolute top-2 left-2 right-2 md:top-3 md:left-3 md:right-auto px-1.5 py-0.5 md:px-3 md:py-1 bg-amber-500/90 backdrop-blur-md rounded md:rounded-lg text-black text-[8px] md:text-[10px] font-black border border-amber-400/50 shadow-xl tracking-tighter flex items-center justify-center md:justify-start gap-1">
-                                                        {videoData.type === 'slideshow' ? <><Layers size={10} /> {videoData.images.length}</> : "PHOTO"}
+                                                        {videoData.type === 'slideshow' || (videoData.images && videoData.images.length > 0) ? <><Layers size={10} /> {videoData.images.length} PHOTOS (LIVE)</> : "LIVE PHOTO"}
                                                     </div>
                                                 </div>
                                             ) : (
@@ -388,8 +396,16 @@ export default function TikTokDownloader() {
                                                         playsInline
                                                     />
                                                     <div className="absolute top-2 left-2 right-2 md:top-3 md:left-3 md:right-auto px-1.5 py-0.5 md:px-3 md:py-1 bg-sky-500/90 backdrop-blur-md rounded md:rounded-lg text-white text-[8px] md:text-[10px] font-black border border-sky-400/50 shadow-xl tracking-tighter text-center md:text-left">
-                                                        MP4
+                                                        NORMAL VIDEO (MP4)
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            {/* H.265 Codec Warning */}
+                                            {videoData.type === 'video' && (
+                                                <div className="mt-2 text-center text-[10px] md:text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 p-2 rounded-lg border border-amber-200 dark:border-amber-800">
+                                                    ⚠️ បើវីដេអូលោតពណ៌ខ្មៅ (ឭតែសំឡេង) មកពី Browser អត់ស្គាល់កូដិក <strong>H.265</strong>។<br />
+                                                    សូមទាញយកធម្មតា វាអត់ខូចទេ (អាចមើលក្នុង VLC ឯកសារដើម)។
                                                 </div>
                                             )}
                                         </div>
@@ -405,9 +421,9 @@ export default function TikTokDownloader() {
 
                                                 <div className="flex flex-wrap gap-1.5 md:gap-2 items-center">
                                                     {[
-                                                        (videoData.type === 'slideshow' || videoData.type === 'photo') ? 'រូប គុណភាពដើម 100%' : 'Video គុណភាពដើម 100%',
-                                                        'Ultra Clear (ច្បាស់)',
-                                                        'No Watermark (គ្មាន)'
+                                                        (videoData.type === 'slideshow' || videoData.type === 'photo' || (videoData.images && videoData.images.length > 0)) ? 'Live Photo (រូបសន្លឹក)' : 'Normal Video (វីដេអូធម្មតា)',
+                                                        'គុណភាពដើម (Original Quality)',
+                                                        'No Watermark (គ្មានឡូហ្កូ)'
                                                     ].map(tag => (
                                                         <span key={tag} className="px-2 py-0.5 md:px-3 md:py-1 rounded-lg bg-white/40 dark:bg-white/5 backdrop-blur-md text-gray-700 dark:text-gray-300 text-[9px] md:text-xs font-semibold border border-white/20 whitespace-nowrap">
                                                             {tag}
@@ -527,22 +543,68 @@ export default function TikTokDownloader() {
                                                     </>
                                                 ) : (
                                                     videoData.no_watermark_url ? (
-                                                        <button
-                                                            onClick={() => {
-                                                                const rawTitle = videoData.title || videoData.desc || videoData.id || "tiktok_video";
-                                                                const title = String(rawTitle);
-                                                                const safeFilename = title.replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50);
-                                                                const videoId = videoData.id || `video_${Date.now()}`;
-                                                                const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${encodeURIComponent(videoData.no_watermark_url)}&filename=${encodeURIComponent(safeFilename + '.mp4')}`;
-                                                                triggerDownload(downloadUrl, `${safeFilename}.mp4`);
-                                                            }}
-                                                            className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20"
-                                                        >
-                                                            <>
-                                                                <Video size={20} />
-                                                                <span>Download Full Video <span className="hidden md:inline">(HD - MP4)</span></span>
-                                                            </>
-                                                        </button>
+                                                        <div className="flex flex-col gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    const rawTitle = videoData.title || videoData.desc || videoData.id || "tiktok_video";
+                                                                    const title = String(rawTitle);
+                                                                    const safeFilename = title.replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50);
+                                                                    const videoId = videoData.id || `video_${Date.now()}`;
+                                                                    const targetUrl = videoData.no_watermark_url;
+                                                                    if (!targetUrl) {
+                                                                        toast.error("Video URL is missing. Cannot download.");
+                                                                        return;
+                                                                    }
+                                                                    try {
+                                                                        const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${safeEncode(targetUrl)}&filename=${safeEncode(safeFilename + '.mp4')}`;
+                                                                        triggerDownload(downloadUrl, `${safeFilename}.mp4`);
+                                                                    } catch (err) {
+                                                                        toast.error("Invalid Video URL format.");
+                                                                    }
+                                                                }}
+                                                                className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20"
+                                                            >
+                                                                <>
+                                                                    <Video size={20} />
+                                                                    <span>Download Full Video <span className="hidden md:inline">(HD - MP4)</span></span>
+                                                                </>
+                                                            </button>
+
+                                                            <button
+                                                                onClick={async () => {
+                                                                    const tId = toast.loading("កំពុងបម្លែងវីដេអូទៅជា H.264 (សូមរង់ចាំ)...");
+                                                                    try {
+                                                                        let extractUrl = videoData.web_url || url;
+
+                                                                        // If we don't have a direct URL but we have author and ID (e.g., from Profile view)
+                                                                        if (!extractUrl && videoData.author?.unique_id && videoData.id) {
+                                                                            extractUrl = `https://www.tiktok.com/@${videoData.author.unique_id}/video/${videoData.id}`;
+                                                                        }
+                                                                        // Last resort construct
+                                                                        if (!extractUrl && videoData.id) {
+                                                                            extractUrl = `https://www.tiktok.com/@user/video/${videoData.id}`;
+                                                                        }
+
+                                                                        const res = await api.post('/tools/tiktok/compatible', { url: extractUrl });
+                                                                        if (res.data.success && res.data.url) {
+                                                                            const rawTitle = videoData.title || videoData.desc || videoData.id || "tiktok_video";
+                                                                            const safeFilename = String(rawTitle).replace(/[^a-z0-9\u0080-\uffff]/gi, '_').slice(0, 50) + "-compatible.mp4";
+                                                                            const proxyUrl = getProxyUrl(res.data.url, { filename: safeFilename, type: 'video/mp4' });
+                                                                            triggerDownload(proxyUrl, safeFilename);
+                                                                            toast.success("ទាញយករួចរាល់ ( جاهز للتحميل )!", { id: tId });
+                                                                        } else {
+                                                                            toast.error("មិនអាចបម្លែងបាននៅពេលនេះទេ", { id: tId });
+                                                                        }
+                                                                    } catch (e) {
+                                                                        toast.error("បរាជ័យក្នុងការបម្លែងវីដេអូ", { id: tId });
+                                                                    }
+                                                                }}
+                                                                className="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20"
+                                                            >
+                                                                <Play size={20} />
+                                                                <span>Download Compatible Video <span className="hidden md:inline">(Fix Black Screen)</span></span>
+                                                            </button>
+                                                        </div>
                                                     ) : (
                                                         <div className="p-4 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-center">
                                                             <p className="text-gray-500 dark:text-gray-400 font-medium">Video Not Available for this Post</p>

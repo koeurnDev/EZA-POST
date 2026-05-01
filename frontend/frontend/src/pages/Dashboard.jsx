@@ -164,7 +164,8 @@ export default function Dashboard() {
 
       const endpoint = "/api/posts/create";
       const token = localStorage.getItem("token");
-      const response = await fetch(`${(import.meta.env.VITE_API_BASE_URL || "https://eza-post-backend.onrender.com/api").replace(/\/api$/, "")}${endpoint}`, {
+      const baseURL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
+      const response = await fetch(`${baseURL}${endpoint}`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
         body: formData

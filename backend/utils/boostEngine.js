@@ -1,13 +1,11 @@
 /**
  * ============================================================
- * 🚀 Boost Engine - Auto-Boost Posts Core Logic
+ * 🚀 Boost Engine - Auto-Boost Posts Core Logic (Prisma Version)
  * ============================================================
  * Evaluates boost rules and triggers engagement simulation
  */
 
-const BoostRule = require('../models/BoostRule');
-const BoostedPost = require('../models/BoostedPost');
-const Post = require('../models/Post');
+const prisma = require('./prisma');
 
 class BoostEngine {
     /**
@@ -18,7 +16,9 @@ class BoostEngine {
             console.log('🚀 Boost Engine: Starting evaluation...');
 
             // Get all users with enabled boost rules
-            const activeRules = await BoostRule.find({ enabled: true });
+            const activeRules = await prisma.boostRule.findMany({
+                where: { enabled: true }
+            });
 
             for (const userRule of activeRules) {
                 await this.evaluateUserPosts(userRule);
@@ -26,7 +26,7 @@ class BoostEngine {
 
             console.log('✅ Boost Engine: Evaluation complete');
         } catch (err) {
-            console.error('❌ Boost Engine error:', err);
+            console.error('❌ Boost Engine error:', err.message);
         }
     }
 
@@ -38,26 +38,35 @@ class BoostEngine {
             // Get user's posts from last 7 days that aren't already boosted
             const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-            const posts = await Post.find({
-                userId: userRule.userId,
-                createdAt: { $gte: sevenDaysAgo },
-                status: 'published'
+            const posts = await prisma.post.findMany({
+                where: {
+                    userId: userRule.userId,
+                    createdAt: { gte: sevenDaysAgo },
+                    status: 'published'
+                }
             });
 
+            if (posts.length === 0) return;
+
             // Get already boosted post IDs
-            const boostedPostIds = await BoostedPost.find({
-                userId: userRule.userId,
-                status: { $in: ['active', 'completed'] }
-            }).distinct('postId');
+            const boostedPosts = await prisma.boostedPost.findMany({
+                where: {
+                    userId: userRule.userId,
+                    status: { in: ['active', 'completed'] }
+                },
+                select: { postId: true }
+            });
+            const boostedPostIds = boostedPosts.map(bp => bp.postId);
 
             // Filter out already boosted posts
             const unboostedPosts = posts.filter(
-                p => !boostedPostIds.some(id => id.equals(p._id))
+                p => !boostedPostIds.includes(p.id)
             );
 
             // Evaluate each post against rules
             for (const post of unboostedPosts) {
-                for (const rule of userRule.rules) {
+                const rules = Array.isArray(userRule.rules) ? userRule.rules : [];
+                for (const rule of rules) {
                     if (await this.shouldBoost(post, rule)) {
                         await this.boostPost(post, userRule.userId, rule);
                         break; // Only apply first matching rule
@@ -65,7 +74,7 @@ class BoostEngine {
                 }
             }
         } catch (err) {
-            console.error('❌ Error evaluating user posts:', err);
+            console.error('❌ Error evaluating user posts:', err.message);
         }
     }
 
@@ -75,21 +84,21 @@ class BoostEngine {
     async shouldBoost(post, rule) {
         if (rule.type === 'time') {
             // Time-based: boost if post is X hours old
-            const hoursOld = (Date.now() - post.createdAt) / (1000 * 60 * 60);
-            return hoursOld >= rule.condition.hours;
+            const hoursOld = (Date.now() - new Date(post.createdAt)) / (1000 * 60 * 60);
+            return hoursOld >= (rule.condition?.hours || 0);
         }
 
         if (rule.type === 'engagement') {
             // Engagement-based: boost if engagement is below threshold
             const metrics = post.metrics || { likes: 0, comments: 0, shares: 0 };
 
-            if (rule.condition.minLikes && metrics.likes < rule.condition.minLikes) {
+            if (rule.condition?.minLikes && (metrics.likes || 0) < rule.condition.minLikes) {
                 return true;
             }
-            if (rule.condition.minComments && metrics.comments < rule.condition.minComments) {
+            if (rule.condition?.minComments && (metrics.comments || 0) < rule.condition.minComments) {
                 return true;
             }
-            if (rule.condition.minShares && metrics.shares < rule.condition.minShares) {
+            if (rule.condition?.minShares && (metrics.shares || 0) < rule.condition.minShares) {
                 return true;
             }
         }
@@ -102,69 +111,103 @@ class BoostEngine {
      */
     async boostPost(post, userId, rule) {
         try {
-            console.log(`🎯 Boosting post ${post._id} for user ${userId}`);
+            console.log(`🎯 Boosting post ${post.id} for user ${userId}`);
+
+            const actions = rule.actions || ['like'];
+            const engagement = this.calculateEngagement(rule.intensity || 'medium', actions);
 
             // Create boosted post record
-            const boostedPost = await BoostedPost.create({
-                userId,
-                postId: post._id,
-                platform: post.platform,
-                postUrl: post.url,
-                boostStarted: new Date(),
-                targetLikes: rule.action.likes || 0,
-                targetComments: rule.action.comments || 0,
-                targetShares: rule.action.shares || 0,
-                status: 'active'
+            const boostedPost = await prisma.boostedPost.create({
+                data: {
+                    userId,
+                    postId: post.id,
+                    boostStarted: new Date(),
+                    status: 'active',
+                    ruleTriggered: rule.type,
+                    realBoost: {
+                        targetLikes: engagement.likes || 0,
+                        targetComments: engagement.comments || 0,
+                        targetShares: engagement.shares || 0,
+                        enabled: false
+                    }
+                }
             });
 
             // Determine if using real boost
-            const User = require('../models/User');
-            const CreditTransaction = require('../models/CreditTransaction');
-            const BoostRule = require('../models/BoostRule');
-
-            const userRule = await BoostRule.findOne({ userId });
-            const useRealBoost = userRule?.realBoost?.enabled || false;
+            // Re-fetch userRule to get latest realBoost settings
+            const userRule = await prisma.boostRule.findFirst({ where: { userId } });
+            const useRealBoost = userRule?.realBoost && userRule.realBoost.enabled === true;
 
             if (useRealBoost) {
-                // Real boost - check credits first
-                const user = await User.findOne({ id: userId });
-                const totalActions = (rule.action.likes || 0) + (rule.action.comments || 0) + (rule.action.shares || 0);
-
-                if (!user || user.credits < totalActions) {
-                    console.log(`❌ Insufficient credits for user ${userId}. Required: ${totalActions}, Available: ${user?.credits || 0}`);
-                    boostedPost.status = 'failed';
-                    boostedPost.error = 'Insufficient credits';
-                    await boostedPost.save();
-                    return;
-                }
-
-                // Deduct credits upfront
-                user.credits -= totalActions;
-                user.totalCreditsSpent += totalActions;
-                await user.save();
-
-                // Log transaction
-                await CreditTransaction.create({
-                    userId,
-                    type: 'spend',
-                    amount: -totalActions,
-                    balance: user.credits,
-                    description: `Real boost for post ${post._id} (${totalActions} actions)`,
-                    relatedId: boostedPost._id
-                });
-
-                console.log(`💰 Deducted ${totalActions} credits from user ${userId}. New balance: ${user.credits}`);
-
-                // Perform real boost via queue
-                const boostQueue = require('./boostQueue');
-                await boostQueue.addToQueue(boostedPost);
+                await this.handleRealBoost(post, userId, boostedPost, rule, engagement);
             } else {
                 // Simulated boost
-                await this.simulateBoost(boostedPost, rule);
+                await this.simulateEngagement(post, boostedPost, engagement, actions);
             }
 
         } catch (err) {
-            console.error('❌ Error boosting post:', err);
+            console.error('❌ Error boosting post:', err.message);
+        }
+    }
+
+    /**
+     * Handle real boost with credits and queue
+     */
+    async handleRealBoost(post, userId, boostedPost, rule, engagement) {
+        try {
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            const totalActions = engagement.likes + engagement.comments + engagement.shares;
+
+            if (!user || user.credits < totalActions) {
+                console.log(`❌ Insufficient credits for user ${userId}. Required: ${totalActions}, Available: ${user?.credits || 0}`);
+                await prisma.boostedPost.update({
+                    where: { id: boostedPost.id },
+                    data: { status: 'failed' }
+                });
+                return;
+            }
+
+            // Deduct credits
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    credits: { decrement: totalActions },
+                    totalCreditsSpent: { increment: totalActions }
+                }
+            });
+
+            // Log transaction
+            await prisma.creditTransaction.create({
+                data: {
+                    userId,
+                    type: 'spend',
+                    amount: -totalActions,
+                    balance: user.credits - totalActions,
+                    description: `Real boost for post ${post.id} (${totalActions} actions)`,
+                    relatedId: boostedPost.id
+                }
+            });
+
+            // Update boostedPost with real boost settings
+            await prisma.boostedPost.update({
+                where: { id: boostedPost.id },
+                data: {
+                    realBoost: {
+                        enabled: true,
+                        targetLikes: engagement.likes,
+                        targetComments: engagement.comments,
+                        targetShares: engagement.shares
+                    }
+                }
+            });
+
+            console.log(`💰 Deducted ${totalActions} credits from user ${userId}.`);
+
+            // Perform real boost via queue
+            const boostQueue = require('./boostQueue');
+            await boostQueue.addToQueue(boostedPost);
+        } catch (err) {
+            console.error('❌ Error handling real boost:', err.message);
         }
     }
 
@@ -180,58 +223,48 @@ class BoostEngine {
 
         const amounts = baseAmounts[intensity] || baseAmounts.medium;
 
-        // Add randomness (±30%)
         return {
-            likes: Math.floor(amounts.likes * (0.7 + Math.random() * 0.6)),
-            comments: Math.floor(amounts.comments * (0.7 + Math.random() * 0.6)),
-            shares: Math.floor(amounts.shares * (0.7 + Math.random() * 0.6))
+            likes: actions.includes('like') ? Math.floor(amounts.likes * (0.7 + Math.random() * 0.6)) : 0,
+            comments: actions.includes('comment') ? Math.floor(amounts.comments * (0.7 + Math.random() * 0.6)) : 0,
+            shares: actions.includes('share') ? Math.floor(amounts.shares * (0.7 + Math.random() * 0.6)) : 0
         };
     }
 
     /**
-     * Simulate engagement gradually to appear natural
+     * Simulate engagement gradually
      */
     async simulateEngagement(post, boostedPost, engagement, actions) {
         try {
-            // Update post metrics
-            if (!post.metrics) {
-                post.metrics = { likes: 0, comments: 0, shares: 0 };
-            }
+            const metrics = post.metrics || { likes: 0, comments: 0, shares: 0 };
 
-            let likesAdded = 0;
-            let commentsAdded = 0;
-            let sharesAdded = 0;
-
-            if (actions.includes('like')) {
-                post.metrics.likes = (post.metrics.likes || 0) + engagement.likes;
-                likesAdded = engagement.likes;
-            }
-
-            if (actions.includes('comment')) {
-                post.metrics.comments = (post.metrics.comments || 0) + engagement.comments;
-                commentsAdded = engagement.comments;
-            }
-
-            if (actions.includes('share')) {
-                post.metrics.shares = (post.metrics.shares || 0) + engagement.shares;
-                sharesAdded = engagement.shares;
-            }
-
-            await post.save();
-
-            // Update boosted post metrics
-            boostedPost.metrics = {
-                likesAdded,
-                commentsAdded,
-                sharesAdded
+            const updatedMetrics = {
+                likes: (metrics.likes || 0) + (engagement.likes || 0),
+                comments: (metrics.comments || 0) + (engagement.comments || 0),
+                shares: (metrics.shares || 0) + (engagement.shares || 0)
             };
-            boostedPost.status = 'completed';
-            boostedPost.boostEnded = new Date();
-            await boostedPost.save();
 
-            console.log(`✅ Added engagement: +${likesAdded} likes, +${commentsAdded} comments, +${sharesAdded} shares`);
+            await prisma.post.update({
+                where: { id: post.id },
+                data: { metrics: updatedMetrics }
+            });
+
+            // Update boosted post
+            await prisma.boostedPost.update({
+                where: { id: boostedPost.id },
+                data: {
+                    metrics: {
+                        likesAdded: engagement.likes,
+                        commentsAdded: engagement.comments,
+                        sharesAdded: engagement.shares
+                    },
+                    status: 'completed',
+                    boostEnded: new Date()
+                }
+            });
+
+            console.log(`✅ Added engagement: +${engagement.likes} likes, +${engagement.comments} comments, +${engagement.shares} shares`);
         } catch (err) {
-            console.error('❌ Error simulating engagement:', err);
+            console.error('❌ Error simulating engagement:', err.message);
         }
     }
 }

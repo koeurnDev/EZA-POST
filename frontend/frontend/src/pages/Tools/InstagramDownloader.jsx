@@ -5,7 +5,7 @@ import api from "../../utils/api";
 import toast from "react-hot-toast";
 
 // 🛠️ Helper for clean API URLs (Consistent with TikTok Downloader)
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.MODE === 'development' ? "" : "https://eza-post-backend.onrender.com/api")).replace(/\/api$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
 
 export default function InstagramDownloader() {
     const [url, setUrl] = useState("");

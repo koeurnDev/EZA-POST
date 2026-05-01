@@ -7,7 +7,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 // ✅ Create Context
 // eslint-disable-next-line react-refresh/only-export-components
 export const ThemeContext = createContext({
-  theme: "light",
+  theme: "dark",
   toggleTheme: () => { },
   setTheme: () => { },
 });
@@ -20,9 +20,9 @@ export const ThemeProvider = ({ children }) => {
     const stored = localStorage.getItem("theme");
     if (stored) return stored;
 
-    // 🌙 Match system preference
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    return prefersDark ? "dark" : "light";
+    // 🌙 Match system preference (Default to dark if no preference)
+    const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
+    return prefersLight ? "light" : "dark";
   }, []);
 
   const [theme, setTheme] = useState(getInitialTheme);

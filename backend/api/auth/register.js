@@ -28,12 +28,14 @@ router.post("/", async (req, res) => {
   }
 
   try {
+    console.log(`[Register] Attempting to find user: ${email}`);
     // 🔍 Check if user already exists
     const existing = await prisma.user.findUnique({
       where: { email },
     });
 
     if (existing) {
+      console.log(`[Register] User already exists: ${email}`);
       return res.status(409).json({
         success: false,
         error: "User already exists. Please log in instead.",
@@ -41,10 +43,11 @@ router.post("/", async (req, res) => {
     }
 
     // 🔐 Hash password
+    console.log(`[Register] Hashing password for: ${email}`);
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 💾 Create new user in PostgreSQL
-    // Prisma handles ID generation (UUID) via @default(uuid()) in schema
+    console.log(`[Register] Creating user in DB: ${email}`);
     const newUser = await prisma.user.create({
       data: {
         email,
@@ -55,9 +58,10 @@ router.post("/", async (req, res) => {
       },
     });
 
-    console.log(`✅ Registered new user: ${email}`);
+    console.log(`✅ [Register] New user created: ${newUser.id} (${email})`);
 
     // 📧 Send Welcome Email
+    console.log(`[Register] Sending welcome email to: ${email}`);
     try {
       await sendEmail({
         to: newUser.email,
@@ -74,11 +78,13 @@ router.post("/", async (req, res) => {
             </div>
         `,
       });
+      console.log(`✅ [Register] Welcome email sent to: ${email}`);
     } catch (emailErr) {
-      console.warn("⚠️ Failed to send welcome email:", emailErr.message);
+      console.warn("⚠️ [Register] Failed to send welcome email:", emailErr.message);
     }
 
     // 🎫 Create JWT token for instant login
+    console.log(`[Register] Generating JWT for: ${email}`);
     const token = jwt.sign(
       { id: newUser.id, email: newUser.email },
       process.env.JWT_SECRET || "supersecretkey",
@@ -100,11 +106,12 @@ router.post("/", async (req, res) => {
       user: { id: newUser.id, email: newUser.email, name: newUser.name },
     });
   } catch (err) {
-    console.error("❌ Register error:", err);
+    console.error("❌ [Register] Critical Error:", err);
     return res.status(500).json({
       success: false,
       error: "Registration failed. Please try again later.",
-      details: err.message
+      details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
 });
