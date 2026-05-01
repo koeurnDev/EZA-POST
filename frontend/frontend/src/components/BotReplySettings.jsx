@@ -45,6 +45,9 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [availablePages, setAvailablePages] = useState([]);
+  const [pageSettings, setPageSettings] = useState([]);
+  const [isLoadingPages, setIsLoadingPages] = useState(false);
 
   const deferredSearch = useDeferredValue(searchTerm);
 
@@ -67,6 +70,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       const normalizedRules = (res.data.rules || []).map(r => ({ ...r, id: r._id }));
       setRules(normalizedRules);
       setIsEnabled(res.data.enabled ?? true);
+      setPageSettings(res.data.pageSettings || []);
     } catch (err) {
       console.warn("⚠️ Fetch failed:", err?.message || err);
       setRules([]);
@@ -77,6 +81,21 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
 
   useEffect(() => {
     fetchRules();
+    // Also fetch available pages to show in selection
+    const fetchPages = async () => {
+      setIsLoadingPages(true);
+      try {
+        const res = await api.get("/user/pages");
+        if (res.data.success) {
+          setAvailablePages(res.data.accounts || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch pages", err);
+      } finally {
+        setIsLoadingPages(false);
+      }
+    };
+    fetchPages();
   }, [fetchRules]);
 
   // ✅ Notification helper
@@ -225,6 +244,35 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     }
   }, [showNotify, isDemo]);
 
+  // ✅ Toggle Page Bot Status
+  const togglePageBot = useCallback(async (pageId, checked) => {
+    try {
+      if (isDemo) {
+        setPageSettings(prev => {
+          const newSettings = [...prev];
+          const idx = newSettings.findIndex(s => s.pageId === pageId);
+          if (idx > -1) newSettings[idx].enableBot = checked;
+          else newSettings.push({ pageId, enableBot: checked });
+          return newSettings;
+        });
+        showNotify(`Bot ${checked ? "enabled" : "disabled"} for this page`);
+        return;
+      }
+
+      await botAPI.updatePageSettings(pageId, checked);
+      setPageSettings(prev => {
+        const newSettings = [...prev];
+        const idx = newSettings.findIndex(s => s.pageId === pageId);
+        if (idx > -1) newSettings[idx].enableBot = checked;
+        else newSettings.push({ pageId, enableBot: checked });
+        return newSettings;
+      });
+      showNotify(`Bot ${checked ? "enabled" : "disabled"} for this page`);
+    } catch (err) {
+      showNotify("Failed to update page bot status", "error");
+    }
+  }, [showNotify, isDemo]);
+
   // ✅ Generate AI Suggestions
   const generateAISuggestions = async () => {
     setGenerating(true);
@@ -345,6 +393,70 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           />
           <div className="w-16 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-green-500"></div>
         </label>
+      </div>
+
+      {/* 1.5️⃣ Middle Panel: Page-Specific Status */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <Filter size={20} className="text-blue-500" />
+          Bot Target Pages
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+          Choose which pages the bot should actively monitor and reply to comments on.
+        </p>
+
+        {isLoadingPages ? (
+          <div className="flex items-center gap-2 text-sm text-gray-400 animate-pulse">
+            <Loader size={16} className="animate-spin" />
+            Loading pages...
+          </div>
+        ) : availablePages.length === 0 ? (
+          <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl text-center text-sm text-gray-500 border border-dashed border-gray-200 dark:border-gray-700">
+            No pages connected. Please connect Facebook pages in Settings.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {availablePages.map((page) => {
+              const settings = pageSettings.find(s => s.pageId === page.id);
+              const isPageBotEnabled = settings?.enableBot ?? false;
+
+              return (
+                <div
+                  key={page.id}
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isPageBotEnabled
+                    ? "bg-blue-50/50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800/50"
+                    : "bg-gray-50/50 border-gray-100 dark:bg-gray-900/20 dark:border-gray-700"
+                    }`}
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <img
+                      src={page.picture || `https://ui-avatars.com/api/?name=${page.name}&background=random`}
+                      alt={page.name}
+                      className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+                    />
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                        {page.name}
+                      </p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate opacity-60">
+                        {page.id}
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer scale-75">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={isPageBotEnabled}
+                      onChange={(e) => togglePageBot(page.id, e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"></div>
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* 2️⃣ Add New Rule Section */}

@@ -35,10 +35,16 @@ router.get("/rules", requireAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
     const status = await prisma.botStatus.findFirst();
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { pageSettings: true }
+    });
+
     res.json({
       success: true,
       rules,
       enabled: status?.enabled ?? true,
+      pageSettings: user?.pageSettings || []
     });
   } catch (err) {
     console.error("❌ GET /rules error:", err.message);
@@ -47,6 +53,37 @@ router.get("/rules", requireAuth, async (req, res) => {
       message: "Server error",
       error: err.message
     });
+  }
+});
+
+// ✅ Update bot settings for a specific page
+router.put("/page-settings", requireAuth, async (req, res) => {
+  const { pageId, enabled } = req.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    let pageSettings = user.pageSettings;
+
+    // Ensure it's an array
+    if (!pageSettings || !Array.isArray(pageSettings)) {
+      pageSettings = [];
+    }
+
+    const existingIdx = pageSettings.findIndex(s => s.pageId === pageId);
+    if (existingIdx > -1) {
+      pageSettings[existingIdx].enableBot = enabled;
+    } else {
+      pageSettings.push({ pageId, enableBot: enabled });
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { pageSettings }
+    });
+
+    res.json({ success: true, message: "Page bot settings updated" });
+  } catch (err) {
+    console.error("❌ PUT /page-settings error:", err.message);
+    res.status(500).json({ success: false, message: "Failed to update page bot settings" });
   }
 });
 
