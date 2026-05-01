@@ -144,9 +144,9 @@ const csrfProtection = csrf({
   }
 });
 
-// ✅ Apply CSRF globally but exempt Webhooks
+// ✅ Apply CSRF globally but exempt Webhooks and Uploads
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/webhooks')) return next();
+  if (req.path.startsWith('/api/webhooks') || req.path.startsWith('/api/upload')) return next();
   csrfProtection(req, res, next);
 });
 
@@ -186,12 +186,12 @@ app.use("/api/auth", require("./api/auth"));
 // ------------------------------------------------------------
 // ✅ Enable Download Tools Only (Non-essential routes commented out for now)
 const routeModules = [
-  // ["posts", "./routes/postRoutes"],
-  // ["posts/bulk", "./api/posts/bulk"],
-  // ["posts/schedule", "./api/posts/schedule"],
-  // ["posts/queue", "./api/posts/queue"],
-  // ["upload/video", "./api/upload/videoUpload"],
-  // ["upload/thumbnail", "./api/upload/uploadThumbnail"],
+  ["posts", "./routes/postRoutes"],
+  ["posts/bulk", "./api/posts/bulk"],
+  ["posts/schedule", "./api/posts/schedule"],
+  ["posts/queue", "./api/posts/queue"],
+  ["upload/video", "./api/upload/videoUpload"],
+  ["upload/thumbnail", "./api/upload/uploadThumbnail"],
   ["upload/cover", "./api/upload/cover"],
   ["upload/avatar", "./api/upload/avatar"],
   // ["upload/error-log", "./api/upload/error-log"],

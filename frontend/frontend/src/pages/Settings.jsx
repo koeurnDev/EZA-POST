@@ -53,18 +53,14 @@ export default function Settings() {
         }
     }, []);
 
-    const fetchPages = async () => {
+    const fetchPages = async (showToast = false) => {
         setIsLoadingPages(true);
         setPageError(null);
         try {
-            // 🔄 Retry up to 3 times for network errors
             const res = await apiUtils.retryRequest(() => apiUtils.getUserPages());
 
             if (res.data.success) {
                 setPages(res.data.accounts);
-                if (res.data.accounts.length > 0) {
-                    toast.success("Pages synced successfully!");
-                }
             } else {
                 throw new Error("Failed to load pages.");
             }
@@ -72,8 +68,6 @@ export default function Settings() {
             apiUtils.logError("Settings.fetchPages", err);
             const message = apiUtils.getUserErrorMessage(err);
             setPageError(message);
-
-            // Only show toast if it's not a persistent UI error (avoid double noise)
             if (!apiUtils.isAuthError(err)) {
                 toast.error(message);
             }
@@ -193,7 +187,7 @@ export default function Settings() {
                                             {pages.length}
                                         </span>
                                     </h3>
-                                    <button onClick={fetchPages} className="p-2 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                    <button onClick={() => fetchPages(true)} className="p-2 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
                                         <RefreshCw size={18} />
                                     </button>
                                 </div>
