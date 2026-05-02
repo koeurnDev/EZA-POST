@@ -12,10 +12,13 @@ import {
     LogOut, Moon, Sun, Bell, CheckCircle2, RefreshCw, 
     ExternalLink, AlertCircle, Settings as SettingsIcon, 
     MessageSquare, Calendar, Radio, Shield, Fingerprint, 
-    Zap, Lock, Cpu, Globe, Cloud, ShieldCheck, ChevronRight,
-    Activity
+    Zap, Lock, Cpu, Globe, Cloud, ShieldCheck, ChevronRight
 } from "lucide-react";
+import { Activity, RefreshCw } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
+
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
 import apiUtils from "../utils/apiUtils";
 import toast from "react-hot-toast";
 import EmptyState from "../components/ui/EmptyState";
@@ -132,7 +135,7 @@ export default function Settings() {
                 </div>
 
                 {!user?.facebookId ? (
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="relative group overflow-hidden bg-white/40 dark:bg-black/40 backdrop-blur-3xl border border-white/20 dark:border-white/5 rounded-[3rem] p-16 text-center shadow-2xl"
@@ -155,13 +158,13 @@ export default function Settings() {
                         </div>
                         {/* Decorative glow */}
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-blue-500/5 blur-[120px] pointer-events-none rounded-full" />
-                    </motion.div>
+                    </MotionDiv>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                         {/* 👈 Left Column: Identities & Page Management */}
                         <div className="lg:col-span-8 space-y-8">
                             {/* Connected Identity Card */}
-                            <motion.div 
+                            <MotionDiv 
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/20 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl"
@@ -192,7 +195,7 @@ export default function Settings() {
                                 >
                                     Reconnect Protocol
                                 </Button>
-                            </motion.div>
+                            </MotionDiv>
 
                             {/* Page Orchestration List */}
                             <div className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 dark:border-white/5 overflow-hidden shadow-xl">
@@ -220,7 +223,7 @@ export default function Settings() {
                                         <EmptyState title="No Nodes Detected" description="No identity nodes found in current handshake." actionLabel="Sync Protocol" onAction={fetchPages} />
                                     ) : (
                                         pages.map((page, idx) => (
-                                            <motion.div 
+                                            <MotionDiv 
                                                 key={page.id}
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
@@ -267,9 +270,9 @@ export default function Settings() {
                                                     </div>
                                                 </div>
 
-                                                <AnimatePresence>
+                                                <MotionAnimatePresence>
                                                     {expandedPageId === page.id && (
-                                                        <motion.div
+                                                        <MotionDiv
                                                             initial={{ height: 0, opacity: 0 }}
                                                             animate={{ height: "auto", opacity: 1 }}
                                                             exit={{ height: 0, opacity: 0 }}
@@ -300,10 +303,10 @@ export default function Settings() {
                                                                     </div>
                                                                 ))}
                                                             </div>
-                                                        </motion.div>
+                                                        </MotionDiv>
                                                     )}
-                                                </AnimatePresence>
-                                            </motion.div>
+                                                </MotionAnimatePresence>
+                                            </MotionDiv>
                                         ))
                                     )}
                                 </div>
@@ -313,7 +316,7 @@ export default function Settings() {
                         {/* 👉 Right Column: Global Protocols */}
                         <div className="lg:col-span-4 space-y-8">
                             {/* Visual Appearance Protocol */}
-                            <motion.div 
+                             <MotionDiv 
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/20 dark:border-white/5 shadow-xl"
@@ -341,10 +344,10 @@ export default function Settings() {
                                         <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all shadow-md ${theme === "dark" ? "left-7" : "left-1"}`} />
                                     </button>
                                 </div>
-                            </motion.div>
+                            </MotionDiv>
 
                             {/* Security Handshakes */}
-                            <motion.div 
+                            <MotionDiv 
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: 0.1 }}
@@ -406,9 +409,9 @@ export default function Settings() {
                                     </div>
 
                                     {/* Verification UX */}
-                                    <AnimatePresence>
+                                    <MotionAnimatePresence>
                                         {isVerifying && !user?.twoFactorEnabled && qrCode && (
-                                            <motion.div 
+                                            <MotionDiv 
                                                 initial={{ height: 0, opacity: 0 }}
                                                 animate={{ height: "auto", opacity: 1 }}
                                                 className="p-6 bg-blue-600/5 rounded-3xl border border-blue-500/20 overflow-hidden"
@@ -442,14 +445,14 @@ export default function Settings() {
                                                         <CheckCircle2 size={20} />
                                                     </button>
                                                 </div>
-                                            </motion.div>
+                                            </MotionDiv>
                                         )}
-                                    </AnimatePresence>
+                                    </MotionAnimatePresence>
                                 </div>
-                            </motion.div>
+                            </MotionDiv>
 
                             {/* Autonomous Protocols (Anti-Ban) */}
-                            <motion.div 
+                            <MotionDiv 
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: 0.2 }}
@@ -492,10 +495,10 @@ export default function Settings() {
                                         </div>
                                     </div>
                                 </div>
-                            </motion.div>
+                            </MotionDiv>
 
                             {/* Backup & Cloud */}
-                            <motion.div 
+                            <MotionDiv 
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: 0.3 }}
@@ -524,10 +527,10 @@ export default function Settings() {
                                         Sync
                                     </button>
                                 </div>
-                            </motion.div>
+                            </MotionDiv>
 
                             {/* Termination */}
-                            <motion.div 
+                             <MotionDiv 
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: 0.4 }}
@@ -541,7 +544,7 @@ export default function Settings() {
                                     <LogOut size={20} />
                                     Purge Session
                                 </button>
-                            </motion.div>
+                            </MotionDiv>
                         </div>
                     </div>
                 )}

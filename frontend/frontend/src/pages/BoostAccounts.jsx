@@ -6,6 +6,9 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import Button from "../components/ui/Button";
 
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
+
 export default function BoostAccounts() {
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -130,9 +133,9 @@ export default function BoostAccounts() {
                     </Button>
                 </div>
 
-                <AnimatePresence>
+                <MotionAnimatePresence>
                     {showAddForm && (
-                        <motion.div
+                        <MotionDiv
                             initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
@@ -195,9 +198,9 @@ export default function BoostAccounts() {
                                     </div>
                                 </div>
                             </div>
-                        </motion.div>
+                        </MotionDiv>
                     )}
-                </AnimatePresence>
+                </MotionAnimatePresence>
 
                 {/* Grid View for Identities */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -209,7 +212,7 @@ export default function BoostAccounts() {
                         </div>
                     ) : (
                         accounts.map((account, i) => (
-                            <motion.div
+                            <MotionDiv
                                 key={account._id}
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
@@ -258,13 +261,13 @@ export default function BoostAccounts() {
                                         Verify Auth
                                     </button>
                                 </div>
-                            </motion.div>
+                            </MotionDiv>
                         ))
                     )}
                 </div>
 
                 {/* Footer Warning */}
-                <motion.div 
+                <MotionDiv 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.5 }}
@@ -279,7 +282,7 @@ export default function BoostAccounts() {
                             Always use burner identities. Passwords are salted and encrypted with AES-256. We do not store raw credentials in our primary databases.
                         </p>
                     </div>
-                </motion.div>
+                </MotionDiv>
             </div>
         </DashboardLayout>
     );

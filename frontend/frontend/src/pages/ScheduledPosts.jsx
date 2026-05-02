@@ -4,6 +4,9 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
 import { Link } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { PageLoader } from "../components/LoadingSpinner";
@@ -117,7 +120,7 @@ export default function ScheduledPosts() {
             <div className="max-w-7xl mx-auto px-4 py-4 md:py-8">
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                     >
@@ -128,9 +131,9 @@ export default function ScheduledPosts() {
                             Queue
                         </h1>
                         <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Manage and optimize your upcoming content schedule.</p>
-                    </motion.div>
+                    </MotionDiv>
 
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         className="flex items-center gap-3"
@@ -155,7 +158,7 @@ export default function ScheduledPosts() {
                         >
                             <Plus size={20} /> Create New
                         </Button>
-                    </motion.div>
+                    </MotionDiv>
                 </div>
 
                 {/* Queue Content */}
@@ -184,9 +187,9 @@ export default function ScheduledPosts() {
                                     </div>
 
                                     <div className={`grid ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
-                                        <AnimatePresence>
+                                        <MotionAnimatePresence>
                                             {posts.map((q, idx) => (
-                                                <motion.div
+                                                <MotionDiv
                                                     layout
                                                     key={q.id}
                                                     initial={{ opacity: 0, y: 20 }}
@@ -257,9 +260,9 @@ export default function ScheduledPosts() {
                                                             <Trash2 size={18} />
                                                         </button>
                                                     </div>
-                                                </motion.div>
+                                                </MotionDiv>
                                             ))}
-                                        </AnimatePresence>
+                                        </MotionAnimatePresence>
                                     </div>
                                 </div>
                             );

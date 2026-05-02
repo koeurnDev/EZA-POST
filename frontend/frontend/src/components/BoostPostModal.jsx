@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
 import { X, DollarSign, Calendar, Users, Target, TrendingUp, AlertCircle } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -79,9 +82,9 @@ const BoostPostModal = ({ post, onClose, onSuccess }) => {
     ];
 
     return (
-        <AnimatePresence>
+        <MotionAnimatePresence>
             <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-                <motion.div
+                <MotionDiv
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
@@ -290,9 +293,9 @@ const BoostPostModal = ({ post, onClose, onSuccess }) => {
                             )}
                         </button>
                     </div>
-                </motion.div>
+                </MotionDiv>
             </div>
-        </AnimatePresence>
+        </MotionAnimatePresence>
     );
 };
 

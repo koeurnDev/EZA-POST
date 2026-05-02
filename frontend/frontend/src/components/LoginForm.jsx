@@ -3,6 +3,9 @@ import { authAPI } from "../utils/api";
 import Button from "./ui/Button";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
+
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
 import { Mail, Lock, Eye, EyeOff, Shield, ArrowRight, AlertCircle } from "lucide-react";
 
 const LoginForm = ({ onSuccess, onForgotPassword }) => {
@@ -77,9 +80,9 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
   return (
     <div className="relative">
       <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-        <AnimatePresence mode="wait">
+        <MotionAnimatePresence mode="wait">
           {show2FA ? (
-            <motion.div 
+            <MotionDiv 
               key="2fa"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -112,9 +115,9 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
               <button type="button" onClick={() => setShow2FA(false)} className="w-full text-xs font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 uppercase tracking-widest transition-colors">
                 Back to credentials
               </button>
-            </motion.div>
+            </MotionDiv>
           ) : (
-            <motion.div 
+            <MotionDiv 
               key="login"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -178,19 +181,19 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
               <Button type="submit" className="h-14 rounded-2xl w-full shadow-xl mt-4" isLoading={loading}>
                 Access Account <ArrowRight size={18} className="ml-2" />
               </Button>
-            </motion.div>
+            </MotionDiv>
           )}
-        </AnimatePresence>
+        </MotionAnimatePresence>
 
         {errors.submit && (
-          <motion.div 
+          <MotionDiv 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-2xl text-red-600 dark:text-red-400 text-xs font-bold"
           >
             <AlertCircle size={16} />
             {errors.submit}
-          </motion.div>
+          </MotionDiv>
         )}
       </form>
     </div>

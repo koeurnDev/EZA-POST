@@ -3,6 +3,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
+
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
 import NetworkStatus from "../components/NetworkStatus";
 import {
   LayoutDashboard, Send, Layers, Clock, BarChart2, Link as LinkIcon, MessageSquare, Zap, Settings, LogOut, Sun, Moon, User, Grid, Search, Bell, MoreHorizontal, X,
@@ -118,17 +121,18 @@ const DashboardLayout = ({ children }) => {
       </header>
 
       <main className="flex-1 pt-24 pb-32 px-6 max-w-[1600px] mx-auto w-full">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }} className="relative z-10">
+        <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }} className="relative z-10">
           {children}
-        </motion.div>
-      </main>      {/* 🚀 FLOATING COMMAND DOCK */}
+        </MotionDiv>
+      </main>
+      {/* 🚀 FLOATING COMMAND DOCK */}
       <div className="fixed bottom-6 md:bottom-10 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
         <div className="relative pointer-events-auto flex justify-center w-full max-w-full">
 
           {/* More Menu Popover */}
-          <AnimatePresence>
+          <MotionAnimatePresence>
             {isMoreMenuOpen && (
-              <motion.div
+              <MotionDiv
                 initial={{ opacity: 0, y: 50, scale: 0.95, x: "-50%" }}
                 animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
                 exit={{ opacity: 0, y: 50, scale: 0.95, x: "-50%" }}
@@ -178,9 +182,9 @@ const DashboardLayout = ({ children }) => {
                     <LogOut size={14} /> Sign Out
                   </button>
                 </div>
-              </motion.div>
+              </MotionDiv>
             )}
-          </AnimatePresence>
+          </MotionAnimatePresence>
 
           {/* Main Dock Bar - Scrollable on Mobile */}
           <nav className={`
@@ -201,7 +205,7 @@ const DashboardLayout = ({ children }) => {
                       {item.label}
                       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45 border-r border-b border-white/10"></div>
                     </div>
-                    {isActive && <motion.div layoutId="active-nav" className="absolute -bottom-1 w-1 h-1 bg-white rounded-full" />}
+                    {isActive && <MotionDiv layoutId="active-nav" className="absolute -bottom-1 w-1 h-1 bg-white rounded-full" />}
                   </Link>
                 );
               })}

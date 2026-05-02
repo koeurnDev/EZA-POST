@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import toast from "react-hot-toast";
 import { authAPI } from "../utils/api";
 import Button from "./ui/Button";
-import { motion } from "framer-motion";
 import { User, Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle2 } from "lucide-react";
 
 const RegisterForm = ({ onSuccess }) => {

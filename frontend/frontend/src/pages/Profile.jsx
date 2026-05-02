@@ -15,6 +15,11 @@ import {
 import EditProfileModal from "../components/EditProfileModal";
 import Button from "../components/ui/Button";
 
+const MotionDiv = motion.div;
+const MotionH1 = motion.h1;
+const MotionP = motion.p;
+const MotionAnimatePresence = AnimatePresence;
+
 export default function Profile() {
     const { user, updateUser, loading } = useAuth();
     const [isDemo, setIsDemo] = useState(false);
@@ -109,7 +114,7 @@ export default function Profile() {
                 {/* Hero Section */}
                 <div className="relative mb-32">
                     {/* Cover Photo */}
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="h-48 md:h-80 w-full rounded-[2.5rem] bg-gray-200 dark:bg-gray-800 overflow-hidden relative group shadow-2xl"
@@ -125,11 +130,11 @@ export default function Profile() {
                             <Camera size={20} />
                             <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'cover')} />
                         </label>
-                    </motion.div>
+                    </MotionDiv>
 
                     {/* Profile Overlay */}
                     <div className="absolute -bottom-16 left-8 md:left-12 flex items-end gap-6 md:gap-8">
-                        <motion.div 
+                        <MotionDiv 
                             initial={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             className="relative group"
@@ -145,25 +150,25 @@ export default function Profile() {
                                     <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'avatar')} />
                                 </label>
                             </div>
-                        </motion.div>
-
+                        </MotionDiv>
+ 
                         <div className="mb-4">
-                            <motion.h1 
+                            <MotionH1 
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 className="text-2xl md:text-4xl font-black text-gray-900 dark:text-white flex items-center gap-3 tracking-tight"
                             >
                                 {user?.name}
                                 {isDemo && <span className="px-3 py-1 text-[10px] bg-amber-500 text-white rounded-full font-black">DEMO</span>}
-                            </motion.h1>
-                            <motion.p 
+                            </MotionH1>
+                            <MotionP 
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: 0.1 }}
                                 className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs mt-1"
                             >
                                 {user?.role || "Power User"}
-                            </motion.p>
+                            </MotionP>
                         </div>
                     </div>
 
@@ -182,7 +187,7 @@ export default function Profile() {
                         {/* Stats Summary */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                             {stats.map((stat, idx) => (
-                                <motion.div
+                                <MotionDiv
                                     key={idx}
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
@@ -194,12 +199,12 @@ export default function Profile() {
                                     </div>
                                     <h3 className="text-3xl font-black text-gray-900 dark:text-white mb-1 tracking-tight">{stat.value}</h3>
                                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                                </motion.div>
+                                </MotionDiv>
                             ))}
                         </div>
 
                         {/* Personal Details */}
-                        <motion.div 
+                        <MotionDiv 
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.5 }}
@@ -231,12 +236,12 @@ export default function Profile() {
                                     </div>
                                 </div>
                             </div>
-                        </motion.div>
+                        </MotionDiv>
                     </div>
 
                     {/* Right Panel: Activity Feed */}
                     <div className="lg:col-span-4">
-                        <motion.div 
+                        <MotionDiv 
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.6 }}
@@ -266,7 +271,7 @@ export default function Profile() {
                             <button className="w-full mt-12 py-4 text-xs font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded-2xl transition-all flex items-center justify-center gap-2">
                                 Full Activity Logs <ChevronRight size={14} />
                             </button>
-                        </motion.div>
+                        </MotionDiv>
                     </div>
                 </div>
             </div>

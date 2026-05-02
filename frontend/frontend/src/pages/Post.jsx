@@ -8,6 +8,11 @@ import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
 import { useDropzone } from "react-dropzone";
 import { Reorder, motion, AnimatePresence } from "framer-motion";
+
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
+const MotionReorderGroup = Reorder.Group;
+const MotionReorderItem = Reorder.Item;
 import { generateThumbnailFromVideo, dataURLtoFile } from "../utils/videoUtils";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
@@ -530,9 +535,9 @@ export default function Post() {
                                     {mediaItems.length === 0 ? (
                                         <div className="h-40 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-[2rem] flex items-center justify-center text-[10px] font-black uppercase text-gray-300">Empty Stack</div>
                                     ) : (
-                                        <Reorder.Group axis="y" values={mediaItems} onReorder={setMediaItems} className="space-y-3">
+                                        <MotionReorderGroup axis="y" values={mediaItems} onReorder={setMediaItems} className="space-y-3">
                                             {mediaItems.map((item, idx) => (
-                                                <Reorder.Item key={item.id} value={item}>
+                                                <MotionReorderItem key={item.id} value={item}>
                                                     <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl cursor-grab active:cursor-grabbing">
                                                         <div className="w-12 h-12 bg-white dark:bg-gray-900 rounded-xl overflow-hidden shadow-sm">
                                                             <img src={item.preview} className="w-full h-full object-cover" />
@@ -543,9 +548,9 @@ export default function Post() {
                                                         </div>
                                                         <GripVertical size={14} className="text-gray-300" />
                                                     </div>
-                                                </Reorder.Item>
+                                                </MotionReorderItem>
                                             ))}
-                                        </Reorder.Group>
+                                        </MotionReorderGroup>
                                     )}
                                 </div>
                             </div>

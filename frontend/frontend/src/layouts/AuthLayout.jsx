@@ -1,6 +1,9 @@
 import React from "react";
 import { useTheme } from "../context/ThemeContext";
-import { motion } from "framer-motion"; // eslint-disable-line no-unused-vars
+import { motion } from "framer-motion";
+
+const MotionDiv = motion.div;
+const MotionH1 = motion.h1;
 
 const AuthLayout = ({ children, title, subtitle }) => {
   const { theme, toggleTheme } = useTheme();
@@ -11,19 +14,19 @@ const AuthLayout = ({ children, title, subtitle }) => {
         }`}
     >
       {/* 🔹 Left Section - Illustration / Branding */}
-      <motion.div
+      <MotionDiv
         initial={{ opacity: 0, x: -40 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.6 }}
         className="flex-1 hidden md:flex flex-col justify-center items-center p-12"
       >
         <div className="max-w-sm text-center">
-          <motion.h1
+          <MotionH1
             className="text-4xl font-bold mb-3 text-blue-500"
             whileHover={{ scale: 1.05 }}
           >
             EZA_POST 🚀
-          </motion.h1>
+          </MotionH1>
           <p className="text-gray-400 text-sm leading-relaxed">
             Automate your Facebook posts with ease.
             Schedule TikTok videos, connect pages, and manage content—all in one place.
@@ -36,10 +39,10 @@ const AuthLayout = ({ children, title, subtitle }) => {
             />
           </div>
         </div>
-      </motion.div>
+      </MotionDiv>
 
       {/* 🔹 Right Section - Auth Form */}
-      <motion.div
+      <MotionDiv
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -79,7 +82,7 @@ const AuthLayout = ({ children, title, subtitle }) => {
             © {new Date().getFullYear()} EZA_POST — All rights reserved.
           </div>
         </div>
-      </motion.div>
+      </MotionDiv>
     </div>
   );
 };

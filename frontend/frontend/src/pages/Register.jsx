@@ -6,6 +6,8 @@ import { getUserData } from "../utils/apiUtils";
 import RegisterForm from "../components/RegisterForm";
 import { Sparkles, ShieldCheck, Zap, Globe, Rocket } from "lucide-react";
 
+const MotionDiv = motion.div;
+
 export default function Register() {
   const navigate = useNavigate();
 
@@ -30,7 +32,7 @@ export default function Register() {
         </div>
 
         {/* Brand Header */}
-        <motion.div 
+        <MotionDiv 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="relative z-10 flex items-center gap-3 text-2xl font-black tracking-tighter cursor-pointer"
@@ -40,11 +42,11 @@ export default function Register() {
             <Zap size={20} fill="white" />
           </div>
           EZA-POST
-        </motion.div>
+        </MotionDiv>
 
         {/* Value Proposition */}
         <div className="relative z-10">
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
@@ -58,9 +60,9 @@ export default function Register() {
             <p className="text-xl text-gray-400 max-w-md leading-relaxed font-medium">
               Join the elite circle of creators using advanced automation to dominate the social landscape.
             </p>
-          </motion.div>
+          </MotionDiv>
 
-          <motion.div 
+          <MotionDiv 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
@@ -78,11 +80,11 @@ export default function Register() {
                 <span className="text-xs font-black uppercase tracking-widest text-gray-500">{item.label}</span>
               </div>
             ))}
-          </motion.div>
+          </MotionDiv>
         </div>
 
         {/* Testimonial/Trust */}
-        <motion.div 
+        <MotionDiv 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
@@ -98,7 +100,7 @@ export default function Register() {
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Digital Strategist</p>
             </div>
           </div>
-        </motion.div>
+        </MotionDiv>
       </div>
 
       {/* 📝 Right Side: Registration Hub */}
@@ -114,7 +116,7 @@ export default function Register() {
             </div>
           </div>
 
-          <motion.div 
+          <MotionDiv 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-10 text-center lg:text-left"
@@ -125,17 +127,17 @@ export default function Register() {
             <p className="text-gray-500 dark:text-gray-400 font-medium">
               Create your account and unlock the full potential of EZA-POST.
             </p>
-          </motion.div>
+          </MotionDiv>
 
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
             <RegisterForm onSuccess={handleRegisterSuccess} />
-          </motion.div>
+          </MotionDiv>
 
-          <motion.div 
+          <MotionDiv 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
@@ -150,7 +152,7 @@ export default function Register() {
                 Sign in to your account
               </button>
             </p>
-          </motion.div>
+          </MotionDiv>
         </div>
 
         {/* Ambient background for mobile */}

@@ -1,5 +1,8 @@
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion"; // eslint-disable-line no-unused-vars
+import { motion, AnimatePresence } from "framer-motion";
+
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
 import { useAuth } from "../context/AuthContext";
 
 export default function EditProfileModal({ isOpen, onClose }) {
@@ -46,11 +49,11 @@ export default function EditProfileModal({ isOpen, onClose }) {
     };
 
     return (
-        <AnimatePresence>
+        <MotionAnimatePresence>
             {isOpen && (
                 <>
                     {/* Backdrop */}
-                    <motion.div
+                    <MotionDiv
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -59,7 +62,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
                     />
 
                     {/* Modal */}
-                    <motion.div
+                    <MotionDiv
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -82,28 +85,28 @@ export default function EditProfileModal({ isOpen, onClose }) {
                             {/* Form */}
                             <form onSubmit={handleSubmit} className="p-6 space-y-4">
                                 {/* Error/Success Messages */}
-                                <AnimatePresence mode="wait">
+                                <MotionAnimatePresence mode="wait">
                                     {error && (
-                                        <motion.div
+                                        <MotionDiv
                                             initial={{ opacity: 0, height: 0 }}
                                             animate={{ opacity: 1, height: "auto" }}
                                             exit={{ opacity: 0, height: 0 }}
                                             className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-100"
                                         >
                                             {error}
-                                        </motion.div>
+                                        </MotionDiv>
                                     )}
                                     {success && (
-                                        <motion.div
+                                        <MotionDiv
                                             initial={{ opacity: 0, height: 0 }}
                                             animate={{ opacity: 1, height: "auto" }}
                                             exit={{ opacity: 0, height: 0 }}
                                             className="bg-emerald-50 text-emerald-600 text-sm p-3 rounded-lg border border-emerald-100"
                                         >
                                             {success}
-                                        </motion.div>
+                                        </MotionDiv>
                                     )}
-                                </AnimatePresence>
+                                </MotionAnimatePresence>
 
                                 {/* Name Input */}
                                 <div className="space-y-2">
@@ -171,9 +174,9 @@ export default function EditProfileModal({ isOpen, onClose }) {
                                 </div>
                             </form>
                         </div>
-                    </motion.div>
+                    </MotionDiv>
                 </>
             )}
-        </AnimatePresence>
+        </MotionAnimatePresence>
     );
 }

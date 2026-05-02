@@ -1,7 +1,11 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { ArrowRight, Zap, BarChart3, Globe, Sparkles, Shield, Rocket, Activity, ChevronRight, Play } from "lucide-react";
+import { motion } from "framer-motion";
+
+const MotionDiv = motion.div;
+const MotionH1 = motion.h1;
+const MotionP = motion.p;
 import Button from "../components/ui/Button";
 
 export default function Welcome() {
@@ -55,28 +59,28 @@ export default function Welcome() {
                     <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
                 </div>
 
-                <motion.div 
+                <MotionDiv 
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
                     className="max-w-7xl mx-auto text-center"
                 >
-                    <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/5 border border-blue-500/10 rounded-full mb-10">
+                    <MotionDiv variants={itemVariants} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/5 border border-blue-500/10 rounded-full mb-10">
                         <Sparkles size={14} className="text-blue-500" />
                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500">The 2026 Engagement Standard</span>
-                    </motion.div>
+                    </MotionDiv>
 
-                    <motion.h1 variants={itemVariants} className="text-7xl md:text-[10rem] font-black tracking-tighter leading-[0.85] mb-12 uppercase italic">
+                    <MotionH1 variants={itemVariants} className="text-7xl md:text-[10rem] font-black tracking-tighter leading-[0.85] mb-12 uppercase italic">
                         Network <br />
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">Dominance.</span>
-                    </motion.h1>
+                    </MotionH1>
 
-                    <motion.p variants={itemVariants} className="text-lg md:text-2xl text-gray-400 max-w-3xl mx-auto mb-16 font-medium leading-relaxed">
+                    <MotionP variants={itemVariants} className="text-lg md:text-2xl text-gray-400 max-w-3xl mx-auto mb-16 font-medium leading-relaxed">
                         Orchestrate your social ecosystem with high-fidelity automation, 
                         deep analytical insights, and cross-platform synchronization.
-                    </motion.p>
+                    </MotionP>
 
-                    <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                    <MotionDiv variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6">
                         <Link to="/register" className="w-full sm:w-auto">
                             <Button className="h-20 px-12 rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-2xl shadow-blue-600/30 w-full">
                                 Establish Identity <ArrowRight className="ml-3" size={20} />
@@ -86,11 +90,11 @@ export default function Welcome() {
                             <Play size={20} className="text-blue-600 fill-blue-600 group-hover:scale-110 transition-transform" /> 
                             System Demo
                         </button>
-                    </motion.div>
-                </motion.div>
+                    </MotionDiv>
+                </MotionDiv>
 
                 {/* Floating Mockup Preview */}
-                <motion.div 
+                <MotionDiv 
                     initial={{ opacity: 0, y: 100 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.8, duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
@@ -120,7 +124,7 @@ export default function Welcome() {
                             </div>
                         </div>
                     </div>
-                </motion.div>
+                </MotionDiv>
             </section>
 
             {/* 🍱 Features Section */}
@@ -140,7 +144,7 @@ export default function Welcome() {
                             { icon: Activity, label: 'Analytics', title: "Neural Insights", desc: "Gain deep algorithmic understanding of your audience behavior with real-time feedback loops.", color: 'text-blue-500', bg: 'bg-blue-500/10' },
                             { icon: Globe, label: 'Global', title: "Cross-Grid Sync", desc: "Simultaneous orchestration of TikTok, Facebook, and Instagram identities from a single core.", color: 'text-emerald-500', bg: 'bg-emerald-500/10' }
                         ].map((feature, i) => (
-                            <motion.div
+                            <MotionDiv
                                 key={i}
                                 initial={{ opacity: 0, y: 20 }}
                                 whileInView={{ opacity: 1, y: 0 }}
@@ -156,7 +160,7 @@ export default function Welcome() {
                                 <p className="text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
                                     {feature.desc}
                                 </p>
-                            </motion.div>
+                            </MotionDiv>
                         ))}
                     </div>
                 </div>
@@ -166,7 +170,7 @@ export default function Welcome() {
             <section className="py-32 px-6">
                 <div className="max-w-5xl mx-auto bg-gradient-to-br from-blue-600 to-indigo-800 rounded-[4rem] p-16 text-center text-white relative overflow-hidden shadow-2xl shadow-blue-600/40">
                     <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, scale: 0.9 }}
                         whileInView={{ opacity: 1, scale: 1 }}
                         className="relative z-10"
@@ -178,7 +182,7 @@ export default function Welcome() {
                                 Initialize Account
                             </Button>
                         </Link>
-                    </motion.div>
+                    </MotionDiv>
                 </div>
             </section>
 

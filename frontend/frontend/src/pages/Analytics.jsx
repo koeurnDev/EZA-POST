@@ -7,8 +7,11 @@ import {
 } from "recharts";
 import { 
     TrendingUp, Users, Calendar, Clock, ArrowUp, ArrowDown, 
-    Share2, Eye, Heart, BarChart2, CheckCircle2, AlertCircle, Info, Activity, Sparkles, ChevronRight, Globe, Zap
+    Share2, Eye, Heart, BarChart2, CheckCircle2, AlertCircle, Info, Sparkles, ChevronRight, Globe, Zap
 } from "lucide-react";
+import { Activity } from "lucide-react";
+
+const MotionDiv = motion.div;
 import api from "../utils/api";
 import toast from "react-hot-toast";
 
@@ -36,7 +39,7 @@ export default function Analytics() {
     }, []);
 
     const StatCard = ({ title, value, subtext, icon: Icon, color, trend, delay = 0 }) => (
-        <motion.div 
+        <MotionDiv 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay }}
@@ -56,7 +59,7 @@ export default function Analytics() {
                 </div>
             </div>
             <div className={`absolute -right-6 -bottom-6 w-32 h-32 bg-${color}-500/5 rounded-full blur-3xl group-hover:bg-${color}-500/10 transition-colors`} />
-        </motion.div>
+        </MotionDiv>
     );
 
     if (loading) return (
@@ -129,7 +132,7 @@ export default function Analytics() {
                 {/* 📈 Charts Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
                     {/* Main Chart: Posts Activity */}
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }}
@@ -172,10 +175,10 @@ export default function Analytics() {
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
-                    </motion.div>
+                    </MotionDiv>
 
                     {/* Side Chart: Platform Distribution */}
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.6 }}
@@ -228,13 +231,13 @@ export default function Analytics() {
                                 </div>
                             ))}
                         </div>
-                    </motion.div>
+                    </MotionDiv>
                 </div>
 
                 {/* 🕑 Lower Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Recommendation Card */}
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.7 }}
@@ -254,7 +257,7 @@ export default function Analytics() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {stats?.bestTimes?.map((time, idx) => (
-                                    <motion.div 
+                                    <MotionDiv 
                                         key={idx} 
                                         whileHover={{ x: 5 }}
                                         className="flex items-center justify-between bg-white/10 backdrop-blur-2xl p-6 rounded-2xl border border-white/10 hover:bg-white/20 transition-all cursor-default"
@@ -263,15 +266,15 @@ export default function Analytics() {
                                         <span className="font-black bg-white text-blue-700 px-4 py-2 rounded-xl text-xs shadow-xl">
                                             {time.time}
                                         </span>
-                                    </motion.div>
+                                    </MotionDiv>
                                 ))}
                             </div>
                         </div>
                         <div className="absolute -top-10 -right-10 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse" />
-                    </motion.div>
+                    </MotionDiv>
 
                     {/* System Health Card */}
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.8 }}
@@ -303,7 +306,7 @@ export default function Analytics() {
                                     </div>
                                 </div>
                             ) : (
-                                <motion.div 
+                                <MotionDiv 
                                     initial={{ scale: 0.9 }}
                                     animate={{ scale: 1 }}
                                     className="flex flex-col items-center"
@@ -315,10 +318,10 @@ export default function Analytics() {
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest max-w-[200px] leading-relaxed">
                                         Your orchestration pipeline is running within peak parameters.
                                     </p>
-                                </motion.div>
+                                </MotionDiv>
                             )}
                         </div>
-                    </motion.div>
+                    </MotionDiv>
                 </div>
             </div>
         </DashboardLayout>

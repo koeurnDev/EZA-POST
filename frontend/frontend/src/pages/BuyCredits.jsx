@@ -6,6 +6,9 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import Button from "../components/ui/Button";
 
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
+
 export default function BuyCredits() {
     const [packages, setPackages] = useState([]);
     const [transactions, setTransactions] = useState([]);
@@ -87,7 +90,7 @@ export default function BuyCredits() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
                     {/* Balance Card */}
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="lg:col-span-4 bg-gradient-to-br from-gray-900 to-black rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl shadow-amber-500/5 border border-white/5 group"
@@ -112,7 +115,7 @@ export default function BuyCredits() {
                                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Live Sync</span>
                             </div>
                         </div>
-                    </motion.div>
+                    </MotionDiv>
 
                     {/* Quick Add / Featured */}
                     <div className="lg:col-span-8 space-y-6">
@@ -125,7 +128,7 @@ export default function BuyCredits() {
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {packages.map((pkg, i) => (
-                                <motion.div
+                                <MotionDiv
                                     key={pkg._id}
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
@@ -163,14 +166,14 @@ export default function BuyCredits() {
                                     >
                                         {purchasing === pkg._id ? 'Processing...' : 'Authorize Add'}
                                     </Button>
-                                </motion.div>
+                                </MotionDiv>
                             ))}
                         </div>
                     </div>
                 </div>
 
                 {/* Ledger History */}
-                <motion.div 
+                <MotionDiv 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
@@ -234,7 +237,7 @@ export default function BuyCredits() {
                             </table>
                         </div>
                     )}
-                </motion.div>
+                </MotionDiv>
             </div>
         </DashboardLayout>
     );

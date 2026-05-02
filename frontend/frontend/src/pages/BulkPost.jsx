@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
 import DashboardLayout from "../layouts/DashboardLayout";
 import { UploadCloud, Calendar, Clock, Check, X, Loader, FileVideo, AlertCircle, Trash2, Send, Filter, Settings } from "lucide-react";
 import api from "../utils/api";
@@ -146,7 +149,7 @@ export default function BulkPost() {
     return (
         <DashboardLayout>
             <div className="max-w-7xl mx-auto px-4 py-4 md:py-8">
-                <motion.div 
+                <MotionDiv 
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="mb-8"
@@ -158,7 +161,7 @@ export default function BulkPost() {
                         Bulk Upload
                     </h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-2">Upload up to 50 videos and auto-schedule them with human-like intervals.</p>
-                </motion.div>
+                </MotionDiv>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     {/* 👈 Left Panel: Controls (Col-span 4) */}
@@ -238,23 +241,23 @@ export default function BulkPost() {
                     {/* 👉 Right Panel: File List (Col-span 8) */}
                     <div className="lg:col-span-8 space-y-6">
                         {/* Drop Zone */}
-                        <motion.label 
+                        <MotionDiv 
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
                             className="block w-full border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 rounded-3xl p-10 text-center cursor-pointer transition-all"
                         >
-                            <input type="file" multiple accept="video/*" onChange={handleFileSelect} className="hidden" />
-                            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <input type="file" id="bulk-file-input" multiple accept="video/*" onChange={handleFileSelect} className="hidden" />
+                            <div onClick={() => document.getElementById('bulk-file-input').click()} className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                 <UploadCloud size={32} />
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Click to Select Videos</h3>
-                            <p className="text-gray-500 dark:text-gray-400 mt-2">MP4, MOV, WEBM (Max 50MB each)</p>
-                        </motion.label>
+                            <h3 onClick={() => document.getElementById('bulk-file-input').click()} className="text-xl font-bold text-gray-900 dark:text-white">Click to Select Videos</h3>
+                            <p onClick={() => document.getElementById('bulk-file-input').click()} className="text-gray-500 dark:text-gray-400 mt-2">MP4, MOV, WEBM (Max 50MB each)</p>
+                        </MotionDiv>
 
                         {/* File Table */}
-                        <AnimatePresence>
+                        <MotionAnimatePresence>
                             {items.length > 0 && (
-                                <motion.div 
+                                <MotionDiv 
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm"
@@ -275,7 +278,7 @@ export default function BulkPost() {
                                     </div>
                                     <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[500px] overflow-y-auto">
                                         {items.map((item, idx) => (
-                                            <motion.div 
+                                            <MotionDiv 
                                                 key={item.id} 
                                                 layout
                                                 initial={{ opacity: 0 }}
@@ -324,12 +327,12 @@ export default function BulkPost() {
                                                         <Trash2 size={18} />
                                                     </button>
                                                 </div>
-                                            </motion.div>
+                                            </MotionDiv>
                                         ))}
                                     </div>
-                                </motion.div>
+                                </MotionDiv>
                             )}
-                        </AnimatePresence>
+                        </MotionAnimatePresence>
                     </div>
                 </div>
             </div>

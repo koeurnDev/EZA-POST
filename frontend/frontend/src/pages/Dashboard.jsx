@@ -10,8 +10,13 @@ import ScheduledPostList from "../components/ScheduledPostList";
 import BotReplySettings from "../components/BotReplySettings";
 import Button from "../components/ui/Button";
 import EmptyState from "../components/ui/EmptyState";
-import { List, Clock, Trash2, Send, Calendar, Sparkles, LayoutDashboard, Share2, MessageSquare, Plus, Activity, ChevronRight, Zap } from "lucide-react";
+import { List, Clock, Trash2, Send, Calendar, Sparkles, LayoutDashboard, Share2, MessageSquare, Plus, ChevronRight, Zap, Search } from "lucide-react";
+import { Activity, RefreshCw } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+
+const MotionDiv = motion.div;
+const MotionButton = motion.button;
+const MotionAnimatePresence = AnimatePresence;
 import { pagesAPI, postsAPI, tiktokAPI } from "../utils/api";
 import apiUtils from "../utils/apiUtils";
 
@@ -209,21 +214,21 @@ export default function Dashboard() {
               <tab.icon size={16} />
               {tab.label}
               {activeTab === tab.id && (
-                <motion.div layoutId="activeDashboardTab" className="absolute inset-0 bg-blue-500/5 rounded-2xl -z-10" />
+                <MotionDiv layoutId="activeDashboardTab" className="absolute inset-0 bg-blue-500/5 rounded-2xl -z-10" />
               )}
             </button>
           ))}
         </div>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {activeTab === "schedule" && (
+        <MotionAnimatePresence mode="wait">
+          {activeTab === "schedule" && (
+            <MotionDiv
+              key="schedule"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            >
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                 {/* Form Column */}
                 <div className="lg:col-span-7 space-y-8">
@@ -387,7 +392,7 @@ export default function Dashboard() {
             )}
 
             {activeTab === "bot" && (
-              <motion.div 
+              <MotionDiv 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[3rem] overflow-hidden shadow-2xl shadow-black/5"
@@ -403,10 +408,10 @@ export default function Dashboard() {
                 <div className="p-10">
                   <BotReplySettings isDemo={isDemo} />
                 </div>
-              </motion.div>
+              </MotionDiv>
             )}
-          </motion.div>
-        </AnimatePresence>
+          </MotionDiv>
+        </MotionAnimatePresence>
       </div>
     </DashboardLayout>
   );

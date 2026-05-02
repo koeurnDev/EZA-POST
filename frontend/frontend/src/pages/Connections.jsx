@@ -6,6 +6,9 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import Button from "../components/ui/Button";
 
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
+
 export default function Connections() {
     const [connections, setConnections] = useState({
         youtube: false,
@@ -85,7 +88,7 @@ export default function Connections() {
                         { id: 'tiktok', name: 'TikTok Network', icon: Video, color: 'from-gray-900 to-black dark:from-white dark:to-gray-200 dark:text-black', isConnected: connections.tiktok, desc: 'Synchronize your primary TikTok identity for viral automation and trend-surging protocols.' },
                         { id: 'instagram', name: 'Instagram Grid', icon: Instagram, color: 'from-orange-500 via-pink-600 to-purple-700', isConnected: connections.instagram, desc: 'Seamless Reel and Carousel orchestration with integrated aesthetic synchronization.' }
                     ].map((platform, idx) => (
-                        <motion.div
+                        <MotionDiv
                             key={platform.id}
                             initial={{ opacity: 0, y: 30 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -108,9 +111,9 @@ export default function Connections() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                    <AnimatePresence mode="wait">
+                                    <MotionAnimatePresence mode="wait">
                                         {platform.isConnected ? (
-                                            <motion.div
+                                            <MotionDiv
                                                 initial={{ opacity: 0, scale: 0.9 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.9 }}
@@ -124,9 +127,9 @@ export default function Connections() {
                                                     <X size={16} className="mr-2 group-hover/btn:rotate-90 transition-transform" />
                                                     Terminate Link
                                                 </Button>
-                                            </motion.div>
+                                            </MotionDiv>
                                         ) : (
-                                            <motion.div
+                                            <MotionDiv
                                                 initial={{ opacity: 0, scale: 0.9 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.9 }}
@@ -139,20 +142,20 @@ export default function Connections() {
                                                     <Zap size={16} className="mr-2 group-hover/btn:scale-125 transition-transform" />
                                                     Initialize Handshake
                                                 </Button>
-                                            </motion.div>
+                                            </MotionDiv>
                                         )}
-                                    </AnimatePresence>
+                                    </MotionAnimatePresence>
                                 </div>
                             </div>
                             
                             {/* Animated background decoration */}
                             <div className={`absolute top-0 right-0 w-64 h-64 bg-gradient-to-br ${platform.color} opacity-[0.03] blur-[60px] rounded-full -translate-y-1/2 translate-x-1/2 group-hover:opacity-[0.07] transition-opacity duration-700`} />
-                        </motion.div>
+                        </MotionDiv>
                     ))}
                 </div>
 
                 {/* Security Footer Section */}
-                <motion.div 
+                <MotionDiv 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.6 }}
@@ -181,7 +184,7 @@ export default function Connections() {
                             </div>
                         </div>
                     </div>
-                </motion.div>
+                </MotionDiv>
             </div>
         </DashboardLayout>
     );

@@ -5,6 +5,8 @@ import api from "../utils/api";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
 
+const MotionDiv = motion.div;
+
 export default function BoostAnalytics() {
     const [stats, setStats] = useState(null);
     const [posts, setPosts] = useState([]);
@@ -63,7 +65,7 @@ export default function BoostAnalytics() {
                         { label: 'Comments Added', value: stats?.totalCommentsAdded || 0, icon: MessageCircle, color: 'text-blue-500', bg: 'bg-blue-500/10' },
                         { label: 'Shares Added', value: stats?.totalSharesAdded || 0, icon: Share2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' }
                     ].map((item, idx) => (
-                        <motion.div
+                        <MotionDiv
                             key={idx}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -82,12 +84,12 @@ export default function BoostAnalytics() {
                             <h3 className="text-4xl font-black text-gray-900 dark:text-white tracking-tight">
                                 {item.value.toLocaleString()}
                             </h3>
-                        </motion.div>
+                        </MotionDiv>
                     ))}
                 </div>
 
                 {/* Content Table */}
-                <motion.div 
+                <MotionDiv 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
@@ -158,7 +160,7 @@ export default function BoostAnalytics() {
                             </table>
                         </div>
                     )}
-                </motion.div>
+                </MotionDiv>
             </div>
         </DashboardLayout>
     );

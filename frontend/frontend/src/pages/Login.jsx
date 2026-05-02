@@ -6,6 +6,8 @@ import { saveUserData } from "../utils/apiUtils";
 import { motion } from "framer-motion";
 import { Sparkles, ShieldCheck, Zap, Globe } from "lucide-react";
 
+const MotionDiv = motion.div;
+
 export default function Login() {
   const navigate = useNavigate();
   const { user, loading: authLoading, setAuthUser } = useAuth();
@@ -34,7 +36,7 @@ export default function Login() {
         </div>
 
         {/* Brand Header */}
-        <motion.div 
+        <MotionDiv 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="relative z-10 flex items-center gap-3 text-2xl font-black tracking-tighter"
@@ -43,11 +45,11 @@ export default function Login() {
             <Zap size={20} fill="white" />
           </div>
           EZA-POST
-        </motion.div>
+        </MotionDiv>
 
         {/* Value Proposition */}
         <div className="relative z-10">
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
@@ -61,9 +63,9 @@ export default function Login() {
             <p className="text-xl text-gray-400 max-w-md leading-relaxed font-medium">
               The next generation of social automation. Built for creators who demand excellence.
             </p>
-          </motion.div>
+          </MotionDiv>
 
-          <motion.div 
+          <MotionDiv 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
@@ -81,11 +83,11 @@ export default function Login() {
                 <span className="text-xs font-black uppercase tracking-widest text-gray-500">{item.label}</span>
               </div>
             ))}
-          </motion.div>
+          </MotionDiv>
         </div>
 
         {/* Footer Info */}
-        <motion.div 
+        <MotionDiv 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
@@ -99,7 +101,7 @@ export default function Login() {
             ))}
           </div>
           <p className="text-sm font-bold text-gray-500">Trusted by 10k+ elite creators</p>
-        </motion.div>
+        </MotionDiv>
       </div>
 
       {/* 📝 Right Side: Authentication Hub */}
@@ -115,7 +117,7 @@ export default function Login() {
             </div>
           </div>
 
-          <motion.div 
+          <MotionDiv 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-10 text-center lg:text-left"
@@ -126,9 +128,9 @@ export default function Login() {
             <p className="text-gray-500 dark:text-gray-400 font-medium">
               Enter your credentials to access your command center.
             </p>
-          </motion.div>
+          </MotionDiv>
 
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -137,9 +139,9 @@ export default function Login() {
               onSuccess={handleLoginSuccess}
               onForgotPassword={() => navigate("/forgot-password")}
             />
-          </motion.div>
+          </MotionDiv>
 
-          <motion.div 
+          <MotionDiv 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
@@ -154,7 +156,7 @@ export default function Login() {
                 Create an account
               </button>
             </p>
-          </motion.div>
+          </MotionDiv>
         </div>
 
         {/* Ambient background for mobile */}

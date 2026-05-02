@@ -4,6 +4,9 @@
 
 import React, { useState, useCallback } from "react";
 import { ImagePlus, Upload, Trash2, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
+import { motion } from "framer-motion";
+
+const MotionDiv = motion.div;
 
 const ThumbnailUpload = ({ onChange, currentThumbnail = null, isDemo = false }) => {
   const [preview, setPreview] = useState(currentThumbnail);
@@ -171,14 +174,14 @@ const ThumbnailUpload = ({ onChange, currentThumbnail = null, isDemo = false }) 
 
             {/* Success Badge (Temporary) */}
             {uploadProgress === 100 && (
-              <motion.div
+              <MotionDiv
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
                 className="absolute top-3 right-3 bg-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-lg flex items-center gap-1"
               >
                 <CheckCircle2 size={12} /> Uploaded
-              </motion.div>
+              </MotionDiv>
             )}
           </>
         ) : (
@@ -218,7 +221,7 @@ const ThumbnailUpload = ({ onChange, currentThumbnail = null, isDemo = false }) 
         {/* 📊 PROGRESS BAR */}
         {uploadProgress > 0 && uploadProgress < 100 && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700">
-            <motion.div
+            <MotionDiv
               className="h-full bg-blue-500"
               initial={{ width: 0 }}
               animate={{ width: `${uploadProgress}%` }}

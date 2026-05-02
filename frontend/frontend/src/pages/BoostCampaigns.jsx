@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
 import { Rocket, DollarSign, Eye, MousePointerClick, TrendingUp, Pause, Play, Trash2, RefreshCw, Calendar, Target, Activity, ChevronRight, AlertCircle, BarChart3 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -106,9 +109,9 @@ const BoostCampaigns = () => {
 
                 {/* Campaigns Grid */}
                 <div className="space-y-6">
-                    <AnimatePresence mode="popLayout">
+                    <MotionAnimatePresence mode="popLayout">
                         {campaigns.length === 0 ? (
-                            <motion.div 
+                            <MotionDiv 
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 className="py-32 text-center bg-gray-50 dark:bg-white/5 rounded-[3rem] border border-dashed border-gray-200 dark:border-white/10"
@@ -116,10 +119,10 @@ const BoostCampaigns = () => {
                                 <Rocket size={64} className="mx-auto mb-6 text-gray-300" />
                                 <h3 className="text-2xl font-black text-gray-400 tracking-tight">No Active Campaigns</h3>
                                 <p className="text-gray-500 mt-2 font-medium">Launch a new campaign from your Viral Hub.</p>
-                            </motion.div>
+                            </MotionDiv>
                         ) : (
                             campaigns.map((campaign, i) => (
-                                <motion.div
+                                <MotionDiv
                                     key={campaign._id}
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
@@ -195,7 +198,7 @@ const BoostCampaigns = () => {
                                                     </p>
                                                 </div>
                                                 <div className="h-2.5 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden border border-gray-200 dark:border-white/5">
-                                                    <motion.div 
+                                                    <MotionDiv 
                                                         initial={{ width: 0 }}
                                                         animate={{ width: `${calculateProgress(campaign)}%` }}
                                                         className="h-full bg-gradient-to-r from-purple-500 via-blue-500 to-emerald-500 rounded-full"
@@ -214,10 +217,10 @@ const BoostCampaigns = () => {
                                             </div>
                                         </div>
                                     )}
-                                </motion.div>
+                                </MotionDiv>
                             ))
                         )}
-                    </AnimatePresence>
+                    </MotionAnimatePresence>
                 </div>
             </div>
         </DashboardLayout>

@@ -6,6 +6,9 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import Button from "../components/ui/Button";
 
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
+
 export default function BoostSettings() {
     const [enabled, setEnabled] = useState(false);
     const [rules, setRules] = useState([]);
@@ -114,7 +117,7 @@ export default function BoostSettings() {
                 <div className="grid grid-cols-1 gap-8">
                     {/* Master Controls */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <motion.div 
+                        <MotionDiv 
                             whileHover={{ y: -4 }}
                             className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-8 shadow-2xl shadow-black/5"
                         >
@@ -135,9 +138,9 @@ export default function BoostSettings() {
                                     <span className={`inline-block h-7 w-7 transform rounded-full bg-white shadow-xl transition-transform duration-300 ${enabled ? 'translate-x-8' : 'translate-x-1'}`} />
                                 </button>
                             </div>
-                        </motion.div>
+                        </MotionDiv>
 
-                        <motion.div 
+                        <MotionDiv 
                             whileHover={{ y: -4 }}
                             className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-8 shadow-2xl shadow-black/5 overflow-hidden relative"
                         >
@@ -161,11 +164,11 @@ export default function BoostSettings() {
                                     <span className={`inline-block h-7 w-7 transform rounded-full bg-white shadow-xl transition-transform duration-300 ${realBoost.enabled ? 'translate-x-8' : 'translate-x-1'}`} />
                                 </button>
                             </div>
-                        </motion.div>
+                        </MotionDiv>
                     </div>
 
                     {realBoost.enabled && (
-                        <motion.div 
+                        <MotionDiv 
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             className="p-6 bg-purple-500/5 border border-purple-500/10 rounded-3xl flex items-center justify-between gap-4"
@@ -177,7 +180,7 @@ export default function BoostSettings() {
                                 </p>
                             </div>
                             <a href="/boost-accounts" className="text-[10px] font-black uppercase tracking-widest bg-purple-500 text-white px-4 py-2 rounded-xl hover:bg-purple-600 transition-colors">Manage Accounts</a>
-                        </motion.div>
+                        </MotionDiv>
                     )}
 
                     {/* Rules Engine */}
@@ -196,9 +199,9 @@ export default function BoostSettings() {
                         </div>
 
                         <div className="grid grid-cols-1 gap-6">
-                            <AnimatePresence mode="popLayout">
+                            <MotionAnimatePresence mode="popLayout">
                                 {rules.map((rule, index) => (
-                                    <motion.div
+                                    <MotionDiv
                                         key={index}
                                         initial={{ opacity: 0, x: -20 }}
                                         animate={{ opacity: 1, x: 0 }}
@@ -276,15 +279,15 @@ export default function BoostSettings() {
                                                 </div>
                                             </div>
                                         </div>
-                                    </motion.div>
+                                    </MotionDiv>
                                 ))}
-                            </AnimatePresence>
+                            </MotionAnimatePresence>
                         </div>
                     </div>
                 </div>
 
                 {/* Risk Notice */}
-                <motion.div 
+                <MotionDiv 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.6 }}
@@ -299,7 +302,7 @@ export default function BoostSettings() {
                             Simulated engagement behavior is managed via decentralized worker nodes. Adjust intensity levels to maintain platform compliance and account longevity.
                         </p>
                     </div>
-                </motion.div>
+                </MotionDiv>
             </div>
         </DashboardLayout>
     );

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const MotionDiv = motion.div;
+const MotionAnimatePresence = AnimatePresence;
 import { TrendingUp, Flame, Eye, Heart, MessageCircle, Share2, DollarSign, RefreshCw, Sparkles, Filter } from 'lucide-react';
 import api from '../utils/api';
 import DashboardLayout from '../layouts/DashboardLayout';
@@ -65,7 +68,7 @@ const ViralPosts = () => {
             <div className="max-w-7xl mx-auto px-4 py-4 md:py-8">
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
-                    <motion.div 
+                    <MotionDiv 
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                     >
@@ -76,9 +79,9 @@ const ViralPosts = () => {
                             Viral Hub
                         </h1>
                         <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Detect and scale your best performing content instantly.</p>
-                    </motion.div>
-
-                    <motion.div 
+                    </MotionDiv>
+ 
+                    <MotionDiv 
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-2xl border border-gray-200 dark:border-gray-700"
@@ -92,9 +95,9 @@ const ViralPosts = () => {
                                 {tier}
                             </button>
                         ))}
-                    </motion.div>
+                    </MotionDiv>
                 </div>
-
+ 
                 {/* Posts Grid */}
                 {viralPosts.length === 0 ? (
                     <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-[2.5rem] border border-dashed border-gray-200 dark:border-gray-700">
@@ -106,9 +109,9 @@ const ViralPosts = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        <AnimatePresence>
+                        <MotionAnimatePresence>
                             {viralPosts.map((item, index) => (
-                                <motion.div
+                                <MotionDiv
                                     key={item.post._id}
                                     layout
                                     initial={{ opacity: 0, scale: 0.9 }}
@@ -191,9 +194,9 @@ const ViralPosts = () => {
                                             </button>
                                         </div>
                                     </div>
-                                </motion.div>
+                                </MotionDiv>
                             ))}
-                        </AnimatePresence>
+                        </MotionAnimatePresence>
                     </div>
                 )}
             </div>
