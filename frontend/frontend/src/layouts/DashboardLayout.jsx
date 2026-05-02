@@ -3,9 +3,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
-
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 import NetworkStatus from "../components/NetworkStatus";
 import {
   LayoutDashboard, Send, Layers, Clock, BarChart2, Link as LinkIcon, MessageSquare, Zap, Settings, LogOut, Sun, Moon, User, Grid, Search, Bell, MoreHorizontal, X,
@@ -14,6 +11,8 @@ import {
 import { toast } from "react-hot-toast";
 
 const DashboardLayout = ({ children }) => {
+  const MotionDiv = motion.div;
+  const MotionAnimatePresence = AnimatePresence;
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const location = useLocation();

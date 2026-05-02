@@ -6,9 +6,9 @@ import { getUserData } from "../utils/apiUtils";
 import RegisterForm from "../components/RegisterForm";
 import { Sparkles, ShieldCheck, Zap, Globe, Rocket } from "lucide-react";
 
-const MotionDiv = motion.div;
 
 export default function Register() {
+  const MotionDiv = motion.div;
   const navigate = useNavigate();
 
   useEffect(() => {

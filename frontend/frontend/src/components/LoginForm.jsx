@@ -4,11 +4,11 @@ import Button from "./ui/Button";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 import { Mail, Lock, Eye, EyeOff, Shield, ArrowRight, AlertCircle } from "lucide-react";
 
 const LoginForm = ({ onSuccess, onForgotPassword }) => {
+  const MotionDiv = motion.div;
+  const MotionAnimatePresence = AnimatePresence;
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);

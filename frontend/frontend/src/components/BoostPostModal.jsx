@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 import { X, DollarSign, Calendar, Users, Target, TrendingUp, AlertCircle } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
 const BoostPostModal = ({ post, onClose, onSuccess }) => {
+    const MotionDiv = motion.div;
+    const MotionAnimatePresence = AnimatePresence;
     const [step, setStep] = useState(1); // 1: Configure, 2: Preview, 3: Confirm
     const [loading, setLoading] = useState(false);
 

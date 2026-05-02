@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Zap, BarChart3, Globe, Sparkles, Shield, Rocket, Activity, ChevronRight, Play } from "lucide-react";
 import { motion } from "framer-motion";
 
-const MotionDiv = motion.div;
-const MotionH1 = motion.h1;
-const MotionP = motion.p;
 import Button from "../components/ui/Button";
 
 export default function Welcome() {
+    const MotionDiv = motion.div;
+    const MotionH1 = motion.h1;
+    const MotionP = motion.p;
     const containerVariants = {
         hidden: { opacity: 0 },
         visible: {

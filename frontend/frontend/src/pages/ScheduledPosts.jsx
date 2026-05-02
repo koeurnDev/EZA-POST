@@ -5,8 +5,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 import { Link } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { PageLoader } from "../components/LoadingSpinner";
@@ -18,6 +16,8 @@ import EmptyState from "../components/ui/EmptyState";
 import Button from "../components/ui/Button";
 
 export default function ScheduledPosts() {
+    const MotionDiv = motion.div;
+    const MotionAnimatePresence = AnimatePresence;
     const { user } = useAuth();
 
     // State

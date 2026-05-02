@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 import { TrendingUp, Flame, Eye, Heart, MessageCircle, Share2, DollarSign, RefreshCw, Sparkles, Filter } from 'lucide-react';
 import api from '../utils/api';
 import DashboardLayout from '../layouts/DashboardLayout';
@@ -11,6 +9,8 @@ import toast from 'react-hot-toast';
 import Button from '../components/ui/Button';
 
 const ViralPosts = () => {
+    const MotionDiv = motion.div;
+    const MotionAnimatePresence = AnimatePresence;
     const [viralPosts, setViralPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedPost, setSelectedPost] = useState(null);

@@ -5,9 +5,9 @@ import api from "../utils/api";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
 
-const MotionDiv = motion.div;
 
 export default function BoostAnalytics() {
+    const MotionDiv = motion.div;
     const [stats, setStats] = useState(null);
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);

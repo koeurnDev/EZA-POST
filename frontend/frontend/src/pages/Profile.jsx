@@ -15,12 +15,12 @@ import {
 import EditProfileModal from "../components/EditProfileModal";
 import Button from "../components/ui/Button";
 
-const MotionDiv = motion.div;
-const MotionH1 = motion.h1;
-const MotionP = motion.p;
-const MotionAnimatePresence = AnimatePresence;
 
 export default function Profile() {
+    const MotionDiv = motion.div;
+    const MotionH1 = motion.h1;
+    const MotionP = motion.p;
+    const MotionAnimatePresence = AnimatePresence;
     const { user, updateUser, loading } = useAuth();
     const [isDemo, setIsDemo] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);

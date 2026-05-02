@@ -6,10 +6,10 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import Button from "../components/ui/Button";
 
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 
 export default function BoostSettings() {
+    const MotionDiv = motion.div;
+    const MotionAnimatePresence = AnimatePresence;
     const [enabled, setEnabled] = useState(false);
     const [rules, setRules] = useState([]);
     const [realBoost, setRealBoost] = useState({ enabled: false });

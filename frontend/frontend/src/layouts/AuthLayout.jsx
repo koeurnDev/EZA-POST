@@ -2,10 +2,9 @@ import React from "react";
 import { useTheme } from "../context/ThemeContext";
 import { motion } from "framer-motion";
 
-const MotionDiv = motion.div;
-const MotionH1 = motion.h1;
-
 const AuthLayout = ({ children, title, subtitle }) => {
+  const MotionDiv = motion.div;
+  const MotionH1 = motion.h1;
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -33,56 +32,51 @@ const AuthLayout = ({ children, title, subtitle }) => {
           </p>
           <div className="mt-8">
             <img
-              src="/illustrations/auth.svg"
-              alt="Auth illustration"
-              className="w-full max-w-xs mx-auto opacity-90"
+              src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3ZqOHByOXB4OHB4OHB4OHB4OHB4OHB4OHB4OHB4OHB4OHB4OHB4JnB2PTA/3o7TKDkDbIDJieKbVm/giphy.gif"
+              alt="Automate Illustration"
+              className="rounded-lg shadow-2xl opacity-80"
             />
           </div>
         </div>
       </MotionDiv>
 
-      {/* 🔹 Right Section - Auth Form */}
-      <MotionDiv
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className={`flex-1 flex flex-col justify-center items-center p-6 sm:p-10`}
-      >
-        <div
-          className={`w-full max-w-md rounded-2xl shadow-lg border ${theme === "dark"
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-            } p-8`}
-        >
-          {/* Header */}
-          <div className="mb-6 text-center">
-            <h2 className="text-2xl font-bold">{title}</h2>
-            {subtitle && (
-              <p className="text-sm mt-2 text-gray-500 dark:text-gray-400">
-                {subtitle}
-              </p>
-            )}
-          </div>
-
-          {/* Auth Form (children) */}
-          <div className="mb-4">{children}</div>
-
-          {/* Theme Toggle */}
-          <div className="mt-6 flex justify-center">
+      {/* 🔹 Right Section - Form Area */}
+      <div className="flex-1 flex flex-col justify-center items-center p-8">
+        <div className="w-full max-w-md">
+          {/* Mobile Theme Toggle */}
+          <div className="flex justify-end md:absolute md:top-8 md:right-8 mb-6">
             <button
               onClick={toggleTheme}
-              className="text-xs px-4 py-2 rounded-md border border-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:scale-110 transition-transform"
             >
-              {theme === "dark" ? "🌞 Switch to Light Mode" : "🌙 Switch to Dark Mode"}
+              {theme === "dark" ? "🌙" : "☀️"}
             </button>
           </div>
 
-          {/* Footer */}
-          <div className="mt-8 text-center text-xs text-gray-400">
-            © {new Date().getFullYear()} EZA_POST — All rights reserved.
-          </div>
+          <MotionDiv
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className={`p-10 rounded-2xl shadow-xl ${theme === "dark" ? "bg-gray-850 border border-gray-700" : "bg-white border border-gray-100"
+              }`}
+          >
+            <div className="mb-10 text-center">
+              <h2 className="text-3xl font-black mb-2 tracking-tight">
+                {title}
+              </h2>
+              <p className="text-gray-400 text-sm">
+                {subtitle}
+              </p>
+            </div>
+
+            {children}
+          </MotionDiv>
+
+          <footer className="mt-8 text-center text-xs text-gray-500">
+            &copy; {new Date().getFullYear()} EZA_POST — All rights reserved.
+          </footer>
         </div>
-      </MotionDiv>
+      </div>
     </div>
   );
 };

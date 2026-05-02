@@ -6,10 +6,10 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import Button from "../components/ui/Button";
 
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 
 export default function Connections() {
+    const MotionDiv = motion.div;
+    const MotionAnimatePresence = AnimatePresence;
     const [connections, setConnections] = useState({
         youtube: false,
         tiktok: false,

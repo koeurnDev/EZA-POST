@@ -6,7 +6,6 @@ import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 
-const MotionDiv = motion.div;
 import { useAuth } from "../hooks/useAuth";
 
 /**
@@ -17,6 +16,7 @@ import { useAuth } from "../hooks/useAuth";
  */
 
 const ProtectedRoute = ({ children, redirectPath = "/login" }) => {
+  const MotionDiv = motion.div;
   const { user, loading } = useAuth();
   const location = useLocation();
 

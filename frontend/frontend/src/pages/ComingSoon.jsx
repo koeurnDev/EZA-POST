@@ -1,11 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-const MotionDiv = motion.div;
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Rocket, Sparkles, Activity, Timer } from 'lucide-react';
 
 const ComingSoon = () => {
+    const MotionDiv = motion.div;
     return (
         <DashboardLayout>
             <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 relative overflow-hidden">

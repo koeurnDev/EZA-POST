@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 import { Rocket, DollarSign, Eye, MousePointerClick, TrendingUp, Pause, Play, Trash2, RefreshCw, Calendar, Target, Activity, ChevronRight, AlertCircle, BarChart3 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -10,6 +8,8 @@ import DashboardLayout from '../layouts/DashboardLayout';
 import Button from '../components/ui/Button';
 
 const BoostCampaigns = () => {
+    const MotionDiv = motion.div;
+    const MotionAnimatePresence = AnimatePresence;
     const [campaigns, setCampaigns] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all'); 

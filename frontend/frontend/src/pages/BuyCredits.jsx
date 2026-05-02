@@ -6,10 +6,10 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import Button from "../components/ui/Button";
 
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 
 export default function BuyCredits() {
+    const MotionDiv = motion.div;
+    const MotionAnimatePresence = AnimatePresence;
     const [packages, setPackages] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);

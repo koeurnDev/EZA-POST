@@ -6,9 +6,9 @@ import { saveUserData } from "../utils/apiUtils";
 import { motion } from "framer-motion";
 import { Sparkles, ShieldCheck, Zap, Globe } from "lucide-react";
 
-const MotionDiv = motion.div;
 
 export default function Login() {
+  const MotionDiv = motion.div;
   const navigate = useNavigate();
   const { user, loading: authLoading, setAuthUser } = useAuth();
 

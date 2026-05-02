@@ -7,19 +7,8 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { motion } from "framer-motion";
 
-const MotionDiv = motion.div;
-
-/**
- * Redirects authenticated users away from public pages
- * (like Login or Register) to the Dashboard.
- *
- * Features:
- * ✅ Uses AuthContext automatically
- * ✅ Animated loading state
- * ✅ Keeps redirect memory (from previous route)
- */
-
 const PublicRoute = ({ children, redirectPath = "/dashboard" }) => {
+  const MotionDiv = motion.div;
   const { user, loading } = useAuth();
   const location = useLocation();
 

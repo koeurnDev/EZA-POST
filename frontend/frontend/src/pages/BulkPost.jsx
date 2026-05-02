@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 import DashboardLayout from "../layouts/DashboardLayout";
 import { UploadCloud, Calendar, Clock, Check, X, Loader, FileVideo, AlertCircle, Trash2, Send, Filter, Settings } from "lucide-react";
 import api from "../utils/api";
@@ -10,6 +8,8 @@ import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
 
 export default function BulkPost() {
+    const MotionDiv = motion.div;
+    const MotionAnimatePresence = AnimatePresence;
     // State
     const [files, setFiles] = useState([]);
     const [uploading, setUploading] = useState(false);
