@@ -367,50 +367,58 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-            )}
+            </MotionDiv>
+          )}
 
-            {activeTab === "queue" && (
-              <div className="space-y-8">
-                <ScheduledPostList
-                  posts={queue}
-                  onCancel={cancelScheduledPost}
-                  onRetry={() => {
-                    setQueueError(null);
-                    const retryFetch = async () => {
-                      try {
-                        const res = await apiUtils.retryRequest(() => postsAPI.getQueue());
-                        setQueue(res.posts || []);
-                      } catch (error) {
-                        setQueueError(apiUtils.getUserErrorMessage(error));
-                      }
-                    };
-                    retryFetch();
-                  }}
-                  error={queueError}
-                />
+          {activeTab === "queue" && (
+            <MotionDiv
+              key="queue"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <ScheduledPostList
+                posts={queue}
+                onCancel={cancelScheduledPost}
+                onRetry={() => {
+                  setQueueError(null);
+                  const retryFetch = async () => {
+                    try {
+                      const res = await apiUtils.retryRequest(() => postsAPI.getQueue());
+                      setQueue(res.posts || []);
+                    } catch (error) {
+                      setQueueError(apiUtils.getUserErrorMessage(error));
+                    }
+                  };
+                  retryFetch();
+                }}
+                error={queueError}
+              />
+            </MotionDiv>
+          )}
+
+          {activeTab === "bot" && (
+            <MotionDiv 
+              key="bot"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[3rem] overflow-hidden shadow-2xl shadow-black/5"
+            >
+              <div className="p-10 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-600">
+                    <Zap size={24} />
+                  </div>
+                  <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Neural Response Logic</h2>
+                </div>
               </div>
-            )}
-
-            {activeTab === "bot" && (
-              <MotionDiv 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[3rem] overflow-hidden shadow-2xl shadow-black/5"
-              >
-                <div className="p-10 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-600">
-                            <Zap size={24} />
-                        </div>
-                        <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Neural Response Logic</h2>
-                    </div>
-                </div>
-                <div className="p-10">
-                  <BotReplySettings isDemo={isDemo} />
-                </div>
-              </MotionDiv>
-            )}
-          </MotionDiv>
+              <div className="p-10">
+                <BotReplySettings isDemo={isDemo} />
+              </div>
+            </MotionDiv>
+          )}
         </MotionAnimatePresence>
       </div>
     </DashboardLayout>
