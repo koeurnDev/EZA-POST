@@ -5,6 +5,7 @@
 import React, { useState, useCallback } from "react";
 import { ImagePlus, Upload, Trash2, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
+import api from "../utils/api";
 
 const MotionDiv = motion.div;
 
@@ -55,11 +56,10 @@ const ThumbnailUpload = ({ onChange, currentThumbnail = null, isDemo = false }) 
             try {
               const formData = new FormData();
               formData.append("thumbnail", file);
-              const res = await fetch(
-                `${(import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "")}/api/upload/thumbnail`,
-                { method: "POST", body: formData }
-              );
-              const data = await res.json();
+              const res = await api.post("/upload/thumbnail", formData, {
+                headers: { "Content-Type": "multipart/form-data" }
+              });
+              const data = res.data;
               if (data.success && onChange) onChange(file, data.file.path);
               else onChange(file, result);
             } catch {

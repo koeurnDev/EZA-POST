@@ -139,24 +139,17 @@ export default function Dashboard() {
     const toastId = toast.loading(isSchedule ? "Queueing..." : "Distributing...");
 
     try {
-      const formData = new FormData();
-      if (videoFile) formData.append("video", videoFile);
-      if (tiktokUrl) formData.append("tiktokUrl", tiktokUrl);
-      if (thumbnail) formData.append("thumbnail", thumbnail);
-      formData.append("caption", caption);
-      formData.append("accounts", JSON.stringify(accounts));
-      if (isSchedule) formData.append("scheduleTime", scheduleTime);
+      const postData = {
+        videoUrl: tiktokUrl,
+        caption,
+        accounts,
+        thumbnailFile: thumbnail,
+        scheduleTime: isSchedule ? scheduleTime : null
+      };
 
-      const endpoint = "/api/posts/create";
-      const token = localStorage.getItem("token");
-      const baseURL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
-      const response = await fetch(`${baseURL}${endpoint}`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
-        body: formData
-      });
-
-      const data = await response.json();
+      const data = isSchedule 
+        ? await postsAPI.schedule(postData)
+        : await postsAPI.create(postData);
 
       if (data.success) {
         toast.success(isSchedule ? "Transmission queued" : "Content distributed", { id: toastId });
