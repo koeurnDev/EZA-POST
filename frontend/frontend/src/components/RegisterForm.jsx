@@ -154,7 +154,3 @@ const RegisterForm = ({ onSuccess }) => {
 };
 
 export default RegisterForm;
-  );
-};
-
-export default RegisterForm;

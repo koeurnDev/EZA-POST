@@ -198,7 +198,3 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
 };
 
 export default LoginForm;
-
-
-
-export default LoginForm;
