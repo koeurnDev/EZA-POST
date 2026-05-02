@@ -12,9 +12,9 @@ import {
     LogOut, Moon, Sun, Bell, CheckCircle2, RefreshCw, 
     ExternalLink, AlertCircle, Settings as SettingsIcon, 
     MessageSquare, Calendar, Radio, Shield, Fingerprint, 
-    Zap, Lock, Cpu, Globe, Cloud, ShieldCheck, ChevronRight
+    Zap, Lock, Cpu, Globe, Cloud, ShieldCheck, ChevronRight,
+    Activity
 } from "lucide-react";
-import { Activity, RefreshCw } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
 
 const MotionDiv = motion.div;
