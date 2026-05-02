@@ -112,40 +112,45 @@ class FacebookAPI {
   /* ------------------------------------------------------------ */
   async waitForVideoProcessing(accessToken, videoId) {
     let attempts = 0;
-    const maxAttempts = 30; // 60 seconds max
-    const delay = 2000; // 2 seconds
+    const maxAttempts = 45; // ✅ Increased to 90 seconds (45 * 2s)
+    const delay = 2000;
 
     while (attempts < maxAttempts) {
       try {
         const res = await this.http.get(`${this.graph}/${videoId}`, {
           params: {
             access_token: accessToken,
-            fields: "status"
+            fields: "status,description,content_category" // Added more fields for debugging
           }
         });
 
         const status = res.data.status;
         const videoStatus = status?.video_status;
-        console.log(`⏳ Video ${videoId} status: ${videoStatus}`);
+        const failureReason = status?.processing_phase?.errors?.[0]?.message || status?.failure_reason;
+
+        console.log(`⏳ [Polling] Video ${videoId} status: ${videoStatus}${failureReason ? ` (Error: ${failureReason})` : ''}`);
 
         if (videoStatus === 'ready') {
           console.log(`✅ Video ${videoId} is ready!`);
           return true;
         }
 
-        if (videoStatus === 'error') {
-          throw new Error("Video processing failed on Facebook side.");
+        if (videoStatus === 'error' || videoStatus === 'failed') {
+          const errorMsg = failureReason || "Video processing failed on Facebook side (Unknown Reason).";
+          console.error(`❌ Facebook Processing Error: ${errorMsg}`);
+          throw new Error(`Facebook Video Error: ${errorMsg}`);
         }
 
       } catch (err) {
-        console.warn(`⚠️ Error checking video status: ${err.message}`);
+        if (err.message.includes("Facebook Video Error")) throw err; // Re-throw our custom errors
+        console.warn(`⚠️ Status check attempt ${attempts + 1} failed: ${err.message}`);
       }
 
       await new Promise(r => setTimeout(r, delay));
       attempts++;
     }
 
-    throw new Error("Video processing timed out.");
+    throw new Error("Video processing timed out. The video might still post later, but we could not verify it.");
   }
 
   /* ------------------------------------------------------------ */

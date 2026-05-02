@@ -8,6 +8,7 @@ const path = require("path");
 const prisma = require('../utils/prisma');
 const fb = require("../utils/fb");
 const axios = require("axios");
+const { processVideo } = require("../services/videoProcessor");
 
 // Decryption helper
 const crypto = require('crypto');
@@ -59,6 +60,24 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
         if (rightSideImageFile) {
             rightSideImageInput = fs.createReadStream(rightSideImageFile.path);
             tempFiles.push(rightSideImageFile.path);
+        }
+
+        // 🚨 1.5. Process Video (Square Pad + AI Options)
+        let processedVideoPath = null;
+        if (videoFile) {
+            try {
+                const aiOptions = req.body.aiOptions ? JSON.parse(req.body.aiOptions) : {};
+                // Force square padding for carousels
+                aiOptions.squarePad = true;
+
+                const outputDir = path.join(__dirname, "../../temp/videos");
+                console.log("🎬 [Carousel] Processing video for 1:1 compatibility...");
+                processedVideoPath = await processVideo(videoFile.path, outputDir, aiOptions);
+                tempFiles.push(processedVideoPath);
+            } catch (procErr) {
+                console.error("❌ Video processing failed:", procErr.message);
+                // Fallback to original file if processing fails
+            }
         }
 
         // 2. Parse Cards
@@ -141,11 +160,15 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             // FB requires unique upload per post usually, but media_fbid can be reused? 
                             // Actually, for carousel, we upload ONCE per post.
 
-                            // We use the 'videoInput' we prepared earlier
+                            // We use the 'processedVideoPath' or original 'videoFile.path'
                             // Note: Streams can only be read once. If multiple accounts, we need fresh streams.
                             // FIX: Re-create stream for each account/upload
                             let currentVideoInput = videoInput;
-                            if (videoFile) currentVideoInput = fs.createReadStream(videoFile.path);
+                            if (processedVideoPath) {
+                                currentVideoInput = fs.createReadStream(processedVideoPath);
+                            } else if (videoFile) {
+                                currentVideoInput = fs.createReadStream(videoFile.path);
+                            }
 
                             let currentThumbInput = thumbnailInput;
                             if (thumbnailFile) currentThumbInput = fs.createReadStream(thumbnailFile.path);
