@@ -225,5 +225,3 @@ const BoostCampaigns = () => {
 };
 
 export default BoostCampaigns;
-
-export default BoostCampaigns;
