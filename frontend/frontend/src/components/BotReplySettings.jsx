@@ -33,7 +33,6 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     scope: "ALL",        // ALL, SPECIFIC
     postId: "",
     keyword: "",
-    keyword: "",
     reply: "",
     attachmentUrl: null,
   });
@@ -123,7 +122,6 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       scope: "ALL",
       postId: "",
       keyword: "",
-      keyword: "",
       reply: "",
       attachmentUrl: null,
     });
@@ -136,7 +134,6 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       ruleType: rule.ruleType || "KEYWORD",
       scope: rule.scope || "ALL",
       postId: rule.postId || "",
-      keyword: rule.keyword,
       keyword: rule.keyword,
       reply: rule.reply,
       attachmentUrl: rule.attachmentUrl || null,
@@ -158,7 +155,6 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       ruleType,
       scope,
       postId: scope === "SPECIFIC" ? postId : undefined,
-      keyword: keyword.trim(),
       keyword: keyword.trim(),
       reply: reply.trim(),
       attachmentUrl
