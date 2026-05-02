@@ -54,10 +54,10 @@ export const API_ENDPOINTS = {
   SYSTEM: { HEALTH: "/system/health" },
   USER: { PAGES: "/user/pages" },
   POSTS: {
-    CREATE: "/posts/create",
+    CREATE: "/posts",
     SCHEDULE: "/posts/schedule",
     QUEUE: "/posts/queue",
-    CANCEL: "/posts/cancel",
+    CANCEL: "/posts/queue",
   },
   TIKTOK: {
     VALIDATE: "/tiktok/validate",
