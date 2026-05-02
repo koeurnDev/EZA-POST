@@ -13,14 +13,14 @@ import EmptyState from "../components/ui/EmptyState";
 import { List, Clock, Trash2, Send, Calendar, Sparkles, LayoutDashboard, Share2, MessageSquare, Plus, ChevronRight, Zap, Search } from "lucide-react";
 import { Activity, RefreshCw } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-
-const MotionDiv = motion.div;
-const MotionButton = motion.button;
-const MotionAnimatePresence = AnimatePresence;
 import { pagesAPI, postsAPI, tiktokAPI } from "../utils/api";
 import apiUtils from "../utils/apiUtils";
 
 export default function Dashboard() {
+  const MotionDiv = motion.div;
+  const MotionButton = motion.button;
+  const MotionAnimatePresence = AnimatePresence;
+
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("schedule");
   const [tiktokUrl, setTiktokUrl] = useState("");

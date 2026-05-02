@@ -7,9 +7,8 @@ import { ImagePlus, Upload, Trash2, RefreshCw, AlertCircle, CheckCircle2 } from 
 import { motion } from "framer-motion";
 import api from "../utils/api";
 
-const MotionDiv = motion.div;
-
 const ThumbnailUpload = ({ onChange, currentThumbnail = null, isDemo = false }) => {
+  const MotionDiv = motion.div;
   const [preview, setPreview] = useState(currentThumbnail);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState("");

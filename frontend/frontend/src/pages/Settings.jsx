@@ -16,15 +16,14 @@ import {
     Activity
 } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
-
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
 import apiUtils from "../utils/apiUtils";
 import toast from "react-hot-toast";
 import EmptyState from "../components/ui/EmptyState";
 import Button from "../components/ui/Button";
 
 export default function Settings() {
+    const MotionDiv = motion.div;
+    const MotionAnimatePresence = AnimatePresence;
     const { user, logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);

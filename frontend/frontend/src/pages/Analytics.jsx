@@ -7,15 +7,14 @@ import {
 } from "recharts";
 import { 
     TrendingUp, Users, Calendar, Clock, ArrowUp, ArrowDown, 
-    Share2, Eye, Heart, BarChart2, CheckCircle2, AlertCircle, Info, Sparkles, ChevronRight, Globe, Zap
+    Share2, Eye, Heart, BarChart2, CheckCircle2, AlertCircle, Info, Sparkles, ChevronRight, Globe, Zap, Activity
 } from "lucide-react";
-import { Activity } from "lucide-react";
-
-const MotionDiv = motion.div;
 import api from "../utils/api";
 import toast from "react-hot-toast";
 
 export default function Analytics() {
+    const MotionDiv = motion.div;
+
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("30");

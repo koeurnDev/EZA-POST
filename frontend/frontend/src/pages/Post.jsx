@@ -8,16 +8,15 @@ import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
 import { useDropzone } from "react-dropzone";
 import { Reorder, motion, AnimatePresence } from "framer-motion";
-
-const MotionDiv = motion.div;
-const MotionAnimatePresence = AnimatePresence;
-const MotionReorderGroup = Reorder.Group;
-const MotionReorderItem = Reorder.Item;
 import { generateThumbnailFromVideo, dataURLtoFile } from "../utils/videoUtils";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
 
 export default function Post() {
+    const MotionDiv = motion.div;
+    const MotionAnimatePresence = AnimatePresence;
+    const MotionReorderGroup = Reorder.Group;
+    const MotionReorderItem = Reorder.Item;
     const { user } = useAuth();
 
     const [postFormat, setPostFormat] = useState("carousel");
