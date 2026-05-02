@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { Users, Plus, Trash2, Check, X, Loader2, TestTube } from "lucide-react";
+import { Users, Plus, Trash2, Check, X, Loader2, ShieldAlert, Activity, Fingerprint, Lock, ChevronRight, AlertCircle } from "lucide-react";
 import api from "../utils/api";
 import toast from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
+import Button from "../components/ui/Button";
 
 export default function BoostAccounts() {
     const [accounts, setAccounts] = useState([]);
@@ -11,7 +13,7 @@ export default function BoostAccounts() {
     const [newAccount, setNewAccount] = useState({
         username: '',
         password: '',
-        dailyLimit: 25  // Reduced from 50 to 25 (more conservative)
+        dailyLimit: 25
     });
     const [testing, setTesting] = useState(null);
     const [adding, setAdding] = useState(false);
@@ -23,48 +25,42 @@ export default function BoostAccounts() {
     const fetchAccounts = async () => {
         try {
             const res = await api.get("/boost-accounts");
-            if (res.data.success) {
-                setAccounts(res.data.accounts);
-            }
+            if (res.data.success) setAccounts(res.data.accounts);
         } catch (err) {
-            toast.error("Failed to load accounts");
+            toast.error("Cloud sync failed");
         } finally {
             setLoading(false);
         }
     };
 
     const addAccount = async () => {
-        if (!newAccount.username || !newAccount.password) {
-            return toast.error("Username and password required");
-        }
-
+        if (!newAccount.username || !newAccount.password) return toast.error("Credentials required");
         setAdding(true);
         try {
             const res = await api.post("/boost-accounts", newAccount);
             if (res.data.success) {
-                toast.success("Account added & auto-logged in!");
+                toast.success("Identity linked & authorized");
                 setAccounts([...accounts, res.data.account]);
-                setNewAccount({ username: '', password: '', dailyLimit: 50 });
+                setNewAccount({ username: '', password: '', dailyLimit: 25 });
                 setShowAddForm(false);
             }
         } catch (err) {
-            toast.error(err.response?.data?.error || "Failed to add account");
+            toast.error(err.response?.data?.error || "Auth handshake failed");
         } finally {
             setAdding(false);
         }
     };
 
     const deleteAccount = async (id) => {
-        if (!confirm("Delete this account?")) return;
-
+        if (!confirm("Deauthorize this identity?")) return;
         try {
             const res = await api.delete(`/boost-accounts/${id}`);
             if (res.data.success) {
-                toast.success("Account deleted");
+                toast.success("Identity purged");
                 setAccounts(accounts.filter(a => a._id !== id));
             }
         } catch (err) {
-            toast.error("Failed to delete account");
+            toast.error("Purge failed");
         }
     };
 
@@ -73,10 +69,10 @@ export default function BoostAccounts() {
         try {
             const res = await api.post(`/boost-accounts/${id}/test`);
             if (res.data.success) {
-                toast.success("Login successful! ✅");
+                toast.success("Handshake verified ✅");
                 fetchAccounts();
             } else {
-                toast.error("Login failed ❌");
+                toast.error("Auth failed ❌");
             }
         } catch (err) {
             toast.error("Test failed");
@@ -87,183 +83,203 @@ export default function BoostAccounts() {
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-            case 'banned': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-            case 'cooldown': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-            case 'error': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'active': return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
+            case 'banned': return 'text-rose-500 bg-rose-500/10 border-rose-500/20';
+            case 'cooldown': return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
+            default: return 'text-slate-500 bg-slate-500/10 border-slate-500/20';
         }
     };
 
     if (loading) {
-        return <DashboardLayout><div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div></DashboardLayout>;
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+                    <div className="relative">
+                        <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+                        <div className="absolute inset-0 border-4 border-transparent border-b-purple-500 rounded-full animate-spin [animation-duration:1.5s]" />
+                    </div>
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Syncing Identities</p>
+                </div>
+            </DashboardLayout>
+        );
     }
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto px-4 py-4 md:py-8">
-                <div className="mb-8 flex items-center justify-between">
+            <div className="max-w-7xl mx-auto px-6 py-10">
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
                     <div>
-                        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 flex items-center gap-3">
-                            <Users className="text-blue-500" size={32} />
-                            Boost Accounts
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded text-[10px] font-black text-blue-500 uppercase tracking-widest">
+                                Network Engine
+                            </div>
+                        </div>
+                        <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            Boost <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Identities.</span>
                         </h1>
-                        <p className="text-gray-500">Manage TikTok accounts for real boosting</p>
+                        <p className="text-gray-500 mt-2 font-medium tracking-tight">Manage and scale your automated TikTok engagement network.</p>
                     </div>
-                    <button
+                    
+                    <Button 
                         onClick={() => setShowAddForm(!showAddForm)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all"
+                        className="h-14 px-8 rounded-2xl shadow-xl shadow-blue-500/20"
                     >
-                        <Plus size={20} />
-                        Add Account
-                    </button>
+                        {showAddForm ? <X size={20} className="mr-2" /> : <Plus size={20} className="mr-2" />}
+                        {showAddForm ? "Close Panel" : "Link Account"}
+                    </Button>
                 </div>
 
-                {/* Add Account Form */}
-                {showAddForm && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-lg border border-gray-200 dark:border-gray-700 mb-6">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Add New TikTok Account</h3>
+                <AnimatePresence>
+                    {showAddForm && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="mb-10 bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-8 shadow-2xl shadow-blue-500/5 relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 right-0 p-8 opacity-5">
+                                <Plus size={120} />
+                            </div>
 
-                        <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                            <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
-                                ℹ️ <strong>Auto-Login:</strong> System will automatically login and save cookies
-                            </p>
-                            <p className="text-xs text-blue-700 dark:text-blue-300">
-                                🛡️ <strong>Conservative Settings:</strong> Daily Limit: 25 actions, Delay: 5-12s, Cooldown: 4h (safer)
-                            </p>
-                        </div>
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-3 mb-8">
+                                    <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white">
+                                        <Fingerprint size={20} />
+                                    </div>
+                                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">New Identity Handshake</h3>
+                                </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <input
-                                type="text"
-                                placeholder="TikTok Username"
-                                value={newAccount.username}
-                                onChange={(e) => setNewAccount({ ...newAccount, username: e.target.value })}
-                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            />
-                            <input
-                                type="password"
-                                placeholder="Password"
-                                value={newAccount.password}
-                                onChange={(e) => setNewAccount({ ...newAccount, password: e.target.value })}
-                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            />
-                            <input
-                                type="number"
-                                placeholder="Daily Limit (25)"
-                                value={newAccount.dailyLimit}
-                                onChange={(e) => setNewAccount({ ...newAccount, dailyLimit: parseInt(e.target.value) })}
-                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            />
-                        </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">TikTok Username</label>
+                                        <input
+                                            type="text"
+                                            placeholder="@username"
+                                            value={newAccount.username}
+                                            onChange={(e) => setNewAccount({ ...newAccount, username: e.target.value })}
+                                            className="w-full px-6 py-4 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-gray-900 dark:text-white font-bold"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Access Token / Password</label>
+                                        <input
+                                            type="password"
+                                            placeholder="••••••••"
+                                            value={newAccount.password}
+                                            onChange={(e) => setNewAccount({ ...newAccount, password: e.target.value })}
+                                            className="w-full px-6 py-4 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-gray-900 dark:text-white font-bold"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Daily Capacity</label>
+                                        <input
+                                            type="number"
+                                            value={newAccount.dailyLimit}
+                                            onChange={(e) => setNewAccount({ ...newAccount, dailyLimit: parseInt(e.target.value) })}
+                                            className="w-full px-6 py-4 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-gray-900 dark:text-white font-bold"
+                                        />
+                                    </div>
+                                </div>
 
-                        <div className="flex gap-2">
-                            <button
-                                onClick={addAccount}
-                                disabled={adding}
-                                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2"
-                            >
-                                {adding ? (
-                                    <>
-                                        <Loader2 size={16} className="animate-spin" />
-                                        Adding & Logging in...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Check size={16} />
-                                        Add Account
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                onClick={() => setShowAddForm(false)}
-                                disabled={adding}
-                                className="bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2"
-                            >
-                                <X size={16} />
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                )}
+                                <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-6 border-t border-gray-100 dark:border-white/5">
+                                    <div className="flex items-center gap-4 text-gray-400">
+                                        <ShieldAlert size={18} className="text-amber-500" />
+                                        <p className="text-xs font-bold leading-relaxed max-w-md">
+                                            System will perform a secure handshake to verify credentials and store session cookies in our encrypted vault.
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <button onClick={() => setShowAddForm(false)} className="px-6 py-3 text-xs font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 transition-colors">Discard</button>
+                                        <Button onClick={addAccount} isLoading={adding} className="px-8 rounded-xl shadow-lg shadow-green-500/20 bg-green-600 hover:bg-green-700">Link Now</Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                {/* Accounts List */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                {/* Grid View for Identities */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {accounts.length === 0 ? (
-                        <div className="p-6 md:p-12 text-center text-gray-500">
-                            <Users size={48} className="mx-auto mb-4 opacity-50" />
-                            <p>No accounts yet. Add your first TikTok account!</p>
+                        <div className="col-span-full py-32 text-center bg-gray-50 dark:bg-white/5 rounded-[3rem] border border-dashed border-gray-200 dark:border-white/10">
+                            <Users size={64} className="mx-auto mb-6 text-gray-300" />
+                            <h3 className="text-2xl font-black text-gray-400 tracking-tight">No Active Identities</h3>
+                            <p className="text-gray-500 mt-2 font-medium">Link your first TikTok account to start boosting.</p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 dark:bg-gray-700/50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Username</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Daily Limit</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions Today</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Actions</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {accounts.map((account) => (
-                                        <tr key={account._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
-                                                {account.username}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(account.status)}`}>
-                                                    {account.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500">
-                                                {account.dailyLimit}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500">
-                                                {account.actionsToday || 0}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500">
-                                                {account.totalActions || 0}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm">
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => testLogin(account._id)}
-                                                        disabled={testing === account._id}
-                                                        className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                                                        title="Test Login"
-                                                    >
-                                                        {testing === account._id ? (
-                                                            <Loader2 size={18} className="animate-spin" />
-                                                        ) : (
-                                                            <TestTube size={18} />
-                                                        )}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => deleteAccount(account._id)}
-                                                        className="text-red-600 hover:text-red-800"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        accounts.map((account, i) => (
+                            <motion.div
+                                key={account._id}
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: i * 0.05 }}
+                                className="group relative bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2rem] p-6 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500"
+                            >
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 bg-gray-50 dark:bg-black rounded-2xl flex items-center justify-center text-xl font-black text-blue-500 border border-gray-100 dark:border-white/5 group-hover:scale-110 transition-transform duration-500">
+                                            {account.username.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-black text-gray-900 dark:text-white tracking-tight leading-none mb-2">{account.username}</h4>
+                                            <div className={`px-2 py-0.5 border rounded-full text-[9px] font-black uppercase tracking-widest inline-block ${getStatusColor(account.status)}`}>
+                                                {account.status}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => deleteAccount(account._id)} className="p-2 text-gray-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all">
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 mb-6">
+                                    <div className="bg-gray-50 dark:bg-black/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Today</p>
+                                        <p className="text-xl font-black text-gray-900 dark:text-white">{account.actionsToday || 0}<span className="text-[10px] text-gray-400 ml-1">/ {account.dailyLimit}</span></p>
+                                    </div>
+                                    <div className="bg-gray-50 dark:bg-black/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Lifetime</p>
+                                        <p className="text-xl font-black text-gray-900 dark:text-white">{account.totalActions || 0}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-white/5">
+                                    <div className="flex items-center gap-2">
+                                        <Activity size={14} className="text-blue-500 animate-pulse" />
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Engine Ready</span>
+                                    </div>
+                                    <button 
+                                        onClick={() => testLogin(account._id)}
+                                        disabled={testing === account._id}
+                                        className="flex items-center gap-2 text-xs font-black text-blue-600 hover:text-blue-700 transition-colors uppercase tracking-widest"
+                                    >
+                                        {testing === account._id ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
+                                        Verify Auth
+                                    </button>
+                                </div>
+                            </motion.div>
+                        ))
                     )}
                 </div>
 
-                {/* Warning */}
-                <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                    <p className="text-sm text-red-800 dark:text-red-200">
-                        ⚠️ <strong>Security Warning:</strong> Use burner accounts only. Passwords are encrypted. Accounts may get banned by TikTok.
-                    </p>
-                </div>
+                {/* Footer Warning */}
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="mt-12 flex items-center gap-4 p-6 bg-rose-500/5 border border-rose-500/10 rounded-3xl"
+                >
+                    <div className="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center text-rose-500">
+                        <AlertCircle size={20} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-1">Security Protocol</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400 leading-relaxed">
+                            Always use burner identities. Passwords are salted and encrypted with AES-256. We do not store raw credentials in our primary databases.
+                        </p>
+                    </div>
+                </motion.div>
             </div>
         </DashboardLayout>
     );

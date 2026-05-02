@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { Zap, Plus, Trash2, Save, TrendingUp, Clock, Heart } from "lucide-react";
+import { Zap, Plus, Trash2, Save, TrendingUp, Clock, Heart, ShieldCheck, Activity, Settings2, Sliders, ChevronRight, AlertTriangle, Sparkles } from "lucide-react";
 import api from "../utils/api";
 import toast from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
+import Button from "../components/ui/Button";
 
 export default function BoostSettings() {
     const [enabled, setEnabled] = useState(false);
@@ -23,7 +25,7 @@ export default function BoostSettings() {
                 setRealBoost(res.data.rules.realBoost || { enabled: false });
             }
         } catch (err) {
-            toast.error("Failed to load boost rules");
+            toast.error("Failed to load automation profile");
         } finally {
             setLoading(false);
         }
@@ -39,7 +41,7 @@ export default function BoostSettings() {
     };
 
     const updateRule = (index, field, value) => {
-        const newRules = [...rules];
+        const newRules = JSON.parse(JSON.stringify(rules));
         if (field.includes('.')) {
             const [parent, child] = field.split('.');
             newRules[index][parent][child] = value;
@@ -68,176 +70,236 @@ export default function BoostSettings() {
         try {
             const res = await api.post("/boost/rules", { enabled, rules, realBoost });
             if (res.data.success) {
-                toast.success("Boost rules saved!");
+                toast.success("Automation profile updated 🚀");
             }
         } catch (err) {
-            toast.error("Failed to save rules");
+            toast.error("Cloud sync failed");
         }
     };
 
     if (loading) {
-        return <DashboardLayout><div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div></DashboardLayout>;
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+                    <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Loading Automation Profile</p>
+                </div>
+            </DashboardLayout>
+        );
     }
 
     return (
         <DashboardLayout>
-            <div className="max-w-5xl mx-auto px-4 py-8">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 flex items-center gap-3">
-                        <Zap className="text-yellow-500" size={32} />
-                        Auto-Boost Settings
-                    </h1>
-                    <p className="text-gray-500">Automatically boost your posts with simulated engagement</p>
-                </div>
-
-                {/* Master Toggle */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-lg mb-6 border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Enable Auto-Boost</h3>
-                            <p className="text-sm text-gray-500">Automatically promote posts based on rules below</p>
+            <div className="max-w-5xl mx-auto px-6 py-10">
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+                    <div>
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded text-[10px] font-black text-blue-500 uppercase tracking-widest">
+                                AI Configuration
+                            </div>
                         </div>
-                        <button
-                            onClick={() => setEnabled(!enabled)}
-                            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${enabled ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-                        >
-                            <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-7' : 'translate-x-1'}`} />
-                        </button>
+                        <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            Auto <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Pilot.</span>
+                        </h1>
+                        <p className="text-gray-500 mt-2 font-medium">Fine-tune your automated engagement behavior and rules.</p>
                     </div>
+                    
+                    <Button onClick={saveRules} className="h-14 px-10 rounded-2xl shadow-xl shadow-blue-500/20">
+                        <Save size={20} className="mr-2" />
+                        Save Profile
+                    </Button>
                 </div>
 
-                {/* Real Boost Toggle */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-lg mb-6 border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Enable Real TikTok Boost 🤖</h3>
-                            <p className="text-sm text-gray-500">Use browser automation for REAL engagement (requires accounts)</p>
-                        </div>
-                        <button
-                            onClick={() => setRealBoost(prev => ({ ...prev, enabled: !prev.enabled }))}
-                            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${realBoost.enabled ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                <div className="grid grid-cols-1 gap-8">
+                    {/* Master Controls */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <motion.div 
+                            whileHover={{ y: -4 }}
+                            className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-8 shadow-2xl shadow-black/5"
                         >
-                            <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${realBoost.enabled ? 'translate-x-7' : 'translate-x-1'}`} />
-                        </button>
-                    </div>
-                    {realBoost.enabled && (
-                        <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                                ⚠️ Real boost requires TikTok accounts. Go to <a href="/boost-accounts" className="underline font-bold">Boost Accounts</a> to add them.
-                            </p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Rules List */}
-                <div className="space-y-4 mb-6">
-                    {rules.map((rule, index) => (
-                        <div key={index} className="bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-lg border border-gray-200 dark:border-gray-700">
-                            <div className="flex items-start justify-between mb-4">
-                                <h4 className="text-lg font-bold text-gray-900 dark:text-white">Rule {index + 1}</h4>
-                                <button onClick={() => deleteRule(index)} className="text-red-500 hover:text-red-700">
-                                    <Trash2 size={20} />
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${enabled ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-gray-100 dark:bg-black text-gray-400'}`}>
+                                        <Activity size={24} className={enabled ? 'animate-pulse' : ''} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Main Engine</h3>
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Auto-Boost System</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setEnabled(!enabled)}
+                                    className={`relative inline-flex h-9 w-16 items-center rounded-full transition-all duration-300 ${enabled ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-800'}`}
+                                >
+                                    <span className={`inline-block h-7 w-7 transform rounded-full bg-white shadow-xl transition-transform duration-300 ${enabled ? 'translate-x-8' : 'translate-x-1'}`} />
                                 </button>
                             </div>
+                        </motion.div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Rule Type */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Rule Type</label>
-                                    <select
-                                        value={rule.type}
-                                        onChange={(e) => updateRule(index, 'type', e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    >
-                                        <option value="time">Time-Based</option>
-                                        <option value="engagement">Engagement-Based</option>
-                                    </select>
-                                </div>
-
-                                {/* Condition */}
-                                {rule.type === 'time' ? (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Boost After (Hours)</label>
-                                        <input
-                                            type="number"
-                                            value={rule.condition.hours || 24}
-                                            onChange={(e) => updateRule(index, 'condition.hours', parseInt(e.target.value))}
-                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Min Likes Threshold</label>
-                                        <input
-                                            type="number"
-                                            value={rule.condition.minLikes || 10}
-                                            onChange={(e) => updateRule(index, 'condition.minLikes', parseInt(e.target.value))}
-                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Intensity */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Intensity</label>
-                                    <select
-                                        value={rule.intensity}
-                                        onChange={(e) => updateRule(index, 'intensity', e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    >
-                                        <option value="low">Low (10-20 likes)</option>
-                                        <option value="medium">Medium (30-50 likes)</option>
-                                        <option value="high">High (100+ likes)</option>
-                                    </select>
-                                </div>
-
-                                {/* Actions */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Actions</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {['like', 'comment', 'share'].map(action => (
-                                            <button
-                                                key={action}
-                                                onClick={() => toggleAction(index, action)}
-                                                className={`px-4 py-2 rounded-lg font-medium transition-colors ${rule.actions.includes(action)
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                                    }`}
-                                            >
-                                                {action.charAt(0).toUpperCase() + action.slice(1)}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                        <motion.div 
+                            whileHover={{ y: -4 }}
+                            className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-8 shadow-2xl shadow-black/5 overflow-hidden relative"
+                        >
+                            <div className="absolute top-0 right-0 p-4 opacity-10">
+                                <Sparkles size={80} className="text-purple-500" />
                             </div>
+                            <div className="flex items-center justify-between relative z-10">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${realBoost.enabled ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' : 'bg-gray-100 dark:bg-black text-gray-400'}`}>
+                                        <ShieldCheck size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Real Network</h3>
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Identity Engagement</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setRealBoost(prev => ({ ...prev, enabled: !prev.enabled }))}
+                                    className={`relative inline-flex h-9 w-16 items-center rounded-full transition-all duration-300 ${realBoost.enabled ? 'bg-purple-500' : 'bg-gray-200 dark:bg-gray-800'}`}
+                                >
+                                    <span className={`inline-block h-7 w-7 transform rounded-full bg-white shadow-xl transition-transform duration-300 ${realBoost.enabled ? 'translate-x-8' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+
+                    {realBoost.enabled && (
+                        <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="p-6 bg-purple-500/5 border border-purple-500/10 rounded-3xl flex items-center justify-between gap-4"
+                        >
+                            <div className="flex items-center gap-4 text-purple-500">
+                                <AlertTriangle size={20} />
+                                <p className="text-xs font-bold uppercase tracking-widest">
+                                    Network accounts required for identity-based engagement.
+                                </p>
+                            </div>
+                            <a href="/boost-accounts" className="text-[10px] font-black uppercase tracking-widest bg-purple-500 text-white px-4 py-2 rounded-xl hover:bg-purple-600 transition-colors">Manage Accounts</a>
+                        </motion.div>
+                    )}
+
+                    {/* Rules Engine */}
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between px-4">
+                            <div className="flex items-center gap-3">
+                                <Sliders size={20} className="text-blue-500" />
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Rules Engine</h3>
+                            </div>
+                            <button 
+                                onClick={addRule}
+                                className="p-3 bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white rounded-2xl transition-all flex items-center gap-2 text-xs font-black uppercase tracking-widest"
+                            >
+                                <Plus size={18} /> Add Rule
+                            </button>
                         </div>
-                    ))}
+
+                        <div className="grid grid-cols-1 gap-6">
+                            <AnimatePresence mode="popLayout">
+                                {rules.map((rule, index) => (
+                                    <motion.div
+                                        key={index}
+                                        initial={{ opacity: 0, x: -20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: 20 }}
+                                        className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-8 shadow-2xl shadow-black/5 relative group"
+                                    >
+                                        <div className="flex items-start justify-between mb-8">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-gray-50 dark:bg-black rounded-xl flex items-center justify-center text-gray-400 font-black">
+                                                    {index + 1}
+                                                </div>
+                                                <h4 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Automation Trigger</h4>
+                                            </div>
+                                            <button 
+                                                onClick={() => deleteRule(index)}
+                                                className="p-3 text-gray-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-2xl transition-all"
+                                            >
+                                                <Trash2 size={20} />
+                                            </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Logic Type</label>
+                                                <select
+                                                    value={rule.type}
+                                                    onChange={(e) => updateRule(index, 'type', e.target.value)}
+                                                    className="w-full px-6 py-4 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-gray-900 dark:text-white font-bold"
+                                                >
+                                                    <option value="time">Chronological</option>
+                                                    <option value="engagement">Engagement Threshold</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">
+                                                    {rule.type === 'time' ? 'Interval (Hours)' : 'Likes Target'}
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    value={rule.type === 'time' ? rule.condition.hours : rule.condition.minLikes}
+                                                    onChange={(e) => updateRule(index, rule.type === 'time' ? 'condition.hours' : 'condition.minLikes', parseInt(e.target.value))}
+                                                    className="w-full px-6 py-4 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-gray-900 dark:text-white font-bold"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Engagement Volume</label>
+                                                <select
+                                                    value={rule.intensity}
+                                                    onChange={(e) => updateRule(index, 'intensity', e.target.value)}
+                                                    className="w-full px-6 py-4 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-gray-900 dark:text-white font-bold"
+                                                >
+                                                    <option value="low">Optimized (10-20)</option>
+                                                    <option value="medium">Accelerated (30-50)</option>
+                                                    <option value="high">Maximum (100+)</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Action Protocol</label>
+                                                <div className="flex gap-2">
+                                                    {['like', 'comment', 'share'].map(action => (
+                                                        <button
+                                                            key={action}
+                                                            onClick={() => toggleAction(index, action)}
+                                                            className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${rule.actions.includes(action)
+                                                                ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                                                                : 'bg-gray-100 dark:bg-black text-gray-400 hover:text-gray-600'
+                                                                }`}
+                                                        >
+                                                            {action}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Add Rule Button */}
-                <button
-                    onClick={addRule}
-                    className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 dark:text-gray-400 hover:border-blue-500 hover:text-blue-500 transition-colors flex items-center justify-center gap-2 mb-6"
+                {/* Risk Notice */}
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.6 }}
+                    className="mt-12 flex items-center gap-4 p-6 bg-amber-500/5 border border-amber-500/10 rounded-3xl"
                 >
-                    <Plus size={20} />
-                    Add New Rule
-                </button>
-
-                {/* Save Button */}
-                <button
-                    onClick={saveRules}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all"
-                >
-                    <Save size={20} />
-                    Save Boost Rules
-                </button>
-
-                {/* Warning */}
-                <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                        ⚠️ <strong>Note:</strong> Simulated engagement may violate platform policies. Use responsibly and at your own risk.
-                    </p>
-                </div>
+                    <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500">
+                        <Settings2 size={20} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] mb-1">Safety Advisory</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400 leading-relaxed">
+                            Simulated engagement behavior is managed via decentralized worker nodes. Adjust intensity levels to maintain platform compliance and account longevity.
+                        </p>
+                    </div>
+                </motion.div>
             </div>
         </DashboardLayout>
     );

@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { UploadCloud, Calendar, Clock, Check, X, Loader, FileVideo, AlertCircle } from "lucide-react";
+import { UploadCloud, Calendar, Clock, Check, X, Loader, FileVideo, AlertCircle, Trash2, Send, Filter, Settings } from "lucide-react";
 import api from "../utils/api";
 import toast from "react-hot-toast";
+import Button from "../components/ui/Button";
 
 export default function BulkPost() {
     // State
     const [files, setFiles] = useState([]);
     const [uploading, setUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0); // Simulated
     const [availablePages, setAvailablePages] = useState([]);
     const [selectedPage, setSelectedPage] = useState("");
 
@@ -17,7 +18,7 @@ export default function BulkPost() {
     const [intervalHours, setIntervalHours] = useState(24); // Default 1 day
     const [commonCaption, setCommonCaption] = useState("");
 
-    // Processed Items (After upload logic or local preview)
+    // Processed Items
     const [items, setItems] = useState([]);
 
     // 🔄 Fetch Pages
@@ -48,7 +49,7 @@ export default function BulkPost() {
         }));
 
         setItems(prev => [...prev, ...newItems]);
-        setFiles(prev => [...prev, ...selected]); // Keep raw files if needed
+        setFiles(prev => [...prev, ...selected]);
     };
 
     // 🚀 Start Bulk Upload
@@ -60,14 +61,12 @@ export default function BulkPost() {
         const toastId = toast.loading(`Uploading ${pendingItems.length} videos...`);
 
         try {
-            // We'll upload in chunks of 5 to avoid timeouts/memory issues
             const CHUNK_SIZE = 5;
             for (let i = 0; i < pendingItems.length; i += CHUNK_SIZE) {
                 const chunk = pendingItems.slice(i, i + CHUNK_SIZE);
                 const formData = new FormData();
                 chunk.forEach(item => formData.append("videos", item.file));
 
-                // Update progress message
                 toast.loading(`Uploading batch ${Math.floor(i / CHUNK_SIZE) + 1}...`, { id: toastId });
 
                 const res = await api.post("/upload/video", formData, {
@@ -75,8 +74,6 @@ export default function BulkPost() {
                 });
 
                 if (res.data.success) {
-                    // Match results back to items by originalName or index
-                    // Since backend returns array corresponding to input, we iterate
                     res.data.files.forEach((uploadedFile) => {
                         setItems(prev => prev.map(item => {
                             if (item.name === uploadedFile.originalName && item.status === "pending") {
@@ -92,7 +89,7 @@ export default function BulkPost() {
                 }
             }
             toast.success("All uploads complete!", { id: toastId });
-            applyAutoSchedule(items); // Re-apply schedule just in case
+            applyAutoSchedule(items);
         } catch (err) {
             console.error(err);
             toast.error("Upload failed", { id: toastId });
@@ -110,13 +107,12 @@ export default function BulkPost() {
             const scheduledTime = new Date(start.getTime() + index * intervalHours * 60 * 60 * 1000);
             return {
                 ...item,
-                caption: item.caption || commonCaption, // Apply common caption if empty
+                caption: item.caption || commonCaption,
                 scheduleTime: scheduledTime.toISOString()
             };
         }));
     }, [startDate, intervalHours, commonCaption]);
 
-    // Apply when settings change
     useEffect(() => {
         applyAutoSchedule();
     }, [startDate, intervalHours, commonCaption, applyAutoSchedule]);
@@ -150,52 +146,60 @@ export default function BulkPost() {
     return (
         <DashboardLayout>
             <div className="max-w-7xl mx-auto px-4 py-4 md:py-8">
-                <div className="flex justify-between items-center mb-8">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <UploadCloud className="text-blue-500" />
-                            Bulk Video Upload
-                        </h1>
-                        <p className="text-gray-500 text-sm mt-1">Upload up to 50 videos and auto-schedule them.</p>
-                    </div>
-                </div>
+                <motion.div 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-8"
+                >
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                        <div className="p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/30">
+                            <UploadCloud size={24} />
+                        </div>
+                        Bulk Upload
+                    </h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2">Upload up to 50 videos and auto-schedule them with human-like intervals.</p>
+                </motion.div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* 👈 Left Panel: Controls */}
-                    <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* 👈 Left Panel: Controls (Col-span 4) */}
+                    <div className="lg:col-span-4 space-y-6">
                         {/* 1. Page Selection */}
-                        <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">1. Post To</label>
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+                            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <Filter size={16} /> 1. Target Page
+                            </h3>
                             <select
                                 value={selectedPage}
                                 onChange={(e) => setSelectedPage(e.target.value)}
-                                className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900"
+                                className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white font-medium"
                             >
                                 {availablePages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                         </div>
 
                         {/* 2. Common Settings */}
-                        <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                            <h3 className="font-bold text-gray-800 dark:text-white mb-4">2. Auto-Scheduler</h3>
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+                            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <Settings size={16} /> 2. Auto-Scheduler
+                            </h3>
 
-                            <div className="space-y-4">
+                            <div className="space-y-5">
                                 <div>
-                                    <label className="text-xs font-semibold text-gray-500 uppercase">Start Date & Time</label>
+                                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 block">Start Date & Time</label>
                                     <input
                                         type="datetime-local"
                                         value={startDate}
                                         onChange={(e) => setStartDate(e.target.value)}
-                                        className="w-full mt-1 p-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-900"
+                                        className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-semibold text-gray-500 uppercase">Frequency</label>
+                                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 block">Post Frequency</label>
                                     <select
                                         value={intervalHours}
                                         onChange={(e) => setIntervalHours(Number(e.target.value))}
-                                        className="w-full mt-1 p-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-900"
+                                        className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white font-medium"
                                     >
                                         <option value={1}>Every 1 Hour</option>
                                         <option value={3}>Every 3 Hours</option>
@@ -207,102 +211,125 @@ export default function BulkPost() {
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-semibold text-gray-500 uppercase">Default Caption</label>
+                                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 block">Common Caption</label>
                                     <textarea
                                         value={commonCaption}
                                         onChange={(e) => setCommonCaption(e.target.value)}
-                                        placeholder="Caption for all videos..."
-                                        className="w-full mt-1 p-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-900 h-24 resize-none"
+                                        placeholder="Add a caption for all videos..."
+                                        className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white h-24 resize-none"
                                     />
                                 </div>
                             </div>
                         </div>
 
                         {/* 3. Action */}
-                        <div className="bg-blue-50 dark:bg-blue-900/10 p-4 md:p-6 rounded-2xl border border-blue-100 dark:border-blue-800">
-                            <button
-                                onClick={handleSubmit}
-                                disabled={uploading || items.length === 0}
-                                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                Schedule {items.length} Posts
-                            </button>
-                        </div>
+                        <Button
+                            onClick={handleSubmit}
+                            disabled={uploading || items.length === 0}
+                            isLoading={uploading}
+                            fullWidth
+                            size="large"
+                            className="rounded-3xl py-6 text-lg"
+                        >
+                            <Send size={20} /> Schedule {items.length} Posts
+                        </Button>
                     </div>
 
-                    {/* 👉 Right Panel: File List */}
-                    <div className="lg:col-span-2 space-y-6">
+                    {/* 👉 Right Panel: File List (Col-span 8) */}
+                    <div className="lg:col-span-8 space-y-6">
                         {/* Drop Zone */}
-                        <label className="block w-full border-3 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-gray-800 rounded-3xl p-6 md:p-10 text-center cursor-pointer transition-all">
+                        <motion.label 
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            className="block w-full border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 rounded-3xl p-10 text-center cursor-pointer transition-all"
+                        >
                             <input type="file" multiple accept="video/*" onChange={handleFileSelect} className="hidden" />
-                            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                 <UploadCloud size={32} />
                             </div>
-                            <h3 className="text-xl font-bold text-gray-700 dark:text-gray-200">Click to Select Videos</h3>
-                            <p className="text-gray-500 mt-2">MP4, MOV, WEBM (Max 50MB each)</p>
-                        </label>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Click to Select Videos</h3>
+                            <p className="text-gray-500 dark:text-gray-400 mt-2">MP4, MOV, WEBM (Max 50MB each)</p>
+                        </motion.label>
 
                         {/* File Table */}
-                        {items.length > 0 && (
-                            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                                    <h3 className="font-bold">Queue ({items.length})</h3>
-                                    {items.some(i => i.status === "pending") && (
-                                        <button
-                                            onClick={startUpload}
-                                            disabled={uploading}
-                                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg flex items-center gap-2"
-                                        >
-                                            {uploading ? <Loader className="animate-spin" size={16} /> : <UploadCloud size={16} />}
-                                            {uploading ? "Uploading..." : "Start Upload"}
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[600px] overflow-y-auto">
-                                    {items.map((item, idx) => (
-                                        <div key={item.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
-                                            <div className="flex items-start gap-4">
-                                                <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                    <FileVideo className="text-gray-400" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex justify-between items-start mb-1">
-                                                        <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate pr-4">{item.name}</h4>
-                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${item.status === 'uploaded' ? 'bg-green-100 text-green-700' :
-                                                            item.status === 'error' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
-                                                            }`}>
-                                                            {item.status.toUpperCase()}
-                                                        </span>
+                        <AnimatePresence>
+                            {items.length > 0 && (
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm"
+                                >
+                                    <div className="p-5 bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                                        <h3 className="font-bold text-gray-900 dark:text-white">Upload Queue ({items.length})</h3>
+                                        {items.some(i => i.status === "pending") && (
+                                            <Button
+                                                onClick={startUpload}
+                                                isLoading={uploading}
+                                                size="small"
+                                                variant="primary"
+                                                className="rounded-full"
+                                            >
+                                                <UploadCloud size={16} /> Start Upload
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[500px] overflow-y-auto">
+                                        {items.map((item, idx) => (
+                                            <motion.div 
+                                                key={item.id} 
+                                                layout
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors"
+                                            >
+                                                <div className="flex items-start gap-4">
+                                                    <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                        <FileVideo className="text-gray-400 dark:text-gray-500" size={24} />
                                                     </div>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Caption..."
-                                                            value={item.caption}
-                                                            onChange={(e) => {
-                                                                const val = e.target.value;
-                                                                setItems(prev => prev.map((i, x) => x === idx ? { ...i, caption: val } : i));
-                                                            }}
-                                                            className="text-sm p-2 rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-900 w-full"
-                                                        />
-                                                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                                                            <Calendar size={14} />
-                                                            {item.scheduleTime ? new Date(item.scheduleTime).toLocaleString() : "Not scheduled"}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div className="overflow-hidden">
+                                                                <h4 className="font-bold text-gray-900 dark:text-white truncate">{item.name}</h4>
+                                                                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">{item.size}</p>
+                                                            </div>
+                                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter ${item.status === 'uploaded' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                                item.status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                                                                }`}>
+                                                                {item.status}
+                                                            </span>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Override caption..."
+                                                                value={item.caption}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    setItems(prev => prev.map((i, x) => x === idx ? { ...i, caption: val } : i));
+                                                                }}
+                                                                className="text-xs p-2.5 rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-1 focus:ring-blue-500 outline-none w-full"
+                                                            />
+                                                            <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-2 rounded-lg border border-gray-100 dark:border-gray-700">
+                                                                <Calendar size={14} className="text-blue-500" />
+                                                                <span className="font-medium">
+                                                                    {item.scheduleTime ? new Date(item.scheduleTime).toLocaleString() : "Syncing..."}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                    <button
+                                                        onClick={() => setItems(prev => prev.filter((_, x) => x !== idx))}
+                                                        className="p-2 text-gray-300 hover:text-red-500 dark:text-gray-600 dark:hover:text-red-400 transition-colors"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    onClick={() => setItems(prev => prev.filter((_, x) => x !== idx))}
-                                                    className="text-gray-400 hover:text-red-500"
-                                                >
-                                                    <X size={18} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
             </div>

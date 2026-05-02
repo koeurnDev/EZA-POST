@@ -1,34 +1,36 @@
 // ============================================================
-// 👤 Profile.jsx — Premium User Profile
+// 👤 Profile.jsx — Premium User Profile (Redesigned 2026)
 // ============================================================
 
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion"; // eslint-disable-line no-unused-vars
-
+import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useAuth } from "../context/AuthContext";
 import { authAPI, pagesAPI } from "../utils/api";
-
+import { 
+    User, Mail, MapPin, Calendar, Camera, Edit3, 
+    TrendingUp, MessageSquare, Shield, Clock, 
+    Settings, LogOut, ChevronRight, Activity 
+} from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
+import Button from "../components/ui/Button";
 
 export default function Profile() {
-    const { user, updateUser, loading } = useAuth(); // ✅ Added loading
+    const { user, updateUser, loading } = useAuth();
     const [isDemo, setIsDemo] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-    // 📝 Static Config for Stats (Icons & Colors) - NEVER CACHE THIS
+    // Stats Configuration
     const statConfig = [
-        { label: "Posts Created", icon: "🎥", color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
-        { label: "Auto-Replies", icon: "💬", color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-        { label: "Pages Connected", icon: "🛡️", color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
+        { label: "Posts", icon: TrendingUp, color: "blue" },
+        { label: "Replies", icon: MessageSquare, color: "emerald" },
+        { label: "Pages", icon: Shield, color: "purple" },
     ];
 
     const [stats, setStats] = useState(() => {
-        // 💾 Load Cached Values ONLY (ignore icons/structure)
         try {
             const cached = localStorage.getItem("profileStatsValues");
             const values = cached ? JSON.parse(cached) : { posts: "0", replies: "0", pages: "0" };
-
             return [
                 { ...statConfig[0], value: values.posts },
                 { ...statConfig[1], value: values.replies },
@@ -39,37 +41,31 @@ export default function Profile() {
         }
     });
 
-    // ✅ Initialize Demo Mode & Fetch Stats
     useEffect(() => {
-        if (localStorage.getItem("isDemo") === "true" || user?.isDemo) {
-            setIsDemo(true);
-        }
+        if (localStorage.getItem("isDemo") === "true" || user?.isDemo) setIsDemo(true);
 
         const fetchStats = async () => {
             try {
-                // Fetch Pages Count
-                const pagesRes = await pagesAPI.getAccounts();
-                const pageCount = pagesRes.success ? pagesRes.accounts.length : 0;
+                const [pagesRes, statsRes] = await Promise.all([
+                    pagesAPI.getAccounts(),
+                    authAPI.getStats()
+                ]);
 
-                // Fetch Real Stats
-                const statsRes = await authAPI.getStats();
+                const pageCount = pagesRes.success ? pagesRes.accounts.length : 0;
                 const postsCount = statsRes.success ? statsRes.stats.posts : 0;
                 const repliesCount = statsRes.success ? statsRes.stats.replies : 0;
 
-                // Update Stats
                 setStats([
                     { ...statConfig[0], value: postsCount.toString() },
                     { ...statConfig[1], value: repliesCount.toString() },
                     { ...statConfig[2], value: pageCount.toString() },
                 ]);
 
-                // 💾 Save Values Only
                 localStorage.setItem("profileStatsValues", JSON.stringify({
                     posts: postsCount.toString(),
                     replies: repliesCount.toString(),
                     pages: pageCount.toString()
                 }));
-
             } catch (err) {
                 console.error("Failed to fetch profile stats:", err);
             }
@@ -78,286 +74,204 @@ export default function Profile() {
         if (user) fetchStats();
     }, [user]);
 
-    // 🕒 Mock Activity
     const activities = [
-        { id: 1, action: "Logged in from new device", time: "2 hours ago", icon: "👤" },
-        { id: 2, action: "Scheduled a new post", time: "5 hours ago", icon: "🎥" },
-        { id: 3, action: "Updated auto-reply rules", time: "1 day ago", icon: "💬" },
-        { id: 4, action: "Connected 'Gaming Hub' page", time: "2 days ago", icon: "🛡️" },
+        { id: 1, action: "Logged in via Desktop", time: "2 hours ago", icon: User },
+        { id: 2, action: "Scheduled video post", time: "5 hours ago", icon: TrendingUp },
+        { id: 3, action: "Updated bot rules", time: "1 day ago", icon: Settings },
+        { id: 4, action: "Connected new page", time: "2 days ago", icon: Shield },
     ];
 
-    // 🖼️ Handle Cover Upload
-    const handleCoverChange = async (e) => {
+    const handleFileUpload = async (e, type) => {
         const file = e.target.files[0];
         if (!file) return;
 
         try {
-            const uploadRes = await authAPI.uploadCover(file);
+            const uploadRes = type === 'cover' ? await authAPI.uploadCover(file) : await authAPI.uploadAvatar(file);
             if (uploadRes.success) {
-                const updateRes = await updateUser({ coverImage: uploadRes.file.url });
-                if (updateRes.success) {
-                    // Success toast or notification could go here
-                }
+                await updateUser({ [type === 'cover' ? 'coverImage' : 'avatar']: uploadRes.file.url });
             }
         } catch (err) {
-            console.error("Failed to upload cover:", err);
+            console.error(`Failed to upload ${type}:`, err);
         }
     };
 
-    // 👤 Handle Avatar Upload
-    const handleAvatarChange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        try {
-            const uploadRes = await authAPI.uploadAvatar(file);
-            if (uploadRes.success) {
-                const updateRes = await updateUser({ avatar: uploadRes.file.url });
-                if (updateRes.success) {
-                    // Success toast
-                }
-            }
-        } catch (err) {
-            console.error("Failed to upload avatar:", err);
-        }
-    };
-
-    // 🛑 1. Check Loading Status
-    if (loading) {
-        return (
-            <DashboardLayout>
-                <div className="flex items-center justify-center h-[50vh]">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                </div>
-            </DashboardLayout>
-        );
-    }
-
-    // 🛑 2. Check for Null/Undefined Data
-    if (!user) {
-        return (
-            <DashboardLayout>
-                <div className="flex flex-col items-center justify-center h-[50vh] text-center">
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Profile Not Found</h2>
-                    <p className="text-gray-500 mb-4">Please log in to view your profile.</p>
-                </div>
-            </DashboardLayout>
-        );
-    }
+    if (loading) return (
+        <DashboardLayout>
+            <div className="flex flex-col items-center justify-center h-[70vh]">
+                <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        </DashboardLayout>
+    );
 
     return (
         <DashboardLayout>
-            {/* 🖼️ Hero Section */}
-            <div className="relative mb-24">
-                {/* Cover Image */}
-                <div className="h-40 md:h-64 w-full rounded-2xl bg-gray-200 dark:bg-gray-800 overflow-hidden relative group">
-                    {user?.coverImage ? (
-                        <img
-                            src={user.coverImage}
-                            alt="Cover"
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                            referrerPolicy="no-referrer"
-                        />
-                    ) : (
-                        <div className="w-full h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
-                    )}
-
-                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
-
-                    <div className="absolute bottom-4 right-4 z-10">
-                        <label className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-lg text-xs md:text-sm font-medium transition-colors cursor-pointer">
-                            <span>📷</span>
-                            <span className="hidden sm:inline">Change Cover</span>
-                            <span className="sm:hidden">Cover</span>
-                            <input
-                                type="file"
-                                className="hidden"
-                                accept="image/*"
-                                onChange={handleCoverChange}
-                            />
-                        </label>
-                    </div>
-                </div>
-
-                {/* Avatar & Info Overlay */}
-                <div className="absolute -bottom-16 left-4 md:left-10 flex items-end gap-4 md:gap-6">
-                    <div className="relative group">
-                        <div className="w-28 h-28 md:w-40 md:h-40 rounded-full border-4 border-white dark:border-gray-900 bg-white dark:bg-gray-800 shadow-xl overflow-hidden flex items-center justify-center text-3xl md:text-4xl font-bold text-gray-400 relative">
-                            {user?.avatar ? (
-                                <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                            ) : (
-                                user?.name?.[0] || "U"
-                            )}
-
-                            {/* Avatar Upload Overlay */}
-                            <label className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                                <span className="text-white text-2xl">📷</span>
-                                <input
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={handleAvatarChange}
-                                />
-                            </label>
-                        </div>
-                    </div>
-
-                    <div className="mb-1 md:mb-4">
-                        <h1 className="text-xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            {user?.name || "User Name"}
-                            {isDemo && (
-                                <span className="px-2 py-0.5 text-[10px] md:text-xs bg-yellow-100 text-yellow-800 rounded-full font-medium">
-                                    DEMO
-                                </span>
-                            )}
-                        </h1>
-                        <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 font-medium">
-                            {user?.role || "Administrator"}
-                        </p>
-                    </div>
-                </div>
-
-                {/* Edit Profile Button (Desktop & Mobile) */}
-                <div className="absolute -bottom-12 right-4 md:right-6">
-                    <button
-                        onClick={() => setIsEditModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 md:px-6 md:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium shadow-lg shadow-blue-500/30 transition-all active:scale-95 text-sm md:text-base"
+            <div className="max-w-7xl mx-auto px-4 py-4 md:py-8">
+                {/* Hero Section */}
+                <div className="relative mb-32">
+                    {/* Cover Photo */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="h-48 md:h-80 w-full rounded-[2.5rem] bg-gray-200 dark:bg-gray-800 overflow-hidden relative group shadow-2xl"
                     >
-                        <span>✏️</span>
-                        <span className="hidden sm:inline">Edit Profile</span>
-                        <span className="sm:hidden">Edit</span>
-                    </button>
-                </div>
-            </div>
+                        {user?.coverImage ? (
+                            <img src={user.coverImage} alt="Cover" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+                        ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700" />
+                        )}
+                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors" />
+                        
+                        <label className="absolute bottom-6 right-6 p-3 bg-white/10 backdrop-blur-xl text-white rounded-2xl border border-white/20 hover:bg-white/20 cursor-pointer transition-all shadow-xl group-hover:translate-x-[-10px]">
+                            <Camera size={20} />
+                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'cover')} />
+                        </label>
+                    </motion.div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
-                {/* 👈 Left Column: Info & Stats */}
-                <div className="lg:col-span-2 space-y-8">
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {stats.map((stat, index) => (
-                            <motion.div
-                                key={index}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                                className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center hover:shadow-md transition-shadow"
+                    {/* Profile Overlay */}
+                    <div className="absolute -bottom-16 left-8 md:left-12 flex items-end gap-6 md:gap-8">
+                        <motion.div 
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="relative group"
+                        >
+                            <div className="w-32 h-32 md:w-44 md:h-44 rounded-full border-[6px] border-white dark:border-gray-900 bg-white dark:bg-gray-800 shadow-2xl overflow-hidden flex items-center justify-center relative">
+                                {user?.avatar ? (
+                                    <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    <span className="text-4xl font-black text-gray-300 uppercase">{user?.name?.[0]}</span>
+                                )}
+                                <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                    <Camera size={32} className="text-white" />
+                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'avatar')} />
+                                </label>
+                            </div>
+                        </motion.div>
+
+                        <div className="mb-4">
+                            <motion.h1 
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="text-2xl md:text-4xl font-black text-gray-900 dark:text-white flex items-center gap-3 tracking-tight"
                             >
-                                <div className={`p-3 rounded-full mb-3 ${stat.bg} ${stat.color} text-xl`}>
-                                    {stat.icon}
-                                </div>
-                                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                    {stat.value}
-                                </h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    {stat.label}
-                                </p>
-                            </motion.div>
-                        ))}
+                                {user?.name}
+                                {isDemo && <span className="px-3 py-1 text-[10px] bg-amber-500 text-white rounded-full font-black">DEMO</span>}
+                            </motion.h1>
+                            <motion.p 
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.1 }}
+                                className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs mt-1"
+                            >
+                                {user?.role || "Power User"}
+                            </motion.p>
+                        </div>
                     </div>
 
-                    {/* Personal Info */}
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 md:p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                                Personal Information
-                            </h3>
-                            <button
-                                onClick={() => setIsEditModalOpen(true)}
-                                className="text-blue-600 hover:text-blue-700 text-sm font-medium md:hidden"
-                            >
-                                Edit
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                    Full Name
-                                </label>
-                                <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200 font-medium">
-                                    <span className="text-gray-400">👤</span>
-                                    {user?.name || "N/A"}
-                                </div>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                    Email Address
-                                </label>
-                                <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200 font-medium">
-                                    <span className="text-gray-400">✉️</span>
-                                    {user?.email || "N/A"}
-                                </div>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                    Location
-                                </label>
-                                <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200 font-medium">
-                                    <span className="text-gray-400">📍</span>
-                                    Phnom Penh, Cambodia
-                                </div>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                    Joined
-                                </label>
-                                <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200 font-medium">
-                                    <span className="text-gray-400">📅</span>
-                                    November 2023
-                                </div>
-                            </div>
-                        </div>
+                    {/* Edit Profile Action */}
+                    <div className="absolute -bottom-10 right-8 md:right-12">
+                        <Button onClick={() => setIsEditModalOpen(true)} className="rounded-2xl px-8 shadow-xl py-6 text-sm">
+                            <Edit3 size={18} /> Edit Profile
+                        </Button>
                     </div>
                 </div>
 
-                {/* 👉 Right Column: Activity */}
-                <div className="space-y-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 md:p-6">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                            <span className="text-blue-500 text-xl">📈</span>
-                            Recent Activity
-                        </h3>
-
-                        <div className="space-y-6">
-                            {activities.map((activity, index) => (
-                                <div key={activity.id} className="flex gap-4 relative">
-                                    {/* Timeline Line */}
-                                    {index !== activities.length - 1 && (
-                                        <div className="absolute left-5 top-10 bottom-[-24px] w-0.5 bg-gray-100 dark:bg-gray-700" />
-                                    )}
-
-                                    <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-700 flex items-center justify-center shrink-0 text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-600 text-lg">
-                                        {activity.icon}
+                {/* Main Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* Left Panel: Info & Stats */}
+                    <div className="lg:col-span-8 space-y-8">
+                        {/* Stats Summary */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                            {stats.map((stat, idx) => (
+                                <motion.div
+                                    key={idx}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.2 + idx * 0.1 }}
+                                    className="bg-white dark:bg-gray-800 p-8 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center group hover:shadow-xl hover:shadow-blue-500/5 transition-all"
+                                >
+                                    <div className={`p-4 rounded-2xl mb-4 bg-${stat.color}-500/10 text-${stat.color}-600 group-hover:scale-110 transition-transform`}>
+                                        <stat.icon size={28} />
                                     </div>
-
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                                            {activity.action}
-                                        </p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                            {activity.time}
-                                        </p>
-                                    </div>
-                                </div>
+                                    <h3 className="text-3xl font-black text-gray-900 dark:text-white mb-1 tracking-tight">{stat.value}</h3>
+                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
+                                </motion.div>
                             ))}
                         </div>
 
-                        <button className="w-full mt-6 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
-                            View All Activity
-                        </button>
+                        {/* Personal Details */}
+                        <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.5 }}
+                            className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100 dark:border-gray-700"
+                        >
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white mb-8 flex items-center gap-3">
+                                <User size={20} className="text-blue-600" /> Account Details
+                            </h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Display Name</label>
+                                    <div className="text-lg font-bold text-gray-800 dark:text-gray-200">{user?.name || "N/A"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email Identity</label>
+                                    <div className="text-lg font-bold text-gray-800 dark:text-gray-200">{user?.email || "N/A"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Geographic Location</label>
+                                    <div className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                        <MapPin size={16} className="text-red-500" /> Phnom Penh, Cambodia
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Member Since</label>
+                                    <div className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                        <Calendar size={16} className="text-blue-500" /> Nov 2023
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+
+                    {/* Right Panel: Activity Feed */}
+                    <div className="lg:col-span-4">
+                        <motion.div 
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.6 }}
+                            className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 shadow-sm border border-gray-100 dark:border-gray-700 h-full"
+                        >
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white mb-8 flex items-center gap-3">
+                                <Activity size={20} className="text-blue-600" /> Pulse
+                            </h3>
+
+                            <div className="space-y-10 relative">
+                                <div className="absolute left-6 top-2 bottom-2 w-px bg-gray-100 dark:bg-gray-700" />
+                                {activities.map((item, idx) => (
+                                    <div key={item.id} className="flex gap-6 relative group">
+                                        <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center shrink-0 text-gray-400 border border-gray-100 dark:border-gray-700 shadow-sm z-10 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                                            <item.icon size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-gray-900 dark:text-gray-200">{item.action}</p>
+                                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                                                <Clock size={10} /> {item.time}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button className="w-full mt-12 py-4 text-xs font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded-2xl transition-all flex items-center justify-center gap-2">
+                                Full Activity Logs <ChevronRight size={14} />
+                            </button>
+                        </motion.div>
                     </div>
                 </div>
             </div>
 
-            {/* Edit Profile Modal */}
-            <EditProfileModal
-                isOpen={isEditModalOpen}
-                onClose={() => setIsEditModalOpen(false)}
-            />
+            <EditProfileModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} />
         </DashboardLayout>
     );
 }

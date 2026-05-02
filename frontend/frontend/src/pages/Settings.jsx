@@ -1,5 +1,5 @@
 // ============================================================
-// ⚙️ Settings.jsx — User Preferences
+// ⚙️ Settings.jsx — Elite Command Center 2026
 // ============================================================
 
 import React, { useState, useEffect } from "react";
@@ -8,12 +8,17 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
-import { LogOut, Moon, Sun, Bell, CheckCircle2, RefreshCw, ExternalLink, AlertCircle, Settings as SettingsIcon, MessageSquare, Calendar, Radio, Shield } from "lucide-react";
+import { 
+    LogOut, Moon, Sun, Bell, CheckCircle2, RefreshCw, 
+    ExternalLink, AlertCircle, Settings as SettingsIcon, 
+    MessageSquare, Calendar, Radio, Shield, Fingerprint, 
+    Zap, Lock, Cpu, Globe, Cloud, ShieldCheck, ChevronRight
+} from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
 import apiUtils from "../utils/apiUtils";
 import toast from "react-hot-toast";
 import EmptyState from "../components/ui/EmptyState";
-
+import Button from "../components/ui/Button";
 
 export default function Settings() {
     const { user, logout } = useAuth();
@@ -24,53 +29,41 @@ export default function Settings() {
     const [pages, setPages] = useState([]);
     const [isLoadingPages, setIsLoadingPages] = useState(false);
     const [pageError, setPageError] = useState(null);
-    const [expandedPageId, setExpandedPageId] = useState(null); // For settings dropdown
+    const [expandedPageId, setExpandedPageId] = useState(null);
 
     // 🔐 2FA State
     const [qrCode, setQrCode] = useState(null);
     const [verifyCode, setVerifyCode] = useState("");
     const [isVerifying, setIsVerifying] = useState(false);
 
-    // Fetch Pages on Mount if Connected
     useEffect(() => {
         if (user?.facebookId) {
             fetchPages();
         }
     }, [user?.facebookId]);
 
-    // ✅ Auto-Refresh on Connect Success
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.get("success") === "facebook_connected") {
-            toast.success("✅ Facebook Connected Successfully!");
-
-            // 1. Clear URL param
+            toast.success("✅ Protocol Synchronized Successfully");
             window.history.replaceState({}, document.title, window.location.pathname);
-
-            // 2. Refresh Auth (Fetch updated user with FB ID)
-            // This will trigger the useEffect above to fetch pages
-            window.location.reload(); // Simple reload to ensure fresh state
+            window.location.reload();
         }
     }, []);
 
-    const fetchPages = async (showToast = false) => {
+    const fetchPages = async () => {
         setIsLoadingPages(true);
         setPageError(null);
         try {
             const res = await apiUtils.retryRequest(() => apiUtils.getUserPages());
-
             if (res.data.success) {
                 setPages(res.data.accounts);
-            } else {
-                throw new Error("Failed to load pages.");
             }
         } catch (err) {
             apiUtils.logError("Settings.fetchPages", err);
             const message = apiUtils.getUserErrorMessage(err);
             setPageError(message);
-            if (!apiUtils.isAuthError(err)) {
-                toast.error(message);
-            }
+            if (!apiUtils.isAuthError(err)) toast.error(message);
         } finally {
             setIsLoadingPages(false);
         }
@@ -81,199 +74,227 @@ export default function Settings() {
     };
 
     const handleTogglePage = async (pageId, currentStatus) => {
-        // Optimistic Update
         setPages(prev => prev.map(p => p.id === pageId ? { ...p, isSelected: !currentStatus } : p));
-        const toastId = toast.loading(currentStatus ? "Deactivating page..." : "Activating page...");
+        const toastId = toast.loading(currentStatus ? "Deactivating identity..." : "Activating identity...");
 
         try {
             await apiUtils.toggleUserPage(pageId, !currentStatus);
-            toast.success(currentStatus ? "Page deactivated" : "Page activated", { id: toastId });
+            toast.success(currentStatus ? "Identity Offline" : "Identity Online", { id: toastId });
         } catch (err) {
-            console.error("Failed to toggle page:", err);
-            // Revert on error
             setPages(prev => prev.map(p => p.id === pageId ? { ...p, isSelected: currentStatus } : p));
-            toast.error("Failed to update page status", { id: toastId });
+            toast.error("Handshake failed", { id: toastId });
         }
     };
 
     const handleUpdateSetting = async (pageId, settingKey, newValue) => {
-        // Optimistic Update
         setPages(prev => prev.map(p => {
             if (p.id === pageId) {
-                return {
-                    ...p,
-                    settings: { ...p.settings, [settingKey]: newValue }
-                };
+                return { ...p, settings: { ...p.settings, [settingKey]: newValue } };
             }
             return p;
         }));
 
         try {
-            // Find current settings to merge
             const page = pages.find(p => p.id === pageId);
             const newSettings = { ...page.settings, [settingKey]: newValue };
-
             await apiUtils.updatePageSettings(pageId, newSettings);
-            toast.success("Settings updated");
+            toast.success("Neural preferences updated");
         } catch (err) {
-            console.error("Failed to update setting:", err);
-            // Revert (fetch pages again to be safe)
             fetchPages();
-            toast.error("Failed to save settings");
+            toast.error("Sync failed");
         }
     };
 
     return (
         <DashboardLayout>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Settings</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-2">Manage your connected accounts and application preferences.</p>
+            {/* Mesh Gradient Background */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20 dark:opacity-40">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500 blur-[120px] rounded-full animate-pulse" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+            </div>
+
+            <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
+                {/* Header */}
+                <div className="mb-12">
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">
+                            System Config
+                        </div>
+                        <div className="h-px w-12 bg-blue-500/20" />
+                    </div>
+                    <h1 className="text-6xl font-black text-gray-900 dark:text-white tracking-tighter mb-4">
+                        Control <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Center.</span>
+                    </h1>
+                    <p className="text-gray-500 dark:text-gray-400 font-medium text-lg max-w-2xl leading-relaxed">
+                        Orchestrate your cross-platform identity, security protocols, and autonomous bot behaviors from a centralized command interface.
+                    </p>
                 </div>
 
                 {!user?.facebookId ? (
-                    <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700 shadow-sm">
-                        <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <ExternalLink size={32} />
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="relative group overflow-hidden bg-white/40 dark:bg-black/40 backdrop-blur-3xl border border-white/20 dark:border-white/5 rounded-[3rem] p-16 text-center shadow-2xl"
+                    >
+                        <div className="relative z-10">
+                            <div className="w-24 h-24 bg-blue-500/10 dark:bg-blue-500/5 text-blue-600 dark:text-blue-400 rounded-[2rem] flex items-center justify-center mx-auto mb-8 border border-blue-500/20">
+                                <ExternalLink size={40} strokeWidth={1.5} />
+                            </div>
+                            <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">Establish Handshake</h2>
+                            <p className="text-gray-500 dark:text-gray-400 mb-10 max-w-md mx-auto text-lg font-medium leading-relaxed">
+                                Link your primary social identities to initialize the automated distribution and neural bot protocols.
+                            </p>
+                            <a
+                                href={apiUtils.getAuthUrl("/auth/facebook")}
+                                className="inline-flex items-center gap-4 px-10 py-5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl transition-all shadow-2xl shadow-blue-500/40 hover:-translate-y-1 text-sm uppercase tracking-widest"
+                            >
+                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
+                                Connect Facebook identity
+                            </a>
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Connect Your Account</h2>
-                        <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-md mx-auto text-lg leading-relaxed">
-                            Link your Facebook account to unlock page management, auto-scheduling, and powerful analytics.
-                        </p>
-                        <a
-                            href={apiUtils.getAuthUrl("/auth/facebook")}
-                            className="inline-flex items-center gap-3 px-8 py-4 bg-[#1877f2] hover:bg-[#166fe5] text-white font-semibold rounded-2xl transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-1"
-                        >
-                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
-                            Connect Facebook
-                        </a>
-                    </div>
+                        {/* Decorative glow */}
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-blue-500/5 blur-[120px] pointer-events-none rounded-full" />
+                    </motion.div>
                 ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* 👈 Left Column: Main Content (Pages) */}
-                        <div className="lg:col-span-2 space-y-6">
-                            {/* Connected Profile Card */}
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* 👈 Left Column: Identities & Page Management */}
+                        <div className="lg:col-span-8 space-y-8">
+                            {/* Connected Identity Card */}
+                            <motion.div 
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/20 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl"
+                            >
+                                <div className="flex flex-col sm:flex-row items-center gap-6">
                                     <div className="relative">
-                                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-2xl font-bold text-gray-500 dark:text-gray-400 border-4 border-white dark:border-gray-800 shadow-md">
+                                        <div className="w-20 h-20 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-[1.8rem] flex items-center justify-center text-3xl font-black text-white shadow-2xl overflow-hidden ring-4 ring-white dark:ring-white/5">
                                             {user.facebookName?.[0] || "F"}
                                         </div>
-                                        <div className="absolute -bottom-1 -right-1 bg-green-500 text-white p-1 rounded-full border-4 border-white dark:border-gray-800">
+                                        <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1.5 rounded-full border-4 border-white dark:border-black shadow-lg">
                                             <CheckCircle2 size={14} />
                                         </div>
                                     </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                                            {user.facebookName || "Facebook User"}
-                                        </h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Connected via Facebook</p>
+                                    <div className="text-center sm:text-left">
+                                        <div className="flex items-center gap-2 mb-1 justify-center sm:justify-start">
+                                            <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                                                {user.facebookName || "Identity"}
+                                            </h3>
+                                            <div className="px-2 py-0.5 bg-blue-500/10 text-blue-500 rounded text-[8px] font-black uppercase tracking-widest">Master</div>
+                                        </div>
+                                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Primary Identity Handshake Active</p>
                                     </div>
                                 </div>
-                                <button
+                                <Button 
+                                    variant="secondary"
                                     onClick={handleReRequest}
-                                    className="w-full sm:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-medium transition-colors"
+                                    className="w-full sm:w-auto h-12 px-8 rounded-xl text-[10px] font-black uppercase tracking-widest"
                                 >
-                                    Reconnect
-                                </button>
-                            </div>
+                                    Reconnect Protocol
+                                </Button>
+                            </motion.div>
 
-                            {/* Pages List */}
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                                <div className="p-4 md:p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                        Your Pages
-                                        <span className="px-2.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-full font-bold">
-                                            {pages.length}
-                                        </span>
-                                    </h3>
-                                    <button onClick={() => fetchPages(true)} className="p-2 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                                        <RefreshCw size={18} />
+                            {/* Page Orchestration List */}
+                            <div className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 dark:border-white/5 overflow-hidden shadow-xl">
+                                <div className="p-8 border-b border-white/10 dark:border-white/5 flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+                                            Identity Nodes
+                                            <span className="px-3 py-1 bg-blue-500/10 text-blue-500 text-[10px] rounded-full font-black tracking-widest uppercase">
+                                                {pages.length} Online
+                                            </span>
+                                        </h3>
+                                    </div>
+                                    <button 
+                                        onClick={() => fetchPages(true)} 
+                                        className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-blue-500 transition-all border border-white/10 shadow-inner"
+                                    >
+                                        <RefreshCw size={18} className={isLoadingPages ? "animate-spin text-blue-500" : ""} />
                                     </button>
                                 </div>
 
-                                <div className="p-6 space-y-4">
+                                <div className="p-8 space-y-6">
                                     {isLoadingPages ? (
-                                        [1, 2].map(i => <div key={i} className="h-24 bg-gray-50 dark:bg-gray-700/50 rounded-2xl animate-pulse" />)
+                                        [1, 2, 3].map(i => <div key={i} className="h-28 bg-white/5 dark:bg-white/5 rounded-[2rem] animate-pulse" />)
                                     ) : pages.length === 0 ? (
-                                        <EmptyState title="No Pages Found" description="We couldn't find any pages." actionLabel="Refresh" onAction={fetchPages} />
+                                        <EmptyState title="No Nodes Detected" description="No identity nodes found in current handshake." actionLabel="Sync Protocol" onAction={fetchPages} />
                                     ) : (
-                                        pages.map(page => (
-                                            <div key={page.id} className={`group border rounded-2xl transition-all duration-300 ${page.isSelected ? "bg-blue-50/30 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800" : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700"}`}>
-                                                <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                                    <div className="flex items-center gap-4 w-full sm:w-auto">
-                                                        <img
-                                                            src={page.picture || "https://via.placeholder.com/50"}
-                                                            alt={page.name}
-                                                            className="w-14 h-14 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm shrink-0"
-                                                            referrerPolicy="no-referrer"
-                                                        />
+                                        pages.map((page, idx) => (
+                                            <motion.div 
+                                                key={page.id}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: idx * 0.05 }}
+                                                className={`group rounded-[2rem] border transition-all duration-500 ${page.isSelected ? "bg-blue-600/5 border-blue-500/20 shadow-lg shadow-blue-500/5" : "bg-white/40 dark:bg-white/5 border-white/10 hover:border-white/20 dark:hover:border-white/10"}`}
+                                            >
+                                                <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+                                                    <div className="flex items-center gap-5 w-full sm:w-auto">
+                                                        <div className="relative">
+                                                            <img
+                                                                src={page.picture || "https://via.placeholder.com/50"}
+                                                                alt={page.name}
+                                                                className="w-16 h-16 rounded-[1.2rem] object-cover border-2 border-white dark:border-white/10 shadow-2xl group-hover:scale-105 transition-transform duration-500"
+                                                                referrerPolicy="no-referrer"
+                                                            />
+                                                            <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-black ${page.isSelected ? "bg-emerald-500 animate-pulse" : "bg-gray-400"}`} />
+                                                        </div>
                                                         <div className="min-w-0">
-                                                            <h4 className={`font-bold text-lg truncate ${page.isSelected ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-400"}`}>
+                                                            <h4 className={`font-black text-lg tracking-tight truncate ${page.isSelected ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}>
                                                                 {page.name}
                                                             </h4>
                                                             <div className="flex items-center gap-2 mt-1">
-                                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${page.isSelected ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"}`}>
-                                                                    <div className={`w-1.5 h-1.5 rounded-full ${page.isSelected ? "bg-green-500" : "bg-gray-400"}`} />
-                                                                    {page.isSelected ? "Active" : "Inactive"}
-                                                                </span>
-                                                                <span className="text-xs text-gray-400 font-mono">ID: {page.id}</span>
+                                                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 font-mono">ID: {page.id}</span>
                                                             </div>
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                                                        {page.isSelected && (
-                                                            <button
-                                                                onClick={() => setExpandedPageId(expandedPageId === page.id ? null : page.id)}
-                                                                className={`p-2.5 rounded-xl transition-all ${expandedPageId === page.id ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400" : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600"}`}
-                                                            >
-                                                                <SettingsIcon size={20} />
-                                                            </button>
-                                                        )}
-                                                        <label className="relative inline-flex items-center cursor-pointer">
-                                                            <input
-                                                                type="checkbox"
-                                                                className="sr-only peer"
-                                                                checked={page.isSelected}
-                                                                onChange={() => handleTogglePage(page.id, page.isSelected)}
-                                                            />
-                                                            <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                                                        </label>
+                                                    <div className="flex items-center gap-4 w-full sm:w-auto justify-end">
+                                                        <button
+                                                            onClick={() => setExpandedPageId(expandedPageId === page.id ? null : page.id)}
+                                                            className={`w-12 h-12 rounded-[1rem] transition-all flex items-center justify-center border ${expandedPageId === page.id ? "bg-blue-600 text-white border-blue-600 shadow-xl" : "bg-white/10 text-gray-400 border-white/10 hover:border-blue-500/50 hover:text-blue-500"}`}
+                                                        >
+                                                            <SettingsIcon size={20} strokeWidth={expandedPageId === page.id ? 2.5 : 2} />
+                                                        </button>
+                                                        
+                                                        {/* High-end Toggle */}
+                                                        <button 
+                                                            onClick={() => handleTogglePage(page.id, page.isSelected)}
+                                                            className={`relative h-12 px-6 rounded-[1rem] flex items-center gap-3 transition-all font-black text-[10px] uppercase tracking-widest border ${page.isSelected ? "bg-emerald-600 border-emerald-600 text-white shadow-xl shadow-emerald-600/20" : "bg-white/5 border-white/10 text-gray-400"}`}
+                                                        >
+                                                            <Radio size={14} className={page.isSelected ? "animate-pulse" : ""} />
+                                                            {page.isSelected ? "Active" : "Disabled"}
+                                                        </button>
                                                     </div>
                                                 </div>
 
                                                 <AnimatePresence>
-                                                    {expandedPageId === page.id && page.isSelected && (
+                                                    {expandedPageId === page.id && (
                                                         <motion.div
                                                             initial={{ height: 0, opacity: 0 }}
                                                             animate={{ height: "auto", opacity: 1 }}
                                                             exit={{ height: 0, opacity: 0 }}
-                                                            className="border-t border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-900/30 px-5 py-5"
+                                                            className="border-t border-white/10 dark:border-white/5 bg-black/5 dark:bg-black/20 p-8"
                                                         >
                                                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                                                 {[
-                                                                    { key: "enableBot", label: "Auto-Reply", icon: MessageSquare, color: "purple" },
-                                                                    { key: "enableSchedule", label: "Scheduling", icon: Calendar, color: "orange" },
-                                                                    { key: "enableInbox", label: "Inbox Sync", icon: Radio, color: "blue" }
+                                                                    { key: "enableBot", label: "Neural Auto-Reply", icon: MessageSquare, color: "blue", desc: "Autonomous comment interaction" },
+                                                                    { key: "enableSchedule", label: "Temporal Scheduling", icon: Calendar, color: "indigo", desc: "Precision distribution timing" },
+                                                                    { key: "enableInbox", label: "Protocol Sync", icon: Radio, color: "emerald", desc: "Real-time communication bridge" }
                                                                 ].map((setting) => (
-                                                                    <div key={setting.key} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col justify-between gap-3 hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
-                                                                        <div className="flex items-center gap-3">
-                                                                            <div className={`p-2 rounded-xl bg-${setting.color}-100 text-${setting.color}-600 dark:bg-${setting.color}-900/30 dark:text-${setting.color}-400`}>
-                                                                                <setting.icon size={18} />
+                                                                    <div key={setting.key} className="bg-white/40 dark:bg-white/5 p-6 rounded-[1.8rem] border border-white/10 dark:border-white/5 shadow-sm flex flex-col justify-between gap-6 hover:border-blue-500/30 transition-all group/setting">
+                                                                        <div>
+                                                                            <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center mb-4 transition-all group-hover/setting:scale-110 ${setting.key === "enableBot" ? "bg-blue-500/10 text-blue-500" : setting.key === "enableSchedule" ? "bg-indigo-500/10 text-indigo-500" : "bg-emerald-500/10 text-emerald-500"}`}>
+                                                                                <setting.icon size={22} />
                                                                             </div>
-                                                                            <span className="font-semibold text-gray-700 dark:text-gray-200 text-sm">{setting.label}</span>
+                                                                            <span className="font-black text-gray-900 dark:text-white text-xs uppercase tracking-widest">{setting.label}</span>
+                                                                            <p className="text-[10px] text-gray-500 mt-1 font-medium">{setting.desc}</p>
                                                                         </div>
                                                                         <div className="flex justify-end">
-                                                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    className="sr-only peer"
-                                                                                    checked={setting.key === "enableSchedule" ? page.settings?.enableSchedule !== false : page.settings?.[setting.key]}
-                                                                                    onChange={(e) => handleUpdateSetting(page.id, setting.key, e.target.checked)}
-                                                                                />
-                                                                                <div className={`w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-${setting.color}-500`}></div>
-                                                                            </label>
+                                                                            <button 
+                                                                                onClick={() => handleUpdateSetting(page.id, setting.key, setting.key === "enableSchedule" ? page.settings?.enableSchedule === false : !page.settings?.[setting.key])}
+                                                                                className={`w-14 h-8 rounded-full transition-all relative ${((setting.key === "enableSchedule" ? page.settings?.enableSchedule !== false : page.settings?.[setting.key])) ? "bg-emerald-500 shadow-lg shadow-emerald-500/20" : "bg-gray-200 dark:bg-white/10"}`}
+                                                                            >
+                                                                                <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all shadow-md ${((setting.key === "enableSchedule" ? page.settings?.enableSchedule !== false : page.settings?.[setting.key])) ? "left-7" : "left-1"}`} />
+                                                                            </button>
                                                                         </div>
                                                                     </div>
                                                                 ))}
@@ -281,50 +302,69 @@ export default function Settings() {
                                                         </motion.div>
                                                     )}
                                                 </AnimatePresence>
-                                            </div>
+                                            </motion.div>
                                         ))
                                     )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* 👉 Right Column: Sidebar (Preferences) */}
-                        <div className="space-y-6">
-                            {/* Theme & Appearance */}
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Appearance</h3>
-                                <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2.5 rounded-xl ${theme === "dark" ? "bg-indigo-500 text-white" : "bg-orange-500 text-white"}`}>
-                                            {theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
+                        {/* 👉 Right Column: Global Protocols */}
+                        <div className="lg:col-span-4 space-y-8">
+                            {/* Visual Appearance Protocol */}
+                            <motion.div 
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/20 dark:border-white/5 shadow-xl"
+                            >
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white mb-8 tracking-tight flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-orange-500/10 text-orange-500 rounded-lg flex items-center justify-center">
+                                        <Zap size={18} />
+                                    </div>
+                                    Interface
+                                </h3>
+                                <div className="p-6 rounded-[2rem] bg-black/5 dark:bg-black/20 border border-white/5 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center shadow-2xl transition-all ${theme === "dark" ? "bg-indigo-600 text-white" : "bg-orange-500 text-white"}`}>
+                                            {theme === "dark" ? <Moon size={22} /> : <Sun size={22} />}
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-gray-900 dark:text-white">Dark Mode</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{theme === "dark" ? "On" : "Off"}</p>
+                                            <p className="font-black text-[10px] uppercase tracking-widest text-gray-900 dark:text-white">Dark Protocol</p>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">{theme === "dark" ? "Active" : "Standby"}</p>
                                         </div>
                                     </div>
                                     <button
                                         onClick={toggleTheme}
-                                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${theme === "dark" ? "bg-indigo-600" : "bg-gray-300"}`}
+                                        className={`w-14 h-8 rounded-full transition-all relative ${theme === "dark" ? "bg-indigo-600 shadow-lg shadow-indigo-600/20" : "bg-gray-200"}`}
                                     >
-                                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${theme === "dark" ? "translate-x-6" : "translate-x-1"}`} />
+                                        <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all shadow-md ${theme === "dark" ? "left-7" : "left-1"}`} />
                                     </button>
                                 </div>
-                            </div>
+                            </motion.div>
 
-                            {/* Security & 2FA */}
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Security</h3>
+                            {/* Security Handshakes */}
+                            <motion.div 
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.1 }}
+                                className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/20 dark:border-white/5 shadow-xl"
+                            >
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white mb-8 tracking-tight flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-blue-500/10 text-blue-500 rounded-lg flex items-center justify-center">
+                                        <ShieldCheck size={18} />
+                                    </div>
+                                    Shield
+                                </h3>
 
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg dark:bg-indigo-900/30 dark:text-indigo-400">
-                                                <Shield size={18} />
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between p-4 bg-black/5 dark:bg-black/20 rounded-2xl border border-white/5">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center shadow-inner">
+                                                <Fingerprint size={20} />
                                             </div>
                                             <div>
-                                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Two-Factor Auth</p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">{user?.twoFactorEnabled ? "Enabled" : "Disabled"}</p>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-900 dark:text-white">2FA Shield</p>
+                                                <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{user?.twoFactorEnabled ? "Active Protocol" : "Vulnerable"}</p>
                                             </div>
                                         </div>
 
@@ -338,160 +378,169 @@ export default function Settings() {
                                                             setIsVerifying(true);
                                                         }
                                                     } catch (err) {
-                                                        console.error("❌ 2FA Setup Error:", err);
-                                                        const msg = err.response?.data?.error || err.message || "Failed to start 2FA setup";
+                                                        const msg = err.response?.data?.error || "Protocol failure";
                                                         toast.error(msg);
                                                     }
                                                 }}
-                                                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors"
+                                                className="h-10 px-4 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
                                             >
-                                                Enable
+                                                Initialize
                                             </button>
                                         ) : (
                                             <button
                                                 onClick={async () => {
-                                                    if (!window.confirm("Are you sure you want to disable 2FA?")) return;
+                                                    if (!window.confirm("Terminate 2FA security?")) return;
                                                     try {
                                                         await axios.post(apiUtils.getFullUrl("/auth/2fa/disable"), {}, { withCredentials: true });
                                                         window.location.reload();
                                                     } catch (err) {
-                                                        console.error("❌ 2FA Disable Error:", err);
-                                                        toast.error("Failed to disable 2FA");
+                                                        toast.error("Handshake failed");
                                                     }
                                                 }}
-                                                className="px-3 py-1.5 bg-red-100 text-red-600 text-xs font-bold rounded-lg hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition-colors"
+                                                className="h-10 px-4 bg-rose-500/10 text-rose-500 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-rose-500/20"
                                             >
                                                 Disable
                                             </button>
                                         )}
                                     </div>
 
-                                    {/* QR Code & Verify Input */}
-                                    {isVerifying && !user?.twoFactorEnabled && qrCode && (
-                                        <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs text-center text-gray-500 mb-3">Scan with Google Authenticator</p>
-                                            <img src={qrCode} alt="2FA QR" className="w-32 h-32 mx-auto rounded-lg mb-4" />
+                                    {/* Verification UX */}
+                                    <AnimatePresence>
+                                        {isVerifying && !user?.twoFactorEnabled && qrCode && (
+                                            <motion.div 
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: "auto", opacity: 1 }}
+                                                className="p-6 bg-blue-600/5 rounded-3xl border border-blue-500/20 overflow-hidden"
+                                            >
+                                                <p className="text-[10px] font-black text-center text-blue-500 uppercase tracking-[0.2em] mb-6">Master Key Fragment</p>
+                                                <div className="relative p-2 bg-white rounded-2xl w-fit mx-auto mb-6 shadow-2xl ring-4 ring-blue-500/10">
+                                                    <img src={qrCode} alt="2FA QR" className="w-32 h-32" />
+                                                </div>
 
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Enter Code (e.g. 123456)"
-                                                    className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                                    onChange={(e) => setVerifyCode(e.target.value)}
-                                                />
-                                                <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            const res = await axios.post(apiUtils.getFullUrl("/auth/2fa/verify"), { token: verifyCode }, { withCredentials: true });
-                                                            if (res.data.success) {
-                                                                toast.success("2FA Enabled Successfully!");
-                                                                window.location.reload();
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="SYNC CODE"
+                                                        className="flex-1 h-12 px-5 bg-white/50 dark:bg-black/40 border border-white/20 dark:border-white/5 rounded-xl text-center font-black tracking-[0.3em] outline-none focus:ring-2 focus:ring-blue-500"
+                                                        onChange={(e) => setVerifyCode(e.target.value)}
+                                                    />
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                const res = await axios.post(apiUtils.getFullUrl("/auth/2fa/verify"), { token: verifyCode }, { withCredentials: true });
+                                                                if (res.data.success) {
+                                                                    toast.success("Identity Verified");
+                                                                    window.location.reload();
+                                                                }
+                                                            } catch (err) {
+                                                                toast.error("Handshake Rejected");
                                                             }
-                                                        } catch (err) {
-                                                            console.error("❌ 2FA Verify Error:", err);
-                                                            toast.error("Invalid Code");
-                                                        }
-                                                    }}
-                                                    className="px-3 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors"
-                                                >
-                                                    <CheckCircle2 size={18} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
+                                                        }}
+                                                        className="w-12 h-12 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-500/20 transition-all"
+                                                    >
+                                                        <CheckCircle2 size={20} />
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
-                            </div>
-                        </div>
+                            </motion.div>
 
-                        {/* Notifications */}
-                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Notifications</h3>
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-yellow-100 text-yellow-600 rounded-lg dark:bg-yellow-900/30 dark:text-yellow-400">
-                                            <Bell size={18} />
-                                        </div>
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Email Alerts</span>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" className="sr-only peer" defaultChecked />
-                                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Stealth Mode & Security */}
-                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Anti-Ban & Stealth 🥷</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex flex-col justify-between h-32">
-                                    <div className="flex items-start justify-between">
-                                        <div className="p-2.5 rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.2-2.85.577-4.147" /></svg>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" className="sr-only peer" defaultChecked onClick={() => toast.success("Stealth Mode: ON (Fingerprints Randomized)")} />
-                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-                                        </label>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-gray-900 dark:text-white">Fingerprint Spoofer</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Randomize Headers/UA</p>
-                                    </div>
-                                </div>
-
-                                <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex flex-col justify-between h-32">
-                                    <div className="flex items-start justify-between">
-                                        <div className="p-2.5 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" className="sr-only peer" defaultChecked onClick={() => toast.success("Action Randomizer: ON (Delays Active)")} />
-                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-teal-600"></div>
-                                        </label>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-gray-900 dark:text-white">Action Randomizer</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Human-like Delays (Jitter)</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Google Drive Integration */}
-                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Cloud Backup</h3>
-                            <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
-                                        <svg className="w-5 h-5" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 25.3-43.8 25.3 43.8z" fill="#0066da" /><path d="m43.65 23.05-25.3 43.8h25.3z" fill="#43a047" /><path d="m73.55 66.85-6.35-10.95-18.95-32.9-6.35-10.95 25.3 43.8z" fill="#0066da" /><path d="m24.6 23.05 19.05 32.9h38.65l-19.05-32.9z" fill="#43a047" /><path d="m.25 66.85 19.05 32.9h65.8l-19.05-32.9z" fill="#cddca3" /><path d="m19.6 66.85 24.05-41.55 24.35 41.55z" fill="#00ad45" /><path d="m43.65 25.3-19.05 32.9h38.1z" fill="#ea4335" /><path d="m.25 66.85 6.35-10.95 6.35 11.05z" fill="#0066da" /><path d="m24.6 23.05-6.35-11.05-6.35 11.05z" fill="#ea4335" /><path d="m43.65 23.05-6.35-11.05 6.35-10.95 6.35 10.95 6.35 11.05z" fill="#ffd04b" /></svg>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-gray-900 dark:text-white">Google Drive</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Auto-backup edited videos</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => toast.success("Feature coming soon: Please upload 'service_account_key.json' to server root manually for now.")}
-                                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-medium transition-colors"
-                                >
-                                    Configured
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Danger Zone */}
-                        <div className="bg-red-50 dark:bg-red-900/10 rounded-3xl p-4 md:p-6 border border-red-100 dark:border-red-900/30">
-                            <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-4">Danger Zone</h3>
-                            <button
-                                onClick={logout}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl font-semibold border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shadow-sm"
+                            {/* Autonomous Protocols (Anti-Ban) */}
+                            <motion.div 
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.2 }}
+                                className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/20 dark:border-white/5 shadow-xl"
                             >
-                                <LogOut size={18} />
-                                Sign Out
-                            </button>
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white mb-8 tracking-tight flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-purple-500/10 text-purple-500 rounded-lg flex items-center justify-center">
+                                        <Cpu size={18} />
+                                    </div>
+                                    Autonomous
+                                </h3>
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div className="p-6 rounded-[2rem] bg-black/5 dark:bg-black/20 border border-white/5 group/anti">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="w-12 h-12 bg-purple-500/10 text-purple-500 rounded-[1rem] flex items-center justify-center group-hover/anti:scale-110 transition-transform">
+                                                <Fingerprint size={24} />
+                                            </div>
+                                            <button className="w-12 h-7 bg-purple-600 rounded-full relative shadow-lg shadow-purple-600/20" onClick={() => toast.success("Spoofer Re-randomized")}>
+                                                <div className="absolute top-1 left-6 w-5 h-5 bg-white rounded-full" />
+                                            </button>
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-[10px] uppercase tracking-widest text-gray-900 dark:text-white">Neural Spoofer</p>
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Randomizing Fingerprints</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-6 rounded-[2rem] bg-black/5 dark:bg-black/20 border border-white/5 group/anti">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="w-12 h-12 bg-teal-500/10 text-teal-500 rounded-[1rem] flex items-center justify-center group-hover/anti:scale-110 transition-transform">
+                                                <Activity size={24} />
+                                            </div>
+                                            <button className="w-12 h-7 bg-teal-600 rounded-full relative shadow-lg shadow-teal-600/20" onClick={() => toast.success("Jitter Protocol Active")}>
+                                                <div className="absolute top-1 left-6 w-5 h-5 bg-white rounded-full" />
+                                            </button>
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-[10px] uppercase tracking-widest text-gray-900 dark:text-white">Human Jitter</p>
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Simulating Organic Input</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+
+                            {/* Backup & Cloud */}
+                            <motion.div 
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.3 }}
+                                className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/20 dark:border-white/5 shadow-xl"
+                            >
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white mb-8 tracking-tight flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-emerald-500/10 text-emerald-500 rounded-lg flex items-center justify-center">
+                                        <Cloud size={18} />
+                                    </div>
+                                    Cloud Link
+                                </h3>
+                                <div className="p-6 rounded-[2rem] bg-black/5 dark:bg-black/20 border border-white/5 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-white/10 p-2.5 rounded-[1rem]">
+                                            <svg className="w-full h-full" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 25.3-43.8 25.3 43.8z" fill="#0066da" /><path d="m43.65 23.05-25.3 43.8h25.3z" fill="#43a047" /><path d="m73.55 66.85-6.35-10.95-18.95-32.9-6.35-10.95 25.3 43.8z" fill="#0066da" /><path d="m24.6 23.05 19.05 32.9h38.65l-19.05-32.9z" fill="#43a047" /><path d="m.25 66.85 19.05 32.9h65.8l-19.05-32.9z" fill="#cddca3" /><path d="m19.6 66.85 24.05-41.55 24.35 41.55z" fill="#00ad45" /><path d="m43.65 25.3-19.05 32.9h38.1z" fill="#ea4335" /><path d="m.25 66.85 6.35-10.95 6.35 11.05z" fill="#0066da" /><path d="m24.6 23.05-6.35-11.05-6.35 11.05z" fill="#ea4335" /><path d="m43.65 23.05-6.35-11.05 6.35-10.95 6.35 10.95 6.35 11.05z" fill="#ffd04b" /></svg>
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-[10px] uppercase tracking-widest text-gray-900 dark:text-white">G-Drive Bridge</p>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Configured</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => toast.success("Bridge Established")}
+                                        className="h-10 px-6 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
+                                    >
+                                        Sync
+                                    </button>
+                                </div>
+                            </motion.div>
+
+                            {/* Termination */}
+                            <motion.div 
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.4 }}
+                                className="bg-rose-500/5 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-rose-500/20 shadow-xl"
+                            >
+                                <h3 className="text-xl font-black text-rose-500 mb-6 tracking-tight">Terminal</h3>
+                                <button
+                                    onClick={logout}
+                                    className="w-full flex items-center justify-center gap-3 h-16 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-rose-500/40 hover:-translate-y-1 transition-all"
+                                >
+                                    <LogOut size={20} />
+                                    Purge Session
+                                </button>
+                            </motion.div>
                         </div>
                     </div>
                 )}

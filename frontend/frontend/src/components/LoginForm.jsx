@@ -2,6 +2,8 @@ import React, { useState, useId } from "react";
 import { authAPI } from "../utils/api";
 import Button from "./ui/Button";
 import toast from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
+import { Mail, Lock, Eye, EyeOff, Shield, ArrowRight, AlertCircle } from "lucide-react";
 
 const LoginForm = ({ onSuccess, onForgotPassword }) => {
   const [loading, setLoading] = useState(false);
@@ -16,222 +18,186 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
   const [tempToken, setTempToken] = useState(null);
   const [twoFactorCode, setTwoFactorCode] = useState("");
 
-  // ✅ Handle Input Change
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  // ✅ Validate Input
   const validateForm = () => {
     const newErrors = {};
     if (!formData.email.trim()) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(formData.email))
-      newErrors.email = "Invalid email format";
-
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Invalid email format";
     if (!formData.password) newErrors.password = "Password is required";
-    else if (formData.password.length < 6)
-      newErrors.password = "Password must be at least 6 characters";
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // ✅ Submit Handler (using backend API)
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // 🔐 2FA Submission
     if (show2FA) {
-      if (!twoFactorCode) {
-        setErrors({ submit: "Please enter the 2FA code" });
-        return;
-      }
+      if (!twoFactorCode) return setErrors({ submit: "Please enter the 2FA code" });
       setLoading(true);
       try {
         const res = await authAPI.verify2FALogin(tempToken, twoFactorCode);
-        toast.success("Welcome back!");
+        toast.success("Identity verified!");
         onSuccess?.(res.user);
       } catch (error) {
-        setErrors({ submit: "Invalid 2FA Code" });
-        toast.error("Invalid 2FA Code");
+        setErrors({ submit: "Invalid verification code" });
       } finally {
         setLoading(false);
       }
       return;
     }
 
-    // 📧 Normal Login
     if (!validateForm()) return;
-
     setLoading(true);
     setErrors({});
-    const toastId = toast.loading("Signing in...");
+    const toastId = toast.loading("Authenticating...");
 
     try {
       const res = await authAPI.login({ email: formData.email, password: formData.password });
-
-      // 🔐 Handle 2FA Challenge
       if (res.requires2FA) {
         setTempToken(res.tempToken);
         setShow2FA(true);
-        toast.success("2FA Code Sent!", { id: toastId });
+        toast.dismiss(toastId);
         return;
       }
-
-      toast.success("Welcome back!", { id: toastId });
+      toast.success("Authentication successful!", { id: toastId });
       onSuccess?.(res.user);
-
     } catch (error) {
-      const errorMessage =
-        error?.response?.data?.error ||
-        error?.message ||
-        "Invalid credentials. Please try again.";
-
-      toast.error(errorMessage, { id: toastId });
-
-      setErrors({
-        submit: errorMessage,
-      });
+      const msg = error?.response?.data?.error || "Login failed. Please try again.";
+      toast.error(msg, { id: toastId });
+      setErrors({ submit: msg });
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Toggle Password Visibility
-  const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
-
-  // ============================================================
-  // 🧱 UI Render
-  // ============================================================
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <div className="relative">
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+        <AnimatePresence mode="wait">
+          {show2FA ? (
+            <motion.div 
+              key="2fa"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div className="text-center">
+                <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-[2rem] flex items-center justify-center mx-auto mb-4 border border-blue-100 dark:border-blue-800">
+                  <Shield size={32} />
+                </div>
+                <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Security Check</h3>
+                <p className="text-sm text-gray-500 mt-2">Enter the verification code from your device.</p>
+              </div>
 
-      {/* 🔐 2FA Input Mode */}
-      {show2FA ? (
-        <div className="space-y-4">
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
-              🛡️
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Two-Factor Authentication</h3>
-            <p className="text-sm text-gray-500">Enter the code from your authenticator app.</p>
-          </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value)}
+                  placeholder="000000"
+                  className="w-full px-6 py-5 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-3xl outline-none text-center text-3xl font-black tracking-[0.5em] focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-gray-900 dark:text-white"
+                  autoFocus
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Authentication Code</label>
-            <input
-              type="text"
-              value={twoFactorCode}
-              onChange={(e) => setTwoFactorCode(e.target.value)}
-              placeholder="123456"
-              className="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg outline-none text-center text-2xl tracking-widest focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-900 dark:text-white"
-              autoFocus
-            />
-          </div>
+              <Button type="submit" className="h-14 rounded-2xl w-full shadow-xl" isLoading={loading}>
+                Verify Identity <ArrowRight size={18} className="ml-2" />
+              </Button>
 
-          <Button type="submit" variant="primary" size="large" fullWidth isLoading={loading}>
-            Verify
-          </Button>
-
-          <button
-            type="button"
-            onClick={() => setShow2FA(false)}
-            className="w-full text-sm text-gray-500 hover:text-gray-700 mt-4"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Email Input */}
-          <div>
-            <label htmlFor={emailId} className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">
-              Email Address
-            </label>
-            <input
-              id={emailId}
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="you@example.com"
-              autoComplete="email"
-              disabled={loading}
-              className={`w-full px-4 py-3 bg-white dark:bg-zinc-900 border rounded-lg outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 ${errors.email ? "border-red-500 focus:border-red-500" : "border-slate-200 dark:border-zinc-800 focus:border-blue-500"
-                } ${loading ? "bg-slate-100 dark:bg-zinc-800 cursor-not-allowed" : ""}`}
-            />
-            {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
-          </div>
-
-          {/* Password Input */}
-          <div>
-            <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                id={passwordId}
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                disabled={loading}
-                className={`w-full px-4 py-3 bg-white dark:bg-zinc-900 border rounded-lg outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all focus:ring-2 focus:ring-blue-500/20 pr-12 ${errors.password ? "border-red-500 focus:border-red-500" : "border-slate-200 dark:border-zinc-800 focus:border-blue-500"
-                  } ${loading ? "bg-slate-100 dark:bg-zinc-800 cursor-not-allowed" : ""}`}
-              />
-              <button
-                type="button"
-                onClick={togglePasswordVisibility}
-                disabled={loading}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                {showPassword ? "🙈" : "👁️"}
+              <button type="button" onClick={() => setShow2FA(false)} className="w-full text-xs font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 uppercase tracking-widest transition-colors">
+                Back to credentials
               </button>
-            </div>
-            {errors.password && <p className="text-red-600 text-sm mt-1">{errors.password}</p>}
-          </div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="login"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-6"
+            >
+              {/* Email */}
+              <div className="space-y-2">
+                <label htmlFor={emailId} className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1">Email Address</label>
+                <div className="relative group">
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                    <Mail size={20} />
+                  </div>
+                  <input
+                    id={emailId}
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="name@company.com"
+                    className={`w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900/50 border rounded-2xl outline-none text-gray-900 dark:text-white placeholder-gray-400 transition-all focus:ring-4 focus:ring-blue-500/10 ${errors.email ? "border-red-500" : "border-gray-100 dark:border-gray-800 focus:border-blue-500"}`}
+                    disabled={loading}
+                  />
+                </div>
+                {errors.email && <p className="text-red-500 text-[10px] font-bold uppercase px-1">{errors.email}</p>}
+              </div>
 
-          {/* Forgot Password Link */}
-          {onForgotPassword && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={onForgotPassword}
-                disabled={loading}
-                className="text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
-              >
-                Forgot password?
-              </button>
-            </div>
+              {/* Password */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center px-1">
+                  <label htmlFor={passwordId} className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Password</label>
+                  {onForgotPassword && (
+                    <button type="button" onClick={onForgotPassword} className="text-[10px] font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest">Forgot?</button>
+                  )}
+                </div>
+                <div className="relative group">
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                    <Lock size={20} />
+                  </div>
+                  <input
+                    id={passwordId}
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    className={`w-full pl-14 pr-14 py-4 bg-gray-50 dark:bg-gray-900/50 border rounded-2xl outline-none text-gray-900 dark:text-white placeholder-gray-400 transition-all focus:ring-4 focus:ring-blue-500/10 ${errors.password ? "border-red-500" : "border-gray-100 dark:border-gray-800 focus:border-blue-500"}`}
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                {errors.password && <p className="text-red-500 text-[10px] font-bold uppercase px-1">{errors.password}</p>}
+              </div>
+
+              <Button type="submit" className="h-14 rounded-2xl w-full shadow-xl mt-4" isLoading={loading}>
+                Access Account <ArrowRight size={18} className="ml-2" />
+              </Button>
+            </motion.div>
           )}
+        </AnimatePresence>
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            variant="primary"
-            size="large"
-            fullWidth
-            isLoading={loading}
+        {errors.submit && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-2xl text-red-600 dark:text-red-400 text-xs font-bold"
           >
-            Sign In
-          </Button>
-        </>
-      )}
-
-      {/* Error Alert (Global) */}
-      {errors.submit && (
-        <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg p-3 text-center animate-pulse">
-          ⚠️ {errors.submit}
-        </div>
-      )}
-
-    </form>
+            <AlertCircle size={16} />
+            {errors.submit}
+          </motion.div>
+        )}
+      </form>
+    </div>
   );
 };
+
+export default LoginForm;
 
 
 
