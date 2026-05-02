@@ -324,5 +324,3 @@ export default function Analytics() {
         </DashboardLayout>
     );
 }
-  );
-}
