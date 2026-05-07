@@ -422,16 +422,27 @@ export default function Post() {
 
             // Force carousel endpoint
             let endpoint = `${API_BASE}/api/posts/mixed-carousel`;
-            const cardsPayload = mediaItems.map(item => ({
-                id: item.id,
-                type: item.type,
-                headline: item.type === 'video' ? headline : carouselCtaText.replace(/\n/g, ' '),
-                description: item.type === 'video' ? (cardDescription || "Swipe to see more") : "",
-                cta,
-                isPageCard: item.isPageCard,
-                imageUrl: item.imageUrl,
-                isRightSide: item.isRightSide
-            }));
+            const cardsPayload = [
+                ...mediaItems.map(item => ({
+                    id: item.id,
+                    type: item.type,
+                    headline: item.type === 'video' ? headline : carouselCtaText.replace(/\n/g, ' '),
+                    description: item.type === 'video' ? (cardDescription || "Swipe to see more") : "",
+                    cta,
+                    isPageCard: item.isPageCard,
+                    imageUrl: item.imageUrl,
+                    isRightSide: item.isRightSide
+                })),
+                {
+                    id: 'card-destination-final',
+                    type: 'image',
+                    isPageCard: true,
+                    headline: 'មើលច្រើនទៀតនៅ',
+                    description: 'FACEBOOK.COM',
+                    link: targetLink,
+                    cta: cta || 'LEARN_MORE'
+                }
+            ];
             formData.append("carouselCards", JSON.stringify(cardsPayload));
 
             const response = await axios.post(endpoint, formData, {
