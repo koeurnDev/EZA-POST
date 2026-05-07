@@ -65,8 +65,6 @@ const ViralPosts = () => {
 
     return (
         <DashboardLayout>
-    return (
-        <DashboardLayout>
             <div className="max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-8">
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 md:mb-10 gap-6 px-1">
