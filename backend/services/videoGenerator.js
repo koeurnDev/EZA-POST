@@ -5,94 +5,114 @@ const fs = require('fs');
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+const { exec } = require('child_process');
+
 /**
- * Generates a slideshow video from images with background music and effects.
- * @param {string[]} imagePaths - Array of absolute paths to images.
- * @param {string} audioPath - Absolute path to audio file (optional).
- * @param {string} outputPath - Path to save the final video.
- * @param {number} durationPerSlide - Duration in seconds for each image (default 3s).
- * @returns {Promise<string>} - Resolves with outputPath on success.
+ * Gets duration of a media file in seconds.
  */
-const createSlideshow = (imagePaths, audioPath, outputPath, durationPerSlide = 3) => {
-    return new Promise((resolve, reject) => {
+const getDuration = (filePath) => {
+    return new Promise((resolve) => {
+        exec(`"${ffmpegPath}" -i "${filePath}"`, (err, stdout, stderr) => {
+            const output = stderr || stdout;
+            const match = output.match(/Duration: (\d+):(\d+):(\d+\.\d+)/);
+            if (match) {
+                const hours = parseInt(match[1]);
+                const minutes = parseInt(match[2]);
+                const seconds = parseFloat(match[3]);
+                resolve((hours * 3600) + (minutes * 60) + seconds);
+            } else {
+                resolve(0);
+            }
+        });
+    });
+};
+
+/**
+ * Generates a high-quality HD slideshow video with premium Ken Burns effect.
+ */
+const createSlideshow = (imagePaths, audioPath, outputPath, durationPerSlide = 5) => {
+    return new Promise(async (resolve, reject) => {
         if (!imagePaths || imagePaths.length === 0) {
             return reject(new Error("No images provided"));
         }
 
-        console.log(`🎬 Starting Video Generation: ${imagePaths.length} images -> ${outputPath}`);
+        console.log(`🎬 Creating Premium HD Video: ${imagePaths.length} images -> ${outputPath}`);
+
+        let totalDuration = imagePaths.length * durationPerSlide;
+        let slideDuration = durationPerSlide;
+
+        const hasAudioInput = audioPath && fs.existsSync(audioPath);
+        if (hasAudioInput) {
+            const audioDuration = await getDuration(audioPath);
+            if (audioDuration > 0) {
+                totalDuration = audioDuration;
+                slideDuration = totalDuration / imagePaths.length;
+                console.log(`🎵 Audio Sync: ${audioDuration}s total duration.`);
+            }
+        }
 
         const command = ffmpeg();
 
-        // 1. Add inputs (Images)
-        // We will loop each image to create a "stream" for the complex filter
+        // 1. Add Image Inputs
         imagePaths.forEach(img => {
-            command.input(img).loop(durationPerSlide); // Loop strictly for duration
+            command.input(img).inputOptions(['-loop 1', `-t ${slideDuration}`]);
         });
 
-        // 2. Add Audio Input (if strictly provided and exists)
-        let hasAudio = false;
-        if (audioPath && fs.existsSync(audioPath)) {
+        if (hasAudioInput) {
             command.input(audioPath);
-            hasAudio = true;
         }
 
-        // 3. Build Filter Complex for "ZoomPan" (Ken Burns Effect)
-        // We need to scale images to a standard size (e.g., 720x1280 9:16 vertical) first.
-        const filterComplex = [];
-        const inputs = [];
+        // 2. Filter Complex for Premium Look (Ken Burns Effect)
+        // We use a safe scaling method that works for all aspect ratios
+        const filters = [];
+        const concatLabel = [];
 
         imagePaths.forEach((_, i) => {
-            // Scale to 720x1280 (Vertical) -> ZoomPan -> FadeOut/In handled by 'concat' with crossfade?
-            // Simple approach: ZoomPan + Concatenate.
-
-            // ZoomPan: Zoom in up to 1.2x over 30*Duration frames
-            // d=duration*25 (assuming 25fps)
-            // s=720x1280
-            filterComplex.push(`[${i}:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,zoompan=z='min(zoom+0.0015,1.5)':d=${durationPerSlide * 25}:s=720x1280[v${i}]`);
-            inputs.push(`[v${i}]`);
+            const label = `v${i}`;
+            
+            // 🚀 PREMIUM ZOOM EFFECT (Ken Burns)
+            // We scale up slightly first, then zoom in slowly.
+            // Safe duration: we use max 300 frames for zoom calculation to prevent crash
+            const zoomFrames = Math.min(slideDuration * 25, 300); 
+            
+            filters.push(
+                `[${i}:v]scale=1280:2276,crop=1080:1920,` + 
+                `zoompan=z='min(zoom+0.001,1.1)':d=${zoomFrames}:s=1080x1920:fps=25,` +
+                `setsar=1[${label}]`
+            );
+            concatLabel.push(`[${label}]`);
         });
 
-        // Concat all video streams
-        filterComplex.push(`${inputs.join('')}concat=n=${imagePaths.length}:v=1:a=0[outv]`);
+        filters.push(`${concatLabel.join('')}concat=n=${imagePaths.length}:v=1:a=0[outv]`);
 
-        command.complexFilter(filterComplex, ['outv']);
+        command.complexFilter(filters);
 
-        // 4. Output Options
-        command.outputOptions([
-            '-c:v libx264',
-            '-pix_fmt yuv420p', // Important for compatibility
-            '-r 25',            // 25 fps
-            '-t', `${imagePaths.length * durationPerSlide}`, // Strict total duration used for safety
-            '-movflags +faststart'
-        ]);
+        // 3. HD Output Settings (H.264 High Profile)
+        command
+            .outputOptions([
+                '-map [outv]',
+                hasAudioInput ? `-map ${imagePaths.length}:a` : '',
+                '-c:v libx264',
+                '-preset slow', // Slow encoding for maximum quality
+                '-crf 18',      // High fidelity
+                '-pix_fmt yuv420p',
+                '-r 25',
+                '-t', totalDuration,
+                '-movflags +faststart'
+            ].filter(Boolean));
 
-        if (hasAudio) {
-            // Loop audio if shorter than video, or trim if longer
-            // However, fluent-ffmpeg 'inputOptions' for audio loop is tricky with complex filter.
-            // Simplest: Just map audio. If shorter, it stops. If longer, -t handles it.
-            // To loop audio: -stream_loop -1 (before input).
-            // But we can't easily inject options before specific inputs in this chain structure nicely without 'inputOption'.
-
-            // We'll just map the audio stream.
-            // command.outputOptions(['-map 1:a']); // Assuming audio is last input? No, index matches inputs order.
-            // Audio is input #N (where N = imagePaths.length)
-            command.outputOptions([`-map ${imagePaths.length}:a`, '-c:a aac', '-b:a 128k', '-shortest']);
+        if (hasAudioInput) {
+            command.outputOptions(['-c:a aac', '-b:a 192k', '-shortest']);
         }
 
-        // Map final video
-        command.outputOptions(['-map [outv]']);
-
         command
-            .on('start', (cmdLine) => {
-                console.log('⚡ FFmpeg Command:', cmdLine);
-            })
-            .on('error', (err, stdout, stderr) => {
-                console.error('❌ FFmpeg Error:', err.message);
-                console.error('Stderr:', stderr);
+            .on('start', (cmd) => console.log('⚡ Premium HD Encoding:', cmd))
+            .on('error', (err) => {
+                console.error('❌ Encoding Failed:', err.message);
                 reject(err);
             })
             .on('end', () => {
-                console.log('✅ Video created successfully:', outputPath);
+                console.log('✅ Premium HD Video Created');
                 resolve(outputPath);
             })
             .save(outputPath);

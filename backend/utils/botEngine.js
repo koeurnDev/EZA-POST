@@ -1,5 +1,5 @@
 const prisma = require("./prisma");
-const { decrypt } = require("./crypto");
+const { encrypt, decrypt } = require("./crypto");
 const axios = require("axios");
 const fb = require("./fb");
 
@@ -11,14 +11,7 @@ const botEngine = {
         try {
             console.log("🤖 Bot Engine: Starting run cycle...");
 
-            // 1️⃣ Check Global Bot Status
-            const status = await prisma.botStatus.findFirst();
-            if (!status || !status.enabled) {
-                console.log("🤖 Bot Engine: Globally disabled. Skipping.");
-                return;
-            }
-
-            // 2️⃣ Process Pending Replies (Queue)
+            // 1️⃣ Process Pending Replies (Queue)
             await botEngine.processPendingReplies();
 
             // 3️⃣ Get All Users with Facebook Connected
@@ -65,9 +58,10 @@ const botEngine = {
 
                     console.log(`      💬 Sending delayed reply to ${reply.commentId}: "${reply.replyMessage}"`);
 
+                    const decryptedToken = decrypt(reply.accessToken);
                     await axios.post(`${fb.graph}/${reply.commentId}/comments`, {
                         message: reply.replyMessage,
-                        access_token: reply.accessToken,
+                        access_token: decryptedToken,
                         attachment_url: reply.attachmentUrl || undefined,
                     });
 
@@ -80,6 +74,7 @@ const botEngine = {
                     // Log History
                     await prisma.botHistory.create({
                         data: {
+                            userId: reply.userId,
                             commentId: reply.commentId,
                             replyMessage: reply.replyMessage,
                             pageId: reply.pageId,
@@ -93,7 +88,7 @@ const botEngine = {
                         data: {
                             commentId: reply.commentId,
                             postId: reply.commentId.split('_')[0],
-                            userId: "system" // Or find actual userId if available
+                            userId: reply.userId
                         }
                     });
 
@@ -123,6 +118,7 @@ const botEngine = {
 
                     await prisma.botHistory.create({
                         data: {
+                            userId: reply.userId,
                             commentId: reply.commentId,
                             replyMessage: reply.replyMessage,
                             pageId: reply.pageId,
@@ -143,6 +139,10 @@ const botEngine = {
      */
     processUser: async (user) => {
         try {
+            // 0. Check User's Bot Status
+            const botStatus = await prisma.botStatus.findUnique({ where: { userId: user.id } });
+            if (!botStatus || !botStatus.enabled) return;
+
             // Validate Token
             const decryptedToken = decrypt(user.facebookAccessToken);
             const validation = await fb.validateAccessToken(decryptedToken);
@@ -175,8 +175,10 @@ const botEngine = {
 
             if (activePages.length === 0) return;
 
-            // Get Rules
-            const rules = await prisma.botRule.findMany({ where: { enabled: true } });
+            // Get Rules (Isolated by userId)
+            const rules = await prisma.botRule.findMany({ 
+                where: { userId: user.id, enabled: true } 
+            });
             if (rules.length === 0) return;
 
             for (const page of activePages) {
@@ -207,7 +209,7 @@ const botEngine = {
                 if (!post.comments || !post.comments.data) continue;
 
                 for (const comment of post.comments.data) {
-                    await botEngine.processComment(comment, page, rules);
+                    await botEngine.processComment(comment, page, rules, page.userId);
                 }
             }
         } catch (err) {
@@ -218,7 +220,7 @@ const botEngine = {
     /**
      * 💬 Process a single comment
      */
-    processComment: async (comment, page, rules) => {
+    processComment: async (comment, page, rules, userId) => {
         // 🛑 1. Ignore Self
         if (comment.from?.id === page.id) return;
 
@@ -241,41 +243,70 @@ const botEngine = {
         let replyMessage = null;
         let attachmentUrl = null;
 
-        // Priority 1: ALL Rule (scope: ALL)
-        const allPostsRule = rules.find((r) => r.scope === "ALL");
-        if (allPostsRule) {
-            replyMessage = allPostsRule.reply;
-            attachmentUrl = allPostsRule.attachmentUrl;
-        } else {
-            // Priority 2: Keyword Match
-            const commentText = (comment.message || "").toLowerCase();
-            const matchedRule = rules.find((r) => {
-                if (r.ruleType !== "KEYWORD") return false;
-                const keyword = r.keyword.toLowerCase();
-                return commentText.includes(keyword);
-            });
+        const commentText = (comment.message || "").toLowerCase();
+        // Post ID format in comment is usually POSTID_COMMENTID
+        const currentPostId = comment.id.split('_')[0];
 
-            if (matchedRule) {
-                replyMessage = matchedRule.reply;
-                attachmentUrl = matchedRule.attachmentUrl;
+        const matchedRules = rules.filter((r) => {
+            // Check scope
+            if (r.scope === "SPECIFIC" && r.postId !== currentPostId) return false;
+
+            // Check keyword
+            // If keyword is * or empty, it matches any text
+            if (!r.keyword || r.keyword.trim() === '*' || r.keyword.trim() === '') return true;
+
+            if (r.ruleType === "KEYWORD") {
+                return commentText.includes(r.keyword.toLowerCase());
+            } else if (r.ruleType === "REGEX") {
+                try {
+                    const regex = new RegExp(r.keyword, "i");
+                    return regex.test(commentText);
+                } catch (e) {
+                    return false;
+                }
             }
+            return false;
+        });
+
+        // 🎯 5.1 Pick ONE rule randomly if multiple match (Rule Rotation)
+        if (matchedRules.length > 0) {
+            const pickedRule = matchedRules[Math.floor(Math.random() * matchedRules.length)];
+            replyMessage = pickedRule.reply;
+            attachmentUrl = pickedRule.attachmentUrl;
         }
 
-        // 🚀 6. Queue Reply (Delay 1-2 mins)
+        // 🚀 6. Queue Reply (Smart Delay)
         if (replyMessage) {
             try {
-                const delayMs = Math.floor(Math.random() * 60000) + 60000; // 1-2 minutes
+                // --- 🧠 Spintax Support {good|hi|hello} ---
+                const spintaxRegex = /\{([^{}|]+(?:\|[^{}|]+)+)\}/g;
+                let finalReply = replyMessage.replace(spintaxRegex, (match, options) => {
+                    const choices = options.split('|');
+                    return choices[Math.floor(Math.random() * choices.length)];
+                });
+
+                // --- ⏳ Smart Delay Calculation ---
+                // Get current pending count to adjust delay
+                const pendingCount = await prisma.pendingReply.count({ where: { status: "pending" } });
+                
+                let baseDelay = 60000; // 1 min default
+                if (pendingCount > 50) baseDelay = 120000; // 2 mins if busy
+                if (pendingCount > 100) baseDelay = 180000; // 3 mins if viral
+
+                const randomExtra = Math.floor(Math.random() * 60000); // + 0-60s
+                const delayMs = baseDelay + randomExtra;
                 const sendAt = new Date(Date.now() + delayMs);
 
-                console.log(`      ⏳ Queuing reply to ${comment.from?.name || 'Unknown'} (Delay: ${Math.round(delayMs / 1000)}s)`);
+                console.log(`      ⏳ Queued (${pendingCount} pending): ${finalReply.substring(0,20)}... (Delay: ${Math.round(delayMs / 1000)}s)`);
 
                 await prisma.pendingReply.create({
                     data: {
+                        userId: userId,
                         commentId: comment.id,
-                        replyMessage: replyMessage,
+                        replyMessage: finalReply,
                         attachmentUrl: attachmentUrl,
                         pageId: page.id,
-                        accessToken: page.access_token,
+                        accessToken: encrypt(page.access_token), // 🔒 Encrypt!
                         sendAt: sendAt,
                         status: "pending"
                     }

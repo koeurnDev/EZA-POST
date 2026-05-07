@@ -92,11 +92,13 @@ router.post("/", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("❌ Login error:", err);
+    console.error("💥 [Login Error] Full Exception Stack:");
+    console.error(err);
     res.status(500).json({
       success: false,
       error: "Internal server error during login",
-      details: err.message
+      details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
 });

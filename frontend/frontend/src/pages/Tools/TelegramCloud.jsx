@@ -18,7 +18,7 @@ const TelegramCloud = () => {
         }
 
         setLoading(true);
-        const toastId = toast.loading("Processing... Downloading & Forwarding...");
+        const toastId = toast.loading("Sending...");
 
         try {
             const token = localStorage.getItem('token');
@@ -30,7 +30,7 @@ const TelegramCloud = () => {
             );
 
             if (res.data.success) {
-                toast.success('Sent to Telegram successfully!', { id: toastId });
+                toast.success('Sent successfully!', { id: toastId });
                 setUrl('');
                 setCaption('');
             }
@@ -50,8 +50,8 @@ const TelegramCloud = () => {
                         <Cloud className="w-8 h-8 text-blue-400" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Cloud Download to Telegram</h1>
-                        <p className="text-gray-600 dark:text-gray-400">Save phone storage! Download TikTok/FB videos directly to your Telegram Group.</p>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Save to Telegram</h1>
+                        <p className="text-gray-600 dark:text-gray-400">Save phone storage! Send TikTok/FB videos directly to your Telegram Group.</p>
                     </div>
                 </div>
 
@@ -117,12 +117,12 @@ const TelegramCloud = () => {
                             {loading ? (
                                 <>
                                     <Loader className="w-5 h-5 animate-spin" />
-                                    <span>Forwarding to Cloud...</span>
+                                    <span>Sending...</span>
                                 </>
                             ) : (
                                 <>
                                     <Send className="w-5 h-5" />
-                                    <span>Send to Telegram 🚀</span>
+                                    <span>Send Now 🚀</span>
                                 </>
                             )}
                         </button>

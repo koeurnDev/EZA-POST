@@ -21,7 +21,7 @@ const FarmControl = () => {
             parsedAccounts = JSON.parse(accounts);
             if (!Array.isArray(parsedAccounts)) throw new Error("Root must be array");
         } catch (e) {
-            toast.error("Invalid Accounts JSON format.");
+            toast.error("Invalid accounts list.");
             return;
         }
 
@@ -35,12 +35,12 @@ const FarmControl = () => {
             await toast.promise(
                 axios.post('/api/tools/farm/story', formData),
                 {
-                    loading: 'Mass Posting Stories...',
-                    success: 'Batch Processed Successfully!',
-                    error: 'Error processing batch.'
+                    loading: 'Sending...',
+                    success: 'Sent successfully!',
+                    error: 'Error. Try again.'
                 }
             );
-            setLogs(prev => [`[${new Date().toLocaleTimeString()}] Mass Story Post Completed.`, ...prev].slice(0, 50));
+            setLogs(prev => [`[${new Date().toLocaleTimeString()}] Sent posts to all accounts.`, ...prev].slice(0, 50));
         } catch (err) {
             console.error(err);
         } finally {
@@ -50,25 +50,25 @@ const FarmControl = () => {
 
     const handleWarmup = async () => {
         if (!accounts) {
-            toast.error("Please provide accounts JSON.");
+            toast.error("Please add accounts first.");
             return;
         }
         let parsedAccounts;
         try {
             parsedAccounts = JSON.parse(accounts);
         } catch (e) {
-            toast.error("Invalid Accounts JSON.");
+            toast.error("Wrong account code.");
             return;
         }
 
         try {
             const res = await axios.post('/api/tools/farm/warmup', { accounts: parsedAccounts, duration: 5 });
             if (res.data.success) {
-                toast.success("Warm-up started in background!");
+                toast.success("Warm-up started!");
                 setLogs(prev => [`[${new Date().toLocaleTimeString()}] Started warm-up for ${parsedAccounts.length} accounts.`, ...prev].slice(0, 50));
             }
         } catch (err) {
-            toast.error("Failed to start warm-up");
+            toast.error("Error. Try again.");
         }
     };
 
@@ -80,8 +80,8 @@ const FarmControl = () => {
                         <Users className="w-8 h-8 text-orange-400" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-white">Cloud Farm Automation</h1>
-                        <p className="text-gray-400">Manage hundreds of accounts: Mass Story Posting & Auto-Warmup.</p>
+                        <h1 className="text-2xl font-bold text-white">Auto Post</h1>
+                        <p className="text-gray-400">Post to many accounts at once and keep them safe.</p>
                     </div>
                 </div>
 
@@ -90,7 +90,7 @@ const FarmControl = () => {
                     <div className="lg:col-span-2 space-y-6">
                         {/* Account Input */}
                         <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl">
-                            <h2 className="text-lg font-semibold text-white mb-2">1. Import Accounts (JSON Cookies)</h2>
+                            <h2 className="text-lg font-semibold text-white mb-2">1. Add Account List</h2>
                             <p className="text-xs text-gray-500 mb-4">Format: <code>[{`{ "id": "acc1", "cookie": [...] }`}, ...]</code></p>
                             <textarea
                                 className="w-full h-40 bg-black/50 border border-white/10 rounded-xl p-4 text-xs font-mono text-gray-300 focus:outline-none focus:border-orange-500/50"
@@ -106,7 +106,7 @@ const FarmControl = () => {
                             <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl flex flex-col justify-between">
                                 <div>
                                     <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                                        <Upload className="w-5 h-5 text-pink-500" /> Mass Story Poster
+                                        <Upload className="w-5 h-5 text-pink-500" /> Post to All
                                     </h3>
                                     <input
                                         type="file"
@@ -119,7 +119,7 @@ const FarmControl = () => {
                                     disabled={loading}
                                     className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl font-bold hover:shadow-lg hover:shadow-pink-500/20 transition-all"
                                 >
-                                    {loading ? "Processing Batch..." : "Post to All Stories"}
+                                    {loading ? "Sending..." : "Send Now"}
                                 </button>
                             </div>
 
@@ -127,17 +127,17 @@ const FarmControl = () => {
                             <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl flex flex-col justify-between">
                                 <div>
                                     <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                                        <Activity className="w-5 h-5 text-green-500" /> Auto-Warmup
+                                        <Activity className="w-5 h-5 text-green-500" /> Safe Warm-up
                                     </h3>
                                     <p className="text-sm text-gray-400 mb-4">
-                                        Simulate scrolling, liking, and watching for 5 minutes on all accounts to prevent checkpoints.
+                                        Automatically like and scroll for 5 minutes to keep accounts safe from being banned.
                                     </p>
                                 </div>
                                 <button
                                     onClick={handleWarmup}
                                     className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold hover:shadow-lg hover:shadow-green-500/20 transition-all"
                                 >
-                                    Start Warm-up Cycle
+                                    Start Warm-up
                                 </button>
                             </div>
                         </div>
@@ -146,7 +146,7 @@ const FarmControl = () => {
                     {/* Right: Logs/Status */}
                     <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl h-fit flex flex-col">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-semibold text-white">Live Activity Logs</h2>
+                            <h2 className="text-lg font-semibold text-white">History</h2>
                             <button
                                 onClick={() => setLogs([])}
                                 className="text-xs text-gray-500 hover:text-white hover:underline"

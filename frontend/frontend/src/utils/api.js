@@ -154,9 +154,13 @@ api.interceptors.response.use(
       console.error(`❌ ${url} failed: ${data?.error || error.message}`);
     }
 
-    // 4️⃣ Clear Session on 401
-    if (status === HTTP_STATUS.UNAUTHORIZED) {
-      localStorage.removeItem("kr_post_user");
+    // 4️⃣ Clear Session on 401 & Redirect
+    if (status === HTTP_STATUS.UNAUTHORIZED && !url?.includes("/auth/status")) {
+      localStorage.removeItem("eza_post_user");
+      // Force redirect to login if not already there
+      if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+        window.location.href = "/login";
+      }
     }
 
     // 5️⃣ Construct Error Object

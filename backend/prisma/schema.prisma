@@ -50,6 +50,10 @@ model User {
   scheduledPosts         ScheduledPost[]
   posts                  Post[]
   facebookPages          FacebookPage[]
+  botStatus              BotStatus?
+  botHistory             BotHistory[]
+  pendingReplies         PendingReply[]
+  botRules               BotRule[]
 
   @@map("users")
 }
@@ -229,6 +233,7 @@ model BotRule {
 
 model BotStatus {
   id            String   @id @default(uuid())
+  userId        String   @unique @map("user_id")
   enabled       Boolean  @default(true)
   lastRun       DateTime? @map("last_run")
   totalReplies  Int      @default(0) @map("total_replies")
@@ -236,11 +241,14 @@ model BotStatus {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  user          User     @relation(fields: [userId], references: [id])
+
   @@map("bot_status")
 }
 
 model BotHistory {
   id            String   @id @default(uuid())
+  userId        String   @map("user_id")
   commentId     String   @map("comment_id")
   replyMessage  String   @map("reply_message")
   pageName      String?  @map("page_name")
@@ -252,11 +260,15 @@ model BotHistory {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
   @@map("bot_history")
 }
 
 model PendingReply {
   id            String   @id @default(uuid())
+  userId        String   @map("user_id")
   commentId     String   @unique @map("comment_id")
   replyMessage  String   @map("reply_message")
   attachmentUrl String?  @map("attachment_url")
@@ -270,7 +282,9 @@ model PendingReply {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@index([sendAt, status])
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([sendAt, status, userId])
   @@map("pending_replies")
 }
 

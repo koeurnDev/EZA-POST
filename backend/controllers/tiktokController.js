@@ -1,74 +1,83 @@
 /**
- * 🎵 tiktokController.js — Handle TikTok Video Fetching & Processing
+ * 🎵 tiktokController.js — Handle TikTok Video Fetching
+ * 🚀 Internalized Downloader (yt-dlp primary)
  */
 
-
-const path = require("path");
-const fs = require("fs");
 const tiktokDownloader = require("../utils/tiktokDownloader");
 
-const cloudinary = require("../utils/cloudinary");
-
-// ✅ Fetch TikTok Video
 exports.fetchTikTokVideo = async (req, res) => {
     try {
         const { url } = req.body;
-        if (!url) return res.status(400).json({ success: false, error: "TikTok URL is required" });
+        if (!url) return res.status(400).json({ success: false, error: "URL is required" });
 
-        console.log(`🎵 Fetching TikTok: ${url}`);
-
-        // 1. Get Metadata
-        const metadata = await tiktokDownloader.getVideoMetadata(url);
-
-        // 2. Download Video
-        const result = await tiktokDownloader.downloadTiktokVideo(url);
-
-        if (!result || !result.buffer) {
-            throw new Error("Failed to download video");
+        console.log(`🔍 [Controller] Fetching TikTok Video: ${url}`);
+        
+        // Use the centralized downloader which prioritizes yt-dlp
+        let videoData = null;
+        try {
+            // First try to get standard lookup data (which gives title, cover, duration, etc.)
+            // We can use the logic from api/tools/tiktok.js lookup route here
+            const cleanUrl = (url.match(/https?:\/\/[^\s]+/) || [url])[0];
+            
+            console.log("    👉 Attempting yt-dlp (Internal Scraper)...");
+            const youtubedl = require("youtube-dl-exec");
+            const path = require("path");
+            const prodPath = path.join(__dirname, '../../bin/yt-dlp');
+            const execPath = (process.env.NODE_ENV === 'production' && require('fs').existsSync(prodPath)) ? prodPath : undefined;
+            
+            const output = await youtubedl(cleanUrl, { dumpSingleJson: true, noWarnings: true }, { execPath });
+            
+            if (output && output.url) {
+                videoData = {
+                    url: output.url,
+                    cover: output.thumbnail,
+                    title: output.title,
+                    author: output.uploader
+                };
+                console.log("    ✅ yt-dlp Success!");
+            }
+        } catch (e) {
+            console.warn("    ⚠️ yt-dlp failed, falling back to downloader:", e.message);
+        }
+        
+        // If yt-dlp fails to get rich metadata, use the proxy fallback
+        if (!videoData) {
+            try {
+                const proxyUrl = await tiktokDownloader.getPlayableUrl(url);
+                const meta = await tiktokDownloader.getVideoMetadata(url);
+                
+                if (proxyUrl) {
+                    videoData = {
+                        url: proxyUrl,
+                        cover: meta.thumbnail,
+                        title: meta.title,
+                        author: meta.author
+                    };
+                }
+            } catch (e) {
+                console.warn("    ⚠️ Fallback failed:", e.message);
+            }
         }
 
-        // 3. Save to Temp File (Required for Cloudinary Upload)
-        const filename = `tiktok_${Date.now()}.mp4`;
-        const tempPath = path.join(__dirname, "../../temp/videos", filename);
+        if (videoData) {
+            return res.json({
+                success: true,
+                video: {
+                    url: videoData.url,
+                    cover: videoData.cover, // Used by Post.jsx
+                    thumbnail: videoData.cover,
+                    meta: {
+                        title: videoData.title || "TikTok Video",
+                        author: videoData.author || "TikTok User"
+                    }
+                }
+            });
+        }
 
-        // Ensure directory exists
-        const dir = path.dirname(tempPath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-        fs.writeFileSync(tempPath, result.buffer);
-
-        // 4. Upload to Cloudinary (with 1:1 transformation)
-        console.log(`☁️ Uploading to Cloudinary: ${filename}`);
-        const uploadResult = await cloudinary.uploadFile(
-            tempPath,
-            "eza-post/videos",
-            "video",
-            true, // Delete local file after upload
-            true  // Apply 1:1 transformation
-        );
-
-        // 5. Return Response
-        const mp3Url = uploadResult.url.replace(/\.[^/.]+$/, ".mp3");
-        const downloadUrl = uploadResult.url.replace("/upload/", "/upload/fl_attachment/");
-        const downloadMp3Url = mp3Url.replace("/upload/", "/upload/fl_attachment/");
-
-        res.json({
-            success: true,
-            video: {
-                url: uploadResult.url, // Cloudinary URL (Stream)
-                download: {
-                    mp4: downloadUrl, // Force Download MP4
-                    mp3: downloadMp3Url // Force Download MP3
-                },
-                publicId: uploadResult.publicId,
-                meta: metadata,
-                duration: uploadResult.duration,
-                format: uploadResult.format
-            }
-        });
+        return res.status(422).json({ success: false, error: "Unable to extract content. TikTok might be blocking direct access. Please try again later." });
 
     } catch (err) {
-        console.error("❌ TikTok Fetch Error:", err.message);
-        res.status(500).json({ success: false, error: err.message });
+        console.error("❌ Fetch Error:", err.message);
+        res.status(500).json({ success: false, error: "Internal processing error." });
     }
 };

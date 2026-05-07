@@ -72,10 +72,20 @@ router.get("/", requireAuth, async (req, res) => {
             { day: 'Sun', time: '09:00 PM' }
         ];
 
+        // 3. Fetch Real Post Metrics
+        const metrics = await prisma.postMetrics.aggregate({
+            where: { userId },
+            _sum: {
+                reach: true,
+                likes: true,
+                shares: true
+            }
+        });
+
         const engagementStats = {
-            views: totalPosts * 1250 + Math.floor(Math.random() * 500),
-            likes: totalPosts * 120 + Math.floor(Math.random() * 50),
-            shares: totalPosts * 15 + Math.floor(Math.random() * 10),
+            views: metrics._sum.reach || 0,
+            likes: metrics._sum.likes || 0,
+            shares: metrics._sum.shares || 0,
         };
 
         res.json({

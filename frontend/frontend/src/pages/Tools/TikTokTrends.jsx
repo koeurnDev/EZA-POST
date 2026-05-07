@@ -30,7 +30,7 @@ export default function TikTokTrends() {
         try {
             const res = await apiUtils.getTikTokTrending(region, 24, 'music');
             if (res.data.success) {
-                setTrends(res.data.music || []);
+                setTrends(res.data.videos || []);
             }
         } catch (err) {
             console.error("Failed to load trends:", err);

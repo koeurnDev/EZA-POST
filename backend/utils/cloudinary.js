@@ -65,15 +65,7 @@ const uploadFile = async (filePath, folder = "eza-post", resourceType = "auto", 
             size: result.bytes,
         };
     } catch (error) {
-        // 🧹 Ensure local file is deleted even on error
-        try {
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
-        } catch (cleanupErr) {
-            // ignore
-        }
-
+        // 🧹 DO NOT delete here, let the controller handle it or keep it for fallback
         console.error("❌ Cloudinary Upload Error:", error.message);
         throw new Error(error.message || "Cloudinary upload failed");
     }

@@ -8,20 +8,7 @@ const prisma = require("../utils/prisma");
 const ai = require("../utils/ai");
 const { requireAuth } = require("../utils/auth"); // ✅ Auth Middleware
 
-// ============================================================
-// 🧠 Initialize bot_status (if missing)
-// ============================================================
-(async () => {
-  try {
-    const count = await prisma.botStatus.count();
-    if (count === 0) {
-      await prisma.botStatus.create({ data: { enabled: true } });
-      console.log("✅ bot_status initialized");
-    }
-  } catch (err) {
-    console.error("❌ bot_status init failed:", err.message);
-  }
-})();
+// ✅ No global initialization needed, created per user on first use
 
 // ============================================================
 // 🧩 Routes
@@ -34,7 +21,9 @@ router.get("/rules", requireAuth, async (req, res) => {
       where: { userId: req.user.id },
       orderBy: { createdAt: 'desc' }
     });
-    const status = await prisma.botStatus.findFirst();
+    const status = await prisma.botStatus.findUnique({
+      where: { userId: req.user.id }
+    });
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: { pageSettings: true }
@@ -100,10 +89,11 @@ router.post("/suggestions", requireAuth, async (req, res) => {
 
 // ✅ Add new rule
 router.post("/rules", requireAuth, async (req, res) => {
-  const { keyword, reply, ruleType, scope, postId, attachmentUrl } = req.body;
+  const { reply, ruleType, scope, postId, attachmentUrl } = req.body;
+  const keyword = req.body.keyword || "*";
 
-  if (!keyword || !reply)
-    return res.status(400).json({ success: false, message: "Keyword and reply required" });
+  if (!reply)
+    return res.status(400).json({ success: false, message: "Reply is required" });
 
   try {
     const rule = await prisma.botRule.create({
@@ -128,7 +118,8 @@ router.post("/rules", requireAuth, async (req, res) => {
 // ✅ Update rule
 router.put("/rules/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { keyword, reply, ruleType, scope, postId, attachmentUrl } = req.body;
+  const { reply, ruleType, scope, postId, attachmentUrl } = req.body;
+  const keyword = req.body.keyword || "*";
   try {
     // Ensure user owns the rule
     const rule = await prisma.botRule.findFirst({
@@ -180,35 +171,36 @@ router.patch("/rules/:id", requireAuth, async (req, res) => {
 // ✅ Delete rule
 router.delete("/rules/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
+  console.log(`🗑️ Deletion attempt for Rule ID: ${id} by User: ${req.user.id}`);
   try {
-    // Check ownership first
     const rule = await prisma.botRule.findFirst({
       where: { id: id, userId: req.user.id }
     });
-    if (!rule) return res.status(404).json({ success: false, message: "Rule not found" });
+    
+    if (!rule) {
+      console.warn(`⚠️ Rule ${id} not found or not owned by user.`);
+      return res.status(404).json({ success: false, message: "Rule not found" });
+    }
 
     await prisma.botRule.delete({ where: { id: id } });
+    console.log(`✅ Rule ${id} deleted successfully.`);
 
     res.json({ success: true, message: "Rule deleted" });
   } catch (err) {
     console.error("❌ DELETE /rules error:", err.message);
-    res.status(500).json({ success: false, message: "Failed to delete rule" });
+    res.status(500).json({ success: false, message: "Failed to delete rule", error: err.message });
   }
 });
 
-// ✅ Update bot settings (Global Toggle)
+// ✅ Update bot settings (User-Specific Toggle)
 router.put("/settings", requireAuth, async (req, res) => {
   const { enabled } = req.body;
   try {
-    const status = await prisma.botStatus.findFirst();
-    if (status) {
-      await prisma.botStatus.update({
-        where: { id: status.id },
-        data: { enabled }
-      });
-    } else {
-      await prisma.botStatus.create({ data: { enabled } });
-    }
+    await prisma.botStatus.upsert({
+      where: { userId: req.user.id },
+      update: { enabled },
+      create: { userId: req.user.id, enabled }
+    });
     res.json({ success: true, message: "Bot settings updated" });
   } catch (err) {
     console.error("❌ PUT /settings error:", err.message);

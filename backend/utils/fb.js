@@ -459,28 +459,30 @@ class FacebookAPI {
 
     for (const account of accounts) {
       try {
-        console.log(`🚀 Posting Carousel to ${account.name}...`);
-
-        // 🔍 Debug: Log Payload
-        console.log("📦 Carousel Payload (child_attachments):", JSON.stringify(childAttachments, null, 2));
+        console.log(`🚀 Posting Carousel to ${account.name} (Cards: ${childAttachments.length})...`);
 
         const payload = {
           child_attachments: childAttachments,
           access_token: account.access_token || accessToken,
-          // ✅ Fix: Parent post MUST have a link (use Page URL as fallback)
           link: `https://facebook.com/${account.id}`
         };
 
-        // ✅ Fix: Parent post MUST have a message
         payload.message = (caption && caption.trim().length > 0) ? caption : "Swipe to see more";
 
         if (options.isScheduled && options.scheduleTime) {
           payload.published = false;
           payload.scheduled_publish_time = options.scheduleTime;
         } else {
-          // ✅ CRITICAL: Explicitly publish immediately if not scheduled
           payload.published = true;
         }
+
+        // 🔍 Detailed Payload Log
+        console.log("📦 FB Carousel Payload:", JSON.stringify({
+            message: payload.message,
+            link: payload.link,
+            cards_count: childAttachments.length,
+            has_tokens: !!payload.access_token
+        }, null, 2));
 
         const res = await this.http.post(`${this.graph}/${account.id}/feed`, payload);
 
@@ -494,9 +496,9 @@ class FacebookAPI {
         console.log(`✅ Carousel posted to ${account.name || account.id} (ID: ${res.data.id})`);
 
       } catch (err) {
-        // 🔍 Debug: Log FULL Facebook Error
-        if (err.response && err.response.data) {
-          console.error("❌ FB API Error Details:", JSON.stringify(err.response.data, null, 2));
+        const fbErr = err.response?.data?.error;
+        if (fbErr) {
+          console.error("❌ FB Carousel Error Details:", JSON.stringify(fbErr, null, 2));
         }
 
         const parsed = this.handleFacebookError(err);

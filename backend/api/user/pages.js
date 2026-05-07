@@ -32,7 +32,7 @@ router.get("/", requireAuth, async (req, res) => {
                 return {
                     id: page.id,
                     name: page.name,
-                    access_token: decrypt(page.accessToken), // Encrypted
+                    // access_token: decrypt(page.accessToken), // 🔒 Secure: Never send to frontend
                     picture: page.picture,
                     isSelected: user.selectedPages?.includes(page.id) || false,
                     settings: {
@@ -53,7 +53,7 @@ router.get("/", requireAuth, async (req, res) => {
                     return {
                         id: page.id,
                         name: page.name,
-                        access_token: page.access_token, // Legacy might be raw or encrypted, assume raw if not migrated yet
+                        // access_token: page.access_token, // 🔒 Secure: Never send to frontend
                         picture: page.picture,
                         isSelected: user.selectedPages?.includes(page.id) || false,
                         settings: {

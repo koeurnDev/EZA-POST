@@ -58,6 +58,9 @@ app.use((req, res, next) => {
 // ✅ Dynamic CORS setup
 const allowedOrigins = [
   "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://localhost:5176",
   "http://localhost:3000",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:3000",
@@ -125,14 +128,32 @@ app.use(
   })
 );
 
-// ✅ Rate limiting
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // Limit each IP to 1000 requests per windowMs
-    message: { error: "Too many requests. Please try again later." },
-  })
-);
+// ✅ Rate limiting (DDoS & Brute Force Protection)
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per 15 mins
+  message: { error: "Too many requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Limit each IP to 20 requests per 15 mins (Auth/Login)
+  message: { error: "Security Alert: Too many attempts. Please wait 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const toolLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10, // Limit heavy tools to 10 requests per minute
+  message: { error: "System busy: Too many tool requests. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(generalLimiter);
 
 // 🛡️ CSRF Protection
 const csrf = require('csurf');
@@ -146,7 +167,7 @@ const csrfProtection = csrf({
 
 // ✅ Apply CSRF globally but exempt Webhooks and Uploads
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/webhooks') || req.path.startsWith('/api/upload')) return next();
+  if (req.path.startsWith('/api/webhooks') || req.path.startsWith('/api/upload') || req.path === '/api/health') return next();
   csrfProtection(req, res, next);
 });
 
@@ -159,6 +180,7 @@ app.get('/api/csrf-token', (req, res) => {
     res.status(500).json({ error: "CSRF Generation Error" });
   }
 });
+
 
 
 // ------------------------------------------------------------
@@ -177,9 +199,8 @@ app.get('/api/debug/session', (req, res) => {
   });
 });
 
-// ✅ Use centralized Auth Router
-// ✅ Use centralized Auth Router
-app.use("/api/auth", require("./api/auth"));
+// ✅ Use centralized Auth Router (Strict Protection)
+app.use("/api/auth", strictLimiter, require("./api/auth"));
 
 // ------------------------------------------------------------
 // ✅ Modular Routes (Posts, Uploads, etc.)
@@ -216,24 +237,27 @@ const routeModules = [
   ["tools/threads", "./api/tools/threads"],
   ["tools/ecommerce", "./api/tools/ecommerce"],
   ["tools/document-converter", "./api/tools/document_converter"],
-  ["tools/video-creator", "./api/tools/video_creator"],
-  ["tools/script-writer", "./api/tools/script"],
-  ["tools/thumbnail-generator", "./api/tools/thumbnail"],
-  ["tools/magic-motion", "./api/tools/magic_motion"],
+  ["tools/video-creator", "./api/tools/video_creator", toolLimiter],
+  ["tools/script-writer", "./api/tools/script", toolLimiter],
+  ["tools/thumbnail-generator", "./api/tools/thumbnail", toolLimiter],
+  ["tools/magic-motion", "./api/tools/magic_motion", toolLimiter],
   ["tools/censorship", "./api/tools/censorship"],
   ["tools/label-swap", "./api/tools/label_swap"],
   ["tools/subtitle-generator", "./api/tools/subtitle"],
   ["tools/farm", "./api/tools/farm"],
   ["tools/telegram-cloud", "./api/tools/telegram_cloud"],
-  ["tools/ai", "./api/tools/ai"],
-  ["boost/campaigns", "./api/boost/campaigns"], 
+  ["tools/ai", "./api/tools/ai", toolLimiter], 
   ["debug", "./api/debug_python"],
 ];
 
-for (const [route, file] of routeModules) {
+for (const [route, file, limiter] of routeModules) {
   try {
     const mod = require(file);
-    app.use(`/api/${route}`, mod);
+    if (limiter) {
+      app.use(`/api/${route}`, limiter, mod);
+    } else {
+      app.use(`/api/${route}`, mod);
+    }
   } catch (err) {
     console.warn(`⚠️ Failed to load module ${file}:`, err.message);
   }
@@ -336,7 +360,7 @@ app.use((err, req, res, next) => {
 // ------------------------------------------------------------
 const { processScheduledPosts, cleanupOldPosts } = require("./utils/scheduler");
 const botEngine = require("./utils/botEngine");
-const boostEngine = require("./utils/boostEngine");
+
 
 setInterval(() => {
   processScheduledPosts();
@@ -344,11 +368,6 @@ setInterval(() => {
   // Run bot every ~2 minutes (odd minutes) to spread load
   if (new Date().getMinutes() % 2 !== 0) {
     botEngine.run();
-  }
-
-  // Run boost engine every 30 minutes
-  if (new Date().getMinutes() % 30 === 0) {
-    boostEngine.run();
   }
 
   // Run cleanup occasionally (e.g., 1% chance or separate interval)

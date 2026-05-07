@@ -20,7 +20,8 @@ import {
   Power,
   Filter,
   Image as ImageIcon,
-  Loader
+  Loader,
+  HelpCircle
 } from "lucide-react";
 import api from "../utils/api";
 
@@ -65,8 +66,8 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       }
 
       const res = await api.get("/bot/rules");
-      // ✅ Normalize _id to id for frontend compatibility
-      const normalizedRules = (res.data.rules || []).map(r => ({ ...r, id: r._id }));
+      // ✅ Normalize ID for frontend compatibility
+      const normalizedRules = (res.data.rules || []).map(r => ({ ...r, id: r.id || r._id }));
       setRules(normalizedRules);
       setIsEnabled(res.data.enabled ?? true);
       setPageSettings(res.data.pageSettings || []);
@@ -148,14 +149,14 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     const { ruleType, scope, postId, keyword, reply, attachmentUrl } = formData;
 
     // Validation
-    if (!keyword.trim() || !reply.trim()) return showNotify("Keyword and Reply are required", "error");
+    if (!reply.trim()) return showNotify("Reply Message is required", "error");
     if (scope === "SPECIFIC" && !postId.trim()) return showNotify("Post ID is required for Specific Post scope", "error");
 
     const payload = {
       ruleType,
       scope,
       postId: scope === "SPECIFIC" ? postId : undefined,
-      keyword: keyword.trim(),
+      keyword: keyword.trim() || "*",
       reply: reply.trim(),
       attachmentUrl
     };
@@ -188,18 +189,33 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
   // ✅ Delete rule
   const deleteRule = useCallback(
     async (id) => {
-      if (!confirm("Delete this rule?")) return;
+      console.log("🖱️ Delete button clicked for ID:", id);
+      if (!window.confirm("តើបងពិតជាចង់លុបច្បាប់ (Rule) នេះមែនទេ?")) return;
+      
       try {
-        if (isDemo) {
-          setRules(prev => prev.filter(r => r.id !== id));
-          showNotify("Demo rule deleted");
+        // 1️⃣ Optimistic Update: Remove from UI immediately so user sees it "gone"
+        setRules(prev => prev.filter(r => r.id !== id));
+        showNotify("កំពុងលុប...");
+
+        if (!isDemo) {
+          console.log("🌐 Sending DELETE request to server...");
+          const res = await api.delete(`/bot/rules/${id}`);
+          console.log("✅ Server response:", res.data);
+          
+          if (res.data.success) {
+            showNotify("បានលុបច្បាប់ (Rule) រួចរាល់");
+            // 2️⃣ Double check sync with server
+            fetchRules();
+          } else {
+            throw new Error(res.data.message || "Failed to delete");
+          }
         } else {
-          await api.delete(`/bot/rules/${id}`);
-          showNotify("Rule deleted");
-          fetchRules();
+          showNotify("បានលុបច្បាប់សាកល្បងរួចរាល់");
         }
-      } catch {
-        showNotify("Delete failed", "error");
+      } catch (err) {
+        console.error("❌ Deletion failed:", err);
+        showNotify("មិនអាចលុបបានទេ សូមព្យាយាមម្តងទៀត", "error");
+        fetchRules(); // Revert back if failed
       }
     },
     [fetchRules, showNotify, isDemo]
@@ -364,6 +380,19 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
         </div>
       )}
 
+      {/* 📘 Quick Guide */}
+      <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-6 shadow-sm">
+        <h3 className="text-lg font-bold text-blue-800 dark:text-blue-400 mb-3 flex items-center gap-2">
+          <HelpCircle size={20} />
+          របៀបប្រើប្រាស់ (Quick Guide)
+        </h3>
+        <ol className="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-2">
+          <li><strong>បើកមុខងារ (Turn ON):</strong> ចុចបើកកុងតាក់ <span className="bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded shadow-sm text-xs border dark:border-gray-700 font-medium">Bot កំពុងដំណើរការ</span>។</li>
+          <li><strong>ជ្រើសរើសផេក (Select Pages):</strong> ជ្រើសរើស Page ដែលបងចង់ឱ្យ Bot ទៅជួយឆ្លើយខមិននៅត្រង់ <span className="bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded shadow-sm text-xs border dark:border-gray-700 font-medium">ជ្រើសរើស Page ដែលចង់ឱ្យ Bot ឆ្លើយតប</span>។</li>
+          <li><strong>បង្កើតច្បាប់ (Create Rule):</strong> កំណត់ពាក្យដែលភ្ញៀវចូលចិត្តសួរ (Keyword) និងសារឆ្លើយតប (Reply Message) រួចចុច Save។</li>
+        </ol>
+      </div>
+
       {/* 1️⃣ Top Panel: Bot Status */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-4">
@@ -372,10 +401,10 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              {isEnabled ? "Bot is Active" : "Bot is Paused"}
+              {isEnabled ? "Bot កំពុងដំណើរការ" : "Bot ត្រូវបានផ្អាក"}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isEnabled ? "The bot is replying to comments based on your rules." : "Enable to automatically reply to comments on your posts."}
+              {isEnabled ? "Bot កំពុងជួយឆ្លើយតបខមិនផ្អែកលើច្បាប់ដែលបងបានកំណត់។" : "បើកមុខងារនេះដើម្បីឱ្យ Bot ជួយឆ្លើយតបខមិនលើផុសរបស់បងដោយស្វ័យប្រវត្តិ។"}
             </p>
           </div>
         </div>
@@ -395,20 +424,20 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <Filter size={20} className="text-blue-500" />
-          Bot Target Pages
+          ជ្រើសរើស Page ដែលចង់ឱ្យ Bot ឆ្លើយតប
         </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-          Choose which pages the bot should actively monitor and reply to comments on.
+          ជ្រើសរើស Page ណាខ្លះដែលបងចង់ឱ្យ Bot តាមដាន និងឆ្លើយតបខមិនដោយស្វ័យប្រវត្តិ។
         </p>
 
         {isLoadingPages ? (
           <div className="flex items-center gap-2 text-sm text-gray-400 animate-pulse">
             <Loader size={16} className="animate-spin" />
-            Loading pages...
+            កំពុងទាញយក Page...
           </div>
         ) : availablePages.length === 0 ? (
           <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl text-center text-sm text-gray-500 border border-dashed border-gray-200 dark:border-gray-700">
-            No pages connected. Please connect Facebook pages in Settings.
+            មិនមាន Page ណាមួយត្រូវបានភ្ជាប់ទេ។ សូមភ្ជាប់ Page Facebook នៅក្នុងការកំណត់ (Settings)។
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -460,7 +489,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
         <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Plus size={20} className="text-blue-500" />
-            {editingId ? "Edit Rule" : "Add New Rule"}
+            {editingId ? "កែប្រែច្បាប់" : "បង្កើតច្បាប់ថ្មី"}
           </h3>
 
           {/* AI Auto-Generate Button */}
@@ -468,10 +497,10 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             onClick={generateAISuggestions}
             disabled={generating}
             className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-purple-200 dark:border-purple-800/50"
-            title="Stuck? Let AI suggest a reply rule based on your post context."
+            title="AI នឹងជួយបង្កើតច្បាប់ឆ្លើយតបដោយស្វ័យប្រវត្តិ។"
           >
             {generating ? "..." : "✨"}
-            AI Auto-Generate
+            AI ជួយបង្កើតឱ្យ
           </button>
         </div>
 
@@ -480,11 +509,11 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             {/* Rule Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
-                Rule Type
+                ប្រភេទច្បាប់ (Rule Type)
                 <div className="group relative">
                   <span className="text-gray-400 cursor-help">(?)</span>
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    Choose how the bot triggers. Keyword matches words, Regex matches patterns.
+                    ជ្រើសរើសរបៀបដែល Bot ដំណើរការ។ Keyword គឺផ្អែកលើពាក្យ ចំណែក Regex គឺផ្អែកលើទម្រង់អក្សរ។
                   </div>
                 </div>
               </label>
@@ -498,7 +527,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                       : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
                       }`}
                   >
-                    {type === "KEYWORD" ? "Keyword Match" : "Regex Pattern"}
+                    {type === "KEYWORD" ? "ប្រើ Keyword" : "ប្រើ Regex"}
                   </button>
                 ))}
               </div>
@@ -507,11 +536,11 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             {/* Scope */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
-                Scope
+                វិសាលភាព (Scope)
                 <div className="group relative">
                   <span className="text-gray-400 cursor-help">(?)</span>
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    Apply to all posts or a specific post ID.
+                    អនុវត្តលើគ្រប់ផុសទាំងអស់ ឬផុសណាមួយជាក់លាក់។
                   </div>
                 </div>
               </label>
@@ -520,8 +549,8 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                 onChange={(e) => handleFormChange("scope", e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               >
-                <option value="ALL">All Posts</option>
-                <option value="SPECIFIC">Specific Post</option>
+                <option value="ALL">គ្រប់ផុសទាំងអស់ (All Posts)</option>
+                <option value="SPECIFIC">ផុសជាក់លាក់ (Specific Post)</option>
               </select>
             </div>
           </div>
@@ -536,7 +565,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                 type="text"
                 value={formData.postId}
                 onChange={(e) => handleFormChange("postId", e.target.value)}
-                placeholder="Enter Facebook Post ID"
+                placeholder="បញ្ជូល Facebook Post ID"
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               />
             </div>
@@ -546,11 +575,11 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             {/* Keyword */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                {formData.ruleType === "KEYWORD" ? "Keyword" : "Regex Pattern"}
+                {formData.ruleType === "KEYWORD" ? "Keyword (Optional)" : "Regex Pattern"}
                 <div className="group relative">
                   <span className="text-gray-400 cursor-help">(?)</span>
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    {formData.ruleType === "KEYWORD" ? "Word or phrase to trigger reply." : "Regular expression pattern to match."}
+                    {formData.ruleType === "KEYWORD" ? "ទុកឱ្យនៅទំនេរដើម្បីឆ្លើយតបទៅកាន់គ្រប់ខមិនទាំងអស់។" : "ទម្រង់ Regex សម្រាប់ត្រួតពិនិត្យអត្ថបទ។"}
                   </div>
                 </div>
               </label>
@@ -558,7 +587,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                 type="text"
                 value={formData.keyword}
                 onChange={(e) => handleFormChange("keyword", e.target.value)}
-                placeholder={formData.ruleType === "KEYWORD" ? "e.g. price" : "e.g. ^(hi|hello)$"}
+                placeholder={formData.ruleType === "KEYWORD" ? "ឧទាហរណ៍៖ តម្លៃ (ទុកឱ្យនៅទំនេរដើម្បីឆ្លើយគ្រប់ខមិន)" : "ឧទាហរណ៍៖ ^(hi|hello)$"}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               />
             </div>
@@ -566,11 +595,11 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             {/* Reply Message */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                Reply Message
+                សារឆ្លើយតប (Reply Message)
                 <div className="group relative">
                   <span className="text-gray-400 cursor-help">(?)</span>
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    Message the bot will send.
+                    សារដែល Bot នឹងផ្ញើទៅកាន់អតិថិជន។
                   </div>
                 </div>
               </label>
@@ -578,7 +607,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                 type="text"
                 value={formData.reply}
                 onChange={(e) => handleFormChange("reply", e.target.value)}
-                placeholder="e.g. Check your DM!"
+                placeholder="ឧទាហរណ៍៖ សូមបងឆែកប្រអប់សារ!"
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               />
             </div>
@@ -587,43 +616,55 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           {/* Image Attachment */}
           <div className="mt-6">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
-              Attachment (Optional)
+              រូបភាពភ្ជាប់ (Attachment - បើមាន)
+              <div className="group relative">
+                <span className="text-gray-400 cursor-help">(?)</span>
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  ភ្ជាប់រូបភាពទៅជាមួយសារឆ្លើយតប។
+                </div>
+              </div>
             </label>
 
-            <div className="flex items-start gap-4">
-              {formData.attachmentUrl ? (
-                <div className="relative group">
-                  <img
-                    src={formData.attachmentUrl}
-                    alt="Attachment"
-                    className="w-32 h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-700"
-                  />
-                  <button
-                    onClick={removeImage}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
+            {formData.attachmentUrl ? (
+              <div className="relative flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl group">
+                <img
+                  src={formData.attachmentUrl}
+                  alt="រូបភាពភ្ជាប់"
+                  className="w-16 h-16 rounded-xl object-cover border border-gray-200 dark:border-gray-600 shadow-sm"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">រូបភាពត្រូវបានដាក់បញ្ចូល</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">រូបភាពនេះនឹងផ្ញើទៅជាមួយសារឆ្លើយតប។</p>
                 </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all group">
-                  {uploading ? (
-                    <Loader size={24} className="animate-spin text-blue-500" />
-                  ) : (
-                    <>
-                      <ImageIcon size={24} className="text-gray-400 group-hover:text-blue-500 mb-1" />
-                      <span className="text-xs text-gray-500 font-medium">Upload</span>
-                    </>
-                  )}
-                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
-                </label>
-              )}
-
-              <div className="flex-1 text-sm text-gray-500 dark:text-gray-400 mt-2">
-                <p>Attach a photo to send with your reply.</p>
-                <p className="text-xs mt-1 text-gray-400">Supported: JPG, PNG • Max: 5MB</p>
+                <button
+                  onClick={removeImage}
+                  className="p-2.5 text-red-500 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-xl transition-colors"
+                  title="លុបរូបភាព"
+                >
+                  <Trash2 size={18} />
+                </button>
               </div>
-            </div>
+            ) : (
+              <label className="relative flex flex-col items-center justify-center w-full py-8 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl cursor-pointer bg-gray-50/50 dark:bg-gray-900/20 hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:border-blue-300 dark:hover:border-blue-700 transition-all group">
+                {uploading ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader size={28} className="animate-spin text-blue-500" />
+                    <span className="text-sm font-medium text-blue-500">កំពុងដាក់រូបភាពបញ្ចូល...</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 bg-white dark:bg-gray-800 shadow-sm border border-gray-100 dark:border-gray-700 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                      <ImageIcon size={24} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                    </div>
+                    <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                      ចុចទីនេះដើម្បីបញ្ចូលរូបភាព
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">ប្រភេទ៖ JPG, PNG • ទំហំអតិបរមា៖ 5MB</p>
+                  </>
+                )}
+                <input type="file" className="hidden" accept="image/jpeg, image/png" onChange={handleImageUpload} disabled={uploading} />
+              </label>
+            )}
           </div>
 
           {/* Actions */}
@@ -632,14 +673,14 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               onClick={resetForm}
               className="px-6 py-2.5 text-gray-600 dark:text-gray-400 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
             >
-              Cancel
+              បោះបង់
             </button>
             <button
               onClick={saveRule}
               className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center gap-2"
             >
               <Save size={18} />
-              {editingId ? "Save Changes" : "Create Rule"}
+              {editingId ? "រក្សាទុកការកែប្រែ" : "បង្កើតច្បាប់ថ្មី"}
             </button>
           </div>
         </div>
@@ -648,12 +689,12 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       {/* 3️⃣ Rule Table */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-          <h3 className="font-bold text-gray-900 dark:text-white">Active Rules</h3>
+          <h3 className="font-bold text-gray-900 dark:text-white">បញ្ជីច្បាប់ដែលកំពុងប្រើ (Active Rules)</h3>
           <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
-              placeholder="Search rules..."
+              placeholder="ស្វែងរកច្បាប់..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -666,9 +707,9 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
               <tr>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keyword / Regex</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Reply Message</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-center">Status</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-right">Actions</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">សារឆ្លើយតប (Reply Message)</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-center">ស្ថានភាព</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-right">សកម្មភាព</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -677,75 +718,87 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                   <td colSpan="4" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     <div className="flex flex-col items-center gap-2">
                       <Filter size={32} className="opacity-20" />
-                      <p>{searchTerm ? "No matching rules found" : "No rules yet. Create one above!"}</p>
+                      <p>{searchTerm ? "មិនមានច្បាប់ដែលត្រូវនឹងការស្វែងរកទេ" : "មិនទាន់មានច្បាប់ឆ្លើយតបនៅឡើយទេ។ បង្កើតមួយនៅខាងលើ!"}</p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                filtered.map((r) => (
-                  <tr key={r.id} className={`hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors group ${r.enabled ? "bg-white dark:bg-gray-800" : "bg-gray-50/50 dark:bg-gray-900/20"}`}>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          {r.keyword}
-                        </span>
-                        <div className="flex gap-2">
-                          <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                            {r.ruleType || "KEYWORD"}
+                filtered.map((r, idx) => {
+                  const ruleId = r._id || r.id || `temp-${idx}`;
+                  return (
+                    <tr key={ruleId} className={`hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors group ${r.enabled ? "bg-white dark:bg-gray-800" : "bg-gray-50/50 dark:bg-gray-900/20"}`}>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមិន)</span> : r.keyword}
                           </span>
-                          {r.scope === "SPECIFIC" && (
-                            <span className="text-[10px] uppercase font-bold text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
-                              Post: {r.postId}
+                          <div className="flex gap-2">
+                            <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                              {r.ruleType || "KEYWORD"}
                             </span>
-                          )}
+                            {r.scope === "SPECIFIC" && (
+                              <span className="text-[10px] uppercase font-bold text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                                ផុស៖ {r.postId}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-start gap-3">
-                        {r.attachmentUrl && (
-                          <img
-                            src={r.attachmentUrl}
-                            alt="Attachment"
-                            className="w-10 h-10 rounded-lg object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0"
-                          />
-                        )}
-                        <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2 pt-0.5">
-                          {r.reply}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button
-                        onClick={() => toggleRule(r.id, r.enabled)}
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${r.enabled
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                          : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                          }`}
-                      >
-                        {r.enabled ? "Active" : "Inactive"}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-start gap-3">
+                          {r.attachmentUrl && (
+                            <img
+                              src={r.attachmentUrl}
+                              alt="រូបភាព"
+                              className="w-10 h-10 rounded-lg object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0"
+                            />
+                          )}
+                          <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2 pt-0.5">
+                            {r.reply}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
                         <button
-                          onClick={() => handleEdit(r)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                          title="Edit"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleRule(ruleId, r.enabled);
+                          }}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${r.enabled
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                            : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                            }`}
                         >
-                          <Edit2 size={16} />
+                          {r.enabled ? "បើក" : "បិទ"}
                         </button>
-                        <button
-                          onClick={() => deleteRule(r.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity relative z-10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(r);
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors cursor-pointer"
+                            title="កែប្រែ"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteRule(ruleId);
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors cursor-pointer"
+                            title="លុប"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

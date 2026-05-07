@@ -158,7 +158,7 @@ export default function BulkPost() {
                         <div className="p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/30">
                             <UploadCloud size={24} />
                         </div>
-                        Bulk Upload
+                        Fast Upload
                     </h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-2">Upload up to 50 videos and auto-schedule them with human-like intervals.</p>
                 </MotionDiv>
@@ -169,7 +169,7 @@ export default function BulkPost() {
                         {/* 1. Page Selection */}
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
                             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <Filter size={16} /> 1. Target Page
+                                <Filter size={16} /> 1. Choose Page
                             </h3>
                             <select
                                 value={selectedPage}
@@ -183,7 +183,7 @@ export default function BulkPost() {
                         {/* 2. Common Settings */}
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
                             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <Settings size={16} /> 2. Auto-Scheduler
+                                <Settings size={16} /> 2. Auto Time
                             </h3>
 
                             <div className="space-y-5">
@@ -198,7 +198,7 @@ export default function BulkPost() {
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 block">Post Frequency</label>
+                                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 block">Gap Time</label>
                                     <select
                                         value={intervalHours}
                                         onChange={(e) => setIntervalHours(Number(e.target.value))}
@@ -214,11 +214,11 @@ export default function BulkPost() {
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 block">Common Caption</label>
+                                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 block">Same Text for All</label>
                                     <textarea
                                         value={commonCaption}
                                         onChange={(e) => setCommonCaption(e.target.value)}
-                                        placeholder="Add a caption for all videos..."
+                                        placeholder="Add a text for all videos..."
                                         className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white h-24 resize-none"
                                     />
                                 </div>
@@ -263,7 +263,7 @@ export default function BulkPost() {
                                     className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm"
                                 >
                                     <div className="p-5 bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                                        <h3 className="font-bold text-gray-900 dark:text-white">Upload Queue ({items.length})</h3>
+                                        <h3 className="font-bold text-gray-900 dark:text-white">Ready to Send ({items.length})</h3>
                                         {items.some(i => i.status === "pending") && (
                                             <Button
                                                 onClick={startUpload}
@@ -276,32 +276,48 @@ export default function BulkPost() {
                                             </Button>
                                         )}
                                     </div>
-                                    <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[500px] overflow-y-auto">
+                                    <div className="flex overflow-x-auto md:grid md:grid-cols-2 lg:grid-cols-3 gap-6 p-6 md:max-h-[700px] md:overflow-y-auto scrollbar-hide snap-x">
                                         {items.map((item, idx) => (
-                                            <MotionDiv 
-                                                key={item.id} 
+                                            <MotionDiv
+                                                key={item.id}
                                                 layout
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors"
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                className="min-w-[280px] w-[85%] md:w-full snap-center flex-shrink-0 group relative bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 p-5 flex flex-col gap-4"
                                             >
-                                                <div className="flex items-start gap-4">
-                                                    <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-xl flex items-center justify-center flex-shrink-0">
-                                                        <FileVideo className="text-gray-400 dark:text-gray-500" size={24} />
+                                                {/* Media Area */}
+                                                <div className="relative aspect-video bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-100 dark:border-white/5">
+                                                    <FileVideo className="text-gray-300 dark:text-gray-600" size={40} />
+                                                    
+                                                    {/* Status Badge */}
+                                                    <div className="absolute top-3 right-3">
+                                                        <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-lg border border-white/20 ${
+                                                            item.status === 'uploaded' ? 'bg-green-500 text-white' : 
+                                                            item.status === 'error' ? 'bg-red-500 text-white' : 
+                                                            'bg-gray-500 text-white'
+                                                        }`}>
+                                                            {item.status}
+                                                        </span>
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <div className="overflow-hidden">
-                                                                <h4 className="font-bold text-gray-900 dark:text-white truncate">{item.name}</h4>
-                                                                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">{item.size}</p>
-                                                            </div>
-                                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter ${item.status === 'uploaded' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                                                item.status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-                                                                }`}>
-                                                                {item.status}
-                                                            </span>
-                                                        </div>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+
+                                                    {/* Delete Button */}
+                                                    <button
+                                                        onClick={() => setItems(prev => prev.filter((_, x) => x !== idx))}
+                                                        className="absolute top-3 left-3 p-2 bg-white/90 dark:bg-black/50 text-gray-400 hover:text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow-sm backdrop-blur-md"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+
+                                                {/* Details */}
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <h4 className="font-bold text-gray-900 dark:text-white truncate text-sm" title={item.name}>{item.name}</h4>
+                                                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-0.5">{item.size}</p>
+                                                    </div>
+
+                                                    <div className="space-y-3">
+                                                        <div className="relative">
                                                             <input
                                                                 type="text"
                                                                 placeholder="Override caption..."
@@ -310,22 +326,17 @@ export default function BulkPost() {
                                                                     const val = e.target.value;
                                                                     setItems(prev => prev.map((i, x) => x === idx ? { ...i, caption: val } : i));
                                                                 }}
-                                                                className="text-xs p-2.5 rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-1 focus:ring-blue-500 outline-none w-full"
+                                                                className="text-[11px] p-3.5 rounded-xl bg-gray-100/50 dark:bg-white/5 outline-none w-full font-bold transition-all text-gray-900 dark:text-white"
                                                             />
-                                                            <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-2 rounded-lg border border-gray-100 dark:border-gray-700">
-                                                                <Calendar size={14} className="text-blue-500" />
-                                                                <span className="font-medium">
-                                                                    {item.scheduleTime ? new Date(item.scheduleTime).toLocaleString() : "Syncing..."}
-                                                                </span>
-                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-3 text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-black/30 p-3 rounded-xl border border-gray-100 dark:border-white/5">
+                                                            <Calendar size={14} className="text-blue-500" />
+                                                            <span className="font-black uppercase tracking-tight">
+                                                                {item.scheduleTime ? new Date(item.scheduleTime).toLocaleString() : "Syncing..."}
+                                                            </span>
                                                         </div>
                                                     </div>
-                                                    <button
-                                                        onClick={() => setItems(prev => prev.filter((_, x) => x !== idx))}
-                                                        className="p-2 text-gray-300 hover:text-red-500 dark:text-gray-600 dark:hover:text-red-400 transition-colors"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
                                                 </div>
                                             </MotionDiv>
                                         ))}

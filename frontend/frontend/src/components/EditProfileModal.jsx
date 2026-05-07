@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 const MotionDiv = motion.div;
@@ -48,7 +49,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
         setIsLoading(false);
     };
 
-    return (
+    return createPortal(
         <MotionAnimatePresence>
             {isOpen && (
                 <>
@@ -58,7 +59,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+                        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[999]"
                     />
 
                     {/* Modal */}
@@ -66,7 +67,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none p-4"
+                        className="fixed inset-0 flex items-center justify-center z-[999] pointer-events-none p-4"
                     >
                         <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl pointer-events-auto overflow-hidden border border-gray-100 dark:border-gray-700">
                             {/* Header */}
@@ -177,6 +178,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
                     </MotionDiv>
                 </>
             )}
-        </MotionAnimatePresence>
+        </MotionAnimatePresence>,
+        document.body
     );
 }

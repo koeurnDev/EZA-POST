@@ -14,36 +14,78 @@ export const generateThumbnailFromVideo = (videoFile) => {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
 
-        // Load video metadata to get dimensions
         video.preload = "metadata";
-        video.src = URL.createObjectURL(videoFile);
+        const src = (videoFile instanceof File || videoFile instanceof Blob) ? URL.createObjectURL(videoFile) : videoFile;
+        video.src = src;
+        if (!(videoFile instanceof File || videoFile instanceof Blob)) video.crossOrigin = "anonymous";
         video.muted = true;
         video.playsInline = true;
 
         video.onloadedmetadata = () => {
-            // Seek to 1 second (or 0.1s if short) to capture a frame
             video.currentTime = Math.min(1, video.duration / 2);
         };
 
         video.onseeked = () => {
-            // Set canvas dimensions to match video
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-
-            // Draw video frame to canvas
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // Convert canvas to data URL (JPEG)
             const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-
-            // Cleanup
-            URL.revokeObjectURL(video.src);
+            if (videoFile instanceof File) URL.revokeObjectURL(video.src);
             resolve(dataUrl);
         };
 
         video.onerror = (err) => {
             URL.revokeObjectURL(video.src);
             reject(new Error("Failed to load video for thumbnail generation"));
+        };
+    });
+};
+
+/**
+ * Generates a gallery of thumbnails from a video file.
+ * @param {File} videoFile 
+ * @param {number} count - Number of frames to extract
+ * @returns {Promise<string[]>}
+ */
+export const generateGalleryFromVideo = (videoFile, count = 6) => {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement("video");
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const frames = [];
+
+        video.preload = "metadata";
+        const src = (videoFile instanceof File || videoFile instanceof Blob) ? URL.createObjectURL(videoFile) : videoFile;
+        video.src = src;
+        if (!(videoFile instanceof File || videoFile instanceof Blob)) video.crossOrigin = "anonymous";
+        video.muted = true;
+        video.playsInline = true;
+
+        video.onloadedmetadata = async () => {
+            const duration = video.duration;
+            const interval = duration / (count + 1);
+
+            for (let i = 1; i <= count; i++) {
+                const timestamp = i * interval;
+                await new Promise((res) => {
+                    video.onseeked = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        frames.push(canvas.toDataURL("image/jpeg", 0.7));
+                        res();
+                    };
+                    video.currentTime = timestamp;
+                });
+            }
+
+            URL.revokeObjectURL(video.src);
+            resolve(frames);
+        };
+
+        video.onerror = (err) => {
+            URL.revokeObjectURL(video.src);
+            reject(new Error("Failed to load video for gallery generation"));
         };
     });
 };

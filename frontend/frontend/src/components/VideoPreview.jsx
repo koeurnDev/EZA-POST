@@ -84,7 +84,7 @@ const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Previe
     <div className="space-y-3">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-          🎬 {title}
+          🎬 Video Preview
         </h3>
         {(videoFile || videoUrl) && (
           <button

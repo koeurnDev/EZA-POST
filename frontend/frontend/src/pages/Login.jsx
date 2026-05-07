@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import LoginForm from "../components/LoginForm";
 import { saveUserData } from "../utils/apiUtils";
 import { motion } from "framer-motion";
-import { Sparkles, ShieldCheck, Zap, Globe } from "lucide-react";
-
+import { Zap, Sparkles, ShieldCheck, Lock, ArrowLeft } from "lucide-react";
 
 export default function Login() {
   const MotionDiv = motion.div;
@@ -14,153 +13,110 @@ export default function Login() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      navigate("/tools/tiktok", { replace: true });
+      navigate("/post", { replace: true });
     }
   }, [user, authLoading, navigate]);
 
   const handleLoginSuccess = (user) => {
     saveUserData(user);
     setAuthUser(user);
-    setTimeout(() => navigate("/tools/tiktok", { replace: true }), 1000);
+    setTimeout(() => navigate("/post", { replace: true }), 1000);
   };
 
   return (
-    <div className="flex min-h-screen bg-white dark:bg-gray-950 transition-colors duration-500 overflow-hidden">
-      {/* 🎨 Left Side: Immersive Visuals */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 dark:bg-black overflow-hidden flex-col justify-between p-16 text-white">
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600/20 rounded-full blur-[120px] animate-pulse" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-purple-600/20 rounded-full blur-[120px] animate-pulse delay-700" />
-          <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
-        </div>
-
-        {/* Brand Header */}
-        <MotionDiv 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative z-10 flex items-center gap-3 text-2xl font-black tracking-tighter"
-        >
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Zap size={20} fill="white" />
-          </div>
-          EZA-POST
-        </MotionDiv>
-
-        {/* Value Proposition */}
-        <div className="relative z-10">
-          <MotionDiv
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <h1 className="text-6xl font-black leading-[1.1] mb-8 tracking-tight">
-              Master your <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 animate-gradient">
-                Social Pulse.
-              </span>
-            </h1>
-            <p className="text-xl text-gray-400 max-w-md leading-relaxed font-medium">
-              The next generation of social automation. Built for creators who demand excellence.
-            </p>
-          </MotionDiv>
-
-          <MotionDiv 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="flex gap-8 mt-12"
-          >
-            {[
-              { icon: ShieldCheck, label: "Secure" },
-              { icon: Zap, label: "Fast" },
-              { icon: Globe, label: "Global" }
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10">
-                  <item.icon size={14} className="text-blue-400" />
-                </div>
-                <span className="text-xs font-black uppercase tracking-widest text-gray-500">{item.label}</span>
-              </div>
-            ))}
-          </MotionDiv>
-        </div>
-
-        {/* Footer Info */}
-        <MotionDiv 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="relative z-10 flex items-center gap-4"
-        >
-          <div className="flex -space-x-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="w-10 h-10 rounded-full border-2 border-gray-900 bg-gray-800 flex items-center justify-center overflow-hidden">
-                <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" />
-              </div>
-            ))}
-          </div>
-          <p className="text-sm font-bold text-gray-500">Trusted by 10k+ elite creators</p>
-        </MotionDiv>
+    <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-6 overflow-hidden font-['Kantumruy_Pro'] relative">
+      
+      {/* 🌌 Immersive Immersive Background */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[150px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[150px] animate-pulse delay-1000" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.05] mix-blend-overlay" />
       </div>
 
-      {/* 📝 Right Side: Authentication Hub */}
-      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-8 md:p-24 relative">
-        <div className="w-full max-w-md">
-          {/* Mobile Brand */}
-          <div className="lg:hidden flex justify-center mb-12">
-            <div className="flex items-center gap-3 text-2xl font-black tracking-tighter dark:text-white">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <Zap size={20} fill="white" />
+      {/* 🔙 Back to Home */}
+      <Link 
+        to="/" 
+        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 flex items-center gap-2 text-[10px] md:text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-white transition-colors group"
+      >
+        <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+        <span className="hidden sm:inline">ត្រឡប់ទៅដើម</span>
+      </Link>
+
+      <MotionDiv
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-lg mt-12 mb-8"
+      >
+        {/* Floating Icon Decoration - Hidden on small mobile */}
+        <div className="hidden sm:block absolute -top-12 -left-12 w-24 h-24 bg-blue-600/10 rounded-3xl blur-2xl animate-bounce duration-[3000ms]" />
+        <div className="hidden sm:block absolute -bottom-12 -right-12 w-32 h-32 bg-indigo-600/10 rounded-full blur-3xl animate-pulse" />
+
+        <div className="bg-white/5 backdrop-blur-[40px] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-12 shadow-2xl shadow-black/50 relative overflow-hidden">
+          {/* Top Decorative Line */}
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50" />
+          
+          {/* Brand Identity */}
+          <div className="flex flex-col items-center mb-10 md:mb-12">
+            <MotionDiv 
+              whileHover={{ rotate: 12, scale: 1.1 }}
+              className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/30 mb-6"
+            >
+              <Zap className="text-white fill-white" size={28} />
+            </MotionDiv>
+            <div className="text-center">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">ចូលគណនី EZA_POST</h1>
+              <div className="flex items-center justify-center gap-2">
+                <Sparkles size={12} className="text-blue-500" />
+                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-blue-500 opacity-80">សូមស្វាគមន៍មកកាន់ប្រព័ន្ធ</span>
               </div>
-              EZA-POST
             </div>
           </div>
 
-          <MotionDiv 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-10 text-center lg:text-left"
-          >
-            <h2 className="text-4xl font-black tracking-tight text-gray-900 dark:text-white mb-3">
-              Welcome back
-            </h2>
-            <p className="text-gray-500 dark:text-gray-400 font-medium">
-              Enter your credentials to access your command center.
-            </p>
-          </MotionDiv>
-
-          <MotionDiv
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
+          {/* Login Form */}
+          <div className="relative">
             <LoginForm
               onSuccess={handleLoginSuccess}
               onForgotPassword={() => navigate("/forgot-password")}
             />
-          </MotionDiv>
+          </div>
 
-          <MotionDiv 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="mt-12 pt-8 border-t border-gray-100 dark:border-gray-900 text-center lg:text-left"
-          >
-            <p className="text-sm font-bold text-gray-500">
-              New to the platform?{" "}
-              <button
-                onClick={() => navigate("/register")}
-                className="text-blue-600 hover:text-blue-700 transition-colors ml-1"
+          {/* Footer Actions */}
+          <div className="mt-12 pt-8 border-t border-white/5 text-center">
+            <p className="text-sm text-gray-500 font-medium">
+              មិនទាន់មានគណនីមែនទេ?{" "}
+              <Link
+                to="/register"
+                className="text-blue-500 hover:text-blue-400 transition-colors font-bold ml-1 underline underline-offset-4"
               >
-                Create an account
-              </button>
+                ចុះឈ្មោះឥតគិតថ្លៃ
+              </Link>
             </p>
-          </MotionDiv>
+          </div>
         </div>
 
-        {/* Ambient background for mobile */}
-        <div className="lg:hidden absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
+        {/* Security Badge */}
+        <MotionDiv 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="mt-8 flex items-center justify-center gap-4 text-gray-600"
+        >
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={14} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">End-to-End Encryption</span>
+          </div>
+          <div className="w-1 h-1 bg-gray-800 rounded-full" />
+          <div className="flex items-center gap-2">
+            <Lock size={14} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Secure Core v2.6</span>
+          </div>
+        </MotionDiv>
+      </MotionDiv>
+
+      {/* Decorative Background Text */}
+      <div className="fixed bottom-[-5%] left-[-5%] text-[15rem] font-bold text-white/5 pointer-events-none select-none tracking-tighter italic">
+        EZA_POST
       </div>
     </div>
   );

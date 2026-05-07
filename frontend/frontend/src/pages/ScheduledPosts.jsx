@@ -186,7 +186,7 @@ export default function ScheduledPosts() {
                                         <span className="text-xs font-black bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full">{posts.length}</span>
                                     </div>
 
-                                    <div className={`grid ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                                    <div className={`flex overflow-x-auto md:grid ${viewMode === 'grid' ? 'md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'} gap-6 pb-8 snap-x scrollbar-hide`}>
                                         <MotionAnimatePresence>
                                             {posts.map((q, idx) => (
                                                 <MotionDiv
@@ -196,7 +196,7 @@ export default function ScheduledPosts() {
                                                     animate={{ opacity: 1, y: 0 }}
                                                     exit={{ opacity: 0, scale: 0.9 }}
                                                     transition={{ delay: idx * 0.05 }}
-                                                    className={`group relative bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 ${viewMode === 'list' ? 'flex items-center gap-6 p-4' : 'flex flex-col overflow-hidden'}`}
+                                                    className={`min-w-[280px] w-[85%] md:w-full snap-center flex-shrink-0 group relative bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 ${viewMode === 'list' ? 'flex items-center gap-6 p-4' : 'flex flex-col overflow-hidden'}`}
                                                 >
                                                     {/* Media Preview */}
                                                     <div className={`${viewMode === 'list' ? 'w-32 h-20 rounded-2xl' : 'w-full h-48'} bg-gray-50 dark:bg-gray-900 relative overflow-hidden flex-shrink-0`}>

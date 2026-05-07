@@ -5,7 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
 import NetworkStatus from "../components/NetworkStatus";
 import {
-  LayoutDashboard, Send, Layers, Clock, BarChart2, Link as LinkIcon, MessageSquare, Zap, Settings, LogOut, Sun, Moon, User, Grid, Search, Bell, MoreHorizontal, X,
+  LayoutDashboard, Send, Layers, Clock, BarChart2, HelpCircle, Link as LinkIcon, MessageSquare, Zap, Settings, LogOut, Sun, Moon, User, Grid, Search, Bell, MoreHorizontal, X,
   Download, Video, Instagram, AtSign, Facebook, Images, Scissors, ShoppingBag, Music, TrendingUp, Film, FileText, ImagePlus, Wand2, EyeOff, Repeat, Languages, Users, Cloud, Eraser
 } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -27,25 +27,22 @@ const DashboardLayout = ({ children }) => {
   };
 
   const CORE_NAV = [
-    { label: "Overview", icon: <LayoutDashboard size={22} />, path: "/dashboard" },
-    { label: "Quick Post", icon: <Send size={22} />, path: "/post" },
-    { label: "Bulk", icon: <Layers size={22} />, path: "/bulk-upload" },
-    { label: "Queue", icon: <Clock size={22} />, path: "/posts" },
-    { label: "Analytics", icon: <BarChart2 size={22} />, path: "/analytics" },
+    { label: "បង្កើតផុស", icon: <Send size={22} />, path: "/post" },
+    { label: "បញ្ជីពេលវេលា", icon: <Clock size={22} />, path: "/posts" },
+    { label: "ឆ្លើយតបស្វ័យប្រវត្តិ", icon: <MessageSquare size={22} />, path: "/bot" },
   ];
 
   const TOOL_CATEGORIES = [
     {
-      title: "Automation & Social",
+      title: "ឧបករណ៍សង្គម",
       items: [
-        { label: "Reply Bot", icon: <MessageSquare size={18} />, path: "/bot" },
-        { label: "Auto-Boost", icon: <Zap size={18} />, path: "/boost-settings" },
-        { label: "Connections", icon: <LinkIcon size={18} />, path: "/connections" },
-        { label: "Settings", icon: <Settings size={18} />, path: "/settings" },
+        { label: "គណនី", icon: <LinkIcon size={18} />, path: "/connections" },
+        { label: "ជំនួយ", icon: <HelpCircle size={18} />, path: "/guide" },
+        { label: "ការកំណត់", icon: <Settings size={18} />, path: "/settings" },
       ]
     },
     {
-      title: "Downloaders 2026",
+      title: "កម្មវិធីទាញយកវីដេអូ",
       items: [
         { label: "TikTok", icon: <Download size={18} />, path: "/tools/tiktok" },
         { label: "YouTube", icon: <Video size={18} />, path: "/tools/youtube" },
@@ -57,32 +54,22 @@ const DashboardLayout = ({ children }) => {
       ]
     },
     {
-      title: "AI & Content Tools",
+      title: "ឧបករណ៍ច្នៃប្រឌិត",
       items: [
-        { label: "Video Creator", icon: <Film size={18} />, path: "/tools/video-creator" },
-        { label: "AI Script", icon: <FileText size={18} />, path: "/tools/script-writer" },
-        { label: "AI Thumbnails", icon: <ImagePlus size={18} />, path: "/tools/thumbnail-generator" },
-        { label: "Magic Motion", icon: <Wand2 size={18} />, path: "/tools/magic-motion" },
-        { label: "Censorship", icon: <EyeOff size={18} />, path: "/tools/censorship" },
-        { label: "Label Swap", icon: <Repeat size={18} />, path: "/tools/label-swap" },
-        { label: "Subtitles", icon: <Languages size={18} />, path: "/tools/subtitle-generator" },
-        { label: "Doc Convert", icon: <FileText size={18} />, path: "/tools/document-converter" },
-        { label: "Watermark", icon: <Eraser size={18} />, path: "/tools/ai" },
+        { label: "ឯកសារ", icon: <FileText size={18} />, path: "/tools/document-converter" },
       ]
     },
     {
-      title: "Cloud & Scaling",
+      title: "ឧបករណ៍កម្រិតខ្ពស់",
       items: [
-        { label: "Cloud Farm", icon: <Users size={18} />, path: "/tools/farm" },
-        { label: "TG Cloud", icon: <Cloud size={18} />, path: "/tools/telegram-cloud" },
-        { label: "Viral Finder", icon: <TrendingUp size={18} />, path: "/tools/viral-finder" },
-        { label: "Trending", icon: <Music size={18} />, path: "/tools/tiktok/trends" },
+        { label: "ស្វែងរកវីដេអូ", icon: <TrendingUp size={18} />, path: "/tools/viral-finder" },
+        { label: "វីដេអូល្បីៗ", icon: <Music size={18} />, path: "/tools/tiktok/trends" },
       ]
     }
   ];
 
   return (
-    <div className={`min-h-screen flex flex-col ${isDarkMode ? "bg-[#050505] text-white" : "bg-[#f8f9fa] text-gray-900"} font-outfit transition-colors duration-500`}>
+    <div className={`min-h-screen flex flex-col ${isDarkMode ? "bg-[#050505] text-white" : "bg-[#f8f9fa] text-gray-900"} transition-colors duration-500`}>
 
       <header className={`fixed top-0 left-0 right-0 h-20 z-40 px-6 flex items-center justify-between`}>
         <div className="flex items-center gap-6">
@@ -92,13 +79,10 @@ const DashboardLayout = ({ children }) => {
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-bold tracking-tight">EZA_POST</span>
-              <span className="text-[10px] uppercase tracking-widest text-blue-500 font-bold opacity-80">Platform 2026</span>
+              <span className="text-[10px] uppercase tracking-widest text-blue-500 font-bold opacity-80">Social Manager</span>
             </div>
           </Link>
-          <div className={`hidden lg:flex items-center px-4 py-2 rounded-2xl border ${isDarkMode ? "bg-white/5 border-white/5" : "bg-black/5 border-black/5"} backdrop-blur-md`}>
-            <Search size={16} className="text-gray-500" />
-            <input type="text" placeholder="⌘ + K to search..." className="bg-transparent border-none focus:ring-0 text-sm ml-2 w-48 placeholder:text-gray-600" />
-          </div>
+
         </div>
 
         <div className={`flex items-center gap-2 p-1.5 rounded-2xl border ${isDarkMode ? "bg-white/5 border-white/5" : "bg-white border-gray-200 shadow-sm"} backdrop-blur-xl`}>
@@ -120,7 +104,7 @@ const DashboardLayout = ({ children }) => {
       </header>
 
       <main className="flex-1 pt-24 pb-32 px-6 max-w-[1600px] mx-auto w-full">
-        <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }} className="relative z-10">
+        <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }} className="relative z-10 motion-div-container">
           {children}
         </MotionDiv>
       </main>
@@ -177,9 +161,9 @@ const DashboardLayout = ({ children }) => {
                     <p className="text-[10px] font-bold opacity-60">EZA_POST PRO</p>
                     <p className="text-[8px] opacity-40">V2.0.26</p>
                   </div>
-                  <button onClick={handleLogout} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 transition-all text-[11px] font-bold shadow-lg shadow-red-500/20">
-                    <LogOut size={14} /> Sign Out
-                  </button>
+                    <button onClick={handleLogout} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 transition-all text-[11px] font-bold shadow-lg shadow-red-500/20">
+                      <LogOut size={14} /> ចាកចេញ
+                    </button>
                 </div>
               </MotionDiv>
             )}
@@ -221,9 +205,9 @@ const DashboardLayout = ({ children }) => {
 
       {/* 🧩 Global Effects & Animations */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
-        body { font-family: 'Outfit', sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
-        html { scroll-behavior: smooth; }
+        @import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,100..700;1,100..700&display=swap');
+        body { font-family: 'Kantumruy Pro', sans-serif; overflow-x: hidden; width: 100%; position: relative; -webkit-tap-highlight-color: transparent; }
+        html { scroll-behavior: smooth; overflow-x: hidden; width: 100%; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(100, 100, 100, 0.2); border-radius: 20px; }
@@ -241,9 +225,35 @@ const DashboardLayout = ({ children }) => {
           scrollbar-width: none;  /* Firefox */
         }
 
-        /* Mobile specific fixes */
+        /* Mobile specific fixes & Performance Optimizations */
         @media (max-width: 768px) {
           main { padding-left: 1rem; padding-right: 1rem; }
+          
+          /* Disable expensive backdrop filters on mobile for better performance */
+          .backdrop-blur-3xl, .backdrop-blur-2xl, .backdrop-blur-xl, .backdrop-blur-md, .backdrop-blur-sm {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+          }
+          
+          /* Simplify background colors when blur is disabled */
+          .bg-white\\/80 { background-color: rgba(255, 255, 255, 0.98) !important; }
+          .bg-black\\/60 { background-color: rgba(5, 5, 5, 0.95) !important; }
+          .bg-white\\/95 { background-color: #ffffff !important; }
+          .bg-\\[\\#0b0b0f\\]\\/95 { background-color: #0b0b0f !important; }
+
+          /* Enable hardware acceleration for smooth scrolling */
+          * { -webkit-overflow-scrolling: touch; }
+          
+          /* Reduce shadow intensity for performance */
+          .shadow-2xl, .shadow-xl {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+          }
+        }
+
+        /* Optimize animations */
+        .motion-div-container {
+          will-change: transform, opacity;
+          transform: translateZ(0);
         }
       `}</style>
     </div>

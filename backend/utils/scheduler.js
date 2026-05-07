@@ -49,6 +49,20 @@ async function processSinglePost(post) {
     // 📥 Handle Video Source
     let videoInput = post.videoUrl;
 
+    // 🎵 1.5. Check for Direct TikTok URL (Auto-Sync for Scheduled)
+    if (post.videoUrl && post.videoUrl.includes("tiktok.com")) {
+      try {
+        console.log(`🕒 [Auto-Sync] Processing scheduled TikTok URL: ${post.videoUrl}`);
+        const tiktokRes = await downloadTiktokVideo(post.videoUrl);
+        if (tiktokRes && tiktokRes.buffer) {
+          videoInput = tiktokRes.buffer;
+          console.log(`✅ [Auto-Sync] TikTok video buffered for upload.`);
+        }
+      } catch (syncErr) {
+        console.warn(`⚠️ [Auto-Sync] Could not buffer TikTok video: ${syncErr.message}. Falling back to URL.`);
+      }
+    }
+
     // If it's a local file (legacy support or fallback), read it
     if (post.videoUrl.startsWith("/uploads")) {
       const fs = require('fs');

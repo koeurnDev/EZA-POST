@@ -29,9 +29,9 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.email.trim()) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Invalid email format";
-    if (!formData.password) newErrors.password = "Password is required";
+    if (!formData.email.trim()) newErrors.email = "សូមបញ្ចូលអ៊ីមែល";
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "ទម្រង់អ៊ីមែលមិនត្រឹមត្រូវ";
+    if (!formData.password) newErrors.password = "សូមបញ្ចូលលេខសម្ងាត់";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -39,14 +39,14 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (show2FA) {
-      if (!twoFactorCode) return setErrors({ submit: "Please enter the 2FA code" });
+      if (!twoFactorCode) return setErrors({ submit: "សូមបញ្ចូលលេខកូដ 2FA" });
       setLoading(true);
       try {
         const res = await authAPI.verify2FALogin(tempToken, twoFactorCode);
-        toast.success("Identity verified!");
+        toast.success("ចូលគណនីបានជោគជ័យ!");
         onSuccess?.(res.user);
       } catch (error) {
-        setErrors({ submit: "Invalid verification code" });
+        setErrors({ submit: "លេខកូដមិនត្រឹមត្រូវ" });
       } finally {
         setLoading(false);
       }
@@ -56,7 +56,7 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
     if (!validateForm()) return;
     setLoading(true);
     setErrors({});
-    const toastId = toast.loading("Authenticating...");
+    const toastId = toast.loading("កំពុងត្រួតពិនិត្យ...");
 
     try {
       const res = await authAPI.login({ email: formData.email, password: formData.password });
@@ -66,10 +66,10 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
         toast.dismiss(toastId);
         return;
       }
-      toast.success("Authentication successful!", { id: toastId });
+      toast.success("ចូលគណនីបានជោគជ័យ!", { id: toastId });
       onSuccess?.(res.user);
     } catch (error) {
-      const msg = error?.response?.data?.error || "Login failed. Please try again.";
+      const msg = error?.response?.data?.error || "មានបញ្ហា។ សូមព្យាយាមម្តងទៀត។";
       toast.error(msg, { id: toastId });
       setErrors({ submit: msg });
     } finally {
@@ -90,11 +90,11 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
               className="space-y-6"
             >
               <div className="text-center">
-                <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-[2rem] flex items-center justify-center mx-auto mb-4 border border-blue-100 dark:border-blue-800">
+                <div className="w-20 h-20 bg-blue-600/10 text-blue-500 rounded-[2rem] flex items-center justify-center mx-auto mb-4 border border-blue-500/20">
                   <Shield size={32} />
                 </div>
-                <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Security Check</h3>
-                <p className="text-sm text-gray-500 mt-2">Enter the verification code from your device.</p>
+                <h3 className="text-2xl font-bold text-white tracking-tight">ផ្ទៀងផ្ទាត់លេខកូដ</h3>
+                <p className="text-sm text-gray-400 mt-2">សូមបញ្ចូលលេខកូដពីទូរស័ព្ទរបស់អ្នក។</p>
               </div>
 
               <div className="relative">
@@ -103,17 +103,21 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
                   value={twoFactorCode}
                   onChange={(e) => setTwoFactorCode(e.target.value)}
                   placeholder="000000"
-                  className="w-full px-6 py-5 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-3xl outline-none text-center text-3xl font-black tracking-[0.5em] focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-gray-900 dark:text-white"
+                  className="w-full px-6 py-5 bg-white/5 border border-white/10 rounded-3xl outline-none text-center text-3xl font-bold tracking-[0.5em] focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-white placeholder-gray-700"
                   autoFocus
                 />
               </div>
 
-              <Button type="submit" className="h-14 rounded-2xl w-full shadow-xl" isLoading={loading}>
-                Verify Identity <ArrowRight size={18} className="ml-2" />
-              </Button>
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="h-16 rounded-2xl w-full bg-blue-600 hover:bg-blue-500 text-white font-bold uppercase tracking-widest shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+              >
+                {loading ? "កំពុងដំណើរការ..." : <>ចូលគណនី <ArrowRight size={20} /></>}
+              </button>
 
-              <button type="button" onClick={() => setShow2FA(false)} className="w-full text-xs font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 uppercase tracking-widest transition-colors">
-                Back to credentials
+              <button type="button" onClick={() => setShow2FA(false)} className="w-full text-xs font-bold text-gray-500 hover:text-white uppercase tracking-widest transition-colors">
+                ត្រឡប់ក្រោយ
               </button>
             </MotionDiv>
           ) : (
@@ -126,10 +130,10 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
             >
               {/* Email */}
               <div className="space-y-2">
-                <label htmlFor={emailId} className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1">Email Address</label>
+                <label htmlFor={emailId} className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">អ៊ីមែល</label>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
-                    <Mail size={20} />
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors">
+                    <Mail size={18} />
                   </div>
                   <input
                     id={emailId}
@@ -137,25 +141,25 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="name@company.com"
-                    className={`w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900/50 border rounded-2xl outline-none text-gray-900 dark:text-white placeholder-gray-400 transition-all focus:ring-4 focus:ring-blue-500/10 ${errors.email ? "border-red-500" : "border-gray-100 dark:border-gray-800 focus:border-blue-500"}`}
+                    placeholder="name@example.com"
+                    className={`w-full pl-14 pr-6 py-4 bg-white/5 border rounded-2xl outline-none text-white placeholder-gray-700 transition-all focus:ring-4 focus:ring-blue-500/10 ${errors.email ? "border-red-500/50" : "border-white/10 focus:border-blue-500"}`}
                     disabled={loading}
                   />
                 </div>
-                {errors.email && <p className="text-red-500 text-[10px] font-bold uppercase px-1">{errors.email}</p>}
+                {errors.email && <p className="text-red-500 text-[10px] font-bold px-1">{errors.email}</p>}
               </div>
 
               {/* Password */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
-                  <label htmlFor={passwordId} className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Password</label>
+                  <label htmlFor={passwordId} className="text-xs font-bold text-gray-500 uppercase tracking-widest">លេខសម្ងាត់</label>
                   {onForgotPassword && (
-                    <button type="button" onClick={onForgotPassword} className="text-[10px] font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest">Forgot?</button>
+                    <button type="button" onClick={onForgotPassword} className="text-[10px] font-bold text-blue-500 hover:text-blue-400 uppercase tracking-widest">ភ្លេចលេខសម្ងាត់?</button>
                   )}
                 </div>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
-                    <Lock size={20} />
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors">
+                    <Lock size={18} />
                   </div>
                   <input
                     id={passwordId}
@@ -164,23 +168,27 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="••••••••"
-                    className={`w-full pl-14 pr-14 py-4 bg-gray-50 dark:bg-gray-900/50 border rounded-2xl outline-none text-gray-900 dark:text-white placeholder-gray-400 transition-all focus:ring-4 focus:ring-blue-500/10 ${errors.password ? "border-red-500" : "border-gray-100 dark:border-gray-800 focus:border-blue-500"}`}
+                    className={`w-full pl-14 pr-14 py-4 bg-white/5 border rounded-2xl outline-none text-white placeholder-gray-700 transition-all focus:ring-4 focus:ring-blue-500/10 ${errors.password ? "border-red-500/50" : "border-white/10 focus:border-blue-500"}`}
                     disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                    className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                   >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
-                {errors.password && <p className="text-red-500 text-[10px] font-bold uppercase px-1">{errors.password}</p>}
+                {errors.password && <p className="text-red-500 text-[10px] font-bold px-1">{errors.password}</p>}
               </div>
 
-              <Button type="submit" className="h-14 rounded-2xl w-full shadow-xl mt-4" isLoading={loading}>
-                Access Account <ArrowRight size={18} className="ml-2" />
-              </Button>
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="h-16 rounded-2xl w-full bg-blue-600 hover:bg-blue-500 text-white font-bold uppercase tracking-widest shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4"
+              >
+                {loading ? "កំពុងដំណើរការ..." : <>ចូលគណនី <ArrowRight size={20} /></>}
+              </button>
             </MotionDiv>
           )}
         </MotionAnimatePresence>
@@ -189,7 +197,7 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
           <MotionDiv 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-2xl text-red-600 dark:text-red-400 text-xs font-bold"
+            className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-[10px] font-bold uppercase tracking-wider"
           >
             <AlertCircle size={16} />
             {errors.submit}

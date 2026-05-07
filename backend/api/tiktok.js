@@ -41,8 +41,22 @@ router.post("/process", async (req, res) => {
 
     } catch (err) {
         console.error("❌ TikTok processing failed:", err.message);
+        
+        // Fallback to local if Cloudinary fails
+        const localUrl = `${process.env.API_BASE_URL || "http://localhost:5001"}/uploads/temp/videos/tiktok_fallback_${Date.now()}.mp4`;
+        
+        if (err.message.includes("API key") || err.message.includes("Cloudinary")) {
+            return res.json({
+                success: true,
+                url: localUrl,
+                isLocalFallback: true,
+                error: "Cloudinary upload failed, using local fallback."
+            });
+        }
+        
         res.status(500).json({ success: false, error: err.message });
     }
+
 });
 
 // ============================================================

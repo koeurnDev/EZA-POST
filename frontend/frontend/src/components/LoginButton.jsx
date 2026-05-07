@@ -58,7 +58,7 @@ const LoginButton = ({
       borderRadius: "8px",
       fontWeight: 600,
       fontFamily:
-        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        '"Kantumruy Pro", sans-serif',
       cursor: loading ? "not-allowed" : "pointer",
       transition: "all 0.25s ease",
       width: "100%",

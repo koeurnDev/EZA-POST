@@ -42,8 +42,9 @@ const processMediaToSquare = (inputPath) => {
                 .videoCodec("libx264")
                 .audioCodec("aac")
                 .outputOptions([
-                    "-preset fast", // Speed up encoding
-                    "-crf 23"       // Reasonable quality
+                    "-preset medium", // Balanced quality/speed
+                    "-crf 18",       // High quality
+                    "-b:a 192k"      // High quality audio
                 ]);
         }
 

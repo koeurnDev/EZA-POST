@@ -67,17 +67,19 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
         if (videoFile) {
             try {
                 const aiOptions = req.body.aiOptions ? JSON.parse(req.body.aiOptions) : {};
-                // Force square padding for carousels
+                // Force square padding for carousels (Critical for FB compliance)
                 aiOptions.squarePad = true;
 
                 const outputDir = path.join(__dirname, "../../temp/videos");
-                console.log("🎬 [Carousel] Processing video for 1:1 compatibility...");
+                console.log(`🎬 [Carousel] Processing video for 1:1 compatibility: ${videoFile.originalname}`);
                 processedVideoPath = await processVideo(videoFile.path, outputDir, aiOptions);
                 tempFiles.push(processedVideoPath);
             } catch (procErr) {
                 console.error("❌ Video processing failed:", procErr.message);
                 // Fallback to original file if processing fails
             }
+        } else if (videoUrl) {
+            console.log(`🔗 [Carousel] Using direct video URL: ${videoUrl}`);
         }
 
         // 2. Parse Cards
@@ -98,7 +100,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                 type: 'image',
                 isPageCard: true,
                 headline: "Follow Us",
-                description: "Visit our page",
+                description: "ចុច Like Page ដើម្បីបានវីដេអូថ្មីៗ",
                 link: null // Will default to page link
             });
         }
@@ -109,8 +111,8 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
         for (const accountId of accountsArray) {
             try {
                 // Fetch Page & Token
-                const page = await prisma.facebookPage.findUnique({
-                    where: { id: accountId }
+                const page = await prisma.facebookPage.findFirst({
+                    where: { id: accountId, userId: userId }
                 });
 
                 let pageToken = page ? decrypt(page.accessToken) : null;
@@ -155,14 +157,6 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                     // 📤 Upload Media to Facebook
                     try {
                         if (card.type === 'video') {
-                            // Only upload video for the FIRST video card (assuming single video for now, or re-upload if multiple)
-                            // Optimization: If we already uploaded for this account, reuse? 
-                            // FB requires unique upload per post usually, but media_fbid can be reused? 
-                            // Actually, for carousel, we upload ONCE per post.
-
-                            // We use the 'processedVideoPath' or original 'videoFile.path'
-                            // Note: Streams can only be read once. If multiple accounts, we need fresh streams.
-                            // FIX: Re-create stream for each account/upload
                             let currentVideoInput = videoInput;
                             if (processedVideoPath) {
                                 currentVideoInput = fs.createReadStream(processedVideoPath);
@@ -173,50 +167,46 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                             let currentThumbInput = thumbnailInput;
                             if (thumbnailFile) currentThumbInput = fs.createReadStream(thumbnailFile.path);
 
+                            console.log(`📤 Uploading Video for Card ${index + 1}...`);
                             const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, currentVideoInput, currentThumbInput);
                             mediaFbid = vRes.id;
-
-                            // Video Link: usually points to the video itself or a target
-                            // If we want the card to open the video, we might not need a link, 
-                            // but child_attachments usually requires one.
-                            // We can use the page URL or a specific target.
-
+                            console.log(`✅ Video Media FBID: ${mediaFbid}`);
                         } else {
                             // Image Card
                             let currentImageInput = null;
 
-                            if (card.isPageCard && rightSideImageFile) {
+                            if (card.isRightSide && rightSideImageFile) {
+                                // 🖼️ Case 1: Uploaded Card 2 (Right-Side Frame/Image)
+                                console.log(`🖼️ Using Uploaded Right-Side Image for Card ${index + 1}...`);
                                 currentImageInput = fs.createReadStream(rightSideImageFile.path);
-                            } else if (card.isPageCard && !rightSideImageFile) {
-                                // 🖼️ Auto-Generated Page Card (Robust High-Res Stream)
+                                const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, currentImageInput);
+                                mediaFbid = pRes.id;
+                            } else if (card.isPageCard) {
+                                // 🖼️ Case 2: Auto-Generated Page Card (Profile Pic)
                                 try {
-                                    console.log(`🖼️ Fetching High-Res Profile Picture for Page ${accountId}...`);
+                                    console.log(`🖼️ Card ${index + 1}: Fetching Auto Page Profile Picture...`);
 
-                                    // 1. Get High-Res URL
                                     const picUrlRes = await axios.get(`https://graph.facebook.com/v19.0/${accountId}/picture`, {
                                         params: { width: 1000, redirect: false, access_token: pageToken }
                                     });
                                     const picUrl = picUrlRes.data?.data?.url;
 
                                     if (picUrl) {
-                                        console.log(`🔗 Downloading stream: ${picUrl}`);
-                                        // 2. Download Stream
                                         const picStream = await axios.get(picUrl, { responseType: 'stream' });
-
-                                        // 3. Upload Stream as Photo Container
                                         const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, picStream.data);
                                         mediaFbid = pRes.id;
-                                    } else {
-                                        console.warn("⚠️ Could not fetch high-res picture URL");
                                     }
                                 } catch (picErr) {
-                                    console.error("❌ Failed to process auto-page-card:", picErr.message);
+                                    console.error(`❌ Failed to auto-process page-card for ${accountId}:`, picErr.message);
                                 }
                             } else if (card.imageUrl) {
-                                // Custom Image URL (if any)
+                                // 🖼️ Case 3: External Image URL
+                                console.log(`🖼️ Using imageUrl for Card ${index + 1}: ${card.imageUrl}`);
                                 const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, card.imageUrl);
                                 mediaFbid = pRes.id;
                             }
+                            
+                            if (mediaFbid) console.log(`✅ Image Media FBID: ${mediaFbid}`);
                         }
                     } catch (uploadErr) {
                         console.error(`❌ Failed to upload media for card ${index + 1}:`, uploadErr.message);
@@ -229,12 +219,17 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
                         description: description,
                     };
 
+                    if (card.cta && card.cta !== 'NO_BUTTON') {
+                        attachment.call_to_action = {
+                            type: card.cta,
+                            value: { link: link }
+                        };
+                    }
+
                     if (mediaFbid) {
                         attachment.media_fbid = mediaFbid;
                     } else {
                         console.warn(`⚠️ No media_fbid for card ${index + 1}, skipping media attachment`);
-                        // Fallback? If it's a link card, maybe just picture?
-                        // But we are doing Native.
                     }
 
                     childAttachments.push(attachment);
@@ -290,7 +285,7 @@ exports.processAndPostCarousel = async (req, accountsArray, userId, caption, sch
 exports.createMixedCarousel = async (req, res) => {
     req.setTimeout(600000);
     try {
-        const { caption, accounts, scheduleTime } = req.body;
+        const { caption, accounts, scheduleTime, enableBot } = req.body;
         const userId = req.user?.id;
 
         if (!accounts) return res.status(400).json({ success: false, error: "Missing accounts" });
@@ -300,6 +295,25 @@ exports.createMixedCarousel = async (req, res) => {
             accountsArray = JSON.parse(accounts);
         } catch {
             return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
+        }
+
+        // 🤖 Handle Auto-Reply Bot Activation
+        if (enableBot === 'true' || enableBot === true) {
+            console.log("🤖 [Carousel] Enabling Auto-Reply Bot for selected pages...");
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            let pageSettings = user.pageSettings || [];
+            if (typeof pageSettings === 'string') try { pageSettings = JSON.parse(pageSettings) } catch(e) { pageSettings = [] }
+
+            accountsArray.forEach(pageId => {
+                const idx = pageSettings.findIndex(s => s.pageId === pageId);
+                if (idx > -1) pageSettings[idx].enableBot = true;
+                else pageSettings.push({ pageId, enableBot: true });
+            });
+
+            await prisma.user.update({
+                where: { id: userId },
+                data: { pageSettings }
+            });
         }
 
         const results = await exports.processAndPostCarousel(req, accountsArray, userId, caption, scheduleTime);
@@ -318,4 +332,3 @@ exports.createMixedCarousel = async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 };
-

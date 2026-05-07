@@ -3,6 +3,7 @@
  */
 
 const fs = require("fs");
+const path = require("path");
 const prisma = require('../utils/prisma');
 const { uploadFile } = require("../utils/cloudinary");
 const fb = require("../utils/fb");
@@ -15,7 +16,7 @@ exports.createPost = async (req, res) => {
     req.setTimeout(600000);
 
     try {
-        const { title, caption, accounts, scheduleTime, tiktokUrl, directMediaUrl, videoUrl, postType, carouselCards } = req.body;
+        const { title, caption, accounts, scheduleTime, tiktokUrl, directMediaUrl, videoUrl, postType, carouselCards, enableBot } = req.body;
         const userId = req.user?.id;
 
         // 🛑 Validate fields
@@ -48,9 +49,6 @@ exports.createPost = async (req, res) => {
                 select: { connectedPages: true }
             });
 
-            // Prisma stores JSON. We need to cast or ensure it's iterable.
-            // If default is "[]" string, we might get a string or object depending on Prisma version/DB handling.
-            // Usually Json type in Prisma returns an Object/Array in JS.
             let connectedPages = user?.connectedPages;
             if (typeof connectedPages === 'string') {
                 try { connectedPages = JSON.parse(connectedPages) } catch (e) { }
@@ -61,6 +59,25 @@ exports.createPost = async (req, res) => {
             } else {
                 return res.status(400).json({ success: false, error: "No connected pages found. Please connect a page first." });
             }
+        }
+
+        // 🤖 Handle Auto-Reply Bot Activation
+        if (enableBot === 'true' || enableBot === true) {
+            console.log("🤖 Enabling Auto-Reply Bot for selected pages...");
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            let pageSettings = user.pageSettings || [];
+            if (typeof pageSettings === 'string') try { pageSettings = JSON.parse(pageSettings) } catch(e) { pageSettings = [] }
+
+            accountsArray.forEach(pageId => {
+                const idx = pageSettings.findIndex(s => s.pageId === pageId);
+                if (idx > -1) pageSettings[idx].enableBot = true;
+                else pageSettings.push({ pageId, enableBot: true });
+            });
+
+            await prisma.user.update({
+                where: { id: userId },
+                data: { pageSettings }
+            });
         }
 
         let results = { successCount: 0, failedCount: 0, details: [] };
@@ -113,7 +130,7 @@ exports.createPost = async (req, res) => {
                     console.log("🤖 Applying AI Randomizer...", aiOptions);
                     try {
                         const { processVideo } = require("../services/videoProcessor");
-                        const tempDir = require("path").join(__dirname, "../../temp/videos");
+                        const tempDir = path.join(__dirname, "../../temp/videos");
                         processedVideoPath = await processVideo(videoFile.path, tempDir, aiOptions);
                         finalVideoPath = processedVideoPath; // Swap to processed file
                     } catch (procErr) {
@@ -134,8 +151,8 @@ exports.createPost = async (req, res) => {
                     const accountId = accountsArray[i];
                     try {
                         // 1. Try finding in FacebookPage table
-                        const page = await prisma.facebookPage.findUnique({
-                            where: { id: accountId }
+                        const page = await prisma.facebookPage.findFirst({
+                            where: { id: accountId, userId: userId }
                         });
 
                         let pageToken = page ? decrypt(page.accessToken) : null;
@@ -237,6 +254,35 @@ exports.createPost = async (req, res) => {
                 }
 
             } else if (videoUrl || directMediaUrl) {
+                // 📥 1.5. Check for Direct TikTok URL (Auto-Sync)
+                if (videoUrl && videoUrl.includes("tiktok.com")) {
+                    try {
+                        console.log(`🎵 [Auto-Sync] Detected Direct TikTok URL: ${videoUrl}`);
+                        const { downloadTiktokVideo } = require("../utils/tiktokDownloader");
+                        const tiktokRes = await downloadTiktokVideo(videoUrl);
+
+                        if (tiktokRes && tiktokRes.buffer) {
+                            const filename = `autosync_${Date.now()}.mp4`;
+                            const tempPath = path.join(__dirname, "../../temp/videos", filename);
+
+                            // Ensure directory exists
+                            const dir = path.dirname(tempPath);
+                            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+                            fs.writeFileSync(tempPath, tiktokRes.buffer);
+                            
+                            // Upload to Cloudinary (Applying 1:1 for better FB compatibility)
+                            const uploadResult = await uploadFile(tempPath, "eza-post/videos", "video", true, true);
+                            videoUrlForDB = uploadResult.url;
+                            directMediaUrl = uploadResult.url;
+                            console.log(`✅ [Auto-Sync] Video downloaded and uploaded to Cloudinary: ${videoUrlForDB}`);
+                        }
+                    } catch (syncErr) {
+                        console.error("⚠️ [Auto-Sync] Failed to sync TikTok video:", syncErr.message);
+                        // Continue with original URL as fallback
+                    }
+                }
+
                 videoUrlForDB = videoUrl || directMediaUrl;
 
                 // Extract Public ID if it's a Cloudinary URL
@@ -380,4 +426,3 @@ exports.createPost = async (req, res) => {
         }
     }
 };
-

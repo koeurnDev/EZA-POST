@@ -99,10 +99,12 @@ class TikTokDownloader {
       console.log(`📥 [Attempt ${i}] Downloading: ${videoUrl}`);
       try {
         const result =
+          (await this.downloadViaYtDlp(videoUrl)) ||
           (await this.downloadViaAPIProxy(videoUrl, noWatermark)) ||
+          (await this.downloadViaTikmate(videoUrl)) ||
           (await this.downloadViaRapidAPI(videoUrl));
 
-        if (result?.buffer) return result.buffer;
+        if (result?.buffer) return result;
         throw new Error("No valid result from any method");
       } catch (err) {
         lastError = err;
@@ -115,9 +117,82 @@ class TikTokDownloader {
   }
 
   /* ------------------------------------------------------------ */
+  /* ✅ Method 0 — yt-dlp (Internal / Local)                      */
+  /* ------------------------------------------------------------ */
+  async downloadViaYtDlp(videoUrl) {
+    try {
+      console.log("🔄 Trying yt-dlp (Internal)...");
+      const youtubedl = require("youtube-dl-exec");
+      
+      const prodPath = path.join(__dirname, '../../bin/yt-dlp');
+      const execPath = (process.env.NODE_ENV === 'production' && fs.existsSync(prodPath)) ? prodPath : undefined;
+
+      const output = await youtubedl(videoUrl, { 
+        dumpSingleJson: true, 
+        noWarnings: true 
+      }, { execPath });
+
+      const url = output.url;
+      if (!url) throw new Error("No download URL from yt-dlp");
+
+      const vidRes = await axios.get(url, {
+        responseType: "arraybuffer",
+        timeout: 60000,
+        headers: this.getRandomHeaders()
+      });
+
+      return { buffer: Buffer.from(vidRes.data), method: "yt-dlp", filename: `tiktok_${Date.now()}.mp4` };
+    } catch (err) {
+      console.warn("❌ yt-dlp failed:", err.message);
+      return null;
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ✅ Method 2 — Tikmate API                                     */
+  /* ------------------------------------------------------------ */
+  async downloadViaTikmate(videoUrl) {
+    try {
+      console.log("🔄 Trying Tikmate...");
+      const res = await axios.post("https://api.tikmate.app/api/lookup", 
+        new URLSearchParams({ url: videoUrl }), 
+        { headers: { ...this.getRandomHeaders(), "Content-Type": "application/x-www-form-urlencoded" } }
+      );
+
+      const data = res.data;
+      const dl = data?.token ? `https://api.tikmate.app/download/${data.id}/${data.token}.mp4` : null;
+      
+      if (!dl) throw new Error("No Tikmate token found");
+
+      const vidRes = await axios.get(dl, {
+        responseType: "arraybuffer",
+        timeout: 60000,
+        headers: this.getRandomHeaders()
+      });
+
+      return { buffer: Buffer.from(vidRes.data), method: "tikmate", filename: `tiktok_${Date.now()}.mp4` };
+    } catch (err) {
+      console.warn("❌ Tikmate failed:", err.message);
+      return null;
+    }
+  }
+
+
+  /* ------------------------------------------------------------ */
   /* ✅ Get Playable Video URL (for Preview)                      */
   /* ------------------------------------------------------------ */
   async getPlayableUrl(videoUrl) {
+    // Method 0: yt-dlp
+    try {
+      const youtubedl = require("youtube-dl-exec");
+      const prodPath = path.join(__dirname, '../../bin/yt-dlp');
+      const execPath = (process.env.NODE_ENV === 'production' && fs.existsSync(prodPath)) ? prodPath : undefined;
+      const output = await youtubedl(videoUrl, { dumpSingleJson: true, noWarnings: true }, { execPath });
+      if (output && output.url) return output.url;
+    } catch(err) {
+       console.warn(`yt-dlp preview failed: ${err.message}`);
+    }
+
     // Method 1: API Proxy
     const endpoints = [
       `https://www.tikwm.com/api/?url=${encodeURIComponent(videoUrl)}`,
@@ -212,10 +287,14 @@ class TikTokDownloader {
           headers: this.getRandomHeaders()
         });
 
-        this.validateVideoBuffer(vidRes.data);
+        // ✅ Validate raw data (could be ArrayBuffer from axios)
+        const rawData = vidRes.data;
+        if (!rawData || (rawData.byteLength || rawData.length) < 1024) {
+          throw new Error("Invalid or empty video data received");
+        }
 
         console.log(`✅ API Proxy Success (${endpoint.split('/')[2]})`);
-        return { buffer: vidRes.data, method: "api", filename: `tiktok_${Date.now()}.mp4` };
+        return { buffer: Buffer.from(vidRes.data), method: "api", filename: `tiktok_${Date.now()}.mp4` };
       } catch (err) {
         console.warn(`❌ ${endpoint.split('/')[2]} failed:`, err.message);
         if (err.response) {
@@ -251,10 +330,13 @@ class TikTokDownloader {
         timeout: 60000,
         headers: this.getRandomHeaders()
       });
-      this.validateVideoBuffer(vidRes.data);
+      const rawData = vidRes.data;
+      if (!rawData || (rawData.byteLength || rawData.length) < 1024) {
+        throw new Error("Invalid or empty video data from RapidAPI");
+      }
 
       console.log("✅ Downloaded via RapidAPI");
-      return { buffer: vidRes.data, method: "rapidapi" };
+      return { buffer: Buffer.from(vidRes.data), method: "rapidapi" };
     } catch (err) {
       console.warn(`⚠️ RapidAPI failed: ${err.message}`);
       return null;
@@ -264,9 +346,9 @@ class TikTokDownloader {
   /* ------------------------------------------------------------ */
   /* 🧩 Validate binary data                                      */
   /* ------------------------------------------------------------ */
-  validateVideoBuffer(buffer) {
-    if (!Buffer.isBuffer(buffer) || buffer.length < 1024)
-      throw new Error("Invalid or empty video buffer");
+  validateVideoBuffer(data) {
+    const len = data instanceof ArrayBuffer ? data.byteLength : (Buffer.isBuffer(data) ? data.length : 0);
+    if (len < 1024) throw new Error("Invalid or empty video buffer");
   }
 
   /* ------------------------------------------------------------ */
@@ -281,6 +363,7 @@ class TikTokDownloader {
         title: meta("og:title") || "TikTok Video",
         author: meta("og:video:actor") || "Unknown",
         description: meta("og:description") || "",
+        thumbnail: meta("og:image") || "",
         url: videoUrl,
       };
     } catch {

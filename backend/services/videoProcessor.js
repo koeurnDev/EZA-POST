@@ -68,14 +68,14 @@ exports.processVideo = (inputPath, outputDir, options = {}) => {
             command.audioFilters(audioFilters);
         }
 
-        // ✅ Use H.264 for maximum compatibility
+        // ✅ Use H.264 with High Quality (CRF 18) and Balanced Performance
         command
             .outputOptions([
                 "-c:v libx264",
-                "-crf 23",
-                "-preset medium",
+                "-preset medium", // Balanced quality/speed
+                "-crf 18",       // High quality
                 "-c:a aac",
-                "-b:a 128k",
+                "-b:a 192k",      // High quality audio
                 "-movflags +faststart" // Enables web streaming
             ])
 

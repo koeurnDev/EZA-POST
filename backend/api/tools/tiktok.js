@@ -12,6 +12,7 @@ const fs = require("fs");
 const crypto = require("crypto"); // 🔐 Added for Cache Hashing
 const { requireAuth } = require("../../utils/auth");
 const cheerio = require("cheerio"); // ✅ Required for fallback scraper
+const { createSlideshow } = require("../../services/videoGenerator");
 
 // 🗂️ Temp directory
 const tempDir = path.join(__dirname, "../../temp/videos");
@@ -100,38 +101,42 @@ router.post("/lookup", requireAuth, async (req, res) => {
         const cleanUrl = (url.match(/https?:\/\/[^\s]+/) || [url])[0];
         let videoData = null;
 
-        // 1️⃣ TikWM
+        // 1️⃣ yt-dlp (Internal First)
         try {
-            const response = await axios.post("https://www.tikwm.com/api/",
-                new URLSearchParams({ url: cleanUrl, hd: 1 }),
-                { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 8000 }
-            );
-            if (response.data.code === 0) {
-                videoData = formatTikTokVideo(response.data.data);
-            }
-        } catch (e) { console.warn("TikWM failed"); }
+            console.log("    👉 Attempting yt-dlp (Internal Scraper)...");
+            const youtubedl = require("youtube-dl-exec");
+            const output = await youtubedl(cleanUrl, { dumpSingleJson: true, noWarnings: true }, { execPath: getBinaryPath() });
 
-        // 2️⃣ yt-dlp Fallback
+            const isSlide = output.vcodec === 'none' && (output.thumbnails?.length > 1);
+            videoData = {
+                id: output.id,
+                title: output.title,
+                cover: output.thumbnail,
+                no_watermark_url: output.url,
+                images: [],
+                type: isSlide ? 'slideshow' : 'video',
+                duration: output.duration,
+                author: { nickname: output.uploader },
+                stats: { plays: output.view_count, likes: output.like_count }
+            };
+            console.log("    ✅ yt-dlp Success!");
+        } catch (e) {
+            console.warn("    ⚠️ yt-dlp failed:", e.message);
+        }
+
+        // 2️⃣ TikWM Fallback
         if (!videoData) {
             try {
-                const youtubedl = require("youtube-dl-exec");
-                const output = await youtubedl(cleanUrl, { dumpSingleJson: true, noWarnings: true }, { execPath: getBinaryPath() });
-
-                const isSlide = output.vcodec === 'none' && (output.thumbnails?.length > 1);
-                videoData = {
-                    id: output.id,
-                    title: output.title,
-                    cover: output.thumbnail,
-                    no_watermark_url: output.url,
-                    images: [],
-                    type: isSlide ? 'slideshow' : 'video',
-                    duration: output.duration,
-                    author: { nickname: output.uploader },
-                    stats: { plays: output.view_count, likes: output.like_count }
-                };
-            } catch (e) {
-                console.warn("yt-dlp fallback failed:", e.message);
-            }
+                console.log("    👉 Attempting TikWM API...");
+                const response = await axios.post("https://www.tikwm.com/api/",
+                    new URLSearchParams({ url: cleanUrl, hd: 1 }),
+                    { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 8000 }
+                );
+                if (response.data.code === 0) {
+                    videoData = formatTikTokVideo(response.data.data);
+                    console.log("    ✅ TikWM Success!");
+                }
+            } catch (e) { console.warn("    ⚠️ TikWM failed"); }
         }
 
         // 3️⃣ Last Resort: LoveTik API (Best for Slideshows/Photos when TikWM is down)
@@ -188,40 +193,92 @@ router.post("/lookup", requireAuth, async (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* 🔧 POST /compatible — Force H.264 / SD Video via LoveTik                   */
+/* 🔧 POST /compatible — Force H.264 / SD Video via Local FFmpeg              */
 /* -------------------------------------------------------------------------- */
 router.post("/compatible", requireAuth, async (req, res) => {
+    let inputPath = null;
+    let outputPath = null;
     try {
         const { url } = req.body;
         if (!url) return res.status(400).json({ success: false, error: "URL required" });
         const cleanUrl = (url.match(/https?:\/\/[^\s]+/) || [url])[0];
 
-        console.log(`    👉 Requesting SD/H.264 version for: ${cleanUrl}`);
-        const loveRes = await axios.post('https://lovetik.com/api/ajax/search',
-            new URLSearchParams({ query: cleanUrl }).toString(),
-            {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                },
-                timeout: 15000
-            }
-        );
+        console.log(`    👉 Requesting Local FFmpeg H.264 version for: ${cleanUrl}`);
+        
+        // 1. Download original video temporarily
+        const fileId = Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+        inputPath = path.join(tempDir, `input_${fileId}.mp4`);
+        outputPath = path.join(tempDir, `compatible_${fileId}.mp4`);
 
-        if (loveRes.data && loveRes.data.status === 'ok') {
-            const d = loveRes.data;
-            // Find the 576p or 720p watermarked/non-watermarked MP4 (ft: 1 or type mp4)
-            const links = d.links || [];
-            let mp4Link = links.find(l => String(l.ft) === "1" || String(l.t).toLowerCase().includes('mp4'))?.a;
-
-            if (mp4Link) {
-                return res.json({ success: true, url: mp4Link });
-            }
+        let videoUrlToDownload = cleanUrl;
+        
+        // If it's a web URL, get the direct media link via yt-dlp
+        if (cleanUrl.includes('tiktok.com/@') || cleanUrl.includes('vt.tiktok.com')) {
+             const youtubedl = require("youtube-dl-exec");
+             try {
+                const output = await youtubedl(cleanUrl, { dumpSingleJson: true, noWarnings: true }, { execPath: getBinaryPath() });
+                if (output && output.url) videoUrlToDownload = output.url;
+             } catch(err) {
+                 console.warn("       yt-dlp failed to resolve direct link, using original:", err.message);
+             }
         }
-        res.status(404).json({ success: false, error: "Compatible format not found" });
+
+        const writer = fs.createWriteStream(inputPath);
+        const response = await axios({
+            url: videoUrlToDownload,
+            method: 'GET',
+            responseType: 'stream',
+            timeout: 30000,
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                'Referer': 'https://www.tiktok.com/'
+            }
+        });
+
+        response.data.pipe(writer);
+        await new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+        });
+
+        // 2. Process with FFmpeg
+        const { execSync } = require('child_process');
+        const ffmpegPath = require('ffmpeg-static');
+        
+        try {
+            console.log("       Starting FFmpeg re-encode (H.264)...");
+            // Use quotes for Windows compatibility and capture errors
+            execSync(`"${ffmpegPath}" -y -i "${inputPath}" -c:v libx264 -preset fast -crf 22 -c:a copy "${outputPath}"`, { stdio: 'pipe' });
+            console.log("       FFmpeg re-encode complete.");
+        } catch (err) {
+            console.error("       FFmpeg failed:", err.stderr?.toString() || err.message);
+            throw new Error(`FFmpeg processing failed: ${err.stderr?.toString() || err.message}`);
+        }
+
+        // Cleanup input
+        if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+
+        // Return local stream URL
+        const streamUrl = `/api/tools/tiktok/stream?id=comp_${fileId}&url=${encodeURIComponent("local_merge")}&filename=compatible.mp4`;
+        
+        // Cache it for /stream
+        const urlHash = crypto.createHash("md5").update("local_merge").digest("hex").slice(0, 8);
+        const correctCacheFilename = `tiktok-comp_${fileId}-${urlHash}.mp4`;
+        const correctCachePath = path.join(tempDir, correctCacheFilename);
+        
+        fs.renameSync(outputPath, correctCachePath);
+
+        res.json({ success: true, url: streamUrl });
+
     } catch (e) {
         console.warn("    ⚠️ /compatible endpoint failed:", e.message);
-        res.status(500).json({ success: false, error: "Fetch Failed" });
+        // Cleanup if error occurs
+        try {
+            if (inputPath && fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+            if (outputPath && fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+        } catch (cleanupErr) {}
+        
+        res.status(500).json({ success: false, error: e.message || "Processing Failed" });
     }
 });
 
@@ -395,6 +452,96 @@ router.post("/download", requireAuth, async (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
+/* 🎬 POST /combine — Merge Photos + Audio into Video                        */
+/* -------------------------------------------------------------------------- */
+router.post("/combine", requireAuth, async (req, res) => {
+    try {
+        const { images, audio, id, title } = req.body;
+        if (!images || images.length === 0) return res.status(400).json({ error: "No images provided" });
+        if (!audio) return res.status(400).json({ error: "No audio provided" });
+
+        console.log(`🎬 [Combine] Starting merger for ${id} (${images.length} images)`);
+
+        const safeId = (id || `tk_${Date.now()}`).replace(/[^a-z0-9]/gi, "_");
+        const folderName = `combine_${safeId}_${Date.now()}`;
+        const targetFolder = path.join(slideDir, folderName);
+        if (!fs.existsSync(targetFolder)) fs.mkdirSync(targetFolder, { recursive: true });
+
+        const localImagePaths = [];
+        const localAudioPath = path.join(targetFolder, "bgm.mp3");
+
+        // 1. Download Images
+        for (let i = 0; i < images.length; i++) {
+            const imgPath = path.join(targetFolder, `img_${i + 1}.jpg`);
+            const writer = fs.createWriteStream(imgPath);
+            const resp = await axios({ url: images[i], method: 'get', responseType: 'stream', timeout: 10000 });
+            resp.data.pipe(writer);
+            await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+            localImagePaths.push(imgPath);
+        }
+
+        // 2. Download Audio
+        const audioWriter = fs.createWriteStream(localAudioPath);
+        const audioResp = await axios({ url: audio, method: 'get', responseType: 'stream', timeout: 15000 });
+        audioResp.data.pipe(audioWriter);
+        await new Promise((resolve, reject) => {
+            audioWriter.on('finish', resolve);
+            audioWriter.on('error', reject);
+        });
+
+        // 3. Generate Video
+        const outputFilename = `combined_${safeId}.mp4`;
+        const outputPath = path.join(targetFolder, outputFilename);
+        
+        // Calculate duration: if 1 image, make it 10s. If more, 5s per slide.
+        const durationPerSlide = images.length === 1 ? 10 : 5;
+
+        await createSlideshow(localImagePaths, localAudioPath, outputPath, durationPerSlide);
+
+        // 4. Move output to tempDir for streaming
+        const finalCacheFilename = `tiktok-combined-${safeId}-${Date.now()}.mp4`;
+        const finalCachePath = path.join(tempDir, finalCacheFilename);
+        fs.renameSync(outputPath, finalCachePath);
+
+        // 5. Cleanup temp folder
+        setTimeout(() => fs.rm(targetFolder, { recursive: true, force: true }, () => { }), 1000);
+
+        const safeTitle = (title || "tiktok").replace(/[^a-z0-9\u0080-\uffff]/gi, "_").substring(0, 50);
+        const streamUrl = `/api/tools/tiktok/stream?id=combined_${safeId}&url=${encodeURIComponent("local")}&filename=${encodeURIComponent(safeTitle + ".mp4")}&path=${encodeURIComponent(finalCachePath)}`;
+        
+        // Note: The /stream endpoint needs to handle the 'path' parameter if we want to serve local files directly easily,
+        // or we just use the cache naming convention.
+        // Let's check /stream logic. It expects 'id' and 'url' to find/create cachePath.
+        
+        // I'll update /stream to support a local file bypass or just use the cache naming convention.
+        // Actually, /stream uses: const cacheFilename = `tiktok-${safeId}-${urlHash}.mp4`;
+        // If I name it correctly, /stream will find it.
+        
+        const urlHash = crypto.createHash("md5").update("local_merge").digest("hex").slice(0, 8);
+        const correctCacheFilename = `tiktok-combined_${safeId}-${urlHash}.mp4`;
+        const correctCachePath = path.join(tempDir, correctCacheFilename);
+        
+        if (fs.existsSync(finalCachePath)) {
+            fs.renameSync(finalCachePath, correctCachePath);
+        }
+
+        const finalStreamUrl = `/api/tools/tiktok/stream?id=combined_${safeId}&url=${encodeURIComponent("local_merge")}&filename=${encodeURIComponent(safeTitle + ".mp4")}`;
+
+        res.json({
+            success: true,
+            url: finalStreamUrl
+        });
+
+    } catch (err) {
+        console.error("❌ Combine Error:", err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/* -------------------------------------------------------------------------- */
 /* 🔄 GET /stream — Smart Caching Stream & Download                           */
 /* -------------------------------------------------------------------------- */
 router.get("/stream", async (req, res) => {
@@ -403,7 +550,7 @@ router.get("/stream", async (req, res) => {
         if (!id || id === 'undefined' || !url) return res.status(400).send("Missing parameters: id or url");
 
         // 🔐 Security: Domain Allowlist
-        if (!url.match(/(tiktokcdn|bytevc1|tikwm|douyin|muscdn|akamaized)/i)) {
+        if (!url.match(/(tiktokcdn|bytevc1|tikwm|douyin|muscdn|akamaized|local_merge)/i)) {
             return res.status(403).send("Forbidden Source");
         }
 

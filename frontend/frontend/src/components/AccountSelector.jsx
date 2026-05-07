@@ -103,14 +103,14 @@ const AccountSelector = React.memo(function AccountSelector({
 
   // --- Add custom account ---
   const addCustomAccount = useCallback(() => {
-    const id = prompt("Enter Facebook Page ID, Group ID, or Username:");
+    const id = prompt("Enter ID:");
     if (!id?.trim()) return;
-    const name = prompt("Enter display name:") || id;
+    const name = prompt("Enter Name:") || id;
     const newAcc = { id: id.trim(), name: name.trim(), custom: true };
 
     setCustomAccounts((prev) => {
       if (prev.some((a) => a.id === newAcc.id)) {
-        alert("Account ID already exists!");
+        alert("Already added!");
         return prev;
       }
       return [...prev, newAcc];
@@ -123,7 +123,7 @@ const AccountSelector = React.memo(function AccountSelector({
   // --- Remove custom account ---
   const removeCustomAccount = useCallback((id, e) => {
     e?.stopPropagation();
-    if (confirm("Remove this custom account?")) {
+    if (confirm("Remove this account?")) {
       setCustomAccounts((prev) => prev.filter((a) => a.id !== id));
       setSelectedAccounts((prev) => prev.filter((a) => a !== id));
     }
@@ -131,7 +131,7 @@ const AccountSelector = React.memo(function AccountSelector({
 
   // --- Clear all ---
   const clearAll = useCallback(() => {
-    if (selectedAccounts.length && confirm("Clear all selected?")) {
+    if (selectedAccounts.length && confirm("Remove all?")) {
       setSelectedAccounts([]);
     }
   }, [selectedAccounts]);
@@ -240,7 +240,7 @@ const AccountSelector = React.memo(function AccountSelector({
           </>
         ) : (
           <span className="text-gray-400 text-sm">
-            Select Facebook accounts...
+            ជ្រើសរើសផេក ឬគណនីដែលត្រូវបង្ហោះ...
           </span>
         )}
       </div>
@@ -257,7 +257,7 @@ const AccountSelector = React.memo(function AccountSelector({
             <div className="p-3 border-b bg-gray-50">
               <input
                 type="text"
-                placeholder="Search accounts..."
+                placeholder="ស្វែងរកផេក..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full border border-gray-300 rounded-md p-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
@@ -271,14 +271,14 @@ const AccountSelector = React.memo(function AccountSelector({
                 onClick={addCustomAccount}
                 className="bg-emerald-500 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-emerald-600 transition"
               >
-                + Add Custom
+                + បន្ថែម ID
               </button>
               {selectedAccounts.length > 0 && (
                 <button
                   onClick={clearAll}
                   className="bg-red-500 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-600 transition"
                 >
-                  Clear All
+                  លុបចេញទាំងអស់
                 </button>
               )}
             </div>
@@ -287,7 +287,7 @@ const AccountSelector = React.memo(function AccountSelector({
             {filteredAccounts.length === 0 ? (
               <div className="text-center text-gray-500 py-8 text-sm flex flex-col items-center gap-3">
                 <div className="text-3xl">🔍</div>
-                <p>No accounts found.</p>
+                <p>រកមិនឃើញផេកទេ</p>
                 <button
                   onClick={() => {
                     const baseURL = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -295,7 +295,7 @@ const AccountSelector = React.memo(function AccountSelector({
                   }}
                   className="mt-2 px-4 py-2 bg-[#1877f2] hover:bg-[#166fe5] text-white rounded-lg font-medium text-sm flex items-center gap-2 transition-colors shadow-sm"
                 >
-                  <span>📘</span> Connect Facebook
+                  <span>📘</span> ភ្ជាប់ជាមួយ Facebook
                 </button>
               </div>
             ) : (
@@ -366,7 +366,7 @@ const AccountSelector = React.memo(function AccountSelector({
 
             {/* Footer */}
             <div className="p-3 text-xs text-gray-500 text-center bg-gray-50 border-t">
-              {selectedAccounts.length} selected • {filteredAccounts.length} total
+              បានជ្រើសរើស {selectedAccounts.length} • សរុប {filteredAccounts.length}
             </div>
           </div>
         </>

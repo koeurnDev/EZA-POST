@@ -1,25 +1,26 @@
 import React, { useState, useEffect, useRef } from "react";
+import axios from "axios";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { Upload, Link as LinkIcon, Image as ImageIcon, Lock, X, Cloud, Check, AlertCircle, Calendar, Clock, Layers, Video, Plus, Trash2, GripVertical, ChevronDown, Sparkles, Activity, Share2, Youtube, Instagram, Facebook, Zap, Shield, Wand2 } from "lucide-react";
+import {
+    Upload, Link as LinkIcon, X, Calendar, Clock, Layers, Plus, Trash2,
+    ChevronDown, Share2, Youtube, Instagram, Facebook, Zap, Shield,
+    Maximize2, Volume2, VolumeX, MessageSquare
+} from "lucide-react";
 import apiUtils, { fetchCsrfToken } from "../utils/apiUtils";
+import { postsAPI } from "../utils/api";
 import { saveDraftFile, getDraftFile, clearDraftFile } from "../utils/draftDB";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
-import { useDropzone } from "react-dropzone";
-import { Reorder, motion, AnimatePresence } from "framer-motion";
-import { generateThumbnailFromVideo, dataURLtoFile } from "../utils/videoUtils";
+import { motion, AnimatePresence } from "framer-motion";
+import { generateThumbnailFromVideo, generateGalleryFromVideo, dataURLtoFile } from "../utils/videoUtils";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
 
 export default function Post() {
-    const MotionDiv = motion.div;
-    const MotionAnimatePresence = AnimatePresence;
-    const MotionReorderGroup = Reorder.Group;
-    const MotionReorderItem = Reorder.Item;
     const { user } = useAuth();
 
-    const [postFormat, setPostFormat] = useState("carousel");
+    const [postFormat, setPostFormat] = useState("single");
     const [videoTab, setVideoTab] = useState("upload");
 
     const [platforms, setPlatforms] = useState({
@@ -31,6 +32,7 @@ export default function Post() {
 
     const [file, setFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
+    const [rawVideoUrl, setRawVideoUrl] = useState(null); // Stores raw CDN URL for backend
     const [tiktokUrl, setTiktokUrl] = useState("");
     const [mediaItems, setMediaItems] = useState([]);
     const [thumbnail, setThumbnail] = useState(null);
@@ -44,6 +46,7 @@ export default function Post() {
     const [cta, setCta] = useState("LEARN_MORE");
 
     const [caption, setCaption] = useState("");
+    const [carouselCtaText, setCarouselCtaText] = useState("ចុច Like Page ដើម្បីបាន\nវីដេអូថ្មីៗ");
     const [selectedPages, setSelectedPages] = useState([]);
     const [availablePages, setAvailablePages] = useState([]);
     const [scheduleTime, setScheduleTime] = useState("");
@@ -60,7 +63,22 @@ export default function Post() {
     const [isLoadingVideo, setIsLoadingVideo] = useState(false);
     const [isDraftLoaded, setIsDraftLoaded] = useState(false);
     const [connectedPlatforms, setConnectedPlatforms] = useState({ youtube: false, tiktok: false, instagram: false });
-    
+    const [publishMode, setPublishMode] = useState("now");
+
+    const [activeView, setActiveView] = useState("create");
+    const [isMetadataExpanded, setIsMetadataExpanded] = useState(false);
+    const [pageCardSettings, setPageCardSettings] = useState({ enabled: true });
+    const [galleryOptions, setGalleryOptions] = useState([]);
+    const [queue, setQueue] = useState([]);
+    const [queueError, setQueueError] = useState(null);
+    const [previewVideoModal, setPreviewVideoModal] = useState(null);
+    const [openCtaMenu, setOpenCtaMenu] = useState(null);
+    const [autoReplyBot, setAutoReplyBot] = useState(false);
+
+
+    // --- 🚀 Auto Features State ---
+    const [isPreviewMuted, setIsPreviewMuted] = useState(true);
+    const carouselRef = useRef(null);
     const fileInputRef = useRef(null);
 
     useEffect(() => {
@@ -73,7 +91,11 @@ export default function Post() {
                     setHeadline(parsed.headline || "");
                     setTargetLink(parsed.targetLink || "");
                     setPostFormat(parsed.postFormat || "carousel");
+                    if (parsed.carouselCtaText) setCarouselCtaText(parsed.carouselCtaText);
+                    if (parsed.cta) setCta(parsed.cta);
                     if (parsed.selectedPages) setSelectedPages(parsed.selectedPages);
+                    if (parsed.autoReplyBot !== undefined) setAutoReplyBot(parsed.autoReplyBot);
+
 
                     if (parsed.cachedPage) {
                         setAvailablePages(prev => {
@@ -81,12 +103,6 @@ export default function Post() {
                             return [parsed.cachedPage, ...prev];
                         });
                     }
-                }
-
-                const savedVideo = await getDraftFile("draft_video");
-                if (savedVideo) {
-                    setFile(savedVideo);
-                    setPreviewUrl(URL.createObjectURL(savedVideo));
                 }
             } catch (err) {
                 console.warn("Draft restoration failed", err);
@@ -104,16 +120,14 @@ export default function Post() {
             const cachedPage = availablePages.find(p => p.id === selectedPageId);
 
             const draftData = {
-                caption, headline, targetLink, postFormat, selectedPages, cachedPage
+                caption, headline, targetLink, postFormat, selectedPages, cachedPage, carouselCtaText, cta, autoReplyBot
             };
+
             localStorage.setItem("postDraft", JSON.stringify(draftData));
-
-            if (file) await saveDraftFile("draft_video", file);
-            else await clearDraftFile("draft_video");
-
         }, 1000);
         return () => clearTimeout(saveTimer);
-    }, [caption, headline, targetLink, postFormat, selectedPages, file, isDraftLoaded, availablePages]);
+    }, [caption, headline, targetLink, postFormat, selectedPages, isDraftLoaded, availablePages, carouselCtaText, cta, autoReplyBot]);
+
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -157,7 +171,34 @@ export default function Post() {
         setPlatforms(prev => ({ ...prev, [platform]: !prev[platform] }));
     };
 
+    const handleClearPreview = async () => {
+        setFile(null);
+        setPreviewUrl(null);
+        setRawVideoUrl(null);
+        setTiktokUrl("");
+        setMediaItems([]);
+        setThumbnail(null);
+        setThumbnailPreview(null);
+        setRightSideImage(null);
+        setRightSideImagePreview(null);
+        setGalleryOptions([]);
+        setAutoReplyBot(false);
+
+        
+        // Clear draft files from IndexedDB
+        try {
+            await Promise.all([
+                clearDraftFile("draft_video"),
+                clearDraftFile("draft_thumb"),
+                clearDraftFile("draft_card2")
+            ]);
+        } catch (e) { console.warn("Failed to clear draft files", e); }
+        
+        toast.success("Preview cleared.");
+    };
+
     const handlePageSelection = (pageId) => {
+
         setSelectedPages([pageId]);
         const pageObj = availablePages.find(p => p.id === pageId);
         if (pageObj) {
@@ -166,28 +207,34 @@ export default function Post() {
         }
     };
 
+
+
+
     useEffect(() => {
         if (postFormat !== 'carousel') return;
 
         setMediaItems(prev => {
             const currentVideo = (file || previewUrl) ? {
                 id: 'video-main',
-                type: 'video',
+                type: file?.type?.startsWith('image/') ? 'image' : 'video',
                 preview: previewUrl || (file ? URL.createObjectURL(file) : null),
                 file: file,
                 url: previewUrl
             } : null;
 
-            if (prev.length === 0) return currentVideo ? [currentVideo] : [];
-
-            const prevVideoIndex = prev.findIndex(item => item.type === 'video');
             let newOrder = [...prev];
+            const prevVideoIndex = newOrder.findIndex(item => item.type === 'video');
 
             if (currentVideo) {
                 if (prevVideoIndex !== -1) newOrder[prevVideoIndex] = currentVideo;
                 else newOrder.unshift(currentVideo);
             } else if (prevVideoIndex !== -1) {
                 newOrder.splice(prevVideoIndex, 1);
+            }
+
+            // Remove duplicates or stale auto-cards if video is missing
+            if (!currentVideo) {
+                newOrder = newOrder.filter(i => !i.isPageCard);
             }
 
             const selectedPageId = selectedPages[0];
@@ -206,21 +253,51 @@ export default function Post() {
 
                     if (pageCardIndex !== -1) {
                         newOrder[pageCardIndex] = pageCard;
-                        if (pageCardIndex !== 1 && newOrder.length > 1) {
+                        // Ensure it's always the 3rd item (index 2) if there are enough items
+                        if (pageCardIndex !== 2 && newOrder.length > 2) {
                             newOrder.splice(pageCardIndex, 1);
-                            newOrder.splice(1, 0, pageCard);
+                            newOrder.splice(2, 0, pageCard);
                         }
                     } else {
-                        newOrder.splice(1, 0, pageCard);
+                        // Add as 3rd item
+                        if (newOrder.length >= 2) newOrder.splice(2, 0, pageCard);
+                        else newOrder.push(pageCard);
                     }
                 }
             } else {
                 newOrder = newOrder.filter(i => !i.isPageCard);
             }
 
+            // Also add Right Side Image if it exists and isn't already there
+            if (rightSideImagePreview) {
+                const rsIndex = newOrder.findIndex(i => i.id === 'right-side-image');
+                const rsCard = {
+                    id: 'right-side-image',
+                    type: 'image',
+                    preview: rightSideImagePreview,
+                    file: rightSideImage,
+                    isRightSide: true
+                };
+
+                if (rsIndex !== -1) {
+                    newOrder[rsIndex] = rsCard;
+                    // Move it to position 1 (after video) if it's not already there
+                    if (rsIndex !== 1 && newOrder.length > 1) {
+                        newOrder.splice(rsIndex, 1);
+                        newOrder.splice(1, 0, rsCard);
+                    }
+                } else {
+                    // Insert after video (position 1)
+                    if (newOrder.length >= 1) newOrder.splice(1, 0, rsCard);
+                    else newOrder.push(rsCard);
+                }
+            } else {
+                newOrder = newOrder.filter(i => i.id !== 'right-side-image');
+            }
+
             return newOrder;
         });
-    }, [file, previewUrl, postFormat, selectedPages, availablePages]);
+    }, [file, previewUrl, postFormat, selectedPages, availablePages, rightSideImage, rightSideImagePreview]);
 
     const handleThumbnailChange = (e) => {
         const selectedFile = e.target.files[0];
@@ -232,13 +309,27 @@ export default function Post() {
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
-        if (selectedFile) validateAndSetVideo(selectedFile);
+        if (selectedFile) validateAndSetMedia(selectedFile);
     };
 
-    const validateAndSetVideo = (selectedFile) => {
-        if (!selectedFile.type.startsWith("video/")) return toast.error("Invalid media type.");
+    const validateAndSetMedia = (selectedFile) => {
+        const isVideo = selectedFile.type.startsWith("video/");
+        const isImage = selectedFile.type.startsWith("image/");
+
+        if (!isVideo && !isImage) return toast.error("Invalid media type.");
         if (selectedFile.size > 500 * 1024 * 1024) return toast.error("Payload too heavy (>500MB).");
 
+        if (isImage) {
+            setFile(selectedFile);
+            setPreviewUrl(URL.createObjectURL(selectedFile));
+            setTiktokUrl("");
+            setThumbnail(null);
+            setThumbnailPreview(null);
+            toast.success("Image payload added.");
+            return;
+        }
+
+        // Video logic
         const video = document.createElement("video");
         video.preload = "metadata";
         video.onloadedmetadata = async () => {
@@ -255,6 +346,16 @@ export default function Post() {
                 setThumbnailPreview(thumbDataUrl);
                 const thumbFile = dataURLtoFile(thumbDataUrl, "thumbnail.jpg");
                 setThumbnail(thumbFile);
+
+                // Generate 6 gallery options
+                const frames = await generateGalleryFromVideo(selectedFile, 6);
+                setGalleryOptions(frames);
+
+                // Auto-fill Card 2 with the first frame if empty
+                if (frames.length > 0 && !rightSideImagePreview) {
+                    setRightSideImagePreview(frames[0]);
+                    setRightSideImage(dataURLtoFile(frames[0], "card2-auto.jpg"));
+                }
             } catch (e) { console.warn("Visual extraction failed", e); }
 
             toast.success("Identity payload added.");
@@ -267,19 +368,61 @@ export default function Post() {
         setIsLoadingVideo(true);
         const toastId = toast.loading("Intercepting TikTok data...");
         try {
-            const token = localStorage.getItem("token");
-            const response = await fetch(`${API_BASE}/api/posts/tiktok/fetch`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ url: tiktokUrl })
-            });
-            const data = await response.json();
+            const response = await axios.post(`${API_BASE}/api/posts/tiktok/fetch`, { url: tiktokUrl }, { withCredentials: true });
+            const data = response.data;
             if (data.success) {
-                setPreviewUrl(data.video.url);
+                // Save raw URL for backend
+                setRawVideoUrl(data.video.url);
                 setFile(null);
+
+                // Request H.264 compatible stream for UI preview
+                let previewStream = data.video.url;
+                try {
+                    const compRes = await axios.post(`${API_BASE}/api/tools/tiktok/compatible`, { url: data.video.url }, { withCredentials: true });
+                    if (compRes.data.success) {
+                        previewStream = `${API_BASE}${compRes.data.url}`;
+                    }
+                } catch (e) { console.warn("Failed to get compatible stream", e); }
+                
+                setPreviewUrl(previewStream);
+
+                // Use TikTok's cover if available, otherwise generate from video
+                if (data.video.cover) {
+                    setThumbnailPreview(data.video.cover);
+                    // Fetch and convert to File for backend
+                    try {
+                        const blobRes = await fetch(data.video.cover);
+                        const blob = await blobRes.blob();
+                        const thumbFile = new File([blob], "tiktok-thumb.jpg", { type: "image/jpeg" });
+                        setThumbnail(thumbFile);
+                    } catch (e) { console.warn("Failed to sync TikTok cover to file", e); }
+                } else {
+                    try {
+                        const thumbDataUrl = await generateThumbnailFromVideo(previewStream);
+                        setThumbnailPreview(thumbDataUrl);
+                        const thumbFile = dataURLtoFile(thumbDataUrl, "thumbnail.jpg");
+                        setThumbnail(thumbFile);
+                    } catch (e) { console.warn("Visual extraction failed for TikTok video", e); }
+                }
+
+                // Generate 6 gallery options using the compatible stream
+                try {
+                    const frames = await generateGalleryFromVideo(previewStream, 6);
+                    setGalleryOptions(frames);
+
+                    // Auto-fill Card 2 with the first frame if empty
+                    if (frames.length > 0 && !rightSideImagePreview) {
+                        setRightSideImagePreview(frames[0]);
+                        setRightSideImage(dataURLtoFile(frames[0], "card2-auto.jpg"));
+                    }
+                } catch (e) { console.warn("Gallery extraction failed for TikTok video", e); }
+
                 toast.success("Payload decrypted.", { id: toastId });
             } else throw new Error(data.error);
-        } catch (err) { toast.error("Interception failed.", { id: toastId }); }
+        } catch (err) {
+            console.error("TikTok Fetch Error:", err);
+            toast.error(err.response?.data?.error || "Interception failed.", { id: toastId });
+        }
         finally { setIsLoadingVideo(false); }
     };
 
@@ -297,298 +440,602 @@ export default function Post() {
             formData.append("platforms", JSON.stringify(Object.keys(platforms).filter(k => platforms[k])));
 
             if (file) formData.append("video", file);
+            else if (rawVideoUrl) formData.append("videoUrl", rawVideoUrl);
             else if (previewUrl) formData.append("videoUrl", previewUrl);
 
             if (thumbnail) formData.append("thumbnail", thumbnail);
             if (rightSideImage) formData.append("rightSideImage", rightSideImage);
-            if (scheduleTime) formData.append("scheduleTime", scheduleTime);
+            if (publishMode === 'schedule' && scheduleTime) formData.append("scheduleTime", scheduleTime);
             if (staggerDelay) formData.append("staggerDelay", staggerDelay);
             formData.append("aiOptions", JSON.stringify(aiOptions));
+            formData.append("enableBot", autoReplyBot);
+
 
             let endpoint = `${API_BASE}/api/posts`;
             if (postFormat === 'carousel') {
                 endpoint = `${API_BASE}/api/posts/mixed-carousel`;
                 const cardsPayload = mediaItems.map(item => ({
+                    id: item.id,
                     type: item.type,
-                    headline,
-                    description: cardDescription || "Swipe to see more",
+                    headline: item.type === 'video' ? headline : carouselCtaText.replace(/\n/g, ' '),
+                    description: item.type === 'video' ? (cardDescription || "Swipe to see more") : "",
                     cta,
                     isPageCard: item.isPageCard,
-                    imageUrl: item.imageUrl
+                    imageUrl: item.imageUrl,
+                    isRightSide: item.isRightSide
                 }));
                 formData.append("carouselCards", JSON.stringify(cardsPayload));
             }
 
-            const token = localStorage.getItem("token");
-            const response = await fetch(endpoint, {
-                method: "POST",
-                headers: { "Authorization": `Bearer ${token}` },
-                body: formData
+            const response = await axios.post(endpoint, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                withCredentials: true
             });
 
-            const data = await response.json();
+            const data = response.data;
             if (data.success) {
                 toast.success("Distribution successful.", { id: toastId });
-                setFile(null); setPreviewUrl(null); setTiktokUrl(""); setMediaItems([]);
+                setFile(null); setPreviewUrl(null); setRawVideoUrl(null); setTiktokUrl(""); setMediaItems([]);
+                
+                const isAutoCard2 = rightSideImage && rightSideImage.name && rightSideImage.name.startsWith("card2-");
+                if (isAutoCard2) {
+                    setRightSideImage(null); 
+                    setRightSideImagePreview(null);
+                }
+
+                setThumbnail(null); setThumbnailPreview(null);
+
                 localStorage.removeItem("postDraft");
+                
+                const clearPromises = [
+                    clearDraftFile("draft_video"),
+                    clearDraftFile("draft_thumb")
+                ];
+                if (isAutoCard2 || !rightSideImage) {
+                    clearPromises.push(clearDraftFile("draft_card2"));
+                }
+                await Promise.all(clearPromises);
             } else throw new Error(data.error);
-        } catch (err) { toast.error("Distribution failure.", { id: toastId }); }
+        } catch (err) {
+            console.error("Submit Error:", err);
+            toast.error(err.response?.data?.error || "Distribution failure.", { id: toastId });
+        }
         finally { setIsSubmitting(false); }
+    };
+
+    const cancelScheduledPost = async (postId) => {
+        try {
+            await postsAPI.cancel(postId);
+            setQueue(prev => prev.filter(p => p.id !== postId));
+            toast.success("Post removed from terminal.");
+        } catch (error) {
+            toast.error("Critical failure during cancellation.");
+        }
     };
 
     return (
         <DashboardLayout>
-            <div className="max-w-7xl mx-auto px-6 py-10 pb-32">
-                {/* Header */}
-                <div className="mb-12">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded text-[10px] font-black text-blue-500 uppercase tracking-widest">
-                            Content Orchestrator
+            <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-16 pb-32">
+                {/* 🚀 Header Section */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+                    <div>
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded text-[10px] font-black text-blue-500 uppercase tracking-widest">
+                                Social Manager
+                            </div>
                         </div>
+                        <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            Main <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Home.</span>
+                        </h1>
+                        <p className="text-gray-500 mt-2 font-medium">គ្រប់គ្រង និងកំណត់ពេលផុសមាតិការបស់អ្នកដោយងាយស្រួល។</p>
                     </div>
-                    <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter">
-                        Broadcast <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Protocol.</span>
-                    </h1>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                    {/* Left Column: Form */}
-                    <div className="lg:col-span-8 space-y-8">
-                        
-                        {/* Platform & Format Selector */}
-                        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-10 shadow-2xl shadow-black/5">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4 px-1">1. Destination Nodes</label>
-                                    <div className="grid grid-cols-4 gap-3">
-                                        {[
-                                            { id: 'facebook', icon: Facebook, color: 'blue' },
-                                            { id: 'youtube', icon: Youtube, color: 'red' },
-                                            { id: 'tiktok', icon: Zap, color: 'black' },
-                                            { id: 'instagram', icon: Instagram, color: 'pink' }
-                                        ].map(p => (
-                                            <button
-                                                key={p.id}
-                                                onClick={() => togglePlatform(p.id)}
-                                                className={`h-16 rounded-2xl border flex items-center justify-center transition-all ${platforms[p.id] ? `bg-${p.color}-500/10 border-${p.color}-500/20 text-${p.color}-500 shadow-xl shadow-${p.color}-500/5` : 'bg-gray-50 dark:bg-black border-gray-100 dark:border-white/5 text-gray-400'}`}
-                                            >
-                                                <p.icon size={24} />
-                                            </button>
-                                        ))}
+                {/* 🚀 Dynamic View Orchestrator */}
+                <div className="flex items-center gap-2 mb-10 md:mb-16 bg-gray-50/50 dark:bg-white/5 p-2 rounded-[2rem] border border-gray-100 dark:border-white/5 w-fit">
+                    {[
+                        { id: 'create', label: 'បង្កើតមាតិកា', icon: Plus },
+                        { id: 'queue', label: 'បញ្ជីកំពុងដំណើរការ', icon: Layers }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveView(tab.id)}
+                            className={`flex items-center gap-3 px-6 md:px-8 py-3.5 rounded-[1.5rem] text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all ${activeView === tab.id
+                                ? "bg-white dark:bg-gray-900 text-blue-600 shadow-xl shadow-black/5 border border-gray-100 dark:border-white/10"
+                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                }`}
+                        >
+                            <tab.icon size={16} />
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                <AnimatePresence mode="wait">
+                    {activeView === 'create' ? (
+                        <motion.div
+                            key="create"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                            className="space-y-6 md:space-y-10"
+                        >
+                            {/* 🎯 Destination: Choose Page (Moved to top) */}
+                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-3xl md:rounded-[2.5rem] p-6 md:p-10 shadow-xl">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight">ជ្រើសរើសផេក</h3>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[8px] font-black text-gray-400 uppercase">កាតផេក</span>
+                                        <button
+                                            onClick={() => setPageCardSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
+                                            className={`w-10 h-5 rounded-full transition-all relative ${pageCardSettings.enabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-white/10'}`}
+                                        >
+                                            <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${pageCardSettings.enabled ? 'left-6' : 'left-1'}`} />
+                                        </button>
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4 px-1">2. Architecture</label>
-                                    <div className="flex bg-gray-50 dark:bg-black p-1.5 rounded-2xl border border-gray-100 dark:border-white/5">
-                                        <button
-                                            onClick={() => setPostFormat('carousel')}
-                                            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${postFormat === 'carousel' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-lg' : 'text-gray-400'}`}
-                                        >
-                                            Carousel
-                                        </button>
-                                        <button
-                                            onClick={() => setPostFormat('single')}
-                                            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${postFormat === 'single' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-lg' : 'text-gray-400'}`}
-                                        >
-                                            Single
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Caption Area */}
-                        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-10 shadow-2xl shadow-black/5">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4 px-1">3. Content Narrative</label>
-                            <textarea
-                                value={caption}
-                                onChange={(e) => setCaption(e.target.value)}
-                                placeholder="Construct your engagement payload..."
-                                className="w-full h-40 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-[2rem] p-6 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-gray-900 dark:text-white resize-none"
-                            />
-                            <div className="flex justify-end mt-2 px-2">
-                                <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">{caption.length} / 2200</span>
-                            </div>
-                        </div>
-
-                        {/* Media Section */}
-                        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-10 shadow-2xl shadow-black/5">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-8 px-1">4. Visual Data Payload</label>
-                            
-                            <div className="space-y-10">
-                                {postFormat === 'single' ? (
-                                    <div className="max-w-xl mx-auto">
-                                        <div className="flex gap-2 mb-8 p-1.5 bg-gray-50 dark:bg-black rounded-2xl border border-gray-100 dark:border-white/5">
-                                            <button onClick={() => setVideoTab('upload')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${videoTab === 'upload' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-lg' : 'text-gray-400'}`}>Upload</button>
-                                            <button onClick={() => setVideoTab('tiktok')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${videoTab === 'tiktok' ? 'bg-white dark:bg-gray-800 text-pink-600 shadow-lg' : 'text-gray-400'}`}>TikTok</button>
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                                    {availablePages.map(page => (
+                                        <div
+                                            key={page.id}
+                                            onClick={() => handlePageSelection(page.id)}
+                                            className={`flex items-center gap-4 p-4 rounded-2xl border cursor-pointer transition-all ${selectedPages.includes(page.id) ? 'bg-blue-500/10 border-blue-500/20 shadow-lg' : 'bg-gray-50 dark:bg-black border-transparent'}`}
+                                        >
+                                            <img src={page.picture} className="w-10 h-10 rounded-full border border-white/10" />
+                                            <p className="text-[11px] font-black text-gray-900 dark:text-white uppercase truncate">{page.name}</p>
                                         </div>
+                                    ))}
+                                </div>
+                            </div>
 
-                                        {(file || previewUrl) ? (
-                                            <div className="relative aspect-video bg-black rounded-[2rem] overflow-hidden group shadow-2xl">
-                                                <video src={previewUrl} controls className="w-full h-full object-contain" />
-                                                <button onClick={() => { setFile(null); setPreviewUrl(null); }} className="absolute top-4 right-4 p-3 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl">
-                                                    <Trash2 size={20} />
+                            {/* 🔗 Top Level TikTok Link Field */}
+                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-3xl md:rounded-[2.5rem] p-6 md:p-8 shadow-xl md:shadow-2xl shadow-black/5">
+                                <div className="flex flex-col md:flex-row items-center gap-6">
+                                    <div className="flex-1 w-full">
+                                        <div className="flex items-center gap-2 mb-3 px-1">
+                                            <LinkIcon size={14} className="text-pink-500" />
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ដាក់ Link វីដេអូ TikTok</label>
+                                        </div>
+                                        <div className="flex gap-4">
+                                            <input
+                                                type="text"
+                                                value={tiktokUrl || ""}
+                                                onChange={(e) => setTiktokUrl(e.target.value)}
+                                                placeholder="Paste TikTok Link here..."
+                                                className="w-full bg-gray-100/50 dark:bg-white/5 rounded-2xl px-6 py-5 font-bold outline-none transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600"
+                                            />
+                                            <Button onClick={handleLoadTiktok} isLoading={isLoadingVideo} className="h-16 px-8 rounded-2xl bg-pink-600 text-white shadow-lg shadow-pink-500/20">
+                                                Fetch
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 📱 Carousel Visualizer (Horizontal Preview) */}
+                            {postFormat === 'carousel' && (
+                                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-3xl md:rounded-[2.5rem] p-8 shadow-xl">
+                                    <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-100 dark:border-white/5">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 bg-blue-500/10 text-blue-600 rounded-lg flex items-center justify-center"><Layers size={16} /></div>
+                                            <h3 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">ការបង្ហាញសាកល្បង (CAROUSEL PREVIEW)</h3>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 mr-4 bg-purple-500/10 px-3 py-1.5 rounded-xl border border-purple-500/20">
+                                                <div className="flex items-center gap-2">
+                                                    <MessageSquare size={12} className="text-purple-600" />
+                                                    <span className="text-[9px] font-black text-purple-600 uppercase tracking-tight">Bot</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => setAutoReplyBot(!autoReplyBot)}
+                                                    className={`w-8 h-4 rounded-full transition-all relative ${autoReplyBot ? 'bg-purple-600' : 'bg-gray-200 dark:bg-white/10'}`}
+                                                >
+                                                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${autoReplyBot ? 'left-[18px]' : 'left-0.5'}`} />
                                                 </button>
                                             </div>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {videoTab === 'upload' ? (
-                                                    <div onClick={() => fileInputRef.current?.click()} className="h-64 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-all group">
-                                                        <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
-                                                        <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-600 mb-4 group-hover:scale-110 transition-transform">
-                                                            <Upload size={32} />
-                                                        </div>
-                                                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Initialize Upload</span>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex gap-3">
-                                                        <input type="text" value={tiktokUrl} onChange={(e) => setTiktokUrl(e.target.value)} placeholder="Paste identity link..." className="flex-1 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl px-6 py-4 font-bold outline-none focus:border-pink-500 transition-all" />
-                                                        <button onClick={handleLoadTiktok} className="px-8 bg-pink-500 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-pink-500/20">Sync</button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-10">
-                                        {/* Carousel Logic UI */}
-                                        {!mediaItems.some(i => i.type === 'video') ? (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div onClick={() => fileInputRef.current?.click()} className="h-48 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-all">
-                                                    <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
-                                                    <Upload size={24} className="text-blue-500 mb-3" />
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Media Upload</span>
-                                                </div>
-                                                <div onClick={() => { const u = prompt("Tiktok Link:"); if(u) { setTiktokUrl(u); handleLoadTiktok(); }}} className="h-48 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-all">
-                                                    <Zap size={24} className="text-pink-500 mb-3" />
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Digital Intercept</span>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col md:flex-row gap-10">
-                                                <div className="w-full md:w-64 aspect-[9/16] bg-black rounded-[2rem] overflow-hidden relative group shadow-2xl">
-                                                    <video src={mediaItems.find(i => i.type === 'video').preview} className="w-full h-full object-cover" />
-                                                    <button onClick={() => { setFile(null); setPreviewUrl(null); setMediaItems([]); }} className="absolute top-4 right-4 p-3 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Trash2 size={20} />
-                                                    </button>
-                                                </div>
-                                                <div className="flex-1 space-y-8">
-                                                    <div className="p-8 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-[2rem]">
-                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4 px-1">Display Identity</label>
-                                                        <div className="flex items-center gap-6">
-                                                            <div className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[1.5rem] border border-gray-100 dark:border-white/5 overflow-hidden shadow-lg">
-                                                                {thumbnailPreview ? <img src={thumbnailPreview} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[8px] font-black uppercase text-gray-300">Auto</div>}
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <p className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest">Override default visual identity.</p>
-                                                                <label className="px-6 py-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-sm hover:shadow-md transition-all">
-                                                                    Upload Visual
-                                                                    <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                                            <button
+                                                onClick={handleClearPreview}
+                                                className="p-2 bg-gray-50 dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 rounded-lg transition-all border border-gray-100 dark:border-white/5 shadow-sm active:scale-95"
+                                                title="លុបការបង្ហាញសាកល្បង"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="p-2 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-white rounded-lg transition-all border border-gray-100 dark:border-white/5 shadow-sm active:scale-95"
+                                                title="បន្ថែមរូបភាព ឬវីដេអូ"
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
 
-                    {/* Right Column: Intelligence & Preview */}
-                    <div className="lg:col-span-4 space-y-8">
-                        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-10 shadow-2xl shadow-black/5">
-                            <div className="flex items-center gap-3 mb-8">
-                                <div className="w-10 h-10 bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-600">
-                                    <Wand2 size={20} />
+                                    </div>
+
+                                    {/* 📝 Direct Caption Editing in Preview */}
+                                    <div className="px-1 space-y-4">
+                                        {/* 👤 Facebook Style Profile Sync */}
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 overflow-hidden shadow-inner">
+                                                {(() => {
+                                                    const selectedPage = availablePages.find(p => p.id === selectedPages[0]);
+                                                    return selectedPage?.picture ? (
+                                                        <img src={selectedPage.picture} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xs">KR</div>
+                                                    );
+                                                })()}
+                                            </div>
+                                            <div>
+                                                <p className="text-[14px] font-bold text-gray-900 dark:text-white leading-tight">
+                                                    {availablePages.find(p => p.id === selectedPages[0])?.name || "ជ្រើសរើសផេក"}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="group/caption-preview relative mt-4 px-1 pb-6">
+                                        <textarea
+                                            value={caption}
+                                            onChange={(e) => setCaption(e.target.value)}
+                                            placeholder="សរសេររៀបរាប់មាតិការបស់អ្នកនៅទីនេះ..."
+                                            className="w-full bg-transparent border-none p-0 text-[15px] font-normal text-gray-800 dark:text-gray-200 leading-[1.3333] outline-none focus:ring-0 rounded-lg resize-none min-h-[40px] scrollbar-hide"
+                                            rows={2}
+                                            spellCheck={false}
+                                        />
+                                    </div>
+
+                                    <div
+                                        ref={carouselRef}
+                                        className="flex overflow-x-auto md:grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pb-12 px-1 snap-x scrollbar-hide"
+                                    >
+                                        {/* 📁 Empty State: Click to Upload Placeholder */}
+                                        {!mediaItems.some(item => item.id === 'video-main') && (
+                                            <div
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="min-w-[280px] w-[85%] md:w-full aspect-square bg-gray-50 dark:bg-black/20 border-2 border-dashed border-gray-200 dark:border-white/5 rounded-[2rem] flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 transition-all group/upload-placeholder snap-center flex-shrink-0"
+                                            >
+                                                <div className="w-16 h-16 bg-white dark:bg-white/5 rounded-full flex items-center justify-center shadow-sm group-hover/upload-placeholder:scale-110 transition-transform">
+                                                    <Plus className="text-blue-500" size={32} />
+                                                </div>
+                                                <div className="text-center px-6">
+                                                    <p className="text-[13px] font-bold text-gray-900 dark:text-white mb-1">បន្ថែមមាតិកា</p>
+                                                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">ចុចទីនេះដើម្បីដាក់វីដេអូ</p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {mediaItems.map((item, idx) => (
+                                            <div
+                                                key={item.id}
+                                                className="min-w-[280px] w-[85%] md:w-full bg-white dark:bg-[#242526] rounded-xl overflow-hidden shadow-md border border-gray-200 dark:border-white/5 flex flex-col snap-center flex-shrink-0 transition-all duration-300 group/card"
+                                            >
+                                                {/* Media Section */}
+                                                <div 
+                                                    className="relative aspect-square bg-black overflow-hidden cursor-pointer"
+                                                    onClick={() => {
+                                                        if (item.id === 'video-main') {
+                                                            fileInputRef.current?.click();
+                                                        } else if (item.isRightSide) {
+                                                            const input = document.createElement('input');
+                                                            input.type = 'file';
+                                                            input.accept = 'image/*';
+                                                            input.onchange = (ev) => {
+                                                                const f = ev.target.files[0];
+                                                                if (f) {
+                                                                    setRightSideImage(f);
+                                                                    setRightSideImagePreview(URL.createObjectURL(f));
+                                                                }
+                                                            };
+                                                            input.click();
+                                                        }
+                                                    }}
+                                                >
+                                                    {item.type === 'video' ? (
+                                                        <video src={item.preview} className="w-full h-full object-cover" autoPlay muted={isPreviewMuted} loop playsInline />
+                                                    ) : (
+                                                        <img src={item.preview} className="w-full h-full object-cover" />
+                                                    )}
+
+                                                    {/* Overlays */}
+                                                    <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/20 transition-all flex items-center justify-center">
+                                                        {(item.id === 'video-main' || item.isRightSide) && (
+                                                            <div className="flex flex-col items-center gap-2 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                                                                <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 text-white shadow-xl">
+                                                                    <Upload size={18} />
+                                                                </div>
+                                                                <p className="text-[9px] font-bold text-white uppercase tracking-widest">ប្តូររូបភាព</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {item.type === 'video' && (
+                                                        <div className="absolute top-3 left-3 z-20">
+                                                            <button 
+                                                                 onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setIsPreviewMuted(!isPreviewMuted);
+                                                                }}
+                                                                className="p-2 bg-black/40 backdrop-blur-sm rounded-lg border border-white/10 text-white hover:bg-black/60 transition-all"
+                                                            >
+                                                                {isPreviewMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Quick Gallery */}
+                                                    {galleryOptions.length > 0 && (item.id === 'video-main' || item.isRightSide) && (
+                                                        <div className="absolute inset-x-0 bottom-0 p-3 bg-black/80 translate-y-full group-hover/card:translate-y-0 transition-transform flex flex-col gap-2 z-30">
+                                                            <div className="flex justify-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                                                                {galleryOptions.map((frame, fIdx) => (
+                                                                    <div
+                                                                        key={fIdx}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            if (item.id === 'video-main') {
+                                                                                setThumbnailPreview(frame);
+                                                                                setThumbnail(dataURLtoFile(frame, `thumb-${fIdx}.jpg`));
+                                                                            } else {
+                                                                                setRightSideImagePreview(frame);
+                                                                                setRightSideImage(dataURLtoFile(frame, `card2-${fIdx}.jpg`));
+                                                                            }
+                                                                        }}
+                                                                        className={`w-8 h-8 rounded-md overflow-hidden border-2 flex-shrink-0 ${(item.id === 'video-main' ? thumbnailPreview : rightSideImagePreview) === frame ? 'border-blue-500' : 'border-white/20'}`}
+                                                                    >
+                                                                        <img src={frame} className="w-full h-full object-cover" />
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Facebook Style Bottom Bar */}
+                                                <div className="px-3 py-3 bg-[#f0f2f5] dark:bg-[#242526] border-t border-gray-200 dark:border-white/5 flex items-center gap-2 relative">
+                                                    <div className="flex-1 min-w-0">
+                                                        <textarea
+                                                            value={carouselCtaText}
+                                                            onChange={(e) => setCarouselCtaText(e.target.value)}
+                                                            className="w-full bg-transparent border-none p-0 text-[12px] font-bold text-gray-900 dark:text-gray-100 leading-tight outline-none focus:ring-0 rounded resize-none overflow-hidden scrollbar-hide block"
+                                                            rows={2}
+                                                            spellCheck={false}
+                                                        />
+                                                    </div>
+
+                                                    <div className="flex-shrink-0 relative group/cta-select transition-all">
+                                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-[#3a3b3c] rounded-md border border-gray-300 dark:border-white/10 shadow-sm">
+                                                            <span className="text-[11px] font-bold text-gray-900 dark:text-white">
+                                                                {cta === 'FOLLOW' ? 'តាមដាន' :
+                                                                 cta === 'LEARN_MORE' ? 'ស្វែងយល់បន្ថែម' :
+                                                                 cta === 'SEND_MESSAGE' ? 'ផ្ញើសារ' :
+                                                                 cta === 'SIGN_UP' ? 'ចុះឈ្មោះ' :
+                                                                 cta === 'BOOK_NOW' ? 'កក់ទុក' :
+                                                                 cta === 'SHOP_NOW' ? 'ទិញឥឡូវនេះ' : 'តាមដាន'}
+                                                            </span>
+                                                            <ChevronDown size={12} className="text-gray-500" />
+                                                        </div>
+                                                        <select
+                                                            value={cta}
+                                                            onChange={(e) => setCta(e.target.value)}
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                        >
+                                                            <option value="FOLLOW">តាមដាន</option>
+                                                            <option value="LEARN_MORE">ស្វែងយល់បន្ថែម</option>
+                                                            <option value="SEND_MESSAGE">ផ្ញើសារ</option>
+                                                            <option value="SIGN_UP">ចុះឈ្មោះ</option>
+                                                            <option value="BOOK_NOW">កក់ទុក</option>
+                                                            <option value="SHOP_NOW">ទិញឥឡូវនេះ</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* Final Destination Card (Facebook Style) */}
+                                        <div
+                                            onClick={() => window.open(targetLink, '_blank')}
+                                            className="min-w-[280px] w-[85%] md:w-full aspect-square bg-white dark:bg-[#242526] rounded-xl shadow-md flex flex-col items-center justify-center text-center p-8 border border-gray-200 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-[#2a2d31] transition-all duration-300 group snap-center flex-shrink-0"
+                                        >
+                                            <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-xl mb-6 overflow-hidden flex items-center justify-center border border-gray-200 dark:border-white/5 group-hover:scale-105 transition-transform">
+                                                {(() => {
+                                                    const selectedPage = availablePages.find(p => p.id === selectedPages[0]);
+                                                    return selectedPage?.picture ? (
+                                                        <img src={selectedPage.picture} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <Share2 className="text-gray-400" size={32} />
+                                                    );
+                                                })()}
+                                            </div>
+                                            <h4 className="text-sm font-bold text-gray-900 dark:text-white/90 mb-1">មើលច្រើនទៀតនៅ</h4>
+                                            <p className="text-gray-500 text-[11px] font-medium uppercase tracking-wider mb-5">FACEBOOK.COM</p>
+                                            <div className="px-5 py-2 bg-gray-100 dark:bg-white/10 rounded-md text-[11px] font-bold text-gray-900 dark:text-white/60 border border-gray-300 dark:border-white/10">
+                                                Go to Page
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight uppercase">Neural MMO</h3>
-                            </div>
-                            <div className="space-y-4">
-                                {[
-                                    { id: 'safeMode', label: 'Hash Randomizer', sub: 'Bypass MD5 filtering' },
-                                    { id: 'pitchShift', label: 'Neural Pitch', sub: 'Modify audio signature' },
-                                    { id: 'flip', label: 'Spatial Flip', sub: 'Mirror visual data' }
-                                ].map(opt => (
-                                    <label key={opt.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl cursor-pointer hover:border-purple-500/20 transition-all group">
-                                        <div>
-                                            <p className="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-tight">{opt.label}</p>
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{opt.sub}</p>
-                                        </div>
-                                        <div className={`w-12 h-6 rounded-full transition-all relative ${aiOptions[opt.id] ? 'bg-purple-600' : 'bg-gray-200 dark:bg-white/10'}`}>
-                                            <input type="checkbox" checked={aiOptions[opt.id]} onChange={(e) => setAiOptions(p => ({...p, [opt.id]: e.target.checked}))} className="hidden" />
-                                            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${aiOptions[opt.id] ? 'left-7' : 'left-1'}`} />
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
+                            )}
 
-                        {/* List Preview */}
-                        {postFormat === 'carousel' && (
-                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-10 shadow-2xl shadow-black/5">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-6 px-1">Structure Preview</label>
-                                <div className="space-y-3">
-                                    {mediaItems.length === 0 ? (
-                                        <div className="h-40 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-[2rem] flex items-center justify-center text-[10px] font-black uppercase text-gray-300">Empty Stack</div>
-                                    ) : (
-                                        <MotionReorderGroup axis="y" values={mediaItems} onReorder={setMediaItems} className="space-y-3">
-                                            {mediaItems.map((item, idx) => (
-                                                <MotionReorderItem key={item.id} value={item}>
-                                                    <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl cursor-grab active:cursor-grabbing">
-                                                        <div className="w-12 h-12 bg-white dark:bg-gray-900 rounded-xl overflow-hidden shadow-sm">
-                                                            <img src={item.preview} className="w-full h-full object-cover" />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <p className="text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-tight">Card {idx + 1}</p>
-                                                            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[120px]">{item.type === 'video' ? 'Identity Video' : 'Page Profile'}</p>
-                                                        </div>
-                                                        <GripVertical size={14} className="text-gray-300" />
-                                                    </div>
-                                                </MotionReorderItem>
+                            {/* 📝 Standalone Caption (Only show if NOT in Carousel mode) */}
+                            {postFormat !== 'carousel' && (
+                                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-3xl p-6 md:p-10 shadow-xl">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4 px-1">ព័ត៌មានសម្រាប់បង្ហោះ</label>
+                                    <textarea
+                                        value={caption}
+                                        onChange={(e) => setCaption(e.target.value)}
+                                        placeholder="សរសេរចំណងជើង ឬការពិពណ៌នា...?"
+                                        className="w-full h-40 bg-gray-100/50 dark:bg-white/5 rounded-3xl p-8 outline-none transition-all font-bold text-gray-900 dark:text-white resize-none text-sm placeholder:text-gray-400 dark:placeholder:text-gray-600"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-3xl p-6 md:p-10 shadow-xl">
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white mb-6">ឧបករណ៍ជំនួយ</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                                    {[
+                                        { id: 'safeMode', label: 'Safe Mode', color: 'blue' },
+                                        { id: 'pitchShift', label: 'Voice Fix', color: 'indigo' },
+                                        { id: 'flip', label: 'Flip Video', color: 'pink' }
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => setAiOptions(prev => ({ ...prev, [opt.id]: !prev[opt.id] }))}
+                                            className={`p-6 rounded-2xl border-2 transition-all font-black uppercase text-[10px] tracking-widest ${aiOptions[opt.id] ? `bg-${opt.color}-500/10 border-${opt.color}-500/20 text-${opt.color}-600` : 'bg-gray-50 dark:bg-black border-transparent text-gray-400'}`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 🚀 Final Actions: Post Now vs Schedule */}
+                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-6 md:p-10 shadow-2xl space-y-8">
+                                <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                                    <div className="flex flex-col gap-4 w-full md:w-auto">
+                                        <label className="text-xs md:text-sm font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest px-1">ជំម្រើសនៃការបង្ហោះ</label>
+                                        <div className="flex bg-gray-100 dark:bg-white/5 p-1.5 rounded-[1.5rem] w-full md:w-fit border border-gray-200 dark:border-white/5">
+                                            {[
+                                                { id: 'now', label: 'ផុសឥឡូវ', icon: Zap },
+                                                { id: 'schedule', label: 'កំណត់ពេលផុស', icon: Calendar }
+                                            ].map(mode => (
+                                                <button
+                                                    key={mode.id}
+                                                    onClick={() => setPublishMode(mode.id)}
+                                                    className={`flex items-center gap-3 px-6 py-3 rounded-2xl text-xs md:text-sm font-black uppercase tracking-widest transition-all ${publishMode === mode.id
+                                                        ? "bg-white dark:bg-gray-800 text-blue-600 shadow-lg border border-gray-100 dark:border-white/10"
+                                                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
+                                                >
+                                                    <mode.icon size={14} />
+                                                    {mode.label}
+                                                </button>
                                             ))}
-                                        </MotionReorderGroup>
-                                    )}
+                                        </div>
+                                    </div>
+
+                                    <AnimatePresence>
+                                        {publishMode === 'schedule' && (
+                                            <motion.div
+                                                initial={{ opacity: 0, x: 20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                exit={{ opacity: 0, x: 20 }}
+                                                className="w-full md:w-72"
+                                            >
+                                                <label className="text-xs md:text-sm font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest block mb-2 px-1">កំណត់ពេលវេលាបង្ហោះ</label>
+                                                <div className="relative group">
+                                                    <input
+                                                        type="datetime-local"
+                                                        value={scheduleTime}
+                                                        onChange={(e) => setScheduleTime(e.target.value)}
+                                                        className="w-full bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl px-5 py-4 text-sm md:text-base font-bold outline-none focus:border-blue-500 transition-all group-hover:border-gray-200 dark:group-hover:border-white/10"
+                                                    />
+                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-blue-500 transition-colors">
+                                                        <Clock size={16} />
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    <div className="w-full md:w-auto">
+                                        <Button
+                                            onClick={handleSubmit}
+                                            isLoading={isSubmitting}
+                                            className={`w-full md:w-auto md:px-20 h-16 md:h-20 rounded-[2rem] text-sm md:text-base font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl ${publishMode === 'schedule'
+                                                    ? "bg-indigo-600 text-white shadow-indigo-500/20"
+                                                    : "bg-blue-600 text-white shadow-blue-500/20"
+                                                }`}
+                                        >
+                                            {publishMode === 'schedule' ? "រក្សាទុកការកំណត់ពេល" : "បង្ហោះឥឡូវនេះ"}
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Fixed Footer Actions */}
-                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-7xl px-8 py-6 bg-white/80 dark:bg-gray-900/80 backdrop-blur-3xl border border-gray-100 dark:border-white/5 rounded-[3rem] shadow-2xl z-50 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="flex flex-col md:flex-row items-center gap-8 w-full md:w-auto">
-                        <div className="w-full md:w-64">
-                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">Chronological Slot</label>
-                            <input type="datetime-local" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} className="w-full bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:border-blue-500 transition-all" />
-                        </div>
-                        {selectedPages.length > 1 && (
-                            <div className="w-full md:w-48">
-                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">Protocol Delay</label>
-                                <select value={staggerDelay} onChange={(e) => setStaggerDelay(Number(e.target.value))} className="w-full bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-xl px-4 py-2.5 text-xs font-bold outline-none">
-                                    <option value={0}>None</option>
-                                    <option value={5}>5m Delay</option>
-                                    <option value={15}>15m Delay</option>
-                                    <option value={30}>30m Delay</option>
-                                </select>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex gap-4 w-full md:w-auto">
-                        <Button
-                            onClick={handleSubmit}
-                            isLoading={isSubmitting}
-                            className={`flex-1 md:px-12 h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 ${scheduleTime ? 'bg-indigo-600 shadow-indigo-500/20' : 'bg-blue-600 shadow-blue-500/20'}`}
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="queue"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                            className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-3xl p-6 md:p-10 shadow-xl"
                         >
-                            {scheduleTime ? <Clock size={16} /> : <Check size={16} />}
-                            {scheduleTime ? "Queue Strategy" : "Execute Protocol"}
-                        </Button>
-                    </div>
-                </div>
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-8 tracking-tighter uppercase">បញ្ជីកំពុងដំណើរការ</h2>
+                            {queue.length === 0 ? (
+                                <div className="py-20 text-center text-gray-400 font-bold uppercase tracking-widest text-[10px]">No active protocols in terminal.</div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {queue.map(post => (
+                                        <div key={post.id} className="flex items-center justify-between p-6 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-2xl">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-600"><Clock size={20} /></div>
+                                                <div>
+                                                    <p className="text-xs font-black text-gray-900 dark:text-white uppercase">{new Date(post.scheduledAt).toLocaleString()}</p>
+                                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">ស្ថានភាព: កំពុងដំណើរការ</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => cancelScheduledPost(post.id)}
+                                                className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all"
+                                            >
+                                                <Trash2 size={16} />
+                                                <span className="text-[10px] font-black uppercase">លុបចោល</span>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
+
+            {/* 🎬 Full Screen Video Preview Modal */}
+            <AnimatePresence>
+                {previewVideoModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
+                        onClick={() => setPreviewVideoModal(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="relative max-w-5xl max-h-[90vh] w-full bg-black rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <video
+                                src={previewVideoModal}
+                                controls
+                                autoPlay
+                                playsInline
+                                preload="auto"
+                                className="w-full h-full max-h-[90vh] object-contain"
+                            />
+                            <button
+                                onClick={() => setPreviewVideoModal(null)}
+                                className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full text-white transition-all z-10"
+                            >
+                                <X size={20} />
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Hidden Input for Manual Uploads */}
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileChange}
+                accept="video/*,image/*"
+                multiple
+            />
         </DashboardLayout>
     );
 }

@@ -56,15 +56,15 @@ const ScriptWriter = () => {
                         <Sparkles className="w-8 h-8 text-teal-400" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">AI Script Writer</h1>
-                        <p className="text-gray-600 dark:text-gray-400">Generate viral video scripts in Khmer instantly.</p>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Write Text</h1>
+                        <p className="text-gray-600 dark:text-gray-400">Write viral video scripts instantly.</p>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Input Section */}
                     <div className="bg-[#1e1e1e] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl h-fit">
-                        <h2 className="text-lg font-semibold text-white mb-4">Topic / Idea</h2>
+                        <h2 className="text-lg font-semibold text-white mb-4">What to write?</h2>
                         <textarea
                             className="w-full h-40 bg-black/50 border border-white/10 rounded-xl p-4 text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50 resize-none"
                             placeholder="E.g., How to make money online for students..."
@@ -84,12 +84,12 @@ const ScriptWriter = () => {
                             {loading ? (
                                 <>
                                     <Loader className="w-5 h-5 animate-spin" />
-                                    <span className="text-white">Writing Magic...</span>
+                                    <span className="text-white">Writing...</span>
                                 </>
                             ) : (
                                 <>
                                     <Sparkles className="w-5 h-5" />
-                                    <span className="text-white">Generate Script</span>
+                                    <span className="text-white">Start Now</span>
                                 </>
                             )}
                         </button>

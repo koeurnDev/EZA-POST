@@ -22,8 +22,14 @@ export const fetchCsrfToken = async () => {
   }
 };
 
-// ✅ Axios Interceptor to attach CSRF Token
+// ✅ Axios Interceptor to attach CSRF Token and Authorization Header
 axios.interceptors.request.use(async (config) => {
+  // Attach Authorization token if available
+  const token = localStorage.getItem("token") || localStorage.getItem("eza_post_token");
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+
   // Only attach for state-changing methods
   if (['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase())) {
     if (!csrfToken) await fetchCsrfToken();

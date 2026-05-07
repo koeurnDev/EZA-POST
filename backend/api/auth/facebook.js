@@ -175,10 +175,12 @@ router.get("/callback", async (req, res) => {
                 where: { id: userId },
                 data: {
                     facebookId: fbUser.id,
-                    facebookAccessToken: access_token,
+                    facebookAccessToken: encrypt(access_token), // 🔒 Encrypted!
                     facebookTokenExpiresAt: expiresAt,
                     facebookName: fbUser.name,
-                    connectedPages: myPages // Storing raw JSON as backup
+                    // Store pages without access_tokens as a backup, 
+                    // real tokens are in FacebookPage table
+                    connectedPages: myPages.map(p => ({ ...p, access_token: undefined })) 
                 }
             });
 
