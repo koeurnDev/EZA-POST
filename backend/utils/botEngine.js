@@ -194,7 +194,7 @@ const botEngine = {
      */
     processPage: async (page, rules) => {
         try {
-            // Fetch recent posts
+            // 1️⃣ Fetch recent posts (Last 5)
             const res = await axios.get(`${fb.graph}/${page.id}/feed`, {
                 params: {
                     access_token: page.access_token,
@@ -203,7 +203,43 @@ const botEngine = {
                 },
             });
 
-            const posts = res.data.data || [];
+            let posts = res.data.data || [];
+
+            // 2️⃣ Fetch manually registered monitored posts
+            const monitoredPosts = await prisma.botMonitoredPost.findMany({
+                where: { pageId: page.id, enabled: true }
+            });
+
+            for (const mPost of monitoredPosts) {
+                // Skip if already in the last 5 posts to avoid double processing
+                if (!posts.find(p => p.id === mPost.facebookPostId)) {
+                    try {
+                        const mRes = await axios.get(`${fb.graph}/${mPost.facebookPostId}`, {
+                            params: {
+                                access_token: page.access_token,
+                                fields: "id,message,comments{id,message,from,created_time}",
+                            }
+                        });
+                        if (mRes.data) {
+                            posts.push(mRes.data);
+                            // Update last checked time
+                            await prisma.botMonitoredPost.update({
+                                where: { id: mPost.id },
+                                data: { lastChecked: new Date() }
+                            });
+                        }
+                    } catch (e) {
+                        console.error(`      ⚠️ Failed to fetch monitored post ${mPost.facebookPostId}:`, e.message);
+                        // If post is not found (deleted), maybe disable it?
+                        if (e.response?.status === 404 || e.response?.status === 400) {
+                            await prisma.botMonitoredPost.update({
+                                where: { id: mPost.id },
+                                data: { enabled: false }
+                            });
+                        }
+                    }
+                }
+            }
 
             for (const post of posts) {
                 if (!post.comments || !post.comments.data) continue;

@@ -117,20 +117,20 @@ export default function ScheduledPosts() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-7xl mx-auto px-4 py-4 md:py-8">
+            <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
                 {/* Header Section */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 md:mb-12 gap-6">
                     <MotionDiv 
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                     >
-                        <h1 className="text-4xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-                            <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-xl shadow-blue-500/30">
-                                <Clock size={28} />
+                        <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white flex items-center gap-3">
+                            <div className="p-2 md:p-2.5 bg-blue-600 text-white rounded-xl md:rounded-2xl shadow-xl shadow-blue-500/30">
+                                <Clock size={24} md:size={28} />
                             </div>
                             Queue
                         </h1>
-                        <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Manage and optimize your upcoming content schedule.</p>
+                        <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-2 font-medium">Manage and optimize your upcoming content schedule.</p>
                     </MotionDiv>
 
                     <MotionDiv 
@@ -138,25 +138,25 @@ export default function ScheduledPosts() {
                         animate={{ opacity: 1, x: 0 }}
                         className="flex items-center gap-3"
                     >
-                        <div className="bg-gray-100 dark:bg-gray-800 p-1.5 rounded-2xl border border-gray-200 dark:border-gray-700 hidden md:flex">
+                        <div className="bg-gray-100 dark:bg-gray-800 p-1 rounded-xl md:rounded-2xl border border-gray-200 dark:border-gray-700 hidden md:flex">
                             <button 
                                 onClick={() => setViewMode("grid")}
-                                className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm' : 'text-gray-400'}`}
+                                className={`p-2 rounded-lg md:rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm' : 'text-gray-400'}`}
                             >
                                 <LayoutGrid size={18} />
                             </button>
                             <button 
                                 onClick={() => setViewMode("list")}
-                                className={`p-2 rounded-xl transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm' : 'text-gray-400'}`}
+                                className={`p-2 rounded-lg md:rounded-xl transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm' : 'text-gray-400'}`}
                             >
                                 <ListIcon size={18} />
                             </button>
                         </div>
                         <Button
                             onClick={() => window.location.href = "/dashboard"}
-                            className="rounded-2xl px-6 shadow-xl"
+                            className="w-full md:w-auto rounded-xl md:rounded-2xl px-6 h-12 md:h-14 shadow-xl text-xs md:text-sm font-black uppercase tracking-widest"
                         >
-                            <Plus size={20} /> Create New
+                            <Plus size={18} md:size={20} className="mr-2" /> បង្កើតថ្មី
                         </Button>
                     </MotionDiv>
                 </div>
@@ -171,22 +171,22 @@ export default function ScheduledPosts() {
                         onAction={() => window.location.href = "/dashboard"}
                     />
                 ) : (
-                    <div className="space-y-12">
+                    <div className="space-y-10 md:space-y-12">
                         {["today", "tomorrow", "later"].map((groupKey) => {
                             const posts = groupedPosts[groupKey];
                             if (posts.length === 0) return null;
 
-                            const title = groupKey === "today" ? "Scheduled Today" : groupKey === "tomorrow" ? "Coming Tomorrow" : "Later this week";
+                            const title = groupKey === "today" ? "ផុសថ្ងៃនេះ" : groupKey === "tomorrow" ? "ផុសថ្ងៃស្អែក" : "ផុសថ្ងៃបន្ទាប់";
 
                             return (
                                 <div key={groupKey}>
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{title}</h3>
+                                    <div className="flex items-center gap-4 mb-5 md:mb-6 px-1">
+                                        <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{title}</h3>
                                         <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800" />
-                                        <span className="text-xs font-black bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full">{posts.length}</span>
+                                        <span className="text-[10px] md:text-xs font-black bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-full">{posts.length}</span>
                                     </div>
 
-                                    <div className={`flex overflow-x-auto md:grid ${viewMode === 'grid' ? 'md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'} gap-6 pb-8 snap-x scrollbar-hide`}>
+                                    <div className={`flex overflow-x-auto md:grid ${viewMode === 'grid' ? 'md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'} gap-4 md:gap-6 pb-6 md:pb-8 snap-x scrollbar-hide`}>
                                         <MotionAnimatePresence>
                                             {posts.map((q, idx) => (
                                                 <MotionDiv
@@ -196,10 +196,10 @@ export default function ScheduledPosts() {
                                                     animate={{ opacity: 1, y: 0 }}
                                                     exit={{ opacity: 0, scale: 0.9 }}
                                                     transition={{ delay: idx * 0.05 }}
-                                                    className={`min-w-[280px] w-[85%] md:w-full snap-center flex-shrink-0 group relative bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 ${viewMode === 'list' ? 'flex items-center gap-6 p-4' : 'flex flex-col overflow-hidden'}`}
+                                                    className={`min-w-[260px] w-[80%] md:w-full snap-center flex-shrink-0 group relative bg-white dark:bg-gray-800 rounded-2xl md:rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-500 ${viewMode === 'list' ? 'flex items-center gap-4 md:gap-6 p-3 md:p-4' : 'flex flex-col overflow-hidden'}`}
                                                 >
                                                     {/* Media Preview */}
-                                                    <div className={`${viewMode === 'list' ? 'w-32 h-20 rounded-2xl' : 'w-full h-48'} bg-gray-50 dark:bg-gray-900 relative overflow-hidden flex-shrink-0`}>
+                                                    <div className={`${viewMode === 'list' ? 'w-24 h-16 md:w-32 md:h-20 rounded-xl md:rounded-2xl' : 'w-full h-40 md:h-48'} bg-gray-50 dark:bg-gray-900 relative overflow-hidden flex-shrink-0`}>
                                                         {q.thumbnailUrl ? (
                                                             <img
                                                                 src={`${import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, "")}${q.thumbnailUrl}`}
@@ -208,56 +208,51 @@ export default function ScheduledPosts() {
                                                             />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center">
-                                                                <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-400">
-                                                                    <Calendar size={24} />
+                                                                <div className="p-2.5 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-400">
+                                                                    <Calendar size={20} />
                                                                 </div>
                                                             </div>
                                                         )}
                                                         
                                                         {/* Status Overlay */}
-                                                        <div className="absolute top-3 left-3">
-                                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter backdrop-blur-xl shadow-lg border border-white/20 ${q.status === 'scheduled' ? 'bg-blue-600/90 text-white' : 'bg-amber-500/90 text-white'}`}>
+                                                        <div className="absolute top-2 md:top-3 left-2 md:left-3">
+                                                            <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[8px] md:text-[10px] font-black uppercase tracking-tighter backdrop-blur-xl shadow-lg border border-white/20 ${q.status === 'scheduled' ? 'bg-blue-600/90 text-white' : 'bg-amber-500/90 text-white'}`}>
                                                                 {q.status}
                                                             </span>
                                                         </div>
                                                     </div>
 
                                                     {/* Content Info */}
-                                                    <div className={`p-5 flex-1 flex flex-col ${viewMode === 'list' ? 'p-0' : ''}`}>
-                                                        <h4 className="font-bold text-gray-900 dark:text-white line-clamp-2 mb-4 leading-snug">
+                                                    <div className={`p-4 md:p-5 flex-1 flex flex-col ${viewMode === 'list' ? 'p-0' : ''}`}>
+                                                        <h4 className="font-bold text-sm md:text-base text-gray-900 dark:text-white line-clamp-2 mb-3 md:mb-4 leading-snug">
                                                             {q.caption || "Untitled Post"}
                                                         </h4>
 
                                                         <div className="flex items-center justify-between mt-auto">
-                                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-700">
-                                                                <Clock size={14} className="text-blue-500" />
-                                                                <span className="text-xs font-black text-gray-600 dark:text-gray-300">
+                                                            <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded-lg md:rounded-xl border border-gray-100 dark:border-gray-700">
+                                                                <Clock size={12} md:size={14} className="text-blue-500" />
+                                                                <span className="text-[10px] md:text-xs font-black text-gray-600 dark:text-gray-300">
                                                                     {new Date(q.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                 </span>
                                                             </div>
 
-                                                            <div className="flex items-center -space-x-2">
+                                                            <div className="flex items-center -space-x-1.5 md:-space-x-2">
                                                                 {q.accounts?.slice(0, 3).map((acc, i) => (
-                                                                    <div key={i} className="h-7 w-7 rounded-full bg-blue-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-[10px] font-black text-white">
+                                                                    <div key={i} className="h-6 w-6 md:h-7 md:w-7 rounded-full bg-blue-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-[8px] md:text-[10px] font-black text-white">
                                                                         {acc.name?.[0]}
                                                                     </div>
                                                                 ))}
-                                                                {q.accounts?.length > 3 && (
-                                                                    <div className="h-7 w-7 rounded-full bg-gray-200 dark:bg-gray-700 border-2 border-white dark:border-gray-800 flex items-center justify-center text-[10px] font-black text-gray-500">
-                                                                        +{q.accounts.length - 3}
-                                                                    </div>
-                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
 
                                                     {/* Actions Overlay / Row */}
-                                                    <div className={`${viewMode === 'list' ? 'flex gap-2' : 'absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0'}`}>
+                                                    <div className={`${viewMode === 'list' ? 'flex gap-2 pr-1' : 'absolute top-2 md:top-3 right-2 md:right-3 opacity-100 md:opacity-0 group-hover:opacity-100 transition-all translate-y-0 md:translate-y-2 group-hover:translate-y-0'}`}>
                                                         <button 
                                                             onClick={() => cancelScheduledPost(q.id)}
-                                                            className="p-2.5 bg-white/95 dark:bg-gray-800/95 text-red-500 rounded-full shadow-xl border border-gray-100 dark:border-gray-700 hover:bg-red-500 hover:text-white transition-all"
+                                                            className="p-2 md:p-2.5 bg-white/95 dark:bg-gray-800/95 text-red-500 rounded-full shadow-lg border border-gray-100 dark:border-gray-700 hover:bg-red-500 hover:text-white transition-all"
                                                         >
-                                                            <Trash2 size={18} />
+                                                            <Trash2 size={16} md:size={18} />
                                                         </button>
                                                     </div>
                                                 </MotionDiv>

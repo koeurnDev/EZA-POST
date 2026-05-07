@@ -46,7 +46,7 @@ export default function Login() {
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-lg mt-12 mb-8"
+        className="relative z-10 w-full max-w-lg mt-8 md:mt-12 mb-8"
       >
         {/* Floating Icon Decoration - Hidden on small mobile */}
         <div className="hidden sm:block absolute -top-12 -left-12 w-24 h-24 bg-blue-600/10 rounded-3xl blur-2xl animate-bounce duration-[3000ms]" />
@@ -57,18 +57,18 @@ export default function Login() {
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50" />
           
           {/* Brand Identity */}
-          <div className="flex flex-col items-center mb-10 md:mb-12">
+          <div className="flex flex-col items-center mb-8 md:mb-12">
             <MotionDiv 
               whileHover={{ rotate: 12, scale: 1.1 }}
-              className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/30 mb-6"
+              className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/30 mb-4 md:mb-6"
             >
-              <Zap className="text-white fill-white" size={28} />
+              <Zap className="text-white fill-white" size={24} md:size={28} />
             </MotionDiv>
             <div className="text-center">
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">ចូលគណនី EZA_POST</h1>
+              <h1 className="text-xl md:text-3xl font-bold tracking-tight mb-2">ចូលគណនី EZA_POST</h1>
               <div className="flex items-center justify-center gap-2">
                 <Sparkles size={12} className="text-blue-500" />
-                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-blue-500 opacity-80">សូមស្វាគមន៍មកកាន់ប្រព័ន្ធ</span>
+                <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-blue-500 opacity-80">សូមស្វាគមន៍មកកាន់ប្រព័ន្ធ</span>
               </div>
             </div>
           </div>
@@ -82,8 +82,8 @@ export default function Login() {
           </div>
 
           {/* Footer Actions */}
-          <div className="mt-12 pt-8 border-t border-white/5 text-center">
-            <p className="text-sm text-gray-500 font-medium">
+          <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-white/5 text-center">
+            <p className="text-xs md:text-sm text-gray-500 font-medium">
               មិនទាន់មានគណនីមែនទេ?{" "}
               <Link
                 to="/register"
@@ -100,22 +100,22 @@ export default function Login() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1 }}
-          className="mt-8 flex items-center justify-center gap-4 text-gray-600"
+          className="mt-6 md:mt-8 flex flex-wrap items-center justify-center gap-3 md:gap-4 text-gray-600"
         >
           <div className="flex items-center gap-2">
-            <ShieldCheck size={14} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">End-to-End Encryption</span>
+            <ShieldCheck size={12} md:size={14} />
+            <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-center">End-to-End Encryption</span>
           </div>
-          <div className="w-1 h-1 bg-gray-800 rounded-full" />
+          <div className="hidden md:block w-1 h-1 bg-gray-800 rounded-full" />
           <div className="flex items-center gap-2">
-            <Lock size={14} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Secure Core v2.6</span>
+            <Lock size={12} md:size={14} />
+            <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-center">Secure Core v2.6</span>
           </div>
         </MotionDiv>
       </MotionDiv>
 
       {/* Decorative Background Text */}
-      <div className="fixed bottom-[-5%] left-[-5%] text-[15rem] font-bold text-white/5 pointer-events-none select-none tracking-tighter italic">
+      <div className="fixed bottom-[-2%] md:bottom-[-5%] left-[-2%] md:left-[-5%] text-[6rem] md:text-[15rem] font-bold text-white/5 pointer-events-none select-none tracking-tighter italic whitespace-nowrap">
         EZA_POST
       </div>
     </div>

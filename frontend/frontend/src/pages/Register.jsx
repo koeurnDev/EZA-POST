@@ -107,20 +107,20 @@ export default function Register() {
       </div>
 
       {/* 📝 Right Side: Registration Portal */}
-      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-8 md:p-20 relative overflow-y-auto bg-[#08080c]">
+      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 md:p-12 lg:p-20 relative overflow-y-auto bg-[#08080c]">
         {/* Ambient Top Glow */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 opacity-50" />
         
-        <div className="w-full max-w-md my-auto relative">
+        <div className="w-full max-w-md my-auto relative py-8 md:py-0">
           {/* Mobile Identity */}
-          <div className="lg:hidden flex justify-center mb-16">
+          <div className="lg:hidden flex justify-center mb-10 md:mb-16">
             <div className="flex flex-col items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/30">
-                <Zap size={28} fill="white" className="text-white" />
+              <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/30">
+                <Zap size={24} md:size={28} fill="white" className="text-white" />
               </div>
               <div className="text-center">
-                <span className="text-2xl font-bold tracking-tight block">EZA_POST</span>
-                <span className="text-[10px] uppercase tracking-widest text-blue-500 font-black opacity-80">Social Manager</span>
+                <span className="text-xl md:text-2xl font-bold tracking-tight block">EZA_POST</span>
+                <span className="text-[8px] md:text-[10px] uppercase tracking-widest text-blue-500 font-black opacity-80">Social Manager</span>
               </div>
             </div>
           </div>
@@ -128,12 +128,12 @@ export default function Register() {
           <MotionDiv 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-12 text-center lg:text-left"
+            className="mb-8 md:mb-12 text-center lg:text-left px-2"
           >
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+            <h2 className="text-2xl md:text-4xl font-bold tracking-tight mb-3 md:mb-4">
               បង្កើតគណនីដោយឥតគិតថ្លៃ
             </h2>
-            <p className="text-gray-400 font-medium">
+            <p className="text-sm md:text-base text-gray-400 font-medium">
               ចាប់ផ្តើមបង្កើនប្រសិទ្ធភាពការងាររបស់អ្នកជាមួយយើងថ្ងៃនេះ។
             </p>
           </MotionDiv>

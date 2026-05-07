@@ -208,4 +208,71 @@ router.put("/settings", requireAuth, async (req, res) => {
   }
 });
 
+// ✅ Get all monitored posts
+router.get("/monitored-posts", requireAuth, async (req, res) => {
+  try {
+    const posts = await prisma.botMonitoredPost.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, posts });
+  } catch (err) {
+    console.error("❌ GET /monitored-posts error:", err.message);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ✅ Add new monitored post from URL
+router.post("/monitored-posts", requireAuth, async (req, res) => {
+  const { url, pageId } = req.body;
+  if (!url || !pageId) return res.status(400).json({ success: false, message: "URL and Page ID are required" });
+
+  try {
+    // Simple FB ID Extraction from URL
+    // Format: .../posts/ID or ...?story_fbid=ID or .../videos/ID
+    const matches = url.match(/(\d{10,20})/g);
+    if (!matches || matches.length === 0) {
+      return res.status(400).json({ success: false, message: "Invalid Facebook URL or ID not found" });
+    }
+    
+    // Usually the last long numeric string is the post ID
+    const facebookPostId = matches[matches.length - 1];
+
+    const monitoredPost = await prisma.botMonitoredPost.upsert({
+      where: {
+        userId_facebookPostId: {
+          userId: req.user.id,
+          facebookPostId: facebookPostId
+        }
+      },
+      update: { enabled: true, pageId },
+      create: {
+        userId: req.user.id,
+        pageId,
+        facebookPostId,
+        enabled: true
+      }
+    });
+
+    res.json({ success: true, post: monitoredPost });
+  } catch (err) {
+    console.error("❌ POST /monitored-posts error:", err.message);
+    res.status(500).json({ success: false, message: "Failed to monitor post" });
+  }
+});
+
+// ✅ Delete monitored post
+router.delete("/monitored-posts/:id", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.botMonitoredPost.deleteMany({
+      where: { id, userId: req.user.id }
+    });
+    res.json({ success: true, message: "Post removed from monitoring" });
+  } catch (err) {
+    console.error("❌ DELETE /monitored-posts error:", err.message);
+    res.status(500).json({ success: false, message: "Failed to remove post" });
+  }
+});
+
 module.exports = router;

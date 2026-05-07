@@ -48,6 +48,13 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
   const [availablePages, setAvailablePages] = useState([]);
   const [pageSettings, setPageSettings] = useState([]);
   const [isLoadingPages, setIsLoadingPages] = useState(false);
+  
+  // ✅ Monitored Posts State
+  const [monitoredPosts, setMonitoredPosts] = useState([]);
+  const [isLoadingMonitored, setIsLoadingMonitored] = useState(false);
+  const [monitoredPostUrl, setMonitoredPostUrl] = useState("");
+  const [monitoredPageId, setMonitoredPageId] = useState("");
+  const [isAddingMonitored, setIsAddingMonitored] = useState(false);
 
   const deferredSearch = useDeferredValue(searchTerm);
 
@@ -79,8 +86,30 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     }
   }, [isDemo]);
 
+  // ✅ Load monitored posts
+  const fetchMonitoredPosts = useCallback(async () => {
+    if (isDemo) {
+        setMonitoredPosts([
+            { id: '1', facebookPostId: '1234567890', pageId: '1000123', enabled: true, createdAt: new Date() }
+        ]);
+        return;
+    }
+    setIsLoadingMonitored(true);
+    try {
+      const res = await api.get("/bot/monitored-posts");
+      if (res.data.success) {
+        setMonitoredPosts(res.data.posts || []);
+      }
+    } catch (err) {
+      console.warn("⚠️ Monitored fetch failed:", err);
+    } finally {
+      setIsLoadingMonitored(false);
+    }
+  }, [isDemo]);
+
   useEffect(() => {
     fetchRules();
+    fetchMonitoredPosts();
     // Also fetch available pages to show in selection
     const fetchPages = async () => {
       setIsLoadingPages(true);
@@ -88,6 +117,9 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
         const res = await api.get("/user/pages");
         if (res.data.success) {
           setAvailablePages(res.data.accounts || []);
+          if (res.data.accounts?.length > 0) {
+            setMonitoredPageId(res.data.accounts[0].id);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch pages", err);
@@ -96,7 +128,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       }
     };
     fetchPages();
-  }, [fetchRules]);
+  }, [fetchRules, fetchMonitoredPosts]);
 
   // ✅ Notification helper
   const showNotify = useCallback((msg, type = "success") => {
@@ -353,6 +385,50 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     setFormData((prev) => ({ ...prev, attachmentUrl: null }));
   };
 
+  // ✅ Add Monitored Post
+  const handleAddMonitored = async () => {
+    if (!monitoredPostUrl.trim() || !monitoredPageId) {
+        return showNotify("សូមបញ្ចូល Link និងរើស Page", "error");
+    }
+
+    setIsAddingMonitored(true);
+    try {
+        if (isDemo) {
+            setMonitoredPosts(prev => [{ id: Date.now().toString(), facebookPostId: 'DemoID', pageId: monitoredPageId, enabled: true, createdAt: new Date() }, ...prev]);
+            setMonitoredPostUrl("");
+            showNotify("បានបន្ថែមផុសសម្រាប់ Monitor (Demo)");
+        } else {
+            const res = await api.post("/bot/monitored-posts", { url: monitoredPostUrl, pageId: monitoredPageId });
+            if (res.data.success) {
+                showNotify("បានបន្ថែមផុសសម្រាប់ Monitor រួចរាល់");
+                setMonitoredPostUrl("");
+                fetchMonitoredPosts();
+            }
+        }
+    } catch (err) {
+        showNotify(err.response?.data?.message || "បរាជ័យក្នុងការបន្ថែមផុស", "error");
+    } finally {
+        setIsAddingMonitored(false);
+    }
+  };
+
+  // ✅ Delete Monitored Post
+  const handleDeleteMonitored = async (id) => {
+    if (!window.confirm("តើបងចង់ឈប់ Monitor ផុសនេះមែនទេ?")) return;
+    try {
+        if (isDemo) {
+            setMonitoredPosts(prev => prev.filter(p => p.id !== id));
+            showNotify("បានលុបផុសចេញពី Monitor (Demo)");
+        } else {
+            await api.delete(`/bot/monitored-posts/${id}`);
+            showNotify("បានលុបផុសចេញពី Monitor រួចរាល់");
+            fetchMonitoredPosts();
+        }
+    } catch (err) {
+        showNotify("មិនអាចលុបបានទេ", "error");
+    }
+  };
+
   // ============================================================
   // 🧱 Render UI
   // ============================================================
@@ -394,30 +470,32 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       </div>
 
       {/* 1️⃣ Top Panel: Bot Status */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-4">
-          <div className={`p-3 rounded-full ${isEnabled ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"}`}>
-            <Power size={24} />
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className={`p-2.5 sm:p-3 rounded-full flex-shrink-0 ${isEnabled ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"}`}>
+            <Power size={20} className="sm:w-6 sm:h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
               {isEnabled ? "Bot កំពុងដំណើរការ" : "Bot ត្រូវបានផ្អាក"}
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isEnabled ? "Bot កំពុងជួយឆ្លើយតបខមិនផ្អែកលើច្បាប់ដែលបងបានកំណត់។" : "បើកមុខងារនេះដើម្បីឱ្យ Bot ជួយឆ្លើយតបខមិនលើផុសរបស់បងដោយស្វ័យប្រវត្តិ។"}
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+              {isEnabled ? "Bot កំពុងឆ្លើយតបខមិន។" : "បើកមុខងារនេះដើម្បីឱ្យ Bot ឆ្លើយតប។"}
             </p>
           </div>
         </div>
 
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            className="sr-only peer"
-            checked={isEnabled}
-            onChange={(e) => toggleBot(e.target.checked)}
-          />
-          <div className="w-16 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-green-500"></div>
-        </label>
+        <div className="w-full sm:w-auto flex justify-end">
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={isEnabled}
+              onChange={(e) => toggleBot(e.target.checked)}
+            />
+            <div className="w-14 h-7 sm:w-16 sm:h-8 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 sm:after:h-6 sm:after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-green-500"></div>
+          </label>
+        </div>
       </div>
 
       {/* 1.5️⃣ Middle Panel: Page-Specific Status */}
@@ -668,19 +746,19 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
             <button
               onClick={resetForm}
-              className="px-6 py-2.5 text-gray-600 dark:text-gray-400 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
+              className="w-full sm:w-auto px-6 py-3 sm:py-2.5 text-gray-600 dark:text-gray-400 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors border sm:border-0 border-gray-200 dark:border-gray-700"
             >
               បោះបង់
             </button>
             <button
               onClick={saveRule}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center gap-2"
+              className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
             >
               <Save size={18} />
-              {editingId ? "រក្សាទុកការកែប្រែ" : "បង្កើតច្បាប់ថ្មី"}
+              {editingId ? "រក្សាទុក" : "បង្កើតថ្មី"}
             </button>
           </div>
         </div>
@@ -688,26 +766,26 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
 
       {/* 3️⃣ Rule Table */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+        <div className="p-4 md:p-5 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h3 className="font-bold text-gray-900 dark:text-white">បញ្ជីច្បាប់ដែលកំពុងប្រើ (Active Rules)</h3>
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
               placeholder="ស្វែងរកច្បាប់..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          {/* Desktop Table View */}
+          <table className="hidden md:table w-full text-left">
             <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
               <tr>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keyword / Regex</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">សារឆ្លើយតប (Reply Message)</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keyword / Reply</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-center">ស្ថានភាព</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-right">សកម្មភាព</th>
               </tr>
@@ -715,10 +793,10 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan="3" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     <div className="flex flex-col items-center gap-2">
                       <Filter size={32} className="opacity-20" />
-                      <p>{searchTerm ? "មិនមានច្បាប់ដែលត្រូវនឹងការស្វែងរកទេ" : "មិនទាន់មានច្បាប់ឆ្លើយតបនៅឡើយទេ។ បង្កើតមួយនៅខាងលើ!"}</p>
+                      <p>{searchTerm ? "មិនមានច្បាប់ដែលត្រូវនឹងការស្វែងរកទេ" : "មិនទាន់មានច្បាប់ឆ្លើយតបនៅឡើយទេ។"}</p>
                     </div>
                   </td>
                 </tr>
@@ -728,72 +806,40 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                   return (
                     <tr key={ruleId} className={`hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors group ${r.enabled ? "bg-white dark:bg-gray-800" : "bg-gray-50/50 dark:bg-gray-900/20"}`}>
                       <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="font-semibold text-gray-900 dark:text-white">
-                            {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមិន)</span> : r.keyword}
-                          </span>
-                          <div className="flex gap-2">
-                            <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900 dark:text-white">
+                              {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
+                            </span>
+                            <span className="text-[9px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">
                               {r.ruleType || "KEYWORD"}
                             </span>
-                            {r.scope === "SPECIFIC" && (
-                              <span className="text-[10px] uppercase font-bold text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
-                                ផុស៖ {r.postId}
-                              </span>
-                            )}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-start gap-3">
-                          {r.attachmentUrl && (
-                            <img
-                              src={r.attachmentUrl}
-                              alt="រូបភាព"
-                              className="w-10 h-10 rounded-lg object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0"
-                            />
+                          <div className="flex items-start gap-3">
+                            {r.attachmentUrl && (
+                              <img src={r.attachmentUrl} alt="រូបភាព" className="w-10 h-10 rounded-lg object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0" />
+                            )}
+                            <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2 pt-0.5">{r.reply}</p>
+                          </div>
+                          {r.scope === "SPECIFIC" && (
+                            <span className="text-[9px] w-fit uppercase font-black text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded tracking-widest">
+                              ផុសជាក់លាក់៖ {r.postId}
+                            </span>
                           )}
-                          <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2 pt-0.5">
-                            {r.reply}
-                          </p>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleRule(ruleId, r.enabled);
-                          }}
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${r.enabled
-                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                            : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                            }`}
+                          onClick={() => toggleRule(ruleId, r.enabled)}
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${r.enabled ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}
                         >
                           {r.enabled ? "បើក" : "បិទ"}
                         </button>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity relative z-10">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEdit(r);
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors cursor-pointer"
-                            title="កែប្រែ"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteRule(ruleId);
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors cursor-pointer"
-                            title="លុប"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleEdit(r)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                          <button onClick={() => deleteRule(ruleId)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
@@ -802,6 +848,210 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               )}
             </tbody>
           </table>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-700">
+            {filtered.length === 0 ? (
+              <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                <div className="flex flex-col items-center gap-2">
+                  <Filter size={32} className="opacity-20" />
+                  <p className="text-sm">{searchTerm ? "មិនមានច្បាប់ដែលត្រូវនឹងការស្វែងរកទេ" : "មិនទាន់មានច្បាប់ឆ្លើយតបនៅឡើយទេ។"}</p>
+                </div>
+              </div>
+            ) : (
+              filtered.map((r, idx) => {
+                const ruleId = r._id || r.id || `temp-${idx}`;
+                return (
+                  <div key={ruleId} className={`p-5 flex flex-col gap-4 ${r.enabled ? "bg-white dark:bg-gray-800" : "bg-gray-50/50 dark:bg-gray-900/20 opacity-80"}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="font-bold text-gray-900 dark:text-white leading-tight">
+                          {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-[8px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">{r.ruleType || "KEYWORD"}</span>
+                          {r.scope === "SPECIFIC" && <span className="text-[8px] uppercase font-black text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded tracking-widest">ID: {r.postId?.slice(-6)}</span>}
+                        </div>
+                      </div>
+                      <button onClick={() => toggleRule(ruleId, r.enabled)} className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-colors ${r.enabled ? "bg-green-500 text-white shadow-lg shadow-green-500/20" : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}>
+                        {r.enabled ? "On" : "Off"}
+                      </button>
+                    </div>
+                    <div className="flex items-start gap-3 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                      {r.attachmentUrl && <img src={r.attachmentUrl} alt="រូបភាព" className="w-12 h-12 rounded-lg object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-sm" />}
+                      <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed line-clamp-3">{r.reply}</p>
+                    </div>
+                    <div className="flex items-center justify-end gap-3 pt-1">
+                      <button onClick={() => handleEdit(r)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg transition-colors"><Edit2 size={14} /> កែប្រែ</button>
+                      <button onClick={() => deleteRule(ruleId)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={14} /> លុប</button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 4️⃣ Monitored Posts Management Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mt-8">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Plus size={20} className="text-blue-500" />
+            បន្ថែមផុសចាស់ៗឱ្យ Bot ជួយឆ្លើយ (Manual Monitor)
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            ប្រសិនបើបងមានផុសចាស់ៗដែលចង់ឱ្យ Bot ជួយឆ្លើយខមិន សូមដាក់ Link ផុសនោះនៅទីនេះ។
+          </p>
+        </div>
+
+        <div className="p-6">
+          <div className="flex flex-col md:flex-row gap-4 mb-8">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Link ផុសពី Facebook</label>
+              <input
+                type="text"
+                placeholder="បិទភ្ជាប់ Link ផុសនៅទីនេះ... (ឧទាហរណ៍៖ https://fb.com/posts/123...)"
+                value={monitoredPostUrl}
+                onChange={(e) => setMonitoredPostUrl(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+              />
+            </div>
+            <div className="w-full md:w-64">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">រើស Page របស់ផុសនោះ</label>
+              <select
+                value={monitoredPageId}
+                onChange={(e) => setMonitoredPageId(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+              >
+                {availablePages.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleAddMonitored}
+                disabled={isAddingMonitored}
+                className="w-full md:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
+              >
+                {isAddingMonitored ? <Loader size={18} className="animate-spin" /> : <Plus size={18} />}
+                បន្ថែម
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">បញ្ជីផុសដែលកំពុង Monitor ({monitoredPosts.length})</label>
+            {isLoadingMonitored ? (
+                <div className="py-8 text-center animate-pulse text-gray-400 text-sm">កំពុងទាញយក...</div>
+            ) : monitoredPosts.length === 0 ? (
+                <div className="py-12 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-2xl text-center text-gray-400 text-sm">
+                    មិនទាន់មានផុសណាមួយត្រូវបានបន្ថែមសម្រាប់ Monitor នៅឡើយទេ។
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {monitoredPosts.map(post => (
+                        <div key={post.id} className="p-4 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-xl flex items-center justify-between group">
+                            <div className="overflow-hidden">
+                                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">Post ID: {post.facebookPostId}</p>
+                                <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Page ID: {post.pageId}</p>
+                            </div>
+                            <button 
+                                onClick={() => handleDeleteMonitored(post.id)}
+                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                                title="ឈប់ Monitor"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+      </div>
+
+      {/* 4️⃣ Monitored Posts Management Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mt-8">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Plus size={20} className="text-blue-500" />
+            បន្ថែមផុសចាស់ៗឱ្យ Bot ជួយឆ្លើយ (Manual Monitor)
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            ប្រសិនបើបងមានផុសចាស់ៗដែលចង់ឱ្យ Bot ជួយឆ្លើយខមិន សូមដាក់ Link ផុសនោះនៅទីនេះ។
+          </p>
+        </div>
+
+        <div className="p-6">
+          <div className="flex flex-col md:flex-row gap-4 mb-8">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Link ផុសពី Facebook</label>
+              <input
+                type="text"
+                placeholder="បិទភ្ជាប់ Link ផុសនៅទីនេះ... (ឧទាហរណ៍៖ https://fb.com/posts/123...)"
+                value={monitoredPostUrl}
+                onChange={(e) => setMonitoredPostUrl(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+              />
+            </div>
+            <div className="w-full md:w-64">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">រើស Page របស់ផុសនោះ</label>
+              <select
+                value={monitoredPageId}
+                onChange={(e) => setMonitoredPageId(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+              >
+                {availablePages.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleAddMonitored}
+                disabled={isAddingMonitored}
+                className="w-full md:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
+              >
+                {isAddingMonitored ? <Loader size={18} className="animate-spin" /> : <Plus size={18} />}
+                បន្ថែម
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">បញ្ជីផុសដែលកំពុង Monitor ({monitoredPosts.length})</label>
+            {isLoadingMonitored ? (
+                <div className="py-8 text-center animate-pulse text-gray-400 text-sm">កំពុងទាញយក...</div>
+            ) : monitoredPosts.length === 0 ? (
+                <div className="py-12 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-2xl text-center text-gray-400 text-sm">
+                    មិនទាន់មានផុសណាមួយត្រូវបានបន្ថែមសម្រាប់ Monitor នៅឡើយទេ។
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {monitoredPosts.map(post => (
+                        <div key={post.id} className="p-4 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-xl flex items-center justify-between group">
+                            <div className="overflow-hidden">
+                                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">Post ID: {post.facebookPostId}</p>
+                                <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Page ID: {post.pageId}</p>
+                            </div>
+                            <button 
+                                onClick={() => handleDeleteMonitored(post.id)}
+                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                                title="ឈប់ Monitor"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

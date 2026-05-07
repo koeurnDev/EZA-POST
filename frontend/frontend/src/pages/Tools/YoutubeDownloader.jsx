@@ -206,26 +206,26 @@ export default function YoutubeDownloader() {
                 <div className="absolute bottom-[-10%] left-[20%] w-[35%] h-[35%] bg-orange-600/20 rounded-full blur-[120px] opacity-50 animate-blob animation-delay-4000" />
             </div>
 
-            <div className={`relative z-10 p-6 max-w-6xl mx-auto transition-opacity duration-700 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
+            <div className={`relative z-10 p-4 md:p-6 max-w-6xl mx-auto transition-opacity duration-700 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
 
                 {/* Header */}
-                <div className="text-center mb-10 space-y-3">
-                    <div className="inline-flex items-center justify-center p-3 rounded-full bg-red-600 shadow-lg shadow-red-500/30 mb-2 border border-red-400/20">
-                        <Youtube size={32} className="text-white" />
+                <div className="text-center mb-8 md:mb-10 space-y-2 md:space-y-3">
+                    <div className="inline-flex items-center justify-center p-2.5 md:p-3 rounded-full bg-red-600 shadow-lg shadow-red-500/30 mb-1 md:2 border border-red-400/20">
+                        <Youtube size={24} md:size={32} className="text-white" />
                     </div>
-                    <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+                    <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
                         YouTube <span className="bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent">Downloader</span>
                     </h1>
-                    <p className="text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">
+                    <p className="text-sm md:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto px-4">
                         Download single videos, playlists, or channels in 4K & HD quality.
                     </p>
                 </div>
 
                 {/* 🔍 Input Section */}
-                <div className="max-w-2xl mx-auto space-y-6 mb-12">
+                <div className="max-w-2xl mx-auto space-y-4 md:space-y-6 mb-8 md:mb-12">
                     <div className="relative flex items-center bg-white/60 dark:bg-black/40 backdrop-blur-xl rounded-xl border border-white/20 dark:border-white/10 shadow-xl shadow-red-500/5 hover:shadow-red-500/10 transition-all duration-300">
-                        <div className="pl-5 pr-3 text-gray-400">
-                            <Search size={22} />
+                        <div className="pl-4 md:pl-5 pr-2 md:pr-3 text-gray-400">
+                            <Search size={18} md:size={22} />
                         </div>
                         <input
                             type="text"
@@ -239,13 +239,13 @@ export default function YoutubeDownloader() {
                                 }
                             }}
                             onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-                            placeholder="Paste Channel, Playlist or Video link..."
-                            className="w-full bg-transparent py-4 pr-4 text-base text-gray-900 dark:text-white placeholder:text-gray-400 border-none shadow-none outline-none font-medium"
+                            placeholder="Paste Link..."
+                            className="w-full bg-transparent py-3.5 md:py-4 pr-4 text-sm md:text-base text-gray-900 dark:text-white placeholder:text-gray-400 border-none shadow-none outline-none font-medium"
                             style={{ caretColor: '#ef4444' }}
                         />
                         {url && (
                             <button onClick={() => setUrl("")} className="p-2 mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                                <X size={20} />
+                                <X size={18} />
                             </button>
                         )}
                     </div>
@@ -254,17 +254,17 @@ export default function YoutubeDownloader() {
                         <button
                             onClick={handleLookup}
                             disabled={!url || loading}
-                            className={`w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${loading ? 'opacity-80 font-black' : ''}`}
+                            className={`w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-xl font-bold text-base md:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${loading ? 'opacity-80 font-black' : ''}`}
                         >
                             {loading ? (
                                 <>
-                                    <Loader2 className="animate-spin" size={24} />
-                                    <span>Extracting YouTube Meta...</span>
+                                    <Loader2 className="animate-spin" size={20} md:size={24} />
+                                    <span className="text-sm md:text-base">Extracting YouTube Meta...</span>
                                 </>
                             ) : (
                                 <>
-                                    <Search size={24} />
-                                    Search for Content
+                                    <Search size={20} md:size={24} />
+                                    <span>Search for Content</span>
                                 </>
                             )}
                         </button>
@@ -273,41 +273,41 @@ export default function YoutubeDownloader() {
 
                 {/* 📂 Playlist / Channel View */}
                 {isPlaylist && (
-                    <div className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 animate-in fade-in slide-in-from-bottom-6 duration-500">
-                        <div className="p-6 md:p-8 border-b border-white/10 flex flex-col md:flex-row justify-between items-center gap-6">
-                            <div className="flex items-center gap-4">
+                    <div className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 animate-in fade-in slide-in-from-bottom-6 duration-500 pb-24 md:pb-0">
+                        <div className="p-5 md:p-8 border-b border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
+                            <div className="flex items-center gap-3 md:gap-4 w-full md:w-auto">
                                 <button onClick={clearLookup} className="p-2 bg-gray-100 dark:bg-white/5 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors">
-                                    <X size={20} />
+                                    <X size={18} md:size={20} />
                                 </button>
-                                <div>
-                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                        <PlaySquare className="text-red-600" />
+                                <div className="min-w-0">
+                                    <h2 className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2 truncate">
+                                        <PlaySquare className="text-red-600 shrink-0" size={20} md:size={24} />
                                         {playlistTitle}
                                     </h2>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">{playlistVideos.length} videos found in this feed</p>
+                                    <p className="text-[10px] md:text-sm text-gray-500 dark:text-gray-400 font-black uppercase tracking-widest">{playlistVideos.length} videos found</p>
                                 </div>
                             </div>
-                            <div className="flex gap-3">
+                            <div className="flex gap-2 w-full md:w-auto">
                                 <button
                                     onClick={toggleSelectAll}
-                                    className="px-5 py-2.5 bg-white/50 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 backdrop-blur-md rounded-xl text-sm font-bold transition-all border border-white/20"
+                                    className="flex-1 md:flex-none px-4 md:px-5 py-2.5 bg-white/50 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 backdrop-blur-md rounded-xl text-[10px] md:text-sm font-bold transition-all border border-white/20"
                                 >
                                     {selectedVideoIds.size === playlistVideos.length ? "Deselect All" : "Select All"}
                                 </button>
                                 <button
                                     onClick={processBatch}
                                     disabled={isBulkProcessing || selectedVideoIds.size === 0}
-                                    className="px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-red-500/30"
+                                    className="flex-[2] md:flex-none px-4 md:px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-[10px] md:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-500/30"
                                 >
-                                    {isBulkProcessing ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
-                                    {isBulkProcessing ? "Batch Processing..." : `Download Selected (${selectedVideoIds.size})`}
+                                    {isBulkProcessing ? <Loader2 className="animate-spin" size={14} md:size={18} /> : <Download size={14} md:size={18} />}
+                                    {isBulkProcessing ? "Processing..." : `Download (${selectedVideoIds.size})`}
                                 </button>
                             </div>
                         </div>
 
                         <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-left border-collapse">
-                                <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">
+                                <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-[10px] font-black uppercase tracking-[0.2em]">
                                     <tr>
                                         <th className="p-5 w-16 text-center">
                                             <input
@@ -371,7 +371,7 @@ export default function YoutubeDownloader() {
                         </div>
 
                         {/* 📱 Mobile Grid View (2 Columns) */}
-                        <div className="md:hidden grid grid-cols-2 gap-3 p-4 bg-gray-50/30 dark:bg-black/20">
+                        <div className="md:hidden grid grid-cols-2 gap-3 p-3 bg-gray-50/30 dark:bg-black/20">
                             {playlistVideos.map((video) => (
                                 <div
                                     key={video.id}
@@ -392,20 +392,20 @@ export default function YoutubeDownloader() {
                                     </div>
 
                                     {/* Info */}
-                                    <div className="p-3 flex-1 flex flex-col justify-between">
+                                    <div className="p-2.5 flex-1 flex flex-col justify-between">
                                         <div>
-                                            <h4 className="text-[11px] font-bold text-gray-900 dark:text-white line-clamp-2 leading-tight mb-2">
+                                            <h4 className="text-[10px] md:text-[11px] font-bold text-gray-900 dark:text-white line-clamp-2 leading-tight mb-2">
                                                 {video.title}
                                             </h4>
                                         </div>
 
-                                        <div className="space-y-2 mt-auto">
+                                        <div className="space-y-1.5 mt-auto">
                                             {/* Status Badge */}
                                             <div className="flex items-center min-h-[14px]">
-                                                {video.status === 'processing' && <span className="text-[9px] font-black text-orange-500 uppercase tracking-tighter flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Pending</span>}
-                                                {video.status === 'ready' && <span className="text-[9px] font-black text-green-500 uppercase tracking-tighter flex items-center gap-1"><CheckCircle size={10} /> Ready</span>}
-                                                {video.status === 'error' && <span className="text-[9px] font-black text-red-500 uppercase tracking-tighter">Failed</span>}
-                                                {video.status === 'idle' && <span className="text-[9px] font-medium text-gray-400">Waiting</span>}
+                                                {video.status === 'processing' && <span className="text-[8px] font-black text-orange-500 uppercase tracking-tighter flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Pending</span>}
+                                                {video.status === 'ready' && <span className="text-[8px] font-black text-green-500 uppercase tracking-tighter flex items-center gap-1"><CheckCircle size={10} /> Ready</span>}
+                                                {video.status === 'error' && <span className="text-[8px] font-black text-red-500 uppercase tracking-tighter">Failed</span>}
+                                                {video.status === 'idle' && <span className="text-[8px] font-medium text-gray-400">Waiting</span>}
                                             </div>
 
                                             {/* Download Button */}
@@ -415,7 +415,7 @@ export default function YoutubeDownloader() {
                                                         e.stopPropagation();
                                                         triggerDownload(video.downloadUrl, `${video.title}.mp4`);
                                                     }}
-                                                    className="w-full py-1.5 bg-red-600 text-white rounded-lg text-[10px] font-black shadow-md active:scale-90 transition-transform flex items-center justify-center gap-1"
+                                                    className="w-full py-1.5 bg-red-600 text-white rounded-lg text-[9px] font-black shadow-md active:scale-90 transition-transform flex items-center justify-center gap-1"
                                                 >
                                                     <Download size={10} /> SAVE
                                                 </button>
@@ -425,69 +425,90 @@ export default function YoutubeDownloader() {
                                 </div>
                             ))}
                         </div>
+
+                        {/* Mobile Bulk Action Floating Button */}
+                        <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-[100]">
+                            <button 
+                                onClick={processBatch} 
+                                disabled={isBulkProcessing || selectedVideoIds.size === 0} 
+                                className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold shadow-[0_20px_50px_rgba(220,38,38,0.3)] transition-all active:scale-95 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
+                            >
+                                {isBulkProcessing ? (
+                                    <>
+                                        <Loader2 className="animate-spin" size={20} />
+                                        <span>Processing Batch...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Download size={20} />
+                                        <span>Download Selected ({selectedVideoIds.size})</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 )}
 
                 {/* 🎬 Single Video Result Card */}
                 {!isPlaylist && videoData && (
-                    <div className="max-w-5xl mx-auto bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 animate-in fade-in zoom-in-95 duration-300">
+                    <div className="max-w-5xl mx-auto bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-3xl md:rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 animate-in fade-in zoom-in-95 duration-300">
                         <div className="flex flex-col lg:flex-row">
 
                             {/* Left: Preview */}
                             <div className="w-full lg:w-1/2 relative">
                                 <img src={videoData.thumbnail} className="w-full h-full object-cover aspect-video lg:aspect-auto" alt="Thumb" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                                <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-white font-black shadow-lg">
+                                <div className="absolute bottom-4 md:bottom-6 left-4 md:left-6 right-4 md:right-6 flex items-center justify-between">
+                                    <div className="flex items-center gap-2 md:gap-3">
+                                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-red-600 flex items-center justify-center text-white text-xs md:text-sm font-black shadow-lg">
                                             {videoData.author?.[0] || 'Y'}
                                         </div>
-                                        <div>
-                                            <p className="text-white font-bold text-sm leading-none mb-1">{videoData.author || "YouTube Channel"}</p>
-                                            <span className="text-white/60 text-xs font-medium">Ready in High Quality</span>
+                                        <div className="min-w-0">
+                                            <p className="text-white font-bold text-xs md:text-sm leading-none mb-1 truncate max-w-[120px] md:max-w-none">{videoData.author || "YouTube Channel"}</p>
+                                            <span className="text-white/60 text-[10px] font-medium">Original Quality</span>
                                         </div>
                                     </div>
-                                    <span className="bg-black/40 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-full border border-white/20 tracking-widest uppercase">
+                                    <span className="bg-black/40 backdrop-blur-md text-white text-[8px] md:text-[10px] font-black px-2 md:px-3 py-1 md:py-1.5 rounded-full border border-white/20 tracking-widest uppercase shrink-0">
                                         {Math.floor(videoData.duration / 60)}:{(videoData.duration % 60).toString().padStart(2, '0')}
                                     </span>
                                 </div>
                             </div>
 
                             {/* Right: Actions */}
-                            <div className="w-full lg:w-1/2 p-8 lg:p-10 flex flex-col">
-                                <div className="flex items-center justify-between mb-6">
-                                    <div className="flex flex-wrap gap-2">
-                                        {['8K/4K Support', 'Original High Bitrate', 'Secure'].map(tag => (
-                                            <span key={tag} className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-black tracking-tighter uppercase border border-red-500/10">
+                            <div className="w-full lg:w-1/2 p-5 md:p-8 lg:p-10 flex flex-col">
+                                <div className="flex items-center justify-between mb-4 md:mb-6">
+                                    <div className="flex flex-wrap gap-1.5 md:gap-2">
+                                        {['4K Support', 'High Bitrate', 'Secure'].map(tag => (
+                                            <span key={tag} className="px-2 py-1 md:px-3 md:py-1.5 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 text-[8px] md:text-[10px] font-black tracking-tighter uppercase border border-red-500/10">
                                                 {tag}
                                             </span>
                                         ))}
                                     </div>
                                     <button onClick={clearLookup} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
-                                        <X size={20} />
+                                        <X size={18} md:size={20} />
                                     </button>
                                 </div>
 
-                                <h3 className="text-2xl font-black text-gray-900 dark:text-white leading-tight mb-8">
+                                <h3 className="text-lg md:text-2xl font-black text-gray-900 dark:text-white leading-tight mb-6 md:mb-8 line-clamp-2 md:line-clamp-none">
                                     {videoData.title}
                                 </h3>
 
-                                <div className="space-y-6">
+                                <div className="space-y-4 md:space-y-6">
                                     {/* Video Format Selector */}
-                                    <div className="bg-gray-100/50 dark:bg-white/5 p-6 rounded-3xl border border-white/10">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="p-2.5 bg-red-600 rounded-xl shadow-lg shadow-red-500/20">
-                                                <Video size={20} className="text-white" />
+                                    <div className="bg-gray-100/50 dark:bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/10">
+                                        <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
+                                            <div className="p-2 md:p-2.5 bg-red-600 rounded-xl shadow-lg shadow-red-500/20">
+                                                <Video size={16} md:size={20} className="text-white" />
                                             </div>
-                                            <span className="font-black text-gray-900 dark:text-white uppercase tracking-wider text-sm">Video Quality</span>
+                                            <span className="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs md:text-sm">Video Quality</span>
                                         </div>
 
-                                        <div className="flex flex-wrap gap-3 mb-6">
+                                        <div className="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6">
                                             {videoData.resolutions?.map(res => (
                                                 <button
                                                     key={res}
                                                     onClick={() => setSelectedQuality(res)}
-                                                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${selectedQuality === res
+                                                    className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black transition-all border ${selectedQuality === res
                                                         ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-500/30 ring-4 ring-red-500/10'
                                                         : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-red-500/50'}`}
                                                 >
@@ -499,32 +520,32 @@ export default function YoutubeDownloader() {
                                         <button
                                             onClick={() => handleDownload('mp4')}
                                             disabled={downloadingMp4 || downloadingMp3}
-                                            className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-black tracking-widest uppercase text-sm shadow-xl hover:bg-black dark:hover:bg-gray-100 transition-all transform active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
+                                            className="w-full py-3 md:py-4 bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl md:rounded-2xl font-black tracking-widest uppercase text-xs md:text-sm shadow-xl hover:bg-black dark:hover:bg-gray-100 transition-all transform active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 md:gap-3"
                                         >
-                                            {downloadingMp4 ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
-                                            {downloadingMp4 ? "Sourcing Streams..." : "Start Video Download"}
+                                            {downloadingMp4 ? <Loader2 className="animate-spin" size={18} md:size={20} /> : <Download size={18} md:size={20} />}
+                                            {downloadingMp4 ? "Sourcing..." : "Download Video"}
                                         </button>
                                     </div>
 
                                     {/* Audio Format */}
-                                    <div className="bg-gray-100/50 dark:bg-white/5 p-6 rounded-3xl border border-white/10">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="p-2.5 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/20">
-                                                <Music size={20} className="text-white" />
+                                    <div className="bg-gray-100/50 dark:bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/10">
+                                        <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
+                                            <div className="p-2 md:p-2.5 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/20">
+                                                <Music size={16} md:size={20} className="text-white" />
                                             </div>
-                                            <span className="font-black text-gray-900 dark:text-white uppercase tracking-wider text-sm">Audio Extractor</span>
+                                            <span className="font-black text-gray-900 dark:text-white uppercase tracking-wider text-xs md:text-sm">Audio Extractor</span>
                                         </div>
 
-                                        <div className="flex flex-wrap gap-3 mb-6">
+                                        <div className="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6">
                                             {[320, 192, 128].map(rate => (
                                                 <button
                                                     key={rate}
                                                     onClick={() => setSelectedAudioQuality(rate)}
-                                                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${selectedAudioQuality === rate
+                                                    className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black transition-all border ${selectedAudioQuality === rate
                                                         ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/30'
                                                         : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-indigo-500/50'}`}
                                                 >
-                                                    {rate}Kbps
+                                                    {rate}K
                                                 </button>
                                             ))}
                                         </div>
@@ -532,31 +553,31 @@ export default function YoutubeDownloader() {
                                         <button
                                             onClick={() => handleDownload('mp3')}
                                             disabled={downloadingMp4 || downloadingMp3}
-                                            className="w-full py-4 border-2 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white rounded-2xl font-black tracking-widest uppercase text-sm hover:border-indigo-500 transition-all transform active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
+                                            className="w-full py-3 md:py-4 border-2 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white rounded-xl md:rounded-2xl font-black tracking-widest uppercase text-xs md:text-sm hover:border-indigo-500 transition-all transform active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 md:gap-3"
                                         >
-                                            {downloadingMp3 ? <Loader2 className="animate-spin" size={20} /> : <Music size={20} />}
-                                            {downloadingMp3 ? "Converting to MP3..." : "Extract Audio"}
+                                            {downloadingMp3 ? <Loader2 className="animate-spin" size={18} md:size={20} /> : <Music size={18} md:size={20} />}
+                                            {downloadingMp3 ? "Converting..." : "Extract Audio"}
                                         </button>
                                     </div>
 
                                     {/* Action Buttons */}
                                     <button
                                         onClick={clearLookup}
-                                        className="w-full py-4 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 transform active:scale-[0.98]"
+                                        className="w-full py-3 md:py-4 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-xl md:rounded-2xl font-bold transition-all flex items-center justify-center gap-2 transform active:scale-[0.98] text-sm"
                                     >
-                                        <Search size={20} /> Download Another Video
+                                        <Search size={18} md:size={20} /> Download Another
                                     </button>
 
                                     {/* Progress Banner */}
                                     {(downloadingMp4 || downloadingMp3) && (
-                                        <div className="mt-4 p-4 bg-red-600/10 dark:bg-red-500/5 border border-red-500/20 rounded-2xl animate-in fade-in duration-300">
+                                        <div className="mt-2 md:mt-4 p-3 md:p-4 bg-red-600/10 dark:bg-red-500/5 border border-red-500/20 rounded-2xl animate-in fade-in duration-300">
                                             <div className="flex justify-between items-center mb-2">
-                                                <span className="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-widest animate-pulse">
+                                                <span className="text-[10px] md:text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-widest animate-pulse">
                                                     {progressStatus}
                                                 </span>
-                                                <span className="text-xs font-black text-gray-500">{Math.round(progress)}%</span>
+                                                <span className="text-[10px] md:text-xs font-black text-gray-500">{Math.round(progress)}%</span>
                                             </div>
-                                            <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-2 overflow-hidden shadow-inner">
+                                            <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-1.5 md:h-2 overflow-hidden shadow-inner">
                                                 <div
                                                     className="bg-red-600 h-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(239,68,68,0.5)]"
                                                     style={{ width: `${progress}%` }}
@@ -572,18 +593,18 @@ export default function YoutubeDownloader() {
 
                 {/* Info Cards (Empty State) */}
                 {!videoData && !isPlaylist && !loading && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 max-w-5xl mx-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mt-12 md:mt-16 max-w-5xl mx-auto">
                         {[
-                            { title: "Smart Extraction", desc: "4K, 1080p, and MP3 quality options", icon: <Sparkles size={20} /> },
-                            { title: "Bulk Support", desc: "Download entire playlists in one click", icon: <Layers size={20} /> },
-                            { title: "Direct Link", desc: "High-speed servers for faster downloads", icon: <Zap size={20} /> }
+                            { title: "Smart Extraction", desc: "4K, 1080p, and MP3 quality options", icon: <Sparkles size={18} md:size={20} /> },
+                            { title: "Bulk Support", desc: "Download entire playlists in one click", icon: <Layers size={18} md:size={20} /> },
+                            { title: "Direct Link", desc: "High-speed servers for faster downloads", icon: <Zap size={18} md:size={20} /> }
                         ].map((item, i) => (
-                            <div key={i} className="p-8 bg-white/40 dark:bg-white/5 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-3xl text-center hover:bg-white/60 dark:hover:bg-white/10 transition-all hover:scale-[1.02] group shadow-xl shadow-black/5">
-                                <div className="w-14 h-14 mx-auto bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-center justify-center text-red-500 group-hover:bg-red-600 group-hover:text-white transition-all transform group-hover:rotate-6 mb-5">
+                            <div key={i} className="p-6 md:p-8 bg-white/40 dark:bg-white/5 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-2xl md:rounded-3xl text-center hover:bg-white/60 dark:hover:bg-white/10 transition-all hover:scale-[1.02] group shadow-xl shadow-black/5">
+                                <div className="w-12 h-12 md:w-14 md:h-14 mx-auto bg-red-50 dark:bg-red-900/20 rounded-xl md:rounded-2xl flex items-center justify-center text-red-500 group-hover:bg-red-600 group-hover:text-white transition-all transform group-hover:rotate-6 mb-4 md:mb-5">
                                     {item.icon}
                                 </div>
-                                <h3 className="font-black text-gray-900 dark:text-white mb-2 uppercase tracking-wide">{item.title}</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{item.desc}</p>
+                                <h3 className="font-black text-gray-900 dark:text-white mb-2 uppercase tracking-wide text-xs md:text-sm">{item.title}</h3>
+                                <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{item.desc}</p>
                             </div>
                         ))}
                     </div>

@@ -18,6 +18,12 @@ const safeEncode = (str) => {
 // 🛡️ Robust Proxy Helper
 const getProxyUrl = (url, options = {}) => {
     if (!url) return "";
+    
+    // 🚀 If it's already an internal API path, don't proxy it again
+    if (url.startsWith('/api/') || url.includes(API_BASE + '/api/')) {
+        return url;
+    }
+
     const { filename = "file", type = "" } = options;
     let proxyUrl = `${API_BASE}/api/tools/tiktok/proxy?url=${safeEncode(url)}&filename=${safeEncode(filename)}`;
     if (type) proxyUrl += `&type=${safeEncode(type)}`;
@@ -298,20 +304,20 @@ export default function TikTokDownloader() {
                 <div className="absolute bottom-[-10%] left-[20%] w-[35%] h-[35%] bg-blue-500/30 rounded-full blur-[120px] opacity-50 animate-blob animation-delay-4000" />
             </div>
 
-            <div className={`relative z-10 p-6 max-w-5xl mx-auto transition-opacity duration-700 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="text-center mb-6 space-y-2">
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+            <div className={`relative z-10 p-4 md:p-6 max-w-5xl mx-auto transition-opacity duration-700 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
+                <div className="text-center mb-6 space-y-1.5 md:space-y-2">
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                         TikTok <span className="text-pink-600">Saver</span>
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-base">
+                    <p className="text-xs md:text-base text-gray-500 dark:text-gray-400">
                         Download videos and profiles without watermarks.
                     </p>
                 </div>
 
-                <div className="flex justify-center mb-8 gap-2 p-1.5 bg-gray-100/50 dark:bg-gray-800/50 backdrop-blur-md rounded-2xl mx-auto w-fit border border-white/20">
+                <div className="flex justify-center mb-6 md:mb-8 gap-1.5 md:gap-2 p-1.5 bg-gray-100/50 dark:bg-gray-800/50 backdrop-blur-md rounded-2xl mx-auto w-fit border border-white/20">
                     <button
                         onClick={() => setActiveTab("single")}
-                        className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === "single"
+                        className={`px-4 md:px-8 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all duration-300 ${activeTab === "single"
                             ? "bg-white dark:bg-white/10 shadow-sm text-gray-900 dark:text-white backdrop-blur-sm"
                             : "text-gray-500 hover:bg-black/5 dark:hover:bg-white/5 dark:text-gray-400"}`}
                     >
@@ -319,7 +325,7 @@ export default function TikTokDownloader() {
                     </button>
                     <button
                         onClick={() => setActiveTab("profile")}
-                        className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === "profile"
+                        className={`px-4 md:px-8 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all duration-300 ${activeTab === "profile"
                             ? "bg-white dark:bg-white/10 shadow-sm text-gray-900 dark:text-white backdrop-blur-sm"
                             : "text-gray-500 hover:bg-black/5 dark:hover:bg-white/5 dark:text-gray-400"}`}
                     >
@@ -327,13 +333,13 @@ export default function TikTokDownloader() {
                     </button>
                 </div>
 
-                <div className="relative min-h-[400px]">
+                <div className="relative min-h-[300px] md:min-h-[400px]">
                     {activeTab === "single" && (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6 md:space-y-8">
                             <div className="max-w-xl mx-auto space-y-4">
                                 <div className="relative flex items-center bg-white/60 dark:bg-black/40 backdrop-blur-xl rounded-xl border border-white/20 dark:border-white/10 shadow-xl shadow-black/5 overflow-hidden transition-all">
-                                    <div className="pl-5 pr-3 text-gray-400">
-                                        <Search size={22} />
+                                    <div className="pl-4 md:pl-5 pr-2 md:pr-3 text-gray-400">
+                                        <Search size={18} md:size={22} />
                                     </div>
                                     <input
                                         type="text"
@@ -344,11 +350,11 @@ export default function TikTokDownloader() {
                                         }}
                                         onKeyDown={(e) => e.key === "Enter" && handleLookup()}
                                         placeholder="Paste TikTok Link..."
-                                        className="w-full bg-transparent py-3 pr-4 text-sm md:text-base text-gray-900 dark:text-white placeholder:text-gray-400 border-none shadow-none appearance-none outline-none"
+                                        className="w-full bg-transparent py-3 md:py-4 pr-4 text-sm md:text-base text-gray-900 dark:text-white placeholder:text-gray-400 border-none shadow-none appearance-none outline-none"
                                     />
                                     {url && (
                                         <button onClick={() => setUrl("")} className="p-2 mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                                            <X size={20} />
+                                            <X size={18} />
                                         </button>
                                     )}
                                 </div>
@@ -357,29 +363,34 @@ export default function TikTokDownloader() {
                                 <button
                                     onClick={handleLookup}
                                     disabled={!url || loading}
-                                    className={`w-full md:w-auto md:px-12 md:min-w-[200px] mx-auto block py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2 ${loading ? 'animate-pulse' : ''}`}
+                                    className={`w-full md:w-auto md:px-12 md:min-w-[200px] mx-auto block py-3.5 md:py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2 ${loading ? 'animate-pulse' : ''}`}
                                 >
                                     {loading ? (
                                         <>
                                             <Loader2 className="animate-spin" size={20} />
                                             <span>Processing...</span>
                                         </>
-                                    ) : "Download Video"}
+                                    ) : (
+                                        <>
+                                            <Download size={18} md:size={20} />
+                                            <span>Download Video</span>
+                                        </>
+                                    )}
                                 </button>
                             )}
 
                             {videoData && (
-                                <div className="max-w-4xl mx-auto bg-white/40 dark:bg-black/40 backdrop-blur-2xl rounded-2xl p-6 border border-white/20 dark:border-white/10 shadow-2xl shadow-black/5 animate-in fade-in zoom-in-95 duration-200 relative">
+                                <div className="max-w-4xl mx-auto bg-white/40 dark:bg-black/40 backdrop-blur-2xl rounded-2xl p-4 md:p-6 border border-white/20 dark:border-white/10 shadow-2xl shadow-black/5 animate-in fade-in zoom-in-95 duration-200 relative">
                                     <button
                                         onClick={clearResult}
-                                        className="absolute top-4 right-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                        className="absolute top-3 md:top-4 right-3 md:right-4 p-1.5 md:p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors z-20"
                                         title="Clear Result"
                                     >
-                                        <X size={20} className="text-gray-500 dark:text-gray-300" />
+                                        <X size={16} md:size={20} className="text-gray-500 dark:text-gray-300" />
                                     </button>
 
-                                    <div className="flex flex-row gap-3 md:gap-8">
-                                        <div className="w-[35%] md:w-1/3 shrink-0 relative">
+                                    <div className="flex flex-col sm:flex-row gap-5 md:gap-8">
+                                        <div className="w-full sm:w-[40%] md:w-1/3 shrink-0 relative">
                                             {(videoData.type === 'slideshow' || videoData.type === 'photo' || (videoData.images && videoData.images.length > 0)) ? (
                                                 <div className="aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden relative group bg-gray-100 dark:bg-gray-900 border border-white/10 shadow-lg">
                                                     <img src={videoData.images?.[0] || videoData.cover} alt="cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -404,34 +415,33 @@ export default function TikTokDownloader() {
                                                 </div>
                                             )}
                                             {videoData.type === 'video' && (
-                                                <div className="mt-2 text-center text-[10px] md:text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 p-2 rounded-lg border border-amber-200 dark:border-amber-800">
-                                                    ⚠️ បើវីដេអូលោតពណ៌ខ្មៅ (ឭតែសំឡេង) មកពី Browser អត់ស្គាល់កូដិក <strong>H.265</strong>។<br />
-                                                    សូមទាញយកធម្មតា វាអត់ខូចទេ (អាចមើលក្នុង VLC ឯកសារដើម)។
+                                                <div className="mt-3 text-center text-[9px] md:text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 p-2 rounded-lg border border-amber-200 dark:border-amber-800">
+                                                    ⚠️ បើវីដេអូលោតពណ៌ខ្មៅ (ឭតែសំឡេង) មកពី Browser អត់ស្គាល់កូដិក <strong>H.265</strong>។
                                                 </div>
                                             )}
                                         </div>
                                         <div className="flex-1 flex flex-col min-w-0">
-                                            <div className="mb-2 md:mb-6">
-                                                <span className="inline-block px-2 py-0.5 md:px-3 md:py-1 rounded-full bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 text-[10px] md:text-xs font-bold mb-1 md:mb-2 tracking-wide uppercase truncate max-w-full">
+                                            <div className="mb-4 md:mb-6">
+                                                <span className="inline-block px-2.5 py-1 rounded-full bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 text-[9px] md:text-xs font-bold mb-2 tracking-wide uppercase truncate max-w-full border border-pink-100 dark:border-pink-900/30">
                                                     @{videoData.author.nickname || videoData.author.unique_id}
                                                 </span>
-                                                <h2 className="text-sm md:text-2xl font-bold text-gray-900 dark:text-white leading-tight mb-2 md:mb-4 line-clamp-2 md:line-clamp-none">
+                                                <h2 className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white leading-tight mb-3 md:mb-4 line-clamp-2 md:line-clamp-none">
                                                     {videoData.title || "Untitled Video"}
                                                 </h2>
                                                 <div className="flex flex-wrap gap-1.5 md:gap-2 items-center">
                                                     {[
-                                                        (videoData.type === 'slideshow' || videoData.type === 'photo' || (videoData.images && videoData.images.length > 0)) ? 'Live Photo (រូបសន្លឹក)' : 'Normal Video (វីដេអូធម្មតា)',
-                                                        'គុណភាពដើម (Original Quality)',
-                                                        'No Watermark (គ្មានឡូហ្កូ)'
+                                                        (videoData.type === 'slideshow' || videoData.type === 'photo' || (videoData.images && videoData.images.length > 0)) ? 'Live Photo' : 'Normal Video',
+                                                        'Origin Quality',
+                                                        'No Watermark'
                                                     ].map(tag => (
-                                                        <span key={tag} className="px-2 py-0.5 md:px-3 md:py-1 rounded-lg bg-white/40 dark:bg-white/5 backdrop-blur-md text-gray-700 dark:text-gray-300 text-[9px] md:text-xs font-semibold border border-white/20 whitespace-nowrap">
+                                                        <span key={tag} className="px-2 py-0.5 md:px-3 md:py-1 rounded-lg bg-white/40 dark:bg-white/5 backdrop-blur-md text-gray-700 dark:text-gray-300 text-[8px] md:text-[10px] font-semibold border border-white/20 whitespace-nowrap">
                                                             {tag}
                                                         </span>
                                                     ))}
                                                 </div>
                                             </div>
 
-                                            <div className="mt-auto space-y-3">
+                                            <div className="mt-auto space-y-2.5 md:space-y-3">
                                                 {(videoData.type === 'slideshow' || videoData.type === 'photo' || (videoData.images && videoData.images.length > 0)) ? (
                                                     <>
                                                         {videoData.images?.length > 0 ? (
@@ -456,23 +466,23 @@ export default function TikTokDownloader() {
                                                                     setIsDownloading(false);
                                                                     setDownloadProgress({ current: 0, total: 0 });
                                                                 }}
-                                                                className="relative w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 overflow-hidden shadow-lg shadow-pink-500/20"
+                                                                className="relative w-full py-3.5 md:py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 overflow-hidden shadow-lg shadow-pink-500/20 text-sm md:text-base"
                                                             >
                                                                 {isDownloading ? (
                                                                     <>
                                                                         <div className="absolute inset-0 bg-white/20" style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%`, transition: 'width 0.5s ease' }} />
                                                                         <span className="relative z-10 flex items-center gap-2">
-                                                                            <Loader2 className="animate-spin" size={20} />
+                                                                            <Loader2 className="animate-spin" size={18} />
                                                                             {downloadProgress.current} / {downloadProgress.total} Photos
                                                                         </span>
                                                                     </>
                                                                 ) : (
-                                                                    <><ImageIcon size={20} /> {videoData.images.length === 1 ? 'Download Photo' : `Download All Photos (${videoData.images.length})`}</>
+                                                                    <><ImageIcon size={18} md:size={20} /> {videoData.images.length === 1 ? 'Download Photo' : `Download All Photos (${videoData.images.length})`}</>
                                                                 )}
                                                             </button>
                                                         ) : (
-                                                            <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl text-center">
-                                                                <p className="text-xs text-amber-800 dark:text-amber-400 font-medium">
+                                                            <div className="p-3 md:p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl text-center">
+                                                                <p className="text-[10px] md:text-xs text-amber-800 dark:text-amber-400 font-medium">
                                                                     ⚠️ HD Photos not available individually.
                                                                 </p>
                                                             </div>
@@ -482,17 +492,17 @@ export default function TikTokDownloader() {
                                                             <button
                                                                 disabled={isCombining}
                                                                 onClick={handleCombine}
-                                                                className="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 mt-2"
+                                                                className="w-full py-3.5 md:py-4 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 text-sm md:text-base"
                                                             >
                                                                 {isCombining ? (
-                                                                    <><Loader2 className="animate-spin" size={20} /> Processing Video...</>
+                                                                    <><Loader2 className="animate-spin" size={18} md:size={20} /> Processing Video...</>
                                                                 ) : (
-                                                                    <><Video size={20} /> Combine to Video (HD .MP4)</>
+                                                                    <><Video size={18} md:size={20} /> Combine to Video (HD)</>
                                                                 )}
                                                             </button>
                                                         )}
 
-                                                        <div className="flex flex-col gap-2">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                             {videoData.no_watermark_url && (
                                                                 <button
                                                                     onClick={async () => {
@@ -501,9 +511,9 @@ export default function TikTokDownloader() {
                                                                         const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: videoData.web_url, type: 'video/mp4' });
                                                                         triggerDownload(proxyUrl, safeFilename);
                                                                     }}
-                                                                    className="w-full py-3 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 text-gray-600 dark:text-gray-300 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm"
+                                                                    className="w-full py-3 border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 text-gray-600 dark:text-gray-300 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-[11px] md:text-xs"
                                                                 >
-                                                                    <Video size={16} /> Download Slideshow Video (MP4)
+                                                                    <Video size={14} md:size={16} /> Download Video
                                                                 </button>
                                                             )}
                                                             {videoData.music && (
@@ -514,9 +524,9 @@ export default function TikTokDownloader() {
                                                                         const proxyUrl = getProxyUrl(targetUrl, { filename: safeFilename, web_url: videoData.web_url, type: 'audio/mpeg' });
                                                                         triggerDownload(proxyUrl, safeFilename);
                                                                     }}
-                                                                    className="w-full py-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm"
+                                                                    className="w-full py-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-[11px] md:text-xs"
                                                                 >
-                                                                    <Music size={16} /> Download Audio (MP3)
+                                                                    <Music size={14} md:size={16} /> Download Audio
                                                                 </button>
                                                             )}
                                                         </div>
@@ -534,9 +544,9 @@ export default function TikTokDownloader() {
                                                                     const downloadUrl = `${API_BASE}/api/tools/tiktok/stream?id=${videoId}&url=${safeEncode(targetUrl)}&filename=${safeEncode(safeFilename + '.mp4')}`;
                                                                     triggerDownload(downloadUrl, `${safeFilename}.mp4`);
                                                                 }}
-                                                                className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20"
+                                                                className="w-full py-3.5 md:py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20 text-sm md:text-base"
                                                             >
-                                                                <Video size={20} /> Download Full Video (HD)
+                                                                <Video size={18} md:size={20} /> Download Video (HD)
                                                             </button>
                                                             <button
                                                                 onClick={async () => {
@@ -550,9 +560,9 @@ export default function TikTokDownloader() {
                                                                         }
                                                                     } catch { toast.error("Error", { id: tId }); }
                                                                 }}
-                                                                className="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20"
+                                                                className="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20 text-[11px] md:text-sm"
                                                             >
-                                                                <Play size={20} /> Fix Black Screen
+                                                                <Play size={18} md:size={20} /> Fix Black Screen
                                                             </button>
                                                         </div>
                                                     ) : (
@@ -561,8 +571,8 @@ export default function TikTokDownloader() {
                                                         </div>
                                                     )
                                                 )}
-                                                <button onClick={clearResult} className="w-full py-4 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2">
-                                                    <Search size={20} /> Download Another
+                                                <button onClick={clearResult} className="w-full py-3.5 md:py-4 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm md:text-base">
+                                                    <Search size={18} md:size={20} /> Search Another
                                                 </button>
                                             </div>
                                         </div>
@@ -573,47 +583,70 @@ export default function TikTokDownloader() {
                     )}
 
                     {activeTab === "profile" && (
-                        <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
                             {!profileData && !profileLoading ? (
                                 <div className="max-w-xl mx-auto">
                                     <div className="relative flex items-center bg-white/60 dark:bg-black/40 backdrop-blur-xl rounded-xl border border-white/20 dark:border-white/10 shadow-xl shadow-black/5 overflow-hidden transition-all">
-                                        <span className="pl-5 text-gray-400 font-bold text-lg select-none">@</span>
+                                        <span className="pl-4 md:pl-5 text-gray-400 font-bold text-base md:text-lg select-none">@</span>
                                         <input
                                             type="text"
                                             value={profileInput}
                                             onChange={(e) => setProfileInput(e.target.value)}
                                             onKeyDown={(e) => e.key === "Enter" && handleProfileLookup()}
                                             placeholder="username (e.g. khabylame)"
-                                            className="w-full bg-transparent p-5 text-lg outline-none text-gray-900 dark:text-white border-none shadow-none"
+                                            className="w-full bg-transparent p-4 md:p-5 text-base md:text-lg outline-none text-gray-900 dark:text-white border-none shadow-none"
                                         />
-                                        <button onClick={handleProfileLookup} disabled={profileLoading || !profileInput} className="mr-2 px-6 py-2 bg-gray-900 text-white rounded-lg font-bold">
-                                            <ChevronRight size={20} />
+                                        <button onClick={handleProfileLookup} disabled={profileLoading || !profileInput} className="mr-2 px-4 md:px-6 py-2 bg-gray-900 dark:bg-white/10 text-white rounded-lg font-bold">
+                                            <ChevronRight size={18} md:size={20} />
                                         </button>
                                     </div>
                                 </div>
                             ) : (
-                                profileLoading ? <div className="text-center p-12"><Loader2 className="animate-spin mx-auto mb-4" /> Loading Profile...</div> : (
+                                profileLoading ? <div className="text-center p-12"><Loader2 className="animate-spin mx-auto mb-4" /> <span className="text-sm font-medium">Scanning Profile...</span></div> : (
                                     <div className="space-y-6">
                                         <div className="flex items-center gap-4 p-4 bg-white/40 dark:bg-black/40 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg">
-                                            <button onClick={() => setProfileData(null)} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button>
-                                            {profileData.profile.avatar && <img src={getProxyUrl(profileData.profile.avatar)} className="w-16 h-16 rounded-full" />}
-                                            <div>
-                                                <h2 className="text-2xl font-bold">@{profileData.profile.username}</h2>
-                                                <p className="text-xs text-gray-500">{selectedVideos.size} selected</p>
+                                            <button onClick={() => setProfileData(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full"><X size={20} /></button>
+                                            {profileData.profile.avatar && <img src={getProxyUrl(profileData.profile.avatar)} className="w-12 h-12 md:w-16 md:h-16 rounded-full border-2 border-white/20" />}
+                                            <div className="min-w-0">
+                                                <h2 className="text-lg md:text-2xl font-bold truncate">@{profileData.profile.username}</h2>
+                                                <p className="text-[10px] md:text-xs text-gray-500 font-black uppercase tracking-widest">{selectedVideos.size} selected</p>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
                                             {sortedVideos.map(video => (
-                                                <div key={video.id} onClick={() => toggleSelect(video.id)} className={`cursor-pointer relative aspect-[3/4] rounded-xl overflow-hidden border-2 ${selectedVideos.has(video.id) ? 'border-pink-500' : 'border-transparent'}`}>
-                                                    <img src={getProxyUrl(video.cover)} className="w-full h-full object-cover" />
-                                                    <div className="absolute inset-0 bg-black/20" />
-                                                    {selectedVideos.has(video.id) && <div className="absolute top-2 right-2 bg-pink-500 rounded-full p-1"><Check size={12} className="text-white" /></div>}
+                                                <div key={video.id} onClick={() => toggleSelect(video.id)} className={`group cursor-pointer relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all ${selectedVideos.has(video.id) ? 'border-pink-500 scale-[0.98]' : 'border-transparent'}`}>
+                                                    <img src={getProxyUrl(video.cover)} className="w-full h-full object-cover" loading="lazy" />
+                                                    <div className={`absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors ${selectedVideos.has(video.id) ? 'bg-pink-500/20' : ''}`} />
+                                                    {selectedVideos.has(video.id) && (
+                                                        <div className="absolute top-2 right-2 bg-pink-500 rounded-full p-1 shadow-lg ring-2 ring-white">
+                                                            <Check size={10} md:size={12} className="text-white" strokeWidth={4} />
+                                                        </div>
+                                                    )}
+                                                    <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white text-[8px] md:text-[10px] font-black drop-shadow-lg">
+                                                        <Play size={10} fill="white" /> {video.stats.plays > 1000 ? (video.stats.plays / 1000).toFixed(1) + 'k' : video.stats.plays}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
-                                        <button onClick={handleBulkDownload} disabled={isDownloading || selectedVideos.size === 0} className="fixed bottom-8 right-8 px-8 py-4 bg-pink-600 text-white rounded-full font-bold shadow-2xl">
-                                            {isDownloading ? `Downloading ${downloadProgress.current}/${downloadProgress.total}` : `Download Selected (${selectedVideos.size})`}
-                                        </button>
+                                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-[100]">
+                                            <button 
+                                                onClick={handleBulkDownload} 
+                                                disabled={isDownloading || selectedVideos.size === 0} 
+                                                className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-2xl font-bold shadow-[0_20px_50px_rgba(219,39,119,0.3)] transition-all active:scale-95 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
+                                            >
+                                                {isDownloading ? (
+                                                    <>
+                                                        <Loader2 className="animate-spin" size={20} />
+                                                        <span>{downloadProgress.current} / {downloadProgress.total}</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Download size={20} />
+                                                        <span>Download Selected ({selectedVideos.size})</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                 )
                             )}

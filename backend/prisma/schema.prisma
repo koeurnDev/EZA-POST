@@ -54,6 +54,7 @@ model User {
   botHistory             BotHistory[]
   pendingReplies         PendingReply[]
   botRules               BotRule[]
+  botMonitoredPosts      BotMonitoredPost[]
 
   @@map("users")
 }
@@ -387,4 +388,20 @@ model PlatformConfig {
   updatedAt       DateTime  @updatedAt
 
   @@map("platform_configs")
+}
+model BotMonitoredPost {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  pageId          String   @map("page_id")
+  facebookPostId  String   @map("facebook_post_id")
+  enabled         Boolean  @default(true)
+  lastChecked     DateTime? @map("last_checked")
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, facebookPostId])
+  @@map("bot_monitored_posts")
 }
