@@ -237,37 +237,6 @@ export default function Post() {
                 newOrder = newOrder.filter(i => !i.isPageCard);
             }
 
-            const selectedPageId = selectedPages[0];
-            if (newOrder.some(i => i.type === 'video') && selectedPageId) {
-                const pageObj = availablePages.find(p => p.id === selectedPageId);
-                if (pageObj) {
-                    const pageCardIndex = newOrder.findIndex(i => i.isPageCard);
-                    const pageCard = {
-                        id: 'card-page-auto',
-                        type: 'image',
-                        preview: pageObj.picture,
-                        file: null,
-                        imageUrl: pageObj.picture,
-                        isPageCard: true
-                    };
-
-                    if (pageCardIndex !== -1) {
-                        newOrder[pageCardIndex] = pageCard;
-                        // Ensure it's always the 3rd item (index 2) if there are enough items
-                        if (pageCardIndex !== 2 && newOrder.length > 2) {
-                            newOrder.splice(pageCardIndex, 1);
-                            newOrder.splice(2, 0, pageCard);
-                        }
-                    } else {
-                        // Add as 3rd item
-                        if (newOrder.length >= 2) newOrder.splice(2, 0, pageCard);
-                        else newOrder.push(pageCard);
-                    }
-                }
-            } else {
-                newOrder = newOrder.filter(i => !i.isPageCard);
-            }
-
             // Also add Right Side Image if it exists and isn't already there
             if (rightSideImagePreview) {
                 const rsIndex = newOrder.findIndex(i => i.id === 'right-side-image');
