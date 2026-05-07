@@ -447,7 +447,8 @@ export default function Post() {
 
             const response = await axios.post(endpoint, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
-                withCredentials: true
+                withCredentials: true,
+                timeout: 120000 // 2 minute timeout for UI response
             });
 
             const data = response.data;
@@ -473,12 +474,24 @@ export default function Post() {
                     clearPromises.push(clearDraftFile("draft_card2"));
                 }
                 await Promise.all(clearPromises);
-            } else throw new Error(data.error);
+            } else throw new Error(data.error || "Unknown distribution error");
         } catch (err) {
             console.error("Submit Error:", err);
-            toast.error(err.response?.data?.error || "Distribution failure.", { id: toastId });
+            let errMsg = "Distribution failure.";
+            
+            if (err.code === 'ECONNABORTED') {
+                errMsg = "ប្រព័ន្ធកំពុងដំណើរការនៅ Backend។ សូមរង់ចាំបន្តិច រួចពិនិត្យមើលក្នុង Facebook របស់អ្នក។";
+            } else if (err.response?.data?.error) {
+                errMsg = err.response.data.error;
+            } else if (err.message) {
+                errMsg = err.message;
+            }
+            
+            toast.error(errMsg, { id: toastId, duration: 6000 });
         }
-        finally { setIsSubmitting(false); }
+        finally { 
+            setIsSubmitting(false); 
+        }
     };
 
     const cancelScheduledPost = async (postId) => {
