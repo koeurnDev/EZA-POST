@@ -320,6 +320,3 @@ const botEngine = {
 };
 
 module.exports = botEngine;
-
-
-module.exports = botEngine;
