@@ -974,89 +974,6 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     </div>
   );
 });
-      </div>
-
-      {/* 4️⃣ Monitored Posts Management Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mt-8">
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Plus size={20} className="text-blue-500" />
-            បន្ថែមផុសចាស់ៗឱ្យ Bot ជួយឆ្លើយ (Manual Monitor)
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            ប្រសិនបើបងមានផុសចាស់ៗដែលចង់ឱ្យ Bot ជួយឆ្លើយខមិន សូមដាក់ Link ផុសនោះនៅទីនេះ។
-          </p>
-        </div>
-
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row gap-4 mb-8">
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Link ផុសពី Facebook</label>
-              <input
-                type="text"
-                placeholder="បិទភ្ជាប់ Link ផុសនៅទីនេះ... (ឧទាហរណ៍៖ https://fb.com/posts/123...)"
-                value={monitoredPostUrl}
-                onChange={(e) => setMonitoredPostUrl(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-              />
-            </div>
-            <div className="w-full md:w-64">
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">រើស Page របស់ផុសនោះ</label>
-              <select
-                value={monitoredPageId}
-                onChange={(e) => setMonitoredPageId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-              >
-                {availablePages.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={handleAddMonitored}
-                disabled={isAddingMonitored}
-                className="w-full md:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
-              >
-                {isAddingMonitored ? <Loader size={18} className="animate-spin" /> : <Plus size={18} />}
-                បន្ថែម
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">បញ្ជីផុសដែលកំពុង Monitor ({monitoredPosts.length})</label>
-            {isLoadingMonitored ? (
-                <div className="py-8 text-center animate-pulse text-gray-400 text-sm">កំពុងទាញយក...</div>
-            ) : monitoredPosts.length === 0 ? (
-                <div className="py-12 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-2xl text-center text-gray-400 text-sm">
-                    មិនទាន់មានផុសណាមួយត្រូវបានបន្ថែមសម្រាប់ Monitor នៅឡើយទេ។
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {monitoredPosts.map(post => (
-                        <div key={post.id} className="p-4 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-xl flex items-center justify-between group">
-                            <div className="overflow-hidden">
-                                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">Post ID: {post.facebookPostId}</p>
-                                <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Page ID: {post.pageId}</p>
-                            </div>
-                            <button 
-                                onClick={() => handleDeleteMonitored(post.id)}
-                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                                title="ឈប់ Monitor"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-});
 
 // ✅ Wrapper
 const BotReplySettingsAPI = ({ isDemo }) => (
@@ -1066,3 +983,4 @@ const BotReplySettingsAPI = ({ isDemo }) => (
 );
 
 export default BotReplySettingsAPI;
+
