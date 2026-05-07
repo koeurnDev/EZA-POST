@@ -568,26 +568,26 @@ router.get("/stream", async (req, res) => {
 
         // 🛡️ Header Setup
         const isDownload = !!filename;
-        const setHeaders = (size) => {
-            const rawName = filename || `tiktok_${safeId}.mp4`;
-            // RFC 5987 Compliance
-            const utf8Name = encodeURIComponent(rawName);
-            const asciiName = rawName.replace(/[^a-zA-Z0-9_\-\.]/g, "_"); // ✅ Safe ASCII Fallback
-            console.log(`[DEBUG] Stream Header: raw="${rawName}" ascii="${asciiName}" utf8="${utf8Name}"`);
+        const rawName = filename || `tiktok_${safeId}.mp4`;
+        const utf8Name = encodeURIComponent(rawName);
+        const asciiName = rawName.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
 
-            res.setHeader('Cache-Control', 'no-store'); // 🚫 Prevent Mobile Caching
-            res.setHeader('Accept-Ranges', 'bytes');
+        const getCommonHeaders = (size) => {
+            const headers = {
+                'Cache-Control': 'no-store',
+                'Accept-Ranges': 'bytes',
+            };
 
             if (isDownload) {
-                // ⬇️ Force Download Mode
-                res.setHeader('Content-Type', 'application/octet-stream');
-                res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`);
+                headers['Content-Type'] = 'application/octet-stream';
+                headers['Content-Disposition'] = `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`;
             } else {
-                // 🎥 Preview Mode
-                res.setHeader('Content-Type', 'video/mp4');
-                res.setHeader('Content-Disposition', 'inline');
+                headers['Content-Type'] = 'video/mp4';
+                headers['Content-Disposition'] = 'inline';
             }
-            if (size) res.setHeader('Content-Length', size);
+
+            if (size) headers['Content-Length'] = size;
+            return headers;
         };
 
         // 1️⃣ CACHE HIT: Serve from disk
@@ -608,16 +608,13 @@ router.get("/stream", async (req, res) => {
                     const file = fs.createReadStream(cachePath, { start, end });
 
                     res.writeHead(206, {
+                        ...getCommonHeaders(),
                         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-                        'Accept-Ranges': 'bytes',
                         'Content-Length': chunksize,
-                        'Content-Type': isDownload ? 'application/octet-stream' : 'video/mp4',
-                        'Cache-Control': 'no-store'
                     });
                     file.pipe(res);
                 } else {
-                    setHeaders(fileSize);
-                    res.status(200);
+                    res.writeHead(200, getCommonHeaders(fileSize));
                     fs.createReadStream(cachePath).pipe(res);
                 }
                 return;
@@ -654,7 +651,8 @@ router.get("/stream", async (req, res) => {
             });
 
             // Set Headers immediately
-            setHeaders(response.headers['content-length']);
+            const responseSize = response.headers['content-length'];
+            res.writeHead(200, getCommonHeaders(responseSize));
 
             // 🚿 Pipe Logic: Response -> PassThrough -> (Res + File)
             response.data.pipe(passThrough);
