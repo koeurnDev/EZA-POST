@@ -4,7 +4,7 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import {
     Upload, Link as LinkIcon, X, Calendar, Clock, Layers, Plus, Trash2,
     ChevronDown, Share2, Youtube, Instagram, Facebook, Zap, Shield,
-    Maximize2, Volume2, VolumeX, MessageSquare
+    Maximize2, Volume2, VolumeX, MessageSquare, EyeOff
 } from "lucide-react";
 import apiUtils, { fetchCsrfToken } from "../utils/apiUtils";
 import { postsAPI } from "../utils/api";
@@ -20,7 +20,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/,
 export default function Post() {
     const { user } = useAuth();
 
-    const [postFormat, setPostFormat] = useState("single");
+    const [postFormat, setPostFormat] = useState("carousel");
     const [videoTab, setVideoTab] = useState("upload");
 
     const [platforms, setPlatforms] = useState({
@@ -604,9 +604,9 @@ export default function Post() {
                                                 value={tiktokUrl || ""}
                                                 onChange={(e) => setTiktokUrl(e.target.value)}
                                                 placeholder="Paste TikTok Link here..."
-                                                className="w-full bg-gray-100/50 dark:bg-white/5 rounded-2xl px-6 py-5 font-bold outline-none transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600"
+                                                className="w-full bg-gray-100/50 dark:bg-white/5 rounded-2xl px-6 py-5 font-bold outline-none transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 border-2 border-transparent focus:border-pink-500/30"
                                             />
-                                            <Button onClick={handleLoadTiktok} isLoading={isLoadingVideo} className="h-16 px-8 rounded-2xl bg-pink-600 text-white shadow-lg shadow-pink-500/20">
+                                            <Button onClick={handleLoadTiktok} isLoading={isLoadingVideo} className="h-16 px-10 rounded-2xl bg-pink-600 text-white shadow-lg shadow-pink-500/20 active:scale-95 transition-all">
                                                 Fetch
                                             </Button>
                                         </div>
@@ -614,13 +614,13 @@ export default function Post() {
                                 </div>
                             </div>
 
-                            {/* 📱 Carousel Visualizer (Horizontal Preview) */}
-                            {postFormat === 'carousel' && (
+                            {/* 📱 Universal Visualizer (Preview) */}
+                            {(postFormat === 'carousel' || previewUrl) && (
                                 <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-3xl md:rounded-[2.5rem] p-8 shadow-xl">
                                     <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-100 dark:border-white/5">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 bg-blue-500/10 text-blue-600 rounded-lg flex items-center justify-center"><Layers size={16} /></div>
-                                            <h3 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">ការបង្ហាញសាកល្បង (CAROUSEL PREVIEW)</h3>
+                                            <div className="w-8 h-8 bg-blue-500/10 text-blue-600 rounded-lg flex items-center justify-center"><EyeOff size={16} /></div>
+                                            <h3 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">ការបង្ហាញសាកល្បង ({postFormat === 'carousel' ? 'CAROUSEL' : 'SINGLE'} PREVIEW)</h3>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <div className="flex items-center gap-2 mr-4 bg-purple-500/10 px-3 py-1.5 rounded-xl border border-purple-500/20">

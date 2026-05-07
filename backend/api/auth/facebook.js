@@ -168,8 +168,33 @@ router.get("/callback", async (req, res) => {
         console.log(`🔄 Step 5: Updating User ${userId} in DB...`);
 
         const user = await prisma.user.findUnique({ where: { id: userId } });
-
+        
         if (user) {
+            // 🔍 CHECK FOR DUPLICATE FB ID (Account Takeover Logic)
+            // If another user already has this facebookId, disconnect them first to prevent Prisma error
+            const existingOwner = await prisma.user.findFirst({
+                where: { 
+                    facebookId: fbUser.id,
+                    id: { not: userId } // Not the current user
+                }
+            });
+
+            if (existingOwner) {
+                console.log(`⚠️ ACCOUNT TAKEOVER: FB ID ${fbUser.id} was linked to user ${existingOwner.id}. Disconnecting old link...`);
+                await prisma.user.update({
+                    where: { id: existingOwner.id },
+                    data: {
+                        facebookId: null,
+                        facebookAccessToken: null,
+                        facebookName: null,
+                        connectedPages: []
+                    }
+                });
+                
+                // Also remove their pages from the FacebookPage table
+                await prisma.facebookPage.deleteMany({ where: { userId: existingOwner.id } });
+            }
+
             // Update User Profile with FB details
             await prisma.user.update({
                 where: { id: userId },

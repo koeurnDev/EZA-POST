@@ -121,7 +121,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
             };
             console.log("    ✅ yt-dlp Success!");
         } catch (e) {
-            console.warn("    ⚠️ yt-dlp failed:", e.message);
+            console.warn("    ⚠️ yt-dlp failed:", e.message || "Unknown error", e.stderr || "");
         }
 
         // 2️⃣ TikWM Fallback
@@ -246,13 +246,18 @@ router.post("/compatible", requireAuth, async (req, res) => {
         const ffmpegPath = require('ffmpeg-static');
         
         try {
-            console.log("       Starting FFmpeg re-encode (H.264)...");
-            // Use quotes for Windows compatibility and capture errors
-            execSync(`"${ffmpegPath}" -y -i "${inputPath}" -c:v libx264 -preset fast -crf 22 -c:a copy "${outputPath}"`, { stdio: 'pipe' });
-            console.log("       FFmpeg re-encode complete.");
+            console.log("       🎬 Starting FFmpeg re-encode (H.264 / Ultrafast)...");
+            const startTime = Date.now();
+            
+            // Use ultrafast preset to minimize CPU usage and prevent timeouts on cloud platforms
+            execSync(`"${ffmpegPath}" -y -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 24 -c:a aac -b:a 128k "${outputPath}"`, { stdio: 'pipe' });
+            
+            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+            console.log(`       ✅ FFmpeg re-encode complete in ${duration}s.`);
         } catch (err) {
-            console.error("       FFmpeg failed:", err.stderr?.toString() || err.message);
-            throw new Error(`FFmpeg processing failed: ${err.stderr?.toString() || err.message}`);
+            const errorMsg = err.stderr?.toString() || err.stdout?.toString() || err.message;
+            console.error("       ❌ FFmpeg failed:", errorMsg);
+            throw new Error(`FFmpeg processing failed: ${errorMsg}`);
         }
 
         // Cleanup input
