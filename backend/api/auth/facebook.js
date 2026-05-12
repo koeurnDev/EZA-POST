@@ -47,9 +47,9 @@ router.get("/", (req, res) => {
         "publish_video",
     ];
 
-    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(
+    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(
         CALLBACK_URL
-    )}&scope=${scopes.join(",")}&state=connect_account`;
+    )}&scope=${scopes.join(",")}&state=connect_account&auth_type=rerequest`;
 
     // console.log(`🔄 Redirecting to Facebook: ${authUrl}`);
     res.redirect(authUrl);
@@ -82,7 +82,7 @@ router.get("/callback", async (req, res) => {
         currentStep = "ExchangeCode";
         // console.log("🔄 Step 1: Exchanging code for short-lived token...");
         const tokenRes = await axios.get(
-            "https://graph.facebook.com/v19.0/oauth/access_token",
+            "https://graph.facebook.com/v21.0/oauth/access_token",
             {
                 params: {
                     client_id: FB_APP_ID,
@@ -99,7 +99,7 @@ router.get("/callback", async (req, res) => {
         currentStep = "ExchangeLongLived";
         // console.log("🔄 Step 1.5: Exchanging for long-lived token...");
         const longLivedTokenRes = await axios.get(
-            "https://graph.facebook.com/v19.0/oauth/access_token",
+            "https://graph.facebook.com/v21.0/oauth/access_token",
             {
                 params: {
                     grant_type: "fb_exchange_token",
@@ -146,8 +146,8 @@ router.get("/callback", async (req, res) => {
 
         // 4️⃣ Fetch Pages
         currentStep = "FetchPages";
-        // console.log("🔄 Step 4: Fetching Facebook Pages...");
-        const pagesRes = await axios.get("https://graph.facebook.com/v19.0/me/accounts", {
+        console.log(`🔄 Step 4: Fetching Facebook Pages for token: ${access_token.substring(0, 10)}...`);
+        const pagesRes = await axios.get("https://graph.facebook.com/v21.0/me/accounts", {
             params: {
                 access_token,
                 fields: "id,name,access_token,picture{url},category",
@@ -155,7 +155,15 @@ router.get("/callback", async (req, res) => {
             }
         });
 
-        const myPages = pagesRes.data.data.map(p => ({
+        if (!pagesRes.data || !pagesRes.data.data) {
+            console.error("❌ FB API returned invalid pages data:", pagesRes.data);
+            throw new Error("Invalid response from Facebook Pages API");
+        }
+
+        const rawPages = pagesRes.data.data;
+        console.log(`📊 Found ${rawPages.length} pages in Facebook response.`);
+
+        const myPages = rawPages.map(p => ({
             id: p.id,
             name: p.name,
             access_token: p.access_token,

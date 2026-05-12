@@ -11,7 +11,7 @@ const { downloadTiktokVideo } = require("./tiktokDownloader");
 
 class FacebookAPI {
   constructor() {
-    this.graph = "https://graph.facebook.com/v19.0";
+    this.graph = "https://graph.facebook.com/v21.0";
     this.http = axios.create({
       timeout: 600000, // ✅ Increased to 10 minutes for large files
       maxContentLength: 500 * 1024 * 1024, // 500MB

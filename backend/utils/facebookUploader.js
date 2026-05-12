@@ -8,7 +8,7 @@ const axios = require("axios");
 class FacebookUploader {
   constructor() {
     this.api = axios.create({
-      baseURL: "https://graph.facebook.com/v19.0",
+      baseURL: "https://graph.facebook.com/v21.0",
       timeout: 30000,
       headers: { "User-Agent": "EZA_POST_BACKEND/1.0" },
     });

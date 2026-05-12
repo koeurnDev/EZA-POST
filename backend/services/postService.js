@@ -159,7 +159,7 @@ async function processAndPostCarouselLogic({ userId, accountsArray, caption, sch
                         mediaFbid = vRes.id;
                     } else if (card.isPageCard) {
                         // Auto Page Pic
-                        const picUrlRes = await axios.get(`https://graph.facebook.com/v19.0/${accountId}/picture`, {
+                        const picUrlRes = await axios.get(`https://graph.facebook.com/v21.0/${accountId}/picture`, {
                             params: { width: 1000, redirect: false, access_token: pageToken }
                         });
                         const picUrl = picUrlRes.data?.data?.url;

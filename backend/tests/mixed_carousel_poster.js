@@ -24,7 +24,7 @@ const path = require("path");
 const CONFIG = {
     userAccessToken: process.env.USER_ACCESS_TOKEN,
     videoPath: process.env.VIDEO_PATH || path.join(__dirname, "../temp/videos/sample_video.mp4"),
-    graphUrl: "https://graph.facebook.com/v19.0"
+    graphUrl: "https://graph.facebook.com/v21.0"
 };
 
 async function runAgent() {

@@ -22,7 +22,7 @@ const refreshFacebookToken = async (user) => {
         console.log(`🔄 Refreshing token for user: ${user.name} (${user.id})`);
 
         // 1. Exchange current token for a new one
-        const response = await axios.get("https://graph.facebook.com/v19.0/oauth/access_token", {
+        const response = await axios.get("https://graph.facebook.com/v21.0/oauth/access_token", {
             params: {
                 grant_type: "fb_exchange_token",
                 client_id: FB_APP_ID,
