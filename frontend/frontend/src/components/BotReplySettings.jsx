@@ -23,7 +23,7 @@ import {
   Loader,
   HelpCircle
 } from "lucide-react";
-import api from "../utils/api";
+import api, { botAPI } from "../utils/api";
 
 // ✅ Main Component
 const BotReplySettingsContent = React.memo(({ isDemo }) => {
@@ -137,10 +137,10 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
   }, []);
 
   // ✅ Filtered rules
-  const filtered = rules.filter(
+  const filtered = (rules || []).filter(
     (r) =>
-      r.keyword.toLowerCase().includes(deferredSearch.toLowerCase()) ||
-      r.reply.toLowerCase().includes(deferredSearch.toLowerCase())
+      (r.keyword || "").toLowerCase().includes(deferredSearch.toLowerCase()) ||
+      (r.reply || "").toLowerCase().includes(deferredSearch.toLowerCase())
   );
 
   // ✅ Handle Form Change
@@ -977,9 +977,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
 
 // ✅ Wrapper
 const BotReplySettingsAPI = ({ isDemo }) => (
-  <Suspense fallback={<div className="p-6 text-center text-gray-500">Loading Bot Settings...</div>}>
-    <BotReplySettingsContent isDemo={isDemo} />
-  </Suspense>
+  <BotReplySettingsContent isDemo={isDemo} />
 );
 
 export default BotReplySettingsAPI;

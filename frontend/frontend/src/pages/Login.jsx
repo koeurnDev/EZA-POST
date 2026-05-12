@@ -62,7 +62,7 @@ export default function Login() {
               whileHover={{ rotate: 12, scale: 1.1 }}
               className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/30 mb-4 md:mb-6"
             >
-              <Zap className="text-white fill-white" size={24} md:size={28} />
+              <Zap className="text-white fill-white" size={24}  />
             </MotionDiv>
             <div className="text-center">
               <h1 className="text-xl md:text-3xl font-bold tracking-tight mb-2">ចូលគណនី EZA_POST</h1>
@@ -103,12 +103,12 @@ export default function Login() {
           className="mt-6 md:mt-8 flex flex-wrap items-center justify-center gap-3 md:gap-4 text-gray-600"
         >
           <div className="flex items-center gap-2">
-            <ShieldCheck size={12} md:size={14} />
+            <ShieldCheck size={12}  />
             <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-center">End-to-End Encryption</span>
           </div>
           <div className="hidden md:block w-1 h-1 bg-gray-800 rounded-full" />
           <div className="flex items-center gap-2">
-            <Lock size={12} md:size={14} />
+            <Lock size={12}  />
             <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-center">Secure Core v2.6</span>
           </div>
         </MotionDiv>

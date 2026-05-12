@@ -74,7 +74,7 @@ const ViralPosts = () => {
                     >
                         <h1 className="text-2xl md:text-4xl font-black text-gray-900 dark:text-white flex items-center gap-3">
                             <div className="p-2 md:p-2.5 bg-orange-600 text-white rounded-xl md:rounded-2xl shadow-xl shadow-orange-500/30">
-                                <Flame size={22} md:size={28} />
+                                <Flame size={22}  />
                             </div>
                             Viral Hub
                         </h1>
@@ -102,7 +102,7 @@ const ViralPosts = () => {
                 {viralPosts.length === 0 ? (
                     <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl md:rounded-[2.5rem] border border-dashed border-gray-200 dark:border-gray-700 mx-1">
                         <div className="w-16 h-16 md:w-20 md:h-20 bg-gray-50 dark:bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <TrendingUp size={32} md:size={40} className="text-gray-300" />
+                            <TrendingUp size={32}  className="text-gray-300" />
                         </div>
                         <h3 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">No viral posts found</h3>
                         <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-2">Publish more content to see performance insights here.</p>
@@ -135,7 +135,7 @@ const ViralPosts = () => {
                                         <div className="absolute top-3 md:top-4 inset-x-3 md:inset-x-4 flex justify-between items-start">
                                             <div className="flex flex-col gap-2">
                                                 <div className={`px-3 md:px-4 py-1.5 rounded-full backdrop-blur-xl bg-orange-600/90 text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-xl border border-white/20 flex items-center gap-1.5 md:gap-2`}>
-                                                    <Flame size={10} md:size={12} strokeWidth={3} />
+                                                    <Flame size={10}  strokeWidth={3} />
                                                     {item.viralTier}
                                                 </div>
                                                 {item.post.isBoosted && (
@@ -146,7 +146,7 @@ const ViralPosts = () => {
                                             </div>
 
                                             <div className="bg-white/90 dark:bg-black/50 backdrop-blur-md px-2.5 md:px-3 py-1 md:py-1.5 rounded-xl md:rounded-2xl flex items-center gap-1.5 md:gap-2 shadow-lg">
-                                                <Sparkles size={12} md:size={14} className="text-orange-500" />
+                                                <Sparkles size={12}  className="text-orange-500" />
                                                 <span className="text-xs md:text-sm font-black text-gray-900 dark:text-white">{Math.round(item.viralScore)}</span>
                                             </div>
                                         </div>
@@ -184,14 +184,14 @@ const ViralPosts = () => {
                                                 onClick={() => handleBoostClick(item)}
                                                 className="flex-1 rounded-xl md:rounded-2xl bg-gradient-to-r from-orange-600 to-red-600 border-none h-11 md:h-12 text-xs md:text-sm"
                                             >
-                                                <TrendingUp size={16} md:size={18} /> Boost
+                                                <TrendingUp size={16}  /> Boost
                                             </Button>
                                             <button
                                                 onClick={() => handleSyncMetrics(item.post._id)}
                                                 disabled={syncing === item.post._id}
                                                 className="w-11 h-11 md:w-12 md:h-12 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-xl md:rounded-2xl flex items-center justify-center transition-all disabled:opacity-50"
                                             >
-                                                <RefreshCw size={16} md:size={18} className={syncing === item.post._id ? 'animate-spin' : ''} />
+                                                <RefreshCw size={16}  className={syncing === item.post._id ? 'animate-spin' : ''} />
                                             </button>
                                         </div>
                                     </div>

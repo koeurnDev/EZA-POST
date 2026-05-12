@@ -156,7 +156,7 @@ export default function Connections() {
                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 md:gap-8 relative z-10">
                                 <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6 md:gap-8">
                                     <div className={`w-16 h-16 md:w-24 md:h-24 shrink-0 rounded-2xl md:rounded-[2rem] flex items-center justify-center bg-gradient-to-br ${platform.color} text-white shadow-2xl transition-transform duration-700 group-hover:rotate-[5deg] group-hover:scale-110`}>
-                                        <platform.icon size={platform.id === 'facebook' ? 32 : 48} md:size={48} strokeWidth={1.5} />
+                                        <platform.icon size={platform.id === 'facebook' ? 32 : 48}  strokeWidth={1.5} />
                                     </div>
                                     <div className="max-w-md">
                                         <div className="flex flex-col sm:flex-row items-center gap-2 md:gap-4 mb-2">
@@ -183,7 +183,7 @@ export default function Connections() {
                                                     className="w-full sm:w-auto h-12 md:h-14 px-6 md:px-10 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-widest border-rose-500/20 text-rose-500 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all shadow-xl hover:shadow-rose-600/20 group/btn"
                                                     onClick={() => handleConnect(platform.id)}
                                                 >
-                                                    <X size={14} md:size={16} className="mr-2 group-hover/btn:rotate-90 transition-transform" />
+                                                    <X size={14}  className="mr-2 group-hover/btn:rotate-90 transition-transform" />
                                                     Remove
                                                 </Button>
                                             </MotionDiv>
@@ -199,7 +199,7 @@ export default function Connections() {
                                                     className="w-full sm:w-auto h-12 md:h-14 px-8 md:px-12 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 shadow-2xl shadow-emerald-600/30 group/btn"
                                                     onClick={() => handleConnect(platform.id)}
                                                 >
-                                                    <Zap size={14} md:size={16} className="mr-2 group-hover/btn:scale-125 transition-transform" />
+                                                    <Zap size={14}  className="mr-2 group-hover/btn:scale-125 transition-transform" />
                                                     Connect Now
                                                 </Button>
                                             </MotionDiv>
@@ -234,7 +234,7 @@ export default function Connections() {
                                 onClick={() => fetchPages(true)} 
                                 className="w-9 h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-emerald-500 transition-all border border-white/10 shadow-inner"
                             >
-                                <RefreshCw size={16} md:size={18} className={isLoadingPages ? "animate-spin text-emerald-500" : ""} />
+                                <RefreshCw size={16}  className={isLoadingPages ? "animate-spin text-emerald-500" : ""} />
                             </button>
                         </div>
 
@@ -308,7 +308,7 @@ export default function Connections() {
                                                             <div key={setting.key} className="bg-white/40 dark:bg-white/5 p-5 md:p-6 rounded-2xl md:rounded-[1.8rem] border border-white/10 dark:border-white/5 shadow-sm flex flex-col justify-between gap-4 md:gap-6 hover:border-emerald-500/30 transition-all group/setting">
                                                                 <div>
                                                                     <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-[1rem] flex items-center justify-center mb-3 md:mb-4 transition-all group-hover/setting:scale-110 ${setting.key === "enableBot" ? "bg-blue-500/10 text-blue-500" : setting.key === "enableSchedule" ? "bg-indigo-500/10 text-indigo-500" : "bg-emerald-500/10 text-emerald-500"}`}>
-                                                                        <setting.icon size={18} md:size={22} />
+                                                                        <setting.icon size={18}  />
                                                                     </div>
                                                                     <span className="font-black text-gray-900 dark:text-white text-xs md:text-sm uppercase tracking-widest">{setting.label}</span>
                                                                     <p className="text-[11px] md:text-xs text-gray-500 mt-1 font-medium">{setting.desc}</p>
@@ -347,7 +347,7 @@ export default function Connections() {
                     
                     <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10 relative z-10">
                         <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-500/10 rounded-2xl md:rounded-[1.8rem] flex items-center justify-center text-emerald-500 border border-emerald-500/20 shadow-inner">
-                            <ShieldCheck size={32} md:size={40} />
+                            <ShieldCheck size={32}  />
                         </div>
                         <div className="flex-1 text-center md:text-left">
                             <div className="flex items-center justify-center md:justify-start gap-2 md:gap-3 mb-2 md:mb-3">

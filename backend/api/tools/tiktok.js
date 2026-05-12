@@ -491,7 +491,7 @@ router.post("/compatible", requireAuth, async (req, res) => {
         let videoUrlToDownload = cleanUrl;
         
         // 🛠️ SMART RESOLUTION: If it's already a direct CDN link, use it. Otherwise, resolve.
-        const isDirectLink = cleanUrl.match(/(tiktokcdn|bytevc1|muscdn|akamaized|ibyteimg)/i);
+        const isDirectLink = cleanUrl.match(/(tiktokcdn|bytevc1|muscdn|akamaized|ibyteimg|tiktok\.com\/video\/tos|v19-webapp)/i);
         
         if (!isDirectLink) {
             console.log("       🔍 Resolving direct media link...");
@@ -520,19 +520,44 @@ router.post("/compatible", requireAuth, async (req, res) => {
         const proxy = process.env.TIKTOK_PROXY;
         const proxyArg = proxy ? `--proxy "${proxy}"` : "";
         const mobileUA = "com.zhiliaoapp.musically/2022605040 (Linux; U; Android 13; en_US; Pixel 7; Build/TQ3A.230605.012; Cronet/58.0.2991.0)";
+        const ffmpegPath = require('ffmpeg-static');
 
         let downloadSuccess = false;
+        let transcodeDone = false;
 
-        // 🚀 Stage 1: Try yt-dlp Direct
+        // 🚀 ⚡ STAGE 0: Turbo Transcode (Stream direct from URL to FFmpeg)
+        // This is the fastest method because it skips downloading to disk first.
         try {
-            console.log("       👉 Stage 1: Attempting yt-dlp Direct...");
-            const cmd = `"${ytDlpPath}" -y ${proxyArg} -o "${inputPath}" "${downloadUrl}" --no-playlist --no-warnings --user-agent "${mobileUA}" --no-check-certificates --add-header "Referer:https://www.tiktok.com/"`;
-            execSync(cmd, { stdio: 'pipe' });
-            if (fs.existsSync(inputPath) && fs.statSync(inputPath).size > 100 * 1024) {
+            console.log("       ⚡ Stage 0: Attempting Turbo Transcode (Direct Stream)...");
+            const startTime = Date.now();
+            // We use -t 60 to prevent infinite loops and limit processing to 60s
+            // -headers passes necessary TikTok auth headers
+            const turboCmd = `"${ffmpegPath}" -y -headers "User-Agent: ${mobileUA}\r\nReferer: https://www.tiktok.com/\r\n" -i "${downloadUrl}" -t 60 -c:v libx264 -preset ultrafast -crf 28 -c:a copy -threads 0 "${outputPath}"`;
+            
+            execSync(turboCmd, { stdio: 'pipe', timeout: 45000 }); // 45s timeout for transcode
+            
+            if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 100 * 1024) {
+                const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+                console.log(`       ✅ Turbo Transcode success in ${duration}s!`);
                 downloadSuccess = true;
+                transcodeDone = true;
             }
-        } catch (e1) {
-            console.warn("       ⚠️ Stage 1 Failed, trying Stage 2 (Embed Link extraction)...");
+        } catch (turboErr) {
+            console.warn("       ⚠️ Turbo Transcode failed or timed out. Falling back to Stage 1...");
+        }
+
+        // 🚀 Stage 1: Try yt-dlp Direct (Fallback)
+        if (!downloadSuccess) {
+            try {
+                console.log("       👉 Stage 1: Attempting yt-dlp Direct...");
+                const cmd = `"${ytDlpPath}" -y ${proxyArg} -o "${inputPath}" "${downloadUrl}" --no-playlist --no-warnings --user-agent "${mobileUA}" --no-check-certificates --add-header "Referer:https://www.tiktok.com/"`;
+                execSync(cmd, { stdio: 'pipe' });
+                if (fs.existsSync(inputPath) && fs.statSync(inputPath).size > 100 * 1024) {
+                    downloadSuccess = true;
+                }
+            } catch (e1) {
+                console.warn("       ⚠️ Stage 1 Failed, trying Stage 2 (Embed Link extraction)...");
+            }
         }
 
         // 🚀 Stage 2: Embed Fallback
@@ -587,18 +612,43 @@ router.post("/compatible", requireAuth, async (req, res) => {
 
         console.log("       ✅ Download complete.");
 
-        // 2. Process with FFmpeg
-        const ffmpegPath = require('ffmpeg-static');
-        
+        // 2. Codec Detection & Optimized Processing
+        let skipTranscode = transcodeDone; 
+
+        if (!skipTranscode) {
+            try {
+                console.log("       🔍 Checking codec for optimization skip...");
+                // Run a quick probe using ffmpeg (since ffprobe might not be in path)
+                // Note: ffmpeg -i always returns non-zero if no output is specified, so we catch the error to get the output
+                let probe = "";
+                try {
+                    execSync(`"${ffmpegPath}" -i "${inputPath}"`, { stdio: 'pipe' });
+                } catch (e) {
+                    probe = e.stderr?.toString() || e.stdout?.toString() || "";
+                }
+                
+                if (probe.includes("Video: h264") || probe.includes("Video: avc1")) {
+                    console.log("       ⚡ Video is already H.264! Skipping transcode for maximum speed.");
+                    skipTranscode = true;
+                }
+            } catch (e) {
+                console.log("       ⚠️ Codec probe failed, falling back to full transcode.");
+            }
+        }
+
         try {
-            console.log("       🎬 Starting FFmpeg re-encode (H.264 / Ultrafast)...");
-            const startTime = Date.now();
-            
-            // Use ultrafast preset to minimize CPU usage and prevent timeouts on cloud platforms
-            execSync(`"${ffmpegPath}" -y -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 24 -c:a aac -b:a 128k "${outputPath}"`, { stdio: 'pipe' });
-            
-            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-            console.log(`       ✅ FFmpeg re-encode complete in ${duration}s.`);
+            if (skipTranscode) {
+                fs.renameSync(inputPath, outputPath);
+            } else {
+                console.log("       🎬 Starting FFmpeg re-encode (H.264 / Ultrafast)...");
+                const startTime = Date.now();
+                
+                // Optimized FFmpeg command: ultrafast, low quality penalty for speed, copy audio to save time
+                execSync(`"${ffmpegPath}" -y -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 28 -c:a copy -threads 0 "${outputPath}"`, { stdio: 'pipe' });
+                
+                const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+                console.log(`       ✅ FFmpeg re-encode complete in ${duration}s.`);
+            }
         } catch (err) {
             const errorMsg = err.stderr?.toString() || err.stdout?.toString() || err.message;
             console.error("       ❌ FFmpeg failed:", errorMsg);
@@ -692,11 +742,32 @@ router.post("/profile", requireAuth, async (req, res) => {
 router.post("/trending", requireAuth, async (req, res) => {
     try {
         const { region = "US", count = 20, type = 'music' } = req.body;
-        // Trending is not supported locally without external APIs.
-        // We will return an empty list or a message to use direct search.
-        res.status(403).json({ success: false, error: "Trending feature requires external APIs and is currently disabled for privacy." });
+        console.log(`🔍 Fetching TikTok Trends for region: ${region} (Count: ${count})`);
+
+        // Use TikWM Feed API to get real trending content
+        // This restores functionality to Viral Finder and TikTok Trends pages
+        const tikwmRes = await axios.get(`https://www.tikwm.com/api/feed/list?region=${region}&count=${count}`, {
+            timeout: 10000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        
+        if (tikwmRes.data && tikwmRes.data.data) {
+            const formattedVideos = tikwmRes.data.data.map(v => formatTikTokVideo(v));
+            console.log(`   ✅ Successfully fetched ${formattedVideos.length} trending items.`);
+            return res.json({ 
+                success: true, 
+                videos: formattedVideos 
+            });
+        }
+
+        res.json({ 
+            success: true, 
+            videos: [], 
+            message: "No trending videos found for this region." 
+        });
     } catch (err) {
-        res.status(500).json({ success: false, error: "Server Error" });
+        console.error("❌ Trending Route Error:", err.message);
+        res.status(500).json({ success: false, error: "Failed to fetch trending feed. Please try again later." });
     }
 });
 
@@ -776,21 +847,47 @@ router.post("/combine", requireAuth, async (req, res) => {
         const localAudioPath = path.join(targetFolder, "bgm.mp3");
 
         // 1. Download Images
+        const mobileUA = "com.zhiliaoapp.musically/2022605040 (Linux; U; Android 13; en_US; Pixel 7; Build/TQ3A.230605.012; Cronet/58.0.2991.0)";
+        const commonHeaders = {
+            'User-Agent': mobileUA,
+            'Referer': 'https://www.tiktok.com/'
+        };
+
         for (let i = 0; i < images.length; i++) {
-            const imgPath = path.join(targetFolder, `img_${i + 1}.jpg`);
-            const writer = fs.createWriteStream(imgPath);
-            const resp = await axios({ url: images[i], method: 'get', responseType: 'stream', timeout: 10000 });
-            resp.data.pipe(writer);
-            await new Promise((resolve, reject) => {
-                writer.on('finish', resolve);
-                writer.on('error', reject);
-            });
-            localImagePaths.push(imgPath);
+            try {
+                console.log(`       📸 Downloading image ${i + 1}/${images.length}...`);
+                const imgPath = path.join(targetFolder, `img_${i + 1}.jpg`);
+                const writer = fs.createWriteStream(imgPath);
+                const resp = await axios({ 
+                    url: images[i], 
+                    method: 'get', 
+                    responseType: 'stream', 
+                    timeout: 15000,
+                    headers: commonHeaders
+                });
+                resp.data.pipe(writer);
+                await new Promise((resolve, reject) => {
+                    writer.on('finish', resolve);
+                    writer.on('error', reject);
+                });
+                localImagePaths.push(imgPath);
+            } catch (imgErr) {
+                console.warn(`       ⚠️ Failed to download image ${i + 1}, skipping...`);
+            }
         }
 
+        if (localImagePaths.length === 0) throw new Error("Failed to download any images for slideshow.");
+
         // 2. Download Audio
+        console.log(`       🎵 Downloading audio...`);
         const audioWriter = fs.createWriteStream(localAudioPath);
-        const audioResp = await axios({ url: audio, method: 'get', responseType: 'stream', timeout: 15000 });
+        const audioResp = await axios({ 
+            url: audio, 
+            method: 'get', 
+            responseType: 'stream', 
+            timeout: 20000,
+            headers: commonHeaders
+        });
         audioResp.data.pipe(audioWriter);
         await new Promise((resolve, reject) => {
             audioWriter.on('finish', resolve);
@@ -800,49 +897,54 @@ router.post("/combine", requireAuth, async (req, res) => {
         // 3. Generate Video
         const outputFilename = `combined_${safeId}.mp4`;
         const outputPath = path.join(targetFolder, outputFilename);
-        
-        // Calculate duration: if 1 image, make it 10s. If more, 5s per slide.
         const durationPerSlide = images.length === 1 ? 10 : 5;
 
-        await createSlideshow(localImagePaths, localAudioPath, outputPath, durationPerSlide);
+        try {
+            await createSlideshow(localImagePaths, localAudioPath, outputPath, durationPerSlide);
+            // ⏳ Small delay to ensure FFmpeg releases file handles (Crucial for Windows EPERM)
+            await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (genErr) {
+            console.error("       ❌ Slideshow FFmpeg Error:", genErr.message);
+            throw new Error(`FFmpeg Failed: ${genErr.message}`);
+        }
 
         // 4. Move output to tempDir for streaming
-        const finalCacheFilename = `tiktok-combined-${safeId}-${Date.now()}.mp4`;
+        const urlHash = crypto.createHash("md5").update("local_merge").digest("hex").slice(0, 8);
+        const finalCacheFilename = `tiktok-combined_${safeId}-${urlHash}.mp4`;
         const finalCachePath = path.join(tempDir, finalCacheFilename);
-        fs.renameSync(outputPath, finalCachePath);
+        
+        if (fs.existsSync(outputPath)) {
+            try {
+                // Try rename first (fastest)
+                fs.renameSync(outputPath, finalCachePath);
+            } catch (moveErr) {
+                console.warn("       ⚠️ Rename failed, trying copy-and-delete...");
+                fs.copyFileSync(outputPath, finalCachePath);
+                fs.unlinkSync(outputPath);
+            }
+        } else {
+            throw new Error("FFmpeg output file missing after generation.");
+        }
 
         // 5. Cleanup temp folder
         setTimeout(() => fs.rm(targetFolder, { recursive: true, force: true }, () => { }), 1000);
 
         const safeTitle = (title || "tiktok").replace(/[^a-z0-9\u0080-\uffff]/gi, "_").substring(0, 50);
-        const streamUrl = `/api/tools/tiktok/stream?id=combined_${safeId}&url=${encodeURIComponent("local")}&filename=${encodeURIComponent(safeTitle + ".mp4")}&path=${encodeURIComponent(finalCachePath)}`;
-        
-        // Note: The /stream endpoint needs to handle the 'path' parameter if we want to serve local files directly easily,
-        // or we just use the cache naming convention.
-        // Let's check /stream logic. It expects 'id' and 'url' to find/create cachePath.
-        
-        // I'll update /stream to support a local file bypass or just use the cache naming convention.
-        // Actually, /stream uses: const cacheFilename = `tiktok-${safeId}-${urlHash}.mp4`;
-        // If I name it correctly, /stream will find it.
-        
-        const urlHash = crypto.createHash("md5").update("local_merge").digest("hex").slice(0, 8);
-        const correctCacheFilename = `tiktok-combined_${safeId}-${urlHash}.mp4`;
-        const correctCachePath = path.join(tempDir, correctCacheFilename);
-        
-        if (fs.existsSync(finalCachePath)) {
-            fs.renameSync(finalCachePath, correctCachePath);
-        }
-
         const finalStreamUrl = `/api/tools/tiktok/stream?id=combined_${safeId}&url=${encodeURIComponent("local_merge")}&filename=${encodeURIComponent(safeTitle + ".mp4")}`;
 
         res.json({
             success: true,
-            url: finalStreamUrl
+            url: finalStreamUrl,
+            streamUrl: finalStreamUrl,
+            path: finalCachePath      
         });
 
     } catch (err) {
-        console.error("❌ Combine Error:", err.message);
-        res.status(500).json({ success: false, error: err.message });
+        console.error("🎬 [Combine] Error:", err.message);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message || "Failed to generate HD Slideshow" 
+        });
     }
 });
 
@@ -854,8 +956,9 @@ router.get("/stream", async (req, res) => {
         const { id, url, filename } = req.query;
         if (!id || id === 'undefined' || !url) return res.status(400).send("Missing parameters: id or url");
 
-        // 🔐 Security: Domain Allowlist
-        if (!url.match(/(tiktokcdn|tiktokv|tiktok|bytevc|tikwm|douyin|muscdn|akamaized|local_|local_merge)/i)) {
+        // 🔐 Security: Domain Allowlist (Updated to allow local absolute paths from transcoding)
+        const isLocalPath = path.isAbsolute(url) && fs.existsSync(url);
+        if (!isLocalPath && !url.match(/(tiktokcdn|tiktokv|tiktok|bytevc|tikwm|douyin|muscdn|akamaized|v19-webapp|local_|local_merge)/i)) {
             return res.status(403).send("Forbidden Source: " + url);
         }
 
@@ -876,6 +979,10 @@ router.get("/stream", async (req, res) => {
             const headers = {
                 'Cache-Control': 'no-store',
                 'Accept-Ranges': 'bytes',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                'Access-Control-Allow-Headers': 'Range',
+                'Access-Control-Expose-Headers': 'Content-Range, Content-Length, Accept-Ranges',
             };
 
             if (isDownload) {
@@ -924,6 +1031,30 @@ router.get("/stream", async (req, res) => {
         
         // 2️⃣ CACHE MISS: Download & Stream (Try direct media first for speed)
         const mobileUA = "com.zhiliaoapp.musically/2022605040 (Linux; U; Android 13; en_US; Pixel 7; Build/TQ3A.230605.012; Cronet/58.0.2991.0)";
+        
+        // Handle local transcoded files immediately
+        if (isLocalPath) {
+            console.log(`🎬 [Stream] Serving local transcoded file: ${url}`);
+            const stat = fs.statSync(url);
+            const range = req.headers.range;
+            if (range) {
+                const parts = range.replace(/bytes=/, "").split("-");
+                const start = parseInt(parts[0], 10);
+                const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+                const chunksize = (end - start) + 1;
+                const file = fs.createReadStream(url, { start, end });
+                res.writeHead(206, {
+                    ...getCommonHeaders(),
+                    'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+                    'Content-Length': chunksize,
+                });
+                return file.pipe(res);
+            } else {
+                res.writeHead(200, getCommonHeaders(stat.size));
+                return fs.createReadStream(url).pipe(res);
+            }
+        }
+
         const isDirectMedia = url.match(/(tiktokcdn|tiktokv|bytevc|muscdn|akamaized|douyin|v19-webapp-prime\.tiktok\.com|v16-webapp\.tiktok\.com|playAddr)/i);
 
         if (isDirectMedia) {
@@ -937,7 +1068,7 @@ router.get("/stream", async (req, res) => {
                         'User-Agent': mobileUA,
                         'Referer': 'https://www.tiktok.com/'
                     },
-                    timeout: 30000,
+                    timeout: 60000,
                 });
 
                 const contentLength = parseInt(sourceRes.headers['content-length'], 10);
@@ -950,7 +1081,7 @@ router.get("/stream", async (req, res) => {
                 const writer = fs.createWriteStream(cachePath);
                 pass.pipe(writer);
                 writer.on('finish', () => console.log(`✅ [Stream] Cached direct media: ${cacheFilename}`));
-                writer.on('error', (err) => console.warn(`⚠️ [Stream] Cache write failed: ${err.message}`));
+                writer.on('error', (err) => console.warn(`❌ [Stream] Cache write failed: ${err.message}`));
                 return;
             } catch (err) {
                 console.warn(`⚠️ [Stream] Direct media download failed: ${err.message}`);
@@ -1015,9 +1146,9 @@ router.get("/stream", async (req, res) => {
                         res.writeHead(200, getCommonHeaders(downloadDone ? stat.size : null));
                         fs.createReadStream(cachePath).pipe(res);
                     }
-                } else if (attempts > 30) { // 30 seconds timeout
+                } else if (attempts > 90) { // 90 seconds timeout (increased for reliability)
                     clearInterval(checkFile);
-                    if (!res.headersSent) res.status(504).send("Download Timeout");
+                    if (!res.headersSent) res.status(504).send("Streaming Timeout: TikTok source is responding too slowly.");
                 }
             }, 1000);
 

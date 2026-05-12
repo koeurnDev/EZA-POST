@@ -68,6 +68,21 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    // 🛡️ Check for token in URL (from FB redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get("token");
+    if (urlToken) {
+      console.log("🎟️ Found token in URL, syncing session...");
+      localStorage.setItem("eza_post_token", urlToken);
+      // Remove token from URL to keep it clean
+      const newUrl = window.location.pathname + window.location.search.replace(/[\?&]token=[^&]+/, '').replace(/^&/, '?');
+      window.history.replaceState({}, document.title, newUrl);
+      // Force refresh status
+      checkAuthStatus();
+    }
+  }, [checkAuthStatus]);
+
+  useEffect(() => {
     checkAuthStatus();
   }, [checkAuthStatus]);
 
@@ -79,6 +94,9 @@ export const AuthProvider = ({ children }) => {
     if (data?.user) {
       setUser(data.user);
       saveUserData(data.user);
+      if (data.token) {
+        localStorage.setItem("eza_post_token", data.token);
+      }
     }
     return data.user;
   };
@@ -91,6 +109,9 @@ export const AuthProvider = ({ children }) => {
     if (data?.user) {
       setUser(data.user);
       saveUserData(data.user);
+      if (data.token) {
+        localStorage.setItem("eza_post_token", data.token);
+      }
     }
     return data.user;
   };
@@ -103,6 +124,9 @@ export const AuthProvider = ({ children }) => {
     if (data?.user) {
       setUser(data.user);
       saveUserData(data.user);
+      if (data.token) {
+        localStorage.setItem("eza_post_token", data.token);
+      }
       // Also set isDemo flag in localStorage for Dashboard
       localStorage.setItem("isDemo", "true");
     }
@@ -120,6 +144,7 @@ export const AuthProvider = ({ children }) => {
     }
     setUser(null);
     clearUserData();
+    localStorage.removeItem("eza_post_token");
   };
 
   // ✅ Update User Profile

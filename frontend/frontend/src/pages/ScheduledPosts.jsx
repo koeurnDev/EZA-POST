@@ -126,7 +126,7 @@ export default function ScheduledPosts() {
                     >
                         <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white flex items-center gap-3">
                             <div className="p-2 md:p-2.5 bg-blue-600 text-white rounded-xl md:rounded-2xl shadow-xl shadow-blue-500/30">
-                                <Clock size={24} md:size={28} />
+                                <Clock size={24}  />
                             </div>
                             Queue
                         </h1>
@@ -156,7 +156,7 @@ export default function ScheduledPosts() {
                             onClick={() => window.location.href = "/dashboard"}
                             className="w-full md:w-auto rounded-xl md:rounded-2xl px-6 h-12 md:h-14 shadow-xl text-sm md:text-base font-black uppercase tracking-widest"
                         >
-                            <Plus size={18} md:size={20} className="mr-2" /> បង្កើតថ្មី
+                            <Plus size={18}  className="mr-2" /> បង្កើតថ្មី
                         </Button>
                     </MotionDiv>
                 </div>
@@ -230,7 +230,7 @@ export default function ScheduledPosts() {
 
                                                         <div className="flex items-center justify-between mt-auto">
                                                             <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded-lg md:rounded-xl border border-gray-100 dark:border-gray-700">
-                                                                <Clock size={12} md:size={14} className="text-blue-500" />
+                                                                <Clock size={12}  className="text-blue-500" />
                                                                 <span className="text-xs md:text-sm font-black text-gray-600 dark:text-gray-300">
                                                                     {new Date(q.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                 </span>
@@ -252,7 +252,7 @@ export default function ScheduledPosts() {
                                                             onClick={() => cancelScheduledPost(q.id)}
                                                             className="p-2 md:p-2.5 bg-white/95 dark:bg-gray-800/95 text-red-500 rounded-full shadow-lg border border-gray-100 dark:border-gray-700 hover:bg-red-500 hover:text-white transition-all"
                                                         >
-                                                            <Trash2 size={16} md:size={18} />
+                                                            <Trash2 size={16}  />
                                                         </button>
                                                     </div>
                                                 </MotionDiv>

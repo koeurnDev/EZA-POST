@@ -51,8 +51,13 @@ router.get('/', requireAuth, async (req, res) => {
 
         res.json({ success: true, connections });
     } catch (err) {
-        console.error("Connections Check Error:", err);
-        res.status(500).json({ success: false, error: "Server Error" });
+        console.error("❌ [Connections API] Error:", err);
+        res.status(500).json({ 
+            success: false, 
+            error: "Server Error",
+            details: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
     }
 });
 

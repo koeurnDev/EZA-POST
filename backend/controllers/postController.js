@@ -39,23 +39,22 @@ exports.createPost = async (req, res) => {
 
         // ✅ Auto-Select All Pages if accounts is missing
         if (!accountsArray || accountsArray.length === 0) {
-            const user = await prisma.user.findUnique({ where: { id: userId }, select: { connectedPages: true } });
-            let connectedPages = user?.connectedPages;
-            if (typeof connectedPages === 'string') try { connectedPages = JSON.parse(connectedPages) } catch (e) { }
-            if (Array.isArray(connectedPages)) accountsArray = connectedPages.map(p => p.id);
+            const user = await prisma.user.findUnique({ 
+                where: { id: userId }, 
+                include: { facebookPages: true } 
+            });
+            accountsArray = user?.facebookPages?.map(p => p.id) || [];
         }
 
-        // 🤖 Handle Auto-Reply Bot Activation
+        // 🤖 Handle Auto-Reply Bot Activation (Update FacebookPage model directly)
         if (enableBot === 'true' || enableBot === true) {
-            const user = await prisma.user.findUnique({ where: { id: userId } });
-            let pageSettings = user.pageSettings || [];
-            if (typeof pageSettings === 'string') try { pageSettings = JSON.parse(pageSettings) } catch(e) { pageSettings = [] }
-            accountsArray.forEach(pageId => {
-                const idx = pageSettings.findIndex(s => s.pageId === pageId);
-                if (idx > -1) pageSettings[idx].enableBot = true;
-                else pageSettings.push({ pageId, enableBot: true });
+            await prisma.facebookPage.updateMany({
+                where: { 
+                    id: { in: accountsArray },
+                    userId: userId 
+                },
+                data: { enableBot: true }
             });
-            await prisma.user.update({ where: { id: userId }, data: { pageSettings } });
         }
 
         // 📦 Prepare Job Payload

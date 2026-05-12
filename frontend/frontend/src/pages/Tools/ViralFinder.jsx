@@ -78,10 +78,10 @@ export default function ViralFinder() {
 
     return (
         <DashboardLayout>
-            {/* 🌈 Modern Background Mesh (Pink/Violet) */}
+            {/* 🌈 Optimized Background Mesh (Less heavy on mobile) */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-pink-500/10 to-violet-500/10 rounded-full blur-[120px] animate-pulse" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-rose-500/10 to-purple-500/10 rounded-full blur-[120px] animate-pulse delay-700" />
+                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-pink-500/10 to-violet-500/10 rounded-full blur-[60px] md:blur-[120px] md:animate-pulse" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-rose-500/10 to-purple-500/10 rounded-full blur-[60px] md:blur-[120px] md:animate-pulse delay-700" />
             </div>
 
             <motion.div 
@@ -103,8 +103,8 @@ export default function ViralFinder() {
                     </motion.p>
                 </div>
 
-                {/* 🎛️ Controls */}
-                <div className="sticky top-4 z-40 bg-white/40 dark:bg-black/40 backdrop-blur-3xl border border-white/20 dark:border-white/10 rounded-[2rem] p-2 shadow-2xl flex flex-col md:flex-row gap-4 items-center justify-between max-w-5xl mx-auto">
+                {/* 🎛️ Controls (Optimized for Mobile Performance) */}
+                <div className="sticky top-4 z-40 bg-white/90 dark:bg-black/90 md:bg-white/40 md:dark:bg-black/40 md:backdrop-blur-3xl border border-white/20 dark:border-white/10 rounded-[2rem] p-2 shadow-2xl flex flex-col md:flex-row gap-4 items-center justify-between max-w-5xl mx-auto">
                     <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-2xl w-full md:w-auto">
                         <button
                             onClick={() => setFilterType('video')}
@@ -235,8 +235,8 @@ export default function ViralFinder() {
                 {!loading && videos.length === 0 && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-40 space-y-6 text-center opacity-50">
                         <Globe size={48} className="text-gray-400" />
-                        <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-widest">Global feed empty</h3>
-                        <p className="text-xs font-bold uppercase tracking-[0.2em]">Switching regions may resolve this</p>
+                        <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-widest">Feed is currently empty</h3>
+                        <p className="text-xs font-bold uppercase tracking-[0.1em] max-w-xs mx-auto">Switching regions or refreshing may resolve this. You can also paste a TikTok link directly in the search bar.</p>
                         <button onClick={fetchViralVideos} className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl">Refresh Feed</button>
                     </motion.div>
                 )}

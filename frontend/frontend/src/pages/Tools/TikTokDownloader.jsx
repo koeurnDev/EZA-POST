@@ -579,15 +579,15 @@ export default function TikTokDownloader() {
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
                                                 {selectedVideos.has(video.id) && (
                                                     <div className="absolute top-2 right-2 md:top-3 md:right-3 bg-pink-500 text-white p-1 md:p-1.5 rounded-full shadow-2xl">
-                                                        <Check size={12} md:size={14} strokeWidth={4} />
+                                                        <Check size={12}  strokeWidth={4} />
                                                     </div>
                                                 )}
                                                 <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest drop-shadow-md">
                                                     <div className="flex items-center gap-1">
-                                                        <Play size={8} md:size={10} fill="white" stroke="none" />
+                                                        <Play size={8}  fill="white" stroke="none" />
                                                         {video.stats?.plays > 1000 ? (video.stats.plays / 1000).toFixed(1) + 'K' : (video.stats?.plays || 0)}
                                                     </div>
-                                                    {video.type === 'slideshow' && <Layers size={10} md:size={12} />}
+                                                    {video.type === 'slideshow' && <Layers size={10}  />}
                                                 </div>
                                             </motion.div>
                                         ))}
@@ -613,7 +613,7 @@ export default function TikTokDownloader() {
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-1 md:gap-2 shrink-0">
-                                                        <button onClick={() => setSelectedVideos(new Set())} className="p-2 md:p-3 text-gray-400 hover:text-white dark:hover:text-black transition-colors"><Trash2 size={18} md:size={20} /></button>
+                                                        <button onClick={() => setSelectedVideos(new Set())} className="p-2 md:p-3 text-gray-400 hover:text-white dark:hover:text-black transition-colors"><Trash2 size={18}  /></button>
                                                         <button onClick={handleBulkDownload} disabled={isDownloading} className="px-4 md:px-6 py-2.5 md:py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-2xl font-black text-xs md:text-sm transition-all shadow-xl disabled:opacity-50 flex items-center gap-2">
                                                             {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                                                             <span className="hidden sm:inline">{isDownloading ? 'Processing' : 'Download'}</span>

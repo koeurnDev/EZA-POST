@@ -116,7 +116,7 @@ export default function Register() {
           <div className="lg:hidden flex justify-center mb-10 md:mb-16">
             <div className="flex flex-col items-center gap-4">
               <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/30">
-                <Zap size={24} md:size={28} fill="white" className="text-white" />
+                <Zap size={24}  fill="white" className="text-white" />
               </div>
               <div className="text-center">
                 <span className="text-xl md:text-2xl font-bold tracking-tight block">EZA_POST</span>

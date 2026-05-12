@@ -21,14 +21,20 @@ router.get("/rules", requireAuth, async (req, res) => {
       where: { userId: req.user.id },
       orderBy: { createdAt: 'desc' }
     });
-    const status = await prisma.botStatus.findUnique({
-      where: { userId: req.user.id }
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { pageSettings: true }
     });
+    let pageSettings = user?.pageSettings || [];
+    if (typeof pageSettings === 'string') {
+      try { pageSettings = JSON.parse(pageSettings); } catch (e) { pageSettings = []; }
+    }
+
     res.json({
       success: true,
       rules,
       enabled: status?.enabled ?? true,
-      pageSettings: []
+      pageSettings
     });
   } catch (err) {
     console.error("❌ GET /rules error:", err.message);

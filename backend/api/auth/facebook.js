@@ -253,13 +253,14 @@ router.get("/callback", async (req, res) => {
         // 6️⃣ Refresh JWT
         currentStep = "RefreshJWT";
 
-        setAuthCookie(res, {
+        const token = setAuthCookie(res, {
             id: user.id,
             email: user.email,
             name: user.name
         });
-
-        res.redirect(`${process.env.FRONTEND_URL}/settings?success=facebook_connected`);
+        
+        // Pass token in URL for cross-domain localStorage sync (optional but helpful)
+        res.redirect(`${process.env.FRONTEND_URL}/settings?success=facebook_connected&token=${token}`);
 
     } catch (err) {
         console.error("❌ CRITICAL FAILURE IN FB CALLBACK ❌");

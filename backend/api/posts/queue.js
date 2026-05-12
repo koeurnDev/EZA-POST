@@ -17,23 +17,16 @@ router.get("/", requireAuth, async (req, res) => {
       return res.status(401).json({ success: false, error: "Unauthorized" });
 
     // 🔍 Fetch User to get Connected Pages (for mapping IDs to Names/Avatars)
-    // Note: Prisma stores connectedPages as Json.
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { connectedPages: true }
+      include: { facebookPages: true }
     });
 
     const pageMap = {};
-    if (user?.connectedPages) {
-      let pages = user.connectedPages;
-      if (typeof pages === 'string') {
-        try { pages = JSON.parse(pages); } catch (e) { }
-      }
-      if (Array.isArray(pages)) {
-        pages.forEach(p => {
-          pageMap[p.id] = { name: p.name, picture: p.picture };
-        });
-      }
+    if (user?.facebookPages) {
+      user.facebookPages.forEach(p => {
+        pageMap[p.id] = { name: p.name, picture: p.picture };
+      });
     }
 
     // 🔍 Fetch scheduled posts from Postgres

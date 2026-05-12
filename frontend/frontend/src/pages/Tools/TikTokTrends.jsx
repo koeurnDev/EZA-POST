@@ -91,10 +91,10 @@ export default function TikTokTrends() {
 
     return (
         <DashboardLayout>
-            {/* 🌈 Modern Background Mesh (Cyan/Indigo) */}
+            {/* 🌈 Optimized Background Mesh (Performance Tuning) */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-cyan-500/10 to-indigo-500/10 rounded-full blur-[120px] animate-pulse" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-blue-500/10 to-cyan-500/10 rounded-full blur-[120px] animate-pulse delay-700" />
+                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-cyan-500/10 to-indigo-500/10 rounded-full blur-[60px] md:blur-[120px] md:animate-pulse" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-blue-500/10 to-cyan-500/10 rounded-full blur-[60px] md:blur-[120px] md:animate-pulse delay-700" />
             </div>
 
             <motion.div 
@@ -124,7 +124,7 @@ export default function TikTokTrends() {
                             onClick={() => setRegion(r.code)}
                             className={`px-4 py-2.5 md:px-6 md:py-3 rounded-2xl text-xs md:text-sm font-black transition-all border flex items-center gap-2 ${region === r.code 
                                 ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-transparent shadow-xl scale-105' 
-                                : 'bg-white/40 dark:bg-white/5 backdrop-blur-xl border-white/20 text-gray-500 hover:border-cyan-500/50'}`}
+                                : 'bg-white/90 dark:bg-white/10 md:bg-white/40 md:dark:bg-white/5 md:backdrop-blur-xl border-white/20 text-gray-500 hover:border-cyan-500/50'}`}
                         >
                             <span className="text-base md:text-lg">{r.flag}</span>
                             <span className="uppercase tracking-widest">{r.name}</span>
@@ -210,8 +210,8 @@ export default function TikTokTrends() {
                 {!loading && trends.length === 0 && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-40 space-y-4 text-center opacity-50">
                         <Globe size={48} className="text-gray-400" />
-                        <h3 className="text-xl font-black text-gray-900 dark:text-white">NO TRENDS FOUND</h3>
-                        <p className="text-xs font-bold uppercase tracking-widest">Try switching the region above</p>
+                        <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-widest">No Trends Found</h3>
+                        <p className="text-xs font-bold uppercase tracking-widest max-w-xs mx-auto">Try switching the region above to discover viral sounds from other countries.</p>
                     </motion.div>
                 )}
             </motion.div>

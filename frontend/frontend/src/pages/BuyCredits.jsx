@@ -96,11 +96,11 @@ export default function BuyCredits() {
                         className="lg:col-span-4 bg-gradient-to-br from-gray-900 to-black rounded-[2rem] md:rounded-[3rem] p-8 md:p-10 text-white relative overflow-hidden shadow-2xl shadow-amber-500/5 border border-white/5 group"
                     >
                         <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform duration-700">
-                            <Coins size={120} md:size={160} />
+                            <Coins size={120}  />
                         </div>
                         <div className="relative z-10">
                             <div className="w-12 h-12 md:w-14 md:h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-8 md:mb-10 border border-white/10">
-                                <Wallet size={20} md:size={24} className="text-amber-400" />
+                                <Wallet size={20}  className="text-amber-400" />
                             </div>
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Available Balance</p>
                             <h3 className="text-4xl md:text-6xl font-black tracking-tighter mb-8 md:mb-10 flex items-end gap-2">
@@ -109,7 +109,7 @@ export default function BuyCredits() {
                             </h3>
                             <div className="pt-6 md:pt-8 border-t border-white/5 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Activity size={12} md:size={14} className="text-emerald-500" />
+                                    <Activity size={12}  className="text-emerald-500" />
                                     <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Vault Secure</span>
                                 </div>
                                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Live Sync</span>
@@ -182,7 +182,7 @@ export default function BuyCredits() {
                     <div className="p-6 md:p-10 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
                         <div className="flex items-center gap-3 md:gap-4">
                             <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-50 dark:bg-black rounded-xl md:rounded-2xl flex items-center justify-center text-gray-400">
-                                <History size={20} md:size={24} />
+                                <History size={20}  />
                             </div>
                             <h2 className="text-lg md:text-2xl font-black text-gray-900 dark:text-white tracking-tight">Financial Ledger</h2>
                         </div>
@@ -190,7 +190,7 @@ export default function BuyCredits() {
 
                     {transactions.length === 0 ? (
                         <div className="py-20 md:py-32 text-center text-gray-400">
-                            <Wallet size={40} md:size={48} className="mx-auto mb-6 opacity-20" />
+                            <Wallet size={40}  className="mx-auto mb-6 opacity-20" />
                             <p className="text-[10px] font-black uppercase tracking-widest">No transaction records found</p>
                         </div>
                     ) : (

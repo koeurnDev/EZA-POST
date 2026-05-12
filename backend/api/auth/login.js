@@ -83,6 +83,7 @@ router.post("/", async (req, res) => {
     res.json({
       success: true,
       message: "Login successful",
+      token, // ✅ Return token for localStorage
       user: {
         id: user.id,
         name: user.name,
@@ -150,6 +151,7 @@ router.post("/2fa", async (req, res) => {
     res.json({
       success: true,
       message: "Login successful",
+      token, // ✅ Return token for localStorage
       user: { id: user.id, name: user.name, email: user.email }
     });
 

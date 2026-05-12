@@ -21,9 +21,14 @@ const TRUSTED_DOMAINS = [
 
 const isTrustedUrl = (url) => {
     if (!url) return true;
+    // 📂 Allow local absolute paths (internal server-side optimized files)
+    if (path.isAbsolute(url) && fs.existsSync(url)) return true;
+    
     try {
         const parsed = new URL(url);
-        return TRUSTED_DOMAINS.some(domain => parsed.hostname.endsWith(domain));
+        return TRUSTED_DOMAINS.some(domain => parsed.hostname.endsWith(domain)) || 
+               parsed.hostname === 'localhost' || 
+               parsed.hostname === '127.0.0.1';
     } catch (e) { return false; }
 };
 
@@ -49,7 +54,13 @@ async function processAndPostCarouselLogic({ userId, accountsArray, caption, sch
             videoInput = fs.createReadStream(videoFilePath);
             tempFiles.push(videoFilePath);
         } else if (videoUrl) {
-            videoInput = videoUrl;
+            // Check if videoUrl is actually a local path (from /compatible endpoint)
+            if (path.isAbsolute(videoUrl) && fs.existsSync(videoUrl)) {
+                videoInput = fs.createReadStream(videoUrl);
+                tempFiles.push(videoUrl);
+            } else {
+                videoInput = videoUrl;
+            }
         }
 
         let thumbnailInput = null;

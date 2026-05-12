@@ -22,11 +22,14 @@ router.get("/", async (req, res) => {
           facebookId: true,
           facebookName: true,
           avatar: true,
-          connectedPages: true
+          facebookPages: true
         }
       });
       if (foundUser) {
-        user = foundUser;
+        user = {
+          ...foundUser,
+          connectedPages: foundUser.facebookPages // 🔄 Rename for frontend compatibility
+        };
         // Add isDemo flag for demo user
         if (user.id === "demo_user_001") {
           user.isDemo = true;
@@ -61,12 +64,15 @@ router.get("/", async (req, res) => {
               facebookId: true,
               facebookName: true,
               avatar: true,
-              connectedPages: true
+              facebookPages: true
             }
           });
 
           if (foundUser) {
-            user = foundUser;
+            user = {
+              ...foundUser,
+              connectedPages: foundUser.facebookPages // 🔄 Rename for frontend compatibility
+            };
             authenticated = true;
           } else {
             console.warn("⚠️ User found in token but not in DB");

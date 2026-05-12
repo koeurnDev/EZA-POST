@@ -83,10 +83,16 @@ const api = axios.create({
 /* -------------------------------------------------------------------------- */
 api.interceptors.request.use(
   async (config) => {
+    // 🛡️ Attach Authorization Token if available
+    const token = localStorage.getItem("eza_post_token");
+    if (token) {
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
+
     // 🛡️ Attach CSRF Token for state-changing methods
     if (['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase())) {
-      const token = await fetchCsrfToken();
-      if (token) config.headers['X-CSRF-Token'] = token;
+      const csrfToken = await fetchCsrfToken();
+      if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken;
     }
 
     if (import.meta.env.DEV && !config.url?.includes("/auth/status")) {

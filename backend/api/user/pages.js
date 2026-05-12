@@ -10,15 +10,17 @@ const { decrypt } = require("../../utils/crypto");
 router.get("/", requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
-        const user = await prisma.user.findUnique({ where: { id: userId } });
+        const user = await prisma.user.findUnique({ 
+            where: { id: userId },
+            include: { facebookPages: true } 
+        });
 
-        if (!user || (!user.facebookAccessToken && !user.connectedPages)) {
+        if (!user || (!user.facebookAccessToken && user.facebookPages.length === 0)) {
             return res.json({ success: true, accounts: [] });
         }
 
-        // ✅ Return Saved Pages from DB (Fast & Reliable)
-        // 1. Try fetching from new FacebookPage model
-        let dbPages = await prisma.facebookPage.findMany({ where: { userId: userId } });
+        // ✅ Return Saved Pages from DB
+        let dbPages = user.facebookPages;
         let pages = [];
 
         // Helper to parse JSON fields
@@ -32,44 +34,26 @@ router.get("/", requireAuth, async (req, res) => {
                 return {
                     id: page.id,
                     name: page.name,
-                    // access_token: decrypt(page.accessToken), // 🔒 Secure: Never send to frontend
                     picture: page.picture,
-                    isSelected: user.selectedPages?.includes(page.id) || false,
+                    isSelected: page.isSelected,
                     settings: {
-                        enableBot: settings.enableBot || false,
-                        enableSchedule: settings.enableSchedule !== false, // Default true
-                        enableInbox: settings.enableInbox || false
+                        enableBot: page.enableBot || settings.enableBot || false,
+                        enableSchedule: page.enableSchedule !== false,
+                        enableInbox: page.enableInbox || false
                     }
                 };
             });
-        } else {
-            // 2. Fallback to Legacy User.connectedPages
-            let connectedPages = user.connectedPages;
-            if (typeof connectedPages === 'string') try { connectedPages = JSON.parse(connectedPages) } catch (e) { }
-
-            if (Array.isArray(connectedPages) && connectedPages.length > 0) {
-                pages = connectedPages.map(page => {
-                    const settings = pageSettings.find(s => s.pageId === page.id) || {};
-                    return {
-                        id: page.id,
-                        name: page.name,
-                        // access_token: page.access_token, // 🔒 Secure: Never send to frontend
-                        picture: page.picture,
-                        isSelected: user.selectedPages?.includes(page.id) || false,
-                        settings: {
-                            enableBot: settings.enableBot || false,
-                            enableSchedule: settings.enableSchedule !== false, // Default true
-                            enableInbox: settings.enableInbox || false
-                        }
-                    };
-                });
-            }
         }
 
         res.json({ success: true, accounts: pages });
     } catch (err) {
-        console.error("❌ Fetch pages error:", err.message);
-        res.status(500).json({ success: false, error: "Failed to fetch pages" });
+        console.error("❌ [Pages API] Error:", err);
+        res.status(500).json({ 
+            success: false, 
+            error: "Failed to fetch pages",
+            details: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
     }
 });
 
@@ -82,21 +66,10 @@ router.post("/toggle", requireAuth, async (req, res) => {
 
         if (!pageId) return res.status(400).json({ error: "Page ID required" });
 
-        // Prisma doesn't have native atomic $addToSet for scalar lists in update 
-        // (unless using Postgres specific raw query or atomic Push, but remove is harder).
-        // Best approach: Fetch, Modify, Save.
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { selectedPages: true } });
-        let selectedPages = user.selectedPages || [];
-
-        if (isSelected) {
-            if (!selectedPages.includes(pageId)) selectedPages.push(pageId);
-        } else {
-            selectedPages = selectedPages.filter(id => id !== pageId);
-        }
-
-        await prisma.user.update({
-            where: { id: userId },
-            data: { selectedPages: selectedPages }
+        // ✅ Update selection state on the FacebookPage model directly
+        await prisma.facebookPage.update({
+            where: { id: pageId },
+            data: { isSelected: !!isSelected }
         });
 
         res.json({ success: true, message: isSelected ? "Page Enabled" : "Page Disabled" });

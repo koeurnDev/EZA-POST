@@ -81,39 +81,41 @@ const DashboardLayout = ({ children }) => {
     <div className={`min-h-screen flex flex-col overflow-x-hidden ${isDarkMode ? "bg-[#050505] text-white" : "bg-[#f8f9fa] text-gray-900"} transition-colors duration-500`}>
 
       <header className={`fixed top-0 left-0 right-0 h-16 md:h-20 z-40 px-3 md:px-6 flex items-center justify-between gap-2 transition-all duration-300 ${scrolled ? (isDarkMode ? "bg-[#050505]/80 backdrop-blur-xl border-b border-white/5" : "bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm") : "bg-transparent"}`}>
-        <div className="flex items-center gap-2 md:gap-6 min-w-0">
-          <Link to="/dashboard" className="flex items-center gap-2 md:gap-3 group">
-            <div className="w-8 h-8 md:w-11 md:h-11 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg md:rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/20 group-hover:rotate-6 transition-transform">
-              <Zap className="text-white fill-white" size={16} md:size={22} />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm md:text-lg font-bold tracking-tight">EZA_POST</span>
-              <span className="hidden sm:block text-[7px] md:text-[10px] uppercase tracking-widest text-blue-500 font-bold opacity-80">Social Manager</span>
-            </div>
-          </Link>
-        </div>
-
-        <div className={`flex items-center gap-1 md:gap-2 p-1 md:p-1.5 rounded-lg md:rounded-2xl border ${isDarkMode ? "bg-white/5 border-white/5" : "bg-white border-gray-200 shadow-sm"} backdrop-blur-xl min-w-0`}>
-          <div className="hidden sm:block min-w-0">
-            <NetworkStatus />
+        <div className="max-w-[1400px] mx-auto w-full flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 md:gap-6 min-w-0">
+            <Link to="/dashboard" className="flex items-center gap-2 md:gap-3 group">
+              <div className="w-8 h-8 md:w-11 md:h-11 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg md:rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/20 group-hover:rotate-6 transition-transform">
+                <Zap className="text-white fill-white" size={16}  />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm md:text-lg font-bold tracking-tight">EZA_POST</span>
+                <span className="hidden sm:block text-[7px] md:text-[10px] uppercase tracking-widest text-blue-500 font-bold opacity-80">Social Manager</span>
+              </div>
+            </Link>
           </div>
-          <button onClick={toggleTheme} className={`p-1.5 md:p-2.5 rounded-md md:rounded-xl transition-all ${isDarkMode ? "hover:bg-white/10 text-yellow-400" : "hover:bg-gray-100 text-gray-600"}`}>
-            {isDarkMode ? <Sun size={16} md:size={18} /> : <Moon size={16} md:size={18} />}
-          </button>
-          <div className={`w-px h-4 md:h-6 mx-0.5 md:mx-1 ${isDarkMode ? "bg-white/10" : "bg-gray-200"}`}></div>
-          <Link to="/settings" className={`flex items-center gap-1.5 md:gap-3 p-0.5 md:p-1 rounded-md md:rounded-xl transition-all ${isDarkMode ? "hover:bg-white/5" : "hover:bg-gray-50"}`}>
-            <div className="w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-[10px] md:text-sm text-white shadow-lg">
-              {user?.name?.[0] || "U"}
+
+          <div className={`flex items-center gap-1 md:gap-2 p-1 md:p-1.5 rounded-lg md:rounded-2xl border ${isDarkMode ? "bg-white/5 border-white/5" : "bg-white border-gray-200 shadow-sm"} backdrop-blur-xl min-w-0`}>
+            <div className="hidden sm:block min-w-0">
+              <NetworkStatus />
             </div>
-            <div className="hidden sm:flex flex-col pr-1 md:pr-2 text-left">
-              <span className="text-[10px] md:text-xs font-bold leading-tight">{user?.name || "User"}</span>
-              <span className="text-[8px] md:text-[9px] opacity-60">Pro Account</span>
-            </div>
-          </Link>
+            <button onClick={toggleTheme} className={`p-1.5 md:p-2.5 rounded-md md:rounded-xl transition-all ${isDarkMode ? "hover:bg-white/10 text-yellow-400" : "hover:bg-gray-100 text-gray-600"}`}>
+              {isDarkMode ? <Sun size={16}  /> : <Moon size={16}  />}
+            </button>
+            <div className={`w-px h-4 md:h-6 mx-0.5 md:mx-1 ${isDarkMode ? "bg-white/10" : "bg-gray-200"}`}></div>
+            <Link to="/settings" className={`flex items-center gap-1.5 md:gap-3 p-0.5 md:p-1 rounded-md md:rounded-xl transition-all ${isDarkMode ? "hover:bg-white/5" : "hover:bg-gray-50"}`}>
+              <div className="w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-[10px] md:text-sm text-white shadow-lg">
+                {user?.name?.[0] || "U"}
+              </div>
+              <div className="hidden sm:flex flex-col pr-1 md:pr-2 text-left">
+                <span className="text-[10px] md:text-xs font-bold leading-tight">{user?.name || "User"}</span>
+                <span className="text-[8px] md:text-[9px] opacity-60">Pro Account</span>
+              </div>
+            </Link>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 pt-20 md:pt-24 pb-32 px-3 md:px-6 max-w-[1600px] mx-auto w-full min-w-0">
+      <main className="flex-1 pt-20 md:pt-24 pb-32 px-3 md:px-6 max-w-[1400px] mx-auto w-full min-w-0">
         <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }} className="relative z-10 motion-div-container">
           {children}
         </MotionDiv>
@@ -194,8 +196,8 @@ const DashboardLayout = ({ children }) => {
 
           {/* Main Dock Bar - Scrollable on Mobile */}
           <nav className={`
-            flex items-center gap-1 p-1 md:p-1.5 rounded-full border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] transition-all
-            w-full max-w-[95vw] md:max-w-none overflow-x-auto no-scrollbar
+            flex items-center justify-center gap-1 p-1 md:p-1.5 rounded-full border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] transition-all
+            w-full max-w-[95vw] md:max-w-fit mx-auto overflow-x-auto no-scrollbar
             ${isDarkMode
               ? "bg-black/60 border-white/10 shadow-blue-500/5"
               : "bg-white/90 border-gray-200 shadow-gray-200/30"}

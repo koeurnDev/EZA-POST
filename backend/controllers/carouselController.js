@@ -28,21 +28,14 @@ exports.createMixedCarousel = async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid accounts JSON" });
         }
 
-        // 🤖 Handle Auto-Reply Bot Activation (Lightweight, keep here)
+        // 🤖 Handle Auto-Reply Bot Activation (Update FacebookPage model directly)
         if (enableBot === 'true' || enableBot === true) {
-            const user = await prisma.user.findUnique({ where: { id: userId } });
-            let pageSettings = user.pageSettings || [];
-            if (typeof pageSettings === 'string') try { pageSettings = JSON.parse(pageSettings) } catch(e) { pageSettings = [] }
-
-            accountsArray.forEach(pageId => {
-                const idx = pageSettings.findIndex(s => s.pageId === pageId);
-                if (idx > -1) pageSettings[idx].enableBot = true;
-                else pageSettings.push({ pageId, enableBot: true });
-            });
-
-            await prisma.user.update({
-                where: { id: userId },
-                data: { pageSettings }
+            await prisma.facebookPage.updateMany({
+                where: { 
+                    id: { in: accountsArray },
+                    userId: userId 
+                },
+                data: { enableBot: true }
             });
         }
 

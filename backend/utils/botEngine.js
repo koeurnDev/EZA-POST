@@ -17,7 +17,8 @@ const botEngine = {
             // 3️⃣ Get All Users with Facebook Connected
             // In Prisma, we check if facebookAccessToken is not null
             const users = await prisma.user.findMany({
-                where: { facebookAccessToken: { not: null } }
+                where: { facebookAccessToken: { not: null } },
+                include: { facebookPages: true }
             });
             console.log(`🤖 Bot Engine: Found ${users.length} users with FB tokens.`);
 
@@ -151,27 +152,23 @@ const botEngine = {
                 return;
             }
 
-            // Get Pages
-            const allPages = await fb.getFacebookPages(decryptedToken);
-
-            // Filter Pages: Must be Selected AND have Bot Enabled
-            let selectedPages = user.selectedPages || [];
-            if (typeof selectedPages === 'string') {
-                try { selectedPages = JSON.parse(selectedPages); } catch (e) { selectedPages = []; }
-            }
-
+            // Get Pages from DB (instead of fetching from FB every time)
+            const dbPages = user.facebookPages || [];
+            
             let pageSettings = user.pageSettings;
             if (typeof pageSettings === 'string') {
                 try { pageSettings = JSON.parse(pageSettings); } catch (e) { pageSettings = []; }
             }
             if (!Array.isArray(pageSettings)) pageSettings = [];
 
-            const activePages = allPages.filter(page => {
-                const isSelected = selectedPages.includes(page.id);
+            const activePages = dbPages.filter(page => {
                 const settings = pageSettings.find(s => s.pageId === page.id);
-                const isBotEnabled = settings?.enableBot === true;
-                return isSelected && isBotEnabled;
-            });
+                const isBotEnabled = page.enableBot === true || settings?.enableBot === true;
+                return page.isSelected && isBotEnabled;
+            }).map(page => ({
+                ...page,
+                access_token: decrypt(page.accessToken)
+            }));
 
             if (activePages.length === 0) return;
 

@@ -103,6 +103,7 @@ router.post("/", async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Registration successful",
+      token, // ✅ Return token for localStorage
       user: { id: newUser.id, email: newUser.email, name: newUser.name },
     });
   } catch (err) {

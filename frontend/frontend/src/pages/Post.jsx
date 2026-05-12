@@ -4,7 +4,7 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import {
     Upload, Link as LinkIcon, X, Calendar, Clock, Layers, Plus, Trash2,
     ChevronDown, Share2, Youtube, Instagram, Facebook, Zap, Shield,
-    Maximize2, Volume2, VolumeX, MessageSquare, EyeOff
+    Maximize2, Volume2, VolumeX, MessageSquare, EyeOff, Loader2, AlertCircle
 } from "lucide-react";
 import apiUtils, { fetchCsrfToken } from "../utils/apiUtils";
 import { postsAPI } from "../utils/api";
@@ -74,6 +74,10 @@ export default function Post() {
     const [previewVideoModal, setPreviewVideoModal] = useState(null);
     const [openCtaMenu, setOpenCtaMenu] = useState(null);
     const [autoReplyBot, setAutoReplyBot] = useState(false);
+    const [videoData, setVideoData] = useState(null);
+    const [videoError, setVideoError] = useState(false);
+    const [isFixed, setIsFixed] = useState(false);
+    const [isFixing, setIsFixing] = useState(false);
 
 
     // --- 🚀 Auto Features State ---
@@ -84,18 +88,25 @@ export default function Post() {
     useEffect(() => {
         const loadDraft = async () => {
             try {
+                // 1. Load Global Preferences (Persistent)
+                const savedPrefs = localStorage.getItem("postPreferences");
+                if (savedPrefs) {
+                    const prefs = JSON.parse(savedPrefs);
+                    if (prefs.carouselCtaText) setCarouselCtaText(prefs.carouselCtaText);
+                    if (prefs.cta) setCta(prefs.cta);
+                }
+
+                // 2. Load Post Draft (Temporary)
                 const savedDraft = localStorage.getItem("postDraft");
                 if (savedDraft) {
                     const parsed = JSON.parse(savedDraft);
                     setCaption(parsed.caption || "");
                     setHeadline(parsed.headline || "");
                     setTargetLink(parsed.targetLink || "");
-                    setPostFormat(parsed.postFormat || "carousel");
                     if (parsed.carouselCtaText) setCarouselCtaText(parsed.carouselCtaText);
                     if (parsed.cta) setCta(parsed.cta);
                     if (parsed.selectedPages) setSelectedPages(parsed.selectedPages);
                     if (parsed.autoReplyBot !== undefined) setAutoReplyBot(parsed.autoReplyBot);
-
 
                     if (parsed.cachedPage) {
                         setAvailablePages(prev => {
@@ -119,11 +130,15 @@ export default function Post() {
             const selectedPageId = selectedPages[0];
             const cachedPage = availablePages.find(p => p.id === selectedPageId);
 
+            // Save Temporary Draft
             const draftData = {
                 caption, headline, targetLink, postFormat, selectedPages, cachedPage, carouselCtaText, cta, autoReplyBot
             };
-
             localStorage.setItem("postDraft", JSON.stringify(draftData));
+
+            // Save Global Preferences (Persistent)
+            const prefsData = { carouselCtaText, cta };
+            localStorage.setItem("postPreferences", JSON.stringify(prefsData));
         }, 1000);
         return () => clearTimeout(saveTimer);
     }, [caption, headline, targetLink, postFormat, selectedPages, isDraftLoaded, availablePages, carouselCtaText, cta, autoReplyBot]);
@@ -183,6 +198,9 @@ export default function Post() {
         setRightSideImagePreview(null);
         setGalleryOptions([]);
         setAutoReplyBot(false);
+        setVideoData(null);
+        setVideoError(false);
+        setIsFixed(false);
 
         
         // Clear draft files from IndexedDB
@@ -211,62 +229,32 @@ export default function Post() {
 
 
     useEffect(() => {
-        // We now allow mediaItems to populate even in single mode for preview consistency
-
-        setMediaItems(prev => {
-            const currentVideo = (file || previewUrl) ? {
+        setMediaItems(() => {
+            const items = [];
+            
+            // 1. Main Media (Video or Image) - Card 1
+            items.push({
                 id: 'video-main',
                 type: file?.type?.startsWith('image/') ? 'image' : 'video',
                 preview: previewUrl || (file ? URL.createObjectURL(file) : null),
                 file: file,
-                url: previewUrl
-            } : null;
-
-            let newOrder = [...prev];
-            const prevVideoIndex = newOrder.findIndex(item => item.type === 'video');
-
-            if (currentVideo) {
-                if (prevVideoIndex !== -1) newOrder[prevVideoIndex] = currentVideo;
-                else newOrder.unshift(currentVideo);
-            } else if (prevVideoIndex !== -1) {
-                newOrder.splice(prevVideoIndex, 1);
-            }
-
-            // Remove duplicates or stale auto-cards if video is missing
-            if (!currentVideo) {
-                newOrder = newOrder.filter(i => !i.isPageCard);
-            }
-
-            // Also add Right Side Image if it exists and isn't already there
-            if (rightSideImagePreview) {
-                const rsIndex = newOrder.findIndex(i => i.id === 'right-side-image');
-                const rsCard = {
-                    id: 'right-side-image',
-                    type: 'image',
-                    preview: rightSideImagePreview,
-                    file: rightSideImage,
-                    isRightSide: true
-                };
-
-                if (rsIndex !== -1) {
-                    newOrder[rsIndex] = rsCard;
-                    // Move it to position 1 (after video) if it's not already there
-                    if (rsIndex !== 1 && newOrder.length > 1) {
-                        newOrder.splice(rsIndex, 1);
-                        newOrder.splice(1, 0, rsCard);
-                    }
-                } else {
-                    // Insert after video (position 1)
-                    if (newOrder.length >= 1) newOrder.splice(1, 0, rsCard);
-                    else newOrder.push(rsCard);
-                }
-            } else {
-                newOrder = newOrder.filter(i => i.id !== 'right-side-image');
-            }
-
-            return newOrder;
+                url: previewUrl,
+                isPlaceholder: !(file || previewUrl)
+            });
+            
+            // 2. Right Side Image - Card 2
+            items.push({
+                id: 'right-side-image',
+                type: 'image',
+                preview: rightSideImagePreview,
+                file: rightSideImage,
+                isRightSide: true,
+                isPlaceholder: !rightSideImagePreview
+            });
+            
+            return items;
         });
-    }, [file, previewUrl, postFormat, selectedPages, availablePages, rightSideImage, rightSideImagePreview]);
+    }, [file, previewUrl, rightSideImage, rightSideImagePreview]);
 
     const handleThumbnailChange = (e) => {
         const selectedFile = e.target.files[0];
@@ -325,7 +313,9 @@ export default function Post() {
                     setRightSideImage(dataURLtoFile(frames[0], "card2-auto.jpg"));
                 }
             } catch (e) { console.warn("Visual extraction failed", e); }
-
+            
+            setVideoError(false);
+            setVideoData({ id: 'upload', type: 'video' });
             toast.success("Identity payload added.");
         };
         video.src = URL.createObjectURL(selectedFile);
@@ -334,56 +324,149 @@ export default function Post() {
     const handleLoadTiktok = async () => {
         if (!tiktokUrl) return;
         setIsLoadingVideo(true);
+        setVideoError(false);
+        setIsFixed(false);
         const toastId = toast.loading("Intercepting TikTok data...");
         try {
             const response = await axios.post(`${API_BASE}/api/posts/tiktok/fetch`, { url: tiktokUrl }, { withCredentials: true });
             const data = response.data;
             if (data.success) {
-                // Save raw URL for backend
-                setRawVideoUrl(data.video.url);
+                setVideoData(data.video);
+                setRawVideoUrl(data.video.rawPath || data.video.url);
                 setFile(null);
+                
+                // 📝 Auto-fill Caption and Headline if empty
+                if (data.video.title && !caption) setCaption(data.video.title);
+                if (data.video.title && !headline) setHeadline(data.video.title);
 
-                // Use the original playable URL for preview; compatibility conversion is optional and should not be forced.
-                setPreviewUrl(data.video.url);
-
-                // Use TikTok's cover if available, otherwise generate from video
-                if (data.video.cover) {
-                    setThumbnailPreview(data.video.cover);
-                    // Fetch and convert to File for backend
-                    try {
-                        const blobRes = await fetch(data.video.cover);
-                        const blob = await blobRes.blob();
-                        const thumbFile = new File([blob], "tiktok-thumb.jpg", { type: "image/jpeg" });
-                        setThumbnail(thumbFile);
-                    } catch (e) { console.warn("Failed to sync TikTok cover to file", e); }
+                // 📸 SLIDESHOW HANDLING: Generate Video automatically
+                if (data.video.type === 'slideshow' && data.video.images?.length > 0) {
+                    handleGenerateSlideshow(data.video);
                 } else {
-                    try {
-                        const thumbDataUrl = await generateThumbnailFromVideo(previewStream);
-                        setThumbnailPreview(thumbDataUrl);
-                        const thumbFile = dataURLtoFile(thumbDataUrl, "thumbnail.jpg");
-                        setThumbnail(thumbFile);
-                    } catch (e) { console.warn("Visual extraction failed for TikTok video", e); }
-                }
+                    const streamUrl = `${API_BASE}/api/tools/tiktok/stream?id=${data.video.id}&url=${encodeURIComponent(data.video.url)}`;
+                    setPreviewUrl(streamUrl);
 
-                // Generate 6 gallery options using the compatible stream
-                try {
-                    const frames = await generateGalleryFromVideo(previewStream, 6);
-                    setGalleryOptions(frames);
+                    if (data.video.cover) {
+                        setThumbnailPreview(data.video.cover);
+                        
+                        // 🖼️ INSTANT CARD 2 AUTO-FILL (Like upload)
+                        if (!rightSideImagePreview) {
+                            setRightSideImagePreview(data.video.cover);
+                        }
 
-                    // Auto-fill Card 2 with the first frame if empty
-                    if (frames.length > 0 && !rightSideImagePreview) {
-                        setRightSideImagePreview(frames[0]);
-                        setRightSideImage(dataURLtoFile(frames[0], "card2-auto.jpg"));
+                        try {
+                            const blobRes = await fetch(data.video.cover);
+                            const blob = await blobRes.blob();
+                            const thumbFile = new File([blob], "tiktok-thumb.jpg", { type: "image/jpeg" });
+                            setThumbnail(thumbFile);
+                            
+                            // Also set as Card 2 file if it was chosen
+                            if (!rightSideImage) {
+                                setRightSideImage(new File([blob], "card2-tiktok.jpg", { type: "image/jpeg" }));
+                            }
+                        } catch (e) { console.warn("Failed to sync TikTok cover to file", e); }
+                    } else {
+                        try {
+                            const thumbDataUrl = await generateThumbnailFromVideo(streamUrl);
+                            setThumbnailPreview(thumbDataUrl);
+                            const thumbFile = dataURLtoFile(thumbDataUrl, "thumbnail.jpg");
+                            setThumbnail(thumbFile);
+                        } catch (e) { console.warn("Visual extraction failed for TikTok video", e); }
                     }
-                } catch (e) { console.warn("Gallery extraction failed for TikTok video", e); }
 
-                toast.success("Payload decrypted.", { id: toastId });
+                    try {
+                        const frames = await generateGalleryFromVideo(streamUrl, 6);
+                        setGalleryOptions(frames);
+                        if (frames.length > 0 && !rightSideImagePreview) {
+                            setRightSideImagePreview(frames[0]);
+                            setRightSideImage(dataURLtoFile(frames[0], "card2-auto.jpg"));
+                        }
+                    } catch (e) { console.warn("Gallery extraction failed for TikTok video", e); }
+
+                    toast.success("Payload decrypted.", { id: toastId });
+                }
             } else throw new Error(data.error);
         } catch (err) {
             console.error("TikTok Fetch Error:", err);
             toast.error(err.response?.data?.error || "Interception failed.", { id: toastId });
         }
         finally { setIsLoadingVideo(false); }
+    };
+
+    const handleGenerateSlideshow = async (video) => {
+        setIsLoadingVideo(true);
+        const toastId = toast.loading("Generating HD Slideshow...");
+        try {
+            const res = await axios.post(`${API_BASE}/api/tools/tiktok/combine`, {
+                images: video.images,
+                audio: video.audio,
+                id: video.id,
+                title: video.meta?.title
+            }, { withCredentials: true });
+
+            if (res.data.success) {
+                // The backend returns streamUrl and local path
+                const streamUrl = res.data.streamUrl || res.data.url;
+                const combinedUrl = `${API_BASE}${streamUrl}`;
+                setPreviewUrl(combinedUrl);
+                
+                // Set the rawVideoUrl for final post distribution
+                if (res.data.path) {
+                    setRawVideoUrl(res.data.path);
+                } else if (streamUrl && streamUrl.includes('?')) {
+                    const urlParams = new URLSearchParams(streamUrl.split('?')[1]);
+                    const localPath = urlParams.get('path');
+                    if (localPath) setRawVideoUrl(localPath);
+                }
+                
+                setIsFixed(true); 
+                toast.success("HD Slideshow generated!", { id: toastId });
+
+                // Generate Card 2 from the new video
+                try {
+                    const frames = await generateGalleryFromVideo(combinedUrl, 6);
+                    setGalleryOptions(frames);
+                } catch (e) {}
+            }
+        } catch (err) {
+            console.error("Slideshow generation failed:", err);
+            toast.error("Failed to generate HD Slideshow.", { id: toastId });
+        } finally {
+            setIsLoadingVideo(false);
+        }
+    };
+
+    const handleFixH265 = async (customVideoData) => {
+        const targetData = customVideoData || videoData;
+        if (!targetData?.id || isFixing) return;
+        setIsFixing(true);
+        // Silent background optimization (no toast loading)
+        try {
+            const res = await axios.post(`${API_BASE}/api/tools/tiktok/compatible`, {
+                id: targetData.id,
+                url: targetData.url
+            }, { withCredentials: true });
+
+            if (res.data.success) {
+                const fixedUrl = `${API_BASE}/api/tools/tiktok/stream?id=${targetData.id}&url=${encodeURIComponent(res.data.path)}`;
+                setPreviewUrl(fixedUrl);
+                setRawVideoUrl(res.data.path); // Use the local fixed path for posting
+                setIsFixed(true);
+                setVideoError(false);
+                
+                // Regenerate thumbnails from fixed video silently
+                try {
+                    const thumbDataUrl = await generateThumbnailFromVideo(fixedUrl);
+                    setThumbnailPreview(thumbDataUrl);
+                    const frames = await generateGalleryFromVideo(fixedUrl, 6);
+                    setGalleryOptions(frames);
+                } catch (e) {}
+            }
+        } catch (err) {
+            console.warn("Background optimization failed:", err.message);
+        } finally {
+            setIsFixing(false);
+        }
     };
 
     const handleSubmit = async () => {
@@ -497,9 +580,9 @@ export default function Post() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-16 pb-32">
+            <div className="max-w-5xl mx-auto px-4 md:px-8 py-8 md:py-16 pb-32 flex flex-col items-center">
                 {/* 🚀 Header Section */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-8 mb-8 md:mb-12">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-8 mb-8 md:mb-12 w-full">
                     <div className="space-y-1 md:space-y-2">
                         <div className="flex items-center gap-2 mb-1 md:mb-3">
                             <div className="px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded text-[9px] md:text-[10px] font-black text-blue-500 uppercase tracking-widest">
@@ -527,7 +610,7 @@ export default function Post() {
                                 : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                                 }`}
                         >
-                            <tab.icon size={16} md:size={18} />
+                            <tab.icon size={16}  />
                             {tab.label}
                         </button>
                     ))}
@@ -559,7 +642,7 @@ export default function Post() {
                                 </div>
 
                                 <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
-                                    {useMemo(() => availablePages.map(page => (
+                                    {availablePages.map(page => (
                                         <div
                                             key={page.id}
                                             onClick={() => handlePageSelection(page.id)}
@@ -568,7 +651,7 @@ export default function Post() {
                                             <img src={page.picture} className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-white/10" />
                                             <p className="text-[12px] md:text-[13px] font-black text-gray-900 dark:text-white uppercase truncate">{page.name}</p>
                                         </div>
-                                    )), [availablePages, selectedPages])}
+                                    ))}
                                 </div>
                             </div>
 
@@ -577,7 +660,7 @@ export default function Post() {
                                 <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
                                     <div className="flex-1 w-full">
                                         <div className="flex items-center gap-2 mb-2 md:mb-3 px-1">
-                                            <LinkIcon size={14} md:size={16} className="text-pink-500" />
+                                            <LinkIcon size={14} className="text-pink-500" />
                                             <label className="text-[12px] md:text-sm font-black text-gray-400 uppercase tracking-widest">ដាក់ Link វីដេអូ TikTok</label>
                                         </div>
                                         <div className="flex flex-col sm:flex-row gap-2.5 md:gap-4">
@@ -601,14 +684,14 @@ export default function Post() {
                                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 md:mb-6 pb-4 border-b border-gray-100 dark:border-white/5 gap-4">
                                         <div className="flex items-center gap-3 select-none">
                                             <div className="w-8 h-8 bg-blue-500/10 text-blue-600 rounded-lg flex items-center justify-center">
-                                                <Layers size={16} md:size={18} />
+                                                <Layers size={16}  />
                                             </div>
                                             <h3 className="text-[12px] md:text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">ការបង្ហាញសាកល្បង (PREVIEW)</h3>
                                         </div>
                                         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                                             <div className="flex items-center gap-2 mr-2 bg-purple-500/10 px-2.5 py-1.5 rounded-xl border border-purple-500/20">
                                                 <div className="flex items-center gap-1.5">
-                                                    <MessageSquare size={12} md:size={14} className="text-purple-600" />
+                                                    <MessageSquare size={12}  className="text-purple-600" />
                                                     <span className="text-[10px] md:text-[11px] font-black text-purple-600 uppercase tracking-tight">Bot</span>
                                                 </div>
                                                 <button
@@ -623,14 +706,14 @@ export default function Post() {
                                                 className="p-2 md:p-2.5 bg-gray-50 dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 rounded-lg transition-all border border-gray-100 dark:border-white/5 shadow-sm active:scale-90"
                                                 title="លុប"
                                             >
-                                                <Trash2 size={14} md:size={16} />
+                                                <Trash2 size={14}  />
                                             </button>
                                             <button
                                                 onClick={() => fileInputRef.current?.click()}
                                                 className="p-2 md:p-2.5 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-white rounded-lg transition-all border border-gray-100 dark:border-white/5 shadow-sm active:scale-90"
                                                 title="បន្ថែម"
                                             >
-                                                <Plus size={18} md:size={20} />
+                                                <Plus size={18}  />
                                             </button>
                                         </div>
                                     </div>
@@ -669,23 +752,8 @@ export default function Post() {
 
                                     <div
                                         ref={carouselRef}
-                                        className="flex overflow-x-auto md:grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pb-8 md:pb-12 px-1 snap-x scrollbar-hide"
+                                        className="flex overflow-x-auto justify-center md:grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pb-8 md:pb-12 px-1 snap-x scrollbar-hide w-full"
                                     >
-                                        {/* 📁 Empty State */}
-                                        {!mediaItems.some(item => item.id === 'video-main') && (
-                                            <div
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="min-w-[260px] w-[80%] md:w-full aspect-square bg-gray-50 dark:bg-black/20 border-2 border-dashed border-gray-200 dark:border-white/5 rounded-[2rem] flex flex-col items-center justify-center gap-3 md:gap-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 transition-all group/upload-placeholder snap-center flex-shrink-0"
-                                            >
-                                                <div className="w-12 h-12 md:w-16 md:h-16 bg-white dark:bg-white/5 rounded-full flex items-center justify-center shadow-sm group-hover/upload-placeholder:scale-110 transition-transform">
-                                                    <Plus className="text-blue-500" size={24} md:size={32} />
-                                                </div>
-                                                <div className="text-center px-4 md:px-6">
-                                                    <p className="text-sm md:text-[14px] font-bold text-gray-900 dark:text-white mb-1">បន្ថែមមាតិកា</p>
-                                                    <p className="text-[11px] text-gray-400 font-black uppercase tracking-widest">ចុចទីនេះដើម្បីដាក់វីដេអូ</p>
-                                                </div>
-                                            </div>
-                                        )}
 
                                         {mediaItems.map((item, idx) => (
                                             <div
@@ -694,7 +762,7 @@ export default function Post() {
                                             >
                                                 {/* Media Section */}
                                                 <div 
-                                                    className="relative aspect-square bg-black overflow-hidden cursor-pointer"
+                                                    className={`relative aspect-square overflow-hidden cursor-pointer ${item.isPlaceholder ? 'bg-gray-50 dark:bg-black/20 border-2 border-dashed border-gray-200 dark:border-white/10' : 'bg-black'}`}
                                                     onClick={() => {
                                                         if (item.id === 'video-main') {
                                                             fileInputRef.current?.click();
@@ -713,23 +781,70 @@ export default function Post() {
                                                         }
                                                     }}
                                                 >
-                                                    {item.type === 'video' ? (
-                                                        <video src={item.preview} className="w-full h-full object-cover" autoPlay muted={isPreviewMuted} loop playsInline />
+                                                    {item.isPlaceholder ? (
+                                                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 md:gap-3">
+                                                            <div className="w-10 h-10 md:w-12 md:h-12 bg-white dark:bg-white/5 rounded-full flex items-center justify-center shadow-sm group-hover/card:scale-110 transition-transform">
+                                                                <Plus className="text-blue-500" size={20}  />
+                                                            </div>
+                                                            <div className="text-center px-4">
+                                                                <p className="text-xs md:text-[13px] font-bold text-gray-900 dark:text-white mb-0.5">{item.id === 'video-main' ? 'បន្ថែមវីដេអូ' : 'បន្ថែមរូបភាព'}</p>
+                                                                <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">{item.id === 'video-main' ? 'MAIN MEDIA' : 'CARD 2 IMAGE'}</p>
+                                                            </div>
+                                                        </div>
+                                                    ) : item.type === 'video' ? (
+                                                        <>
+                                                            <video 
+                                                                key={item.preview}
+                                                                src={item.preview} 
+                                                                poster={thumbnailPreview}
+                                                                className="w-full h-full object-cover" 
+                                                                autoPlay 
+                                                                muted={isPreviewMuted} 
+                                                                loop 
+                                                                playsInline 
+                                                                preload="auto"
+                                                                onCanPlay={(e) => {
+                                                                    if (isPreviewMuted) {
+                                                                        const playPromise = e.target.play();
+                                                                        if (playPromise !== undefined) {
+                                                                            playPromise.catch(() => {});
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                onLoadedData={(e) => e.target.play().catch(() => {})}
+                                                                onError={() => {
+                                                                    if (item.id === 'video-main' && !isFixed) {
+                                                                        setVideoError(true);
+                                                                        handleFixH265(); // Auto-fix on error
+                                                                    }
+                                                                }}
+                                                            />
+                                                            
+                                                            {videoError && item.id === 'video-main' && (
+                                                                <div className="absolute inset-0 bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center animate-pulse z-40">
+                                                                    <Loader2 size={32} className="text-pink-500 animate-spin mb-4" />
+                                                                    <p className="text-white font-bold mb-1 text-xs">Optimizing playback...</p>
+                                                                    <p className="text-[10px] text-gray-400 px-4">Preparing video for your device.</p>
+                                                                </div>
+                                                            )}
+                                                        </>
                                                     ) : (
                                                         <img src={item.preview} className="w-full h-full object-cover" />
                                                     )}
 
-                                                    {/* Overlays */}
-                                                    <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/20 transition-all flex items-center justify-center">
-                                                        {(item.id === 'video-main' || item.isRightSide) && (
-                                                            <div className="flex flex-col items-center gap-2 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                                                                <div className="w-9 h-9 md:w-10 md:h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 text-white shadow-xl">
-                                                                    <Upload size={16} md:size={18} />
+                                                    {/* Overlays (Only for non-placeholders) */}
+                                                    {!item.isPlaceholder && (
+                                                        <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/20 transition-all flex items-center justify-center">
+                                                            {(item.id === 'video-main' || item.isRightSide) && (
+                                                                <div className="flex flex-col items-center gap-2 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                                                                    <div className="w-9 h-9 md:w-10 md:h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 text-white shadow-xl">
+                                                                        <Upload size={16}  />
+                                                                    </div>
+                                                                    <p className="text-[10px] md:text-[11px] font-bold text-white uppercase tracking-widest">ប្តូររូបភាព</p>
                                                                 </div>
-                                                                <p className="text-[10px] md:text-[11px] font-bold text-white uppercase tracking-widest">ប្តូររូបភាព</p>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                            )}
+                                                        </div>
+                                                    )}
 
                                                     {item.type === 'video' && (
                                                         <div className="absolute top-2.5 left-2.5 z-20">
@@ -740,7 +855,7 @@ export default function Post() {
                                                                  }}
                                                                 className="p-1.5 md:p-2 bg-black/40 backdrop-blur-sm rounded-lg border border-white/10 text-white hover:bg-black/60 transition-all"
                                                             >
-                                                                {isPreviewMuted ? <VolumeX size={12} md:size={14} /> : <Volume2 size={12} md:size={14} />}
+                                                                {isPreviewMuted ? <VolumeX size={12}  /> : <Volume2 size={12}  />}
                                                             </button>
                                                         </div>
                                                     )}
@@ -824,7 +939,7 @@ export default function Post() {
                                                     return selectedPage?.picture ? (
                                                         <img src={selectedPage.picture} className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <Share2 className="text-gray-400" size={24} md:size={32} />
+                                                        <Share2 className="text-gray-400" size={24}  />
                                                     );
                                                 })()}
                                             </div>
@@ -874,7 +989,7 @@ export default function Post() {
                                                         ? "bg-white dark:bg-gray-800 text-blue-600 shadow-md border border-gray-100 dark:border-white/10"
                                                         : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
                                                 >
-                                                    <mode.icon size={12} md:size={14} />
+                                                    <mode.icon size={12}  />
                                                     {mode.label}
                                                 </button>
                                             ))}
@@ -898,7 +1013,7 @@ export default function Post() {
                                                         className="w-full bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-xl px-4 py-3.5 text-xs md:text-sm font-bold outline-none focus:border-blue-500 transition-all"
                                                     />
                                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-blue-500 transition-colors">
-                                                        <Clock size={14} md:size={16} />
+                                                        <Clock size={14}  />
                                                     </div>
                                                 </div>
                                             </motion.div>
@@ -937,7 +1052,7 @@ export default function Post() {
                                     {queue.map(post => (
                                         <div key={post.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 md:p-6 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-xl md:rounded-2xl gap-4">
                                             <div className="flex items-center gap-3 md:gap-4">
-                                                <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500/10 rounded-lg md:rounded-xl flex items-center justify-center text-blue-600 shrink-0"><Clock size={18} md:size={20} /></div>
+                                                <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500/10 rounded-lg md:rounded-xl flex items-center justify-center text-blue-600 shrink-0"><Clock size={18}  /></div>
                                                 <div className="min-w-0">
                                                     <p className="text-[10px] md:text-xs font-black text-gray-900 dark:text-white uppercase truncate">{new Date(post.scheduledAt).toLocaleString()}</p>
                                                     <p className="text-[8px] md:text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">ស្ថានភាព: កំពុងដំណើរការ</p>
@@ -947,7 +1062,7 @@ export default function Post() {
                                                 onClick={() => cancelScheduledPost(post.id)}
                                                 className="flex items-center justify-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all w-full sm:w-auto"
                                             >
-                                                <Trash2 size={14} md:size={16} />
+                                                <Trash2 size={14}  />
                                                 <span className="text-[9px] md:text-[10px] font-black uppercase">លុបចោល</span>
                                             </button>
                                         </div>
