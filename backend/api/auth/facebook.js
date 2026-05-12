@@ -20,7 +20,10 @@ const BASE_URL =
     "http://localhost:5000";
 
 // Must match exactly what's in Facebook App Settings
-const CALLBACK_URL = `${BASE_URL.replace(/\/$/, "")}/api/auth/facebook/callback`;
+// 💡 On localhost, we prefer hitting the Frontend URL (port 5173) so the Vite proxy preserves cookies
+const CALLBACK_URL = (process.env.NODE_ENV === 'development' && process.env.FRONTEND_URL)
+    ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/api/auth/facebook/callback`
+    : `${BASE_URL.replace(/\/$/, "")}/api/auth/facebook/callback`;
 
 /**
  * 🚀 GET /api/auth/facebook
@@ -47,9 +50,13 @@ router.get("/", (req, res) => {
         "publish_video",
     ];
 
+    // 🔐 Carry User Token in State (Bypasses cookie issues on localhost/cross-domain redirects)
+    const token = req.cookies?.token || req.headers["authorization"]?.replace("Bearer ", "");
+    const state = token ? `connect_account|${token}` : "connect_account";
+
     const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(
         CALLBACK_URL
-    )}&scope=${scopes.join(",")}&state=connect_account&auth_type=rerequest`;
+    )}&scope=${scopes.join(",")}&state=${state}&auth_type=rerequest`;
 
     // console.log(`🔄 Redirecting to Facebook: ${authUrl}`);
     res.redirect(authUrl);
@@ -60,9 +67,9 @@ router.get("/", (req, res) => {
  * Handles the callback from Facebook
  */
 router.get("/callback", async (req, res) => {
-    const { code, error } = req.query;
-
-    console.log("📥 FB Callback received");
+    const { code, error, state } = req.query;
+    console.log("📥 FB Callback received. Query:", JSON.stringify(req.query));
+    console.log("📥 Cookies:", JSON.stringify(req.cookies));
 
     if (error) {
         console.error("❌ Facebook Auth Error (from Query):", error);
@@ -139,10 +146,29 @@ router.get("/callback", async (req, res) => {
             } catch (err) { }
         }
 
+        // Fallback: Recover from state token if cookies/session failed
+        if (!userId && state && state.includes("|")) {
+            const [action, stateToken] = state.split("|");
+            if (stateToken) {
+                try {
+                    console.log("🔄 Step 3.5: Attempting to recover User ID from state token...");
+                    const decoded = jwt.verify(stateToken, process.env.JWT_SECRET || "supersecretkey");
+                    userId = decoded.id;
+                    console.log(`✅ Recovered User ID from state: ${userId}`);
+                } catch (err) {
+                    console.warn("⚠️ Failed to verify state token:", err.message);
+                }
+            }
+        }
+
         if (!userId) {
             console.error("❌ No authenticated user found (Session or JWT missing)");
-            return res.redirect(`${process.env.FRONTEND_URL}/login?error=session_expired`);
+            console.log("   👉 Session User:", JSON.stringify(req.session?.user));
+            console.log("   👉 Cookies.token present:", !!req.cookies?.token);
+            console.log("   👉 State present:", !!state);
+            return res.redirect(`${process.env.FRONTEND_URL}/settings?error=session_expired`);
         }
+        console.log(`✅ Found User ID: ${userId}`);
 
         // 4️⃣ Fetch Pages
         currentStep = "FetchPages";
@@ -252,10 +278,10 @@ router.get("/callback", async (req, res) => {
                     console.error(`❌ Failed to save page ${p.name}:`, pageErr.message);
                 }
             }
-            console.log("✅ Database update successful");
+            console.log(`✅ Database update successful for ${myPages.length} pages`);
         } else {
             console.error(`❌ User ID ${userId} not found in DB`);
-            throw new Error("User not found in database");
+            throw new Error(`User ${userId} not found in database`);
         }
 
         // 6️⃣ Refresh JWT
@@ -272,12 +298,19 @@ router.get("/callback", async (req, res) => {
 
     } catch (err) {
         console.error("❌ CRITICAL FAILURE IN FB CALLBACK ❌");
-
-        if (currentStep === "FetchPages" && err.response?.status === 400) {
-            // likely missing perm
+        console.error("Step:", currentStep);
+        console.error("Error Message:", err.message);
+        if (err.response) {
+            console.error("FB API Error Data:", JSON.stringify(err.response.data));
+        } else {
+            console.error("Stack:", err.stack);
         }
 
-        res.redirect(`${process.env.FRONTEND_URL}/settings?error=server_error`);
+        if (currentStep === "FetchPages" && err.response?.status === 400) {
+            console.error("Likely missing permissions or invalid token.");
+        }
+
+        res.redirect(`${process.env.FRONTEND_URL}/settings?error=server_error&step=${currentStep}&msg=${encodeURIComponent(err.message)}`);
     }
 });
 
