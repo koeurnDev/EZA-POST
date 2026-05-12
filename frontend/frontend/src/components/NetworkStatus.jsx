@@ -31,7 +31,7 @@ const NetworkStatus = ({
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 5000);
           const res = await fetch(endpoint, {
-            method: "HEAD",
+            method: endpoint.endsWith('/health') ? 'GET' : 'HEAD',
             cache: "no-store",
             signal: controller.signal,
           });

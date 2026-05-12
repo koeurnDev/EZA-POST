@@ -121,9 +121,17 @@ router.post("/download", requireAuth, async (req, res) => {
         const safeTitle = `youtube-${Date.now()}`;
         const outputTemplate = path.join(tempDir, `${safeTitle}.%(ext)s`);
 
+        const parseQualityValue = (value) => {
+            if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+            if (typeof value !== 'string') return null;
+            const numeric = parseInt(value.toString().replace(/[^0-9]/g, ''), 10);
+            return Number.isFinite(numeric) ? numeric : null;
+        };
+
+        const requestedQuality = parseQualityValue(quality);
         const qualityLabel = isAudio
-            ? (quality ? `${quality}kbps` : 'Best Audio')
-            : (quality ? `${quality}p` : 'Best Video');
+            ? (requestedQuality ? `${requestedQuality}kbps` : (quality || 'Best Audio'))
+            : (requestedQuality ? `${requestedQuality}p` : (quality || 'Best Video'));
 
         console.log(`📥 Downloading YouTube (${qualityLabel}) as ${isAudio ? 'MP3' : 'MP4'}...`);
 
@@ -151,12 +159,12 @@ router.post("/download", requireAuth, async (req, res) => {
             // 🎥 Video (Smart Selection)
             let formatSelector;
 
-            if (quality && quality <= 720) {
+            if (requestedQuality && requestedQuality <= 720) {
                 // ⚡ Fast Path: Try to find a pre-merged MP4 first
-                formatSelector = `best[ext=mp4][height=${quality}]/bestvideo[height=${quality}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height=${quality}]+bestaudio/best[height<=${quality}]`;
-            } else if (quality) {
-                // 💎 High Quality (1080p+): Force Merge
-                formatSelector = `bestvideo[height=${quality}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height=${quality}][ext=mp4]+bestaudio/bestvideo[height=${quality}]+bestaudio`;
+                formatSelector = `best[ext=mp4][height=${requestedQuality}]/bestvideo[height=${requestedQuality}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height=${requestedQuality}]+bestaudio/best[height<=${requestedQuality}]`;
+            } else if (requestedQuality) {
+                // 💎 High Quality (1080p+): Force Merge with fallback
+                formatSelector = `bestvideo[height=${requestedQuality}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${requestedQuality}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${requestedQuality}]+bestaudio/bestvideo+bestaudio`;
             } else {
                 // 🌟 Best Available
                 formatSelector = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best';

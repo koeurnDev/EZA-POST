@@ -66,12 +66,6 @@ const VideoPreview = ({ videoUrl, videoFile, onFileSelect, title = "Video Previe
   const handleVideoLoadStart = () => setIsLoading(true);
   const handleVideoLoaded = (e) => {
     setIsLoading(false);
-    // ✅ Validate Duration (Max 60s)
-    if (e.target.duration > 60) {
-      setError("Video must be under 60 seconds.");
-      setVideoSrc("");
-      onFileSelect(null); // Clear file in parent
-    }
   };
 
   const handleVideoError = () => {

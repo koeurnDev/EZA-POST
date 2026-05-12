@@ -7,401 +7,447 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserPlan {
+  free
+  pro
+}
+
+enum UserRole {
+  user
+  admin
+  demo
+}
+
+enum PostStatus {
+  draft
+  scheduled
+  processing
+  published
+  failed
+  expired
+  cancelled
+}
+
+enum MediaType {
+  video
+  image
+  carousel
+}
+
+enum BotRuleType {
+  KEYWORD
+  REGEX
+}
+
+enum BotRuleScope {
+  ALL
+  SPECIFIC
+}
+
+enum ReplyStatus {
+  pending
+  processing
+  failed
+  completed
+}
+
+enum BoostCampaignStatus {
+  draft
+  active
+  paused
+  completed
+  failed
+}
+
+enum BoostAccountStatus {
+  active
+  banned
+  cooldown
+  error
+}
+
+enum PlatformName {
+  facebook
+  tiktok
+  youtube
+  instagram
+}
+
+enum CreditTransactionType {
+  purchase
+  spend
+  refund
+  bonus
+}
+
 model User {
-  id                     String    @id @default(uuid())
-  email                  String    @unique
-  password               String
-  name                   String    @default("User")
-  plan                   String    @default("free") // enum: free, pro
-  lastLogin              DateTime? @map("last_login")
-  
-  // Facebook Auth
-  facebookId             String?   @unique
-  facebookAccessToken    String?
-  facebookName           String?
+  id                    String              @id @default(uuid())
+  email                 String              @unique
+  password              String
+  name                  String              @default("User")
+  plan                  UserPlan            @default(free)
+  role                  UserRole            @default(user)
+  lastLogin             DateTime?
+  avatar                String?
+  coverImage            String?
+
+  facebookId            String?             @unique
+  facebookName          String?
+  facebookAccessToken   String?
   facebookTokenExpiresAt DateTime?
 
-  // Pages & Settings (Stored as JSON to match Mongoose flexibility)
-  selectedPages          String[]  @default([])
-  connectedPages         Json?     @default("[]") // Array of objects
-  pageSettings           Json?     @default("[]") // Array of objects
-  
-  // Profile
-  avatar                 String?
-  coverImage             String?
-  role                   String    @default("user") // enum: user, admin
-  
-  // Security
-  resetPasswordToken     String?
-  resetPasswordExpires   DateTime?
-  twoFactorSecret        String?
-  twoFactorEnabled       Boolean   @default(false)
-  twoFactorVerified      Boolean   @default(false)
-  
-  // Credits
-  credits                Int       @default(0)
-  totalCreditsSpent      Int       @default(0)
-  totalCreditsPurchased  Int       @default(0)
+  twoFactorSecret       String?
+  twoFactorEnabled      Boolean             @default(false)
+  twoFactorVerified     Boolean             @default(false)
 
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  credits               Int                 @default(0)
+  totalCreditsSpent     Int                 @default(0)
+  totalCreditsPurchased Int                 @default(0)
+  pageSettings          Json?               @default("[]")
 
-  // Relations
-  scheduledPosts         ScheduledPost[]
-  posts                  Post[]
-  facebookPages          FacebookPage[]
-  botStatus              BotStatus?
-  botHistory             BotHistory[]
-  pendingReplies         PendingReply[]
-  botRules               BotRule[]
-  botMonitoredPosts      BotMonitoredPost[]
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  facebookPages         FacebookPage[]
+  scheduledPosts        ScheduledPost[]
+  botRules              BotRule[]
+  botStatus             BotStatus?
+  botHistory            BotHistory[]
+  pendingReplies        PendingReply[]
+  repliedComments       RepliedComment[]
+  postMetrics           PostMetrics[]
+  boostCampaigns        BoostCampaign[]
+  boostAccounts         BoostAccount[]
+  creditTransactions    CreditTransaction[]
+  platformConfigs       PlatformConfig[]
+  botMonitoredPosts     BotMonitoredPost[]
 
   @@map("users")
 }
 
-model Post {
-  id              String   @id @default(uuid()) @map("_id") // Mongoose used _id, mapping for compatibility if needed, or just new id
-  userId          String
-  caption         String
-  videoUrl        String
-  accounts        String[]
-  scheduleTime    DateTime?
-  status          String   @default("created") // enum: created, scheduled, processing, published, failed
-  
-  platforms       Json?    @default("[]") // Array of objects
-  mediaType       String   @default("video") // enum: video, image, carousel
-  
-  // Legacy
-  platformStatus  Json?
-  
-  // Boost
-  isBoosted       Boolean  @default(false)
-  viralScore      Int      @default(0)
-  lastMetricsSync DateTime?
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  user            User     @relation(fields: [userId], references: [id])
-
-  @@map("posts")
-}
-
-model ScheduledPost {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  postType      String   @default("single")
-  videoUrl      String?  @map("video_url")
-  mediaFiles    String[] @default([])
-  thumbnailUrl  String?  @map("thumbnail_url")
-  caption       String   @default("")
-  accounts      String[] @default([])
-  status        String   @default("scheduled")
-  scheduleTime  DateTime @map("schedule_time")
-  postedAt      DateTime? @map("posted_at")
-  attempts      Int      @default(0)
-  publishedIds  Json?    @default("[]")
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user          User     @relation(fields: [userId], references: [id])
-
-  @@index([status, scheduleTime])
-  @@map("scheduled_posts")
-}
-
 model FacebookPage {
-  id              String   @id @unique // Page ID from FB
-  userId          String   @map("user_id")
-  name            String
-  accessToken     String   @map("access_token")
-  category        String?
-  tasks           String[] @default([])
-  picture         String?
-  followersCount  Int?     @default(0)
-  
-  isConnected     Boolean  @default(true)
-  lastSync        DateTime @default(now())
+  id             String          @id
+  userId         String
+  name           String
+  category       String?
+  picture        String?
+  followersCount Int?            @default(0)
+  accessToken    String?
+  isConnected    Boolean         @default(true)
+  isSelected     Boolean         @default(false)
+  enableSchedule Boolean         @default(true)
+  enableBot      Boolean         @default(false)
+  enableInbox    Boolean         @default(false)
+  lastSync       DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  user           User            @relation(fields: [userId], references: [id])
+  targets        PostTarget[]
+  pendingReplies PendingReply[]
+  botRules       BotRule[]
+  monitoredPosts BotMonitoredPost[]
+  metrics        PostMetrics[]
 
-  user            User     @relation(fields: [userId], references: [id])
-
+  @@index([userId])
+  @@index([isConnected])
   @@map("facebook_pages")
 }
 
+model ScheduledPost {
+  id           String         @id @default(uuid())
+  userId       String
+  caption      String
+  postType     MediaType      @default(video)
+  status       PostStatus     @default(scheduled)
+  scheduleTime DateTime
+  postedAt     DateTime?
+  attempts     Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
-// Placeholders for other models (Mapped as basic tables with JSON for flexibility)
+  user         User           @relation(fields: [userId], references: [id])
+  mediaItems   ScheduledMedia[]
+  targets      PostTarget[]
 
-model BoostCampaign {
-  id              String   @id @default(uuid())
-  userId          String   @map("user_id")
-  postId          String   @map("post_id")
-  facebookPostId  String   @map("facebook_post_id")
-  pageId          String   @map("page_id")
+  @@index([status, scheduleTime])
+  @@index([userId, status])
+  @@map("scheduled_posts")
+}
 
-  campaignId      String?  @unique @map("campaign_id")
-  adSetId         String?  @map("ad_set_id")
-  adId            String?  @map("ad_id")
+model ScheduledMedia {
+  id              String        @id @default(uuid())
+  scheduledPostId String
+  url             String
+  publicId        String?
+  mediaType       MediaType
+  position        Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  budget          Float
-  duration        Int
-  startDate       DateTime @map("start_date")
-  endDate         DateTime @map("end_date")
+  scheduledPost   ScheduledPost @relation(fields: [scheduledPostId], references: [id])
 
-  targeting       Json     @default("{}")
-  status          String   @default("draft") // draft, active, paused, completed, failed
-  metrics         Json     @default("{}")
+  @@index([scheduledPostId])
+  @@map("scheduled_media")
+}
+
+model PostTarget {
+  id              String      @id @default(uuid())
+  scheduledPostId String
+  pageId          String
+  status          PostStatus  @default(scheduled)
+  facebookPostId  String?     @unique
   error           String?
-  lastSyncedAt    DateTime? @map("last_synced_at")
+  postedAt        DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  scheduledPost   ScheduledPost @relation(fields: [scheduledPostId], references: [id])
+  page            FacebookPage  @relation(fields: [pageId], references: [id])
+  metrics         PostMetrics?
+  botRules        BotRule[]
+  boostCampaigns  BoostCampaign[]
 
-  @@index([userId, status])
-  @@map("boost_campaigns")
-}
-
-model BoostAccount {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  platform      String   @default("tiktok") // tiktok, facebook, instagram
-  username      String
-  password      String   // stored encrypted
-  cookies       Json     @default("[]")
-  cookiesUpdated DateTime @default(now()) @map("cookies_updated")
-  status        String   @default("active") // active, banned, cooldown, error
-  lastUsed      DateTime? @map("last_used")
-  totalActions  Int      @default(0) @map("total_actions")
-  dailyLimit    Int      @default(25) @map("daily_limit")
-  actionsToday  Int      @default(0) @map("actions_today")
-  lastResetDate DateTime @default(now()) @map("last_reset_date")
-  cooldownUntil DateTime? @map("cooldown_until")
-
-  createdAt     DateTime @default(now())
-
-  @@index([userId, platform])
-  @@map("boost_accounts")
-}
-
-model BoostRule {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  enabled       Boolean  @default(true)
-  rules         Json     @default("[]") // Array of rule objects
-  realBoost     Json     @default("{}") // Settings for real boost
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@map("boost_rules")
-}
-
-model BoostedPost {
-  id            String   @id @default(uuid())
-  postId        String   @unique @map("post_id")
-  userId        String   @map("user_id")
-  boostStarted  DateTime @default(now()) @map("boost_started")
-  boostEnded    DateTime? @map("boost_ended")
-  metrics       Json     @default("{}")
-  status        String   @default("active") // active, completed, paused
-  ruleTriggered String?  @map("rule_triggered")
-  realBoost     Json     @default("{}")
-
-  @@index([userId, status])
-  @@map("boosted_posts")
-}
-
-model BotRule {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  keyword       String
-  reply         String
-  attachmentUrl String?  @map("attachment_url")
-  ruleType      String   @default("KEYWORD") // KEYWORD, REGEX
-  scope         String   @default("ALL") // ALL, SPECIFIC
-  postId        String?  @map("post_id")
-  enabled       Boolean  @default(true)
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user          User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@map("bot_rules")
-}
-
-model BotStatus {
-  id            String   @id @default(uuid())
-  userId        String   @unique @map("user_id")
-  enabled       Boolean  @default(true)
-  lastRun       DateTime? @map("last_run")
-  totalReplies  Int      @default(0) @map("total_replies")
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user          User     @relation(fields: [userId], references: [id])
-
-  @@map("bot_status")
-}
-
-model BotHistory {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  commentId     String   @map("comment_id")
-  replyMessage  String   @map("reply_message")
-  pageName      String?  @map("page_name")
-  pageId        String?  @map("page_id")
-  status        String   // success, failed
-  error         String?
-  timestamp     DateTime @default(now())
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user          User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@map("bot_history")
-}
-
-model PendingReply {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  commentId     String   @unique @map("comment_id")
-  replyMessage  String   @map("reply_message")
-  attachmentUrl String?  @map("attachment_url")
-  pageId        String   @map("page_id")
-  accessToken   String   @map("access_token")
-  sendAt        DateTime @map("send_at")
-  status        String   @default("pending") // pending, processing, failed, completed
-  attempts      Int      @default(0)
-  error         String?
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user          User     @relation(fields: [userId], references: [id])
-
-  @@index([sendAt, status, userId])
-  @@map("pending_replies")
+  @@unique([scheduledPostId, pageId])
+  @@index([status, pageId])
+  @@map("post_targets")
 }
 
 model PostMetrics {
-  id              String   @id @default(uuid())
-  postId          String   @unique @map("post_id")
-  facebookPostId  String   @unique @map("facebook_post_id")
-  pageId          String   @map("page_id")
-  userId          String   @map("user_id")
+  id             String       @id @default(uuid())
+  postTargetId   String       @unique
+  pageId         String
+  userId         String
+  likes          Int          @default(0)
+  comments       Int          @default(0)
+  shares         Int          @default(0)
+  reactions      Json         @default("{}")
+  reach          Int          @default(0)
+  impressions    Int          @default(0)
+  engagement     Int          @default(0)
+  viralScore     Int          @default(0)
+  viralTier      String       @default("low")
+  lastSyncedAt   DateTime?    @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  likes           Int      @default(0)
-  comments        Int      @default(0)
-  shares          Int      @default(0)
-  reactions       Json     @default("{}") // Object mapping reaction types to counts
-  reach           Int      @default(0)
-  impressions     Int      @default(0)
-  engagement      Int      @default(0)
-
-  viralScore      Int      @default(0) @map("viral_score")
-  viralTier       String   @default("low") @map("viral_tier") // low, medium, high, viral
-
-  lastSyncedAt    DateTime @default(now()) @map("last_synced_at")
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  postTarget     PostTarget   @relation(fields: [postTargetId], references: [id])
+  page           FacebookPage @relation(fields: [pageId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
 
   @@index([userId, viralScore])
   @@index([pageId])
   @@map("post_metrics")
 }
 
-model CreditPackage {
-  id            String   @id @default(uuid())
-  name          String
-  credits       Int
-  price         Float    // in USD
-  priceKHR      Float    @map("price_khr")
-  discount      Float    @default(0)
-  popular       Boolean  @default(false)
-  active        Boolean  @default(true)
+model BotRule {
+  id                String        @id @default(uuid())
+  userId            String
+  pageId            String?
+  scheduledTargetId String?
+  keyword           String
+  reply             String
+  attachmentUrl     String?
+  ruleType          BotRuleType   @default(KEYWORD)
+  scope             BotRuleScope  @default(ALL)
+  enabled           Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  user              User          @relation(fields: [userId], references: [id])
+  page              FacebookPage? @relation(fields: [pageId], references: [id])
+  scheduledTarget   PostTarget?   @relation(fields: [scheduledTargetId], references: [id])
+
+  @@index([userId, enabled])
+  @@map("bot_rules")
+}
+
+model BotStatus {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  enabled      Boolean  @default(true)
+  lastRun      DateTime?
+  totalReplies Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@map("bot_status")
+}
+
+model BotHistory {
+  id           String   @id @default(uuid())
+  userId       String
+  commentId    String
+  replyMessage String
+  pageName     String?
+  pageId       String?
+  status       String
+  error        String?
+  timestamp    DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("bot_history")
+}
+
+model PendingReply {
+  id                String      @id @default(uuid())
+  userId            String
+  pageId            String
+  facebookCommentId String      @unique
+  facebookPostId    String
+  replyMessage      String
+  attachmentUrl     String?
+  accessToken       String
+  sendAt            DateTime
+  status            ReplyStatus @default(pending)
+  attempts          Int         @default(0)
+  error             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  user              User        @relation(fields: [userId], references: [id])
+  page              FacebookPage @relation(fields: [pageId], references: [id])
+
+  @@index([status, sendAt, userId])
+  @@map("pending_replies")
+}
+
+model RepliedComment {
+  id                String   @id @default(uuid())
+  facebookCommentId String   @unique
+  facebookPostId    String
+  userId            String
+  repliedAt         DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, facebookPostId])
+  @@map("replied_comments")
+}
+
+model BoostCampaign {
+  id             String             @id @default(uuid())
+  userId         String
+  postTargetId   String?
+  pageId         String
+  campaignId     String?            @unique
+  adSetId        String?
+  adId           String?
+  budget         Float
+  duration       Int
+  startDate      DateTime
+  endDate        DateTime
+  targeting      Json               @default("{}")
+  status         BoostCampaignStatus @default(draft)
+  metrics        Json               @default("{}")
+  error          String?
+  lastSyncedAt   DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  user           User               @relation(fields: [userId], references: [id])
+  postTarget     PostTarget?        @relation(fields: [postTargetId], references: [id])
+
+  @@index([userId, status, pageId])
+  @@map("boost_campaigns")
+}
+
+model BoostAccount {
+  id                String            @id @default(uuid())
+  userId            String
+  platform          PlatformName
+  username          String
+  encryptedPassword String?
+  cookies           Json              @default("[]")
+  cookiesUpdated    DateTime?         @default(now())
+  status            BoostAccountStatus @default(active)
+  lastUsed          DateTime?
+  totalActions      Int               @default(0)
+  dailyLimit        Int               @default(25)
+  actionsToday      Int               @default(0)
+  lastResetDate     DateTime?         @default(now())
+  cooldownUntil     DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user              User              @relation(fields: [userId], references: [id])
+
+  @@index([userId, platform, status])
+  @@map("boost_accounts")
+}
+
+model CreditPackage {
+  id        String   @id @default(uuid())
+  name      String
+  credits   Int
+  price     Float
+  priceKHR  Float    @map("price_khr")
+  discount  Float    @default(0)
+  popular   Boolean  @default(false)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("credit_packages")
 }
 
 model CreditTransaction {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  type          String   // purchase, spend, refund, bonus
-  amount        Int
-  balance       Int
-  description   String?
-  relatedId     String?  @map("related_id") // Order ID or Boost ID
+  id          String                 @id @default(uuid())
+  userId      String
+  type        CreditTransactionType
+  amount      Int
+  balance     Int
+  description String?
+  relatedId   String?                @map("related_id")
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  user        User                   @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt])
   @@map("credit_transactions")
 }
 
-model PostLog {
-  id                String   @id @default(uuid())
-  userId            String   @map("user_id")
-  pageId            String   @map("page_id")
-  fbPostId          String?  @unique @map("fb_post_id")
-  type              String   // carousel, video, tiktok
-  status            String   @default("processing") // published, scheduled, failed, processing
-  scheduledTime     DateTime? @map("scheduled_time")
-  cloudinaryVideoId String?  @map("cloudinary_video_id")
-  cloudinaryImageIds String[] @default([]) @map("cloudinary_image_ids")
-  error             String?
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
-  @@map("post_logs")
-}
-
-model RepliedComment {
-  id        String   @id @default(uuid())
-  commentId String   @unique @map("comment_id")
-  postId    String   @map("post_id")
-  userId    String   @map("user_id") // Inferred requirement from stats.js
-  repliedAt DateTime @default(now()) @map("replied_at")
-
-  @@map("replied_comments")
-}
-
 model PlatformConfig {
-  id              String    @id @default(uuid())
-  userId          String    @map("user_id") // Added for efficient filtering
-  platform        String    // youtube, tiktok, instagram
-  isEnabled       Boolean   @default(true) @map("is_enabled") // Mongoose default true
-  settings        Json      // flexible settings: accessToken, refreshToken, tokenExpiresAt, profileName, picture, isConnected, externalId
-  updatedAt       DateTime  @updatedAt
+  id           String       @id @default(uuid())
+  userId       String
+  platform     PlatformName
+  isEnabled    Boolean      @default(true) @map("is_enabled")
+  accessToken  String?
+  refreshToken String?
+  externalId   String?
+  settings     Json         @default("{}")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([userId, platform])
   @@map("platform_configs")
 }
-model BotMonitoredPost {
-  id              String   @id @default(uuid())
-  userId          String   @map("user_id")
-  pageId          String   @map("page_id")
-  facebookPostId  String   @map("facebook_post_id")
-  enabled         Boolean  @default(true)
-  lastChecked     DateTime? @map("last_checked")
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
 
-  user            User     @relation(fields: [userId], references: [id])
+model BotMonitoredPost {
+  id              String       @id @default(uuid())
+  userId          String
+  pageId          String
+  facebookPostId  String
+  enabled         Boolean      @default(true)
+  lastChecked     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user            User         @relation(fields: [userId], references: [id])
+  page            FacebookPage @relation(fields: [pageId], references: [id])
 
   @@unique([userId, facebookPostId])
+  @@index([pageId, enabled])
   @@map("bot_monitored_posts")
 }

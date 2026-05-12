@@ -12,7 +12,7 @@ EZA-POST is a comprehensive social media management tool designed to automate po
 
 ### 2️⃣ Backend Processing
 - **Cloudinary Storage**: Secure, optimized storage for all media assets.
-- **Database**: MongoDB stores user data, page tokens, and scheduled posts.
+- **Database**: PostgreSQL (Prisma) stores user data, page tokens, and scheduled posts.
 - **Security**: Temp files are auto-deleted after processing.
 
 ### ☁️ Cloudinary Integration Advantages
@@ -48,12 +48,12 @@ EZA-POST is a comprehensive social media management tool designed to automate po
 
 ## 🛠️ Tech Stack
 - **Frontend**: React, Vite, TailwindCSS, Framer Motion
-- **Backend**: Node.js, Express, MongoDB (Mongoose)
+- **Backend**: Node.js, Express, PostgreSQL (Prisma)
 - **Services**: Cloudinary (Media), Facebook Graph API (Social), Facebook Marketing API (Ads)
 - **Deployment**: Render (Web Service)
 
 ## 📂 Project Structure
-- `/backend`: API server, scheduler, and bot engine.
+- `/backend`: API server, scheduler, and bot engine (PostgreSQL/Prisma).
 - `/frontend`: React application and UI components.
 
 ## 🚀 Deployment
@@ -94,7 +94,7 @@ Ensure the Facebook App is **Live** and has these scopes:
 *Missing any of these can prevent page selection and auto-replies from working.*
 
 ### 3️⃣ Backend / Database
-- **MongoDB**: User must have write access to update `connectedPages`.
+- **PostgreSQL**: Ensure the database is running and accessible via the `DATABASE_URL`.
 - **JWT_SECRET**: Must match between the frontend and backend; otherwise token validation will fail.
 
 ### 4️⃣ Deployment & Environment Variables

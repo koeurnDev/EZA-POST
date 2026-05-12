@@ -10,9 +10,11 @@ const axios = require("axios");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto"); // 🔐 Added for Cache Hashing
+const { PassThrough } = require("stream");
 const { requireAuth } = require("../../utils/auth");
 const cheerio = require("cheerio"); // ✅ Required for fallback scraper
 const { createSlideshow } = require("../../services/videoGenerator");
+const { execSync, exec } = require("child_process");
 
 // 🗂️ Temp directory
 const tempDir = path.join(__dirname, "../../temp/videos");
@@ -22,11 +24,30 @@ if (!fs.existsSync(slideDir)) fs.mkdirSync(slideDir, { recursive: true });
 
 // ⚙️ Helper: Get Binary Path
 const getBinaryPath = () => {
-    const prodPath = path.join(__dirname, '../../bin/yt-dlp');
-    if (process.env.NODE_ENV === 'production' && fs.existsSync(prodPath)) {
-        return prodPath;
+    let finalPath = 'yt-dlp';
+    try {
+        const possiblePath = path.join(__dirname, '../../node_modules/youtube-dl-exec/bin/yt-dlp');
+        const winPath = possiblePath + '.exe';
+        
+        if (fs.existsSync(winPath)) {
+            finalPath = winPath;
+        } else if (fs.existsSync(possiblePath)) {
+            finalPath = possiblePath;
+        } else {
+            // Check in different possible locations for node_modules
+            const altPath = path.join(process.cwd(), 'node_modules/youtube-dl-exec/bin/yt-dlp.exe');
+            if (fs.existsSync(altPath)) finalPath = altPath;
+        }
+    } catch (e) {}
+    
+    if (finalPath === 'yt-dlp') {
+        const prodPath = path.join(__dirname, '../../bin/yt-dlp');
+        if (fs.existsSync(prodPath)) finalPath = prodPath;
+        else if (fs.existsSync(prodPath + '.exe')) finalPath = prodPath + '.exe';
     }
-    return undefined; // Falls back to system PATH (e.g. yt-dlp installed via pip)
+
+    console.log(`       🔍 Using yt-dlp binary at: ${finalPath}`);
+    return finalPath;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -43,8 +64,19 @@ const formatTikTokVideo = (v) => {
 
     const images = rawImages.map(img => {
         if (typeof img === 'string') return img;
-        return img.display_image?.url_list?.[0] || img.url_list?.[0] || img.image_url?.url_list?.[0];
+        return img.display_image?.url_list?.[0] || img.url_list?.[0] || img.image_url?.url_list?.[0] || img.imageURL?.urlList?.[0];
     }).filter(Boolean);
+
+    const musicUrl =
+        v.music?.playUrl ||
+        v.music?.play ||
+        v.music?.url ||
+        v.music_info?.playUrl ||
+        v.music_info?.play ||
+        v.music_info?.music?.playUrl ||
+        v.music_info?.music?.play ||
+        v.music_info?.music?.url ||
+        "";
 
     // 2. 🧠 DATA-FIRST DETECTION (Expanded Codes)
     const isSlideshow =
@@ -53,7 +85,8 @@ const formatTikTokVideo = (v) => {
         v.aweme_type === 61 ||
         v.aweme_type === 55 ||
         !!v.image_post_info ||
-        images.length > 1;
+        !!v.imagePost ||
+        images.length > 0;
 
     // ⚠️ បើជា Slideshow ប៉ុន្តែគ្មានរូប (API មិនឲ្យមក) -> ចាត់ទុកជា Video (MP4)
     // ដើម្បីកុំឲ្យ Error ពេល Download
@@ -70,7 +103,7 @@ const formatTikTokVideo = (v) => {
         cover: v.cover,
         no_watermark_url: noWatermark,
         playUrl: v.play || v.hdplay || "", // Preview URL should also be media, not web_url
-        music: v.music || v.music_info?.play || "", // 🎵 NEW: Audio URL
+        music: musicUrl,
 
         images: images,
         type: finalType, // ✅ Correct Type
@@ -90,6 +123,83 @@ const formatTikTokVideo = (v) => {
     };
 };
 
+const createSlideshowPreview = async ({ images, musicUrl, id, title }) => {
+    if (!images || images.length === 0) return null;
+    const safeId = (id || `slideshow_${Date.now()}`).replace(/[^a-z0-9]/gi, "_");
+    const previewKey = `local_slideshow_${crypto.createHash("md5").update(images.join("|") + "|" + (musicUrl || "")).digest("hex").slice(0, 8)}`;
+    const urlHash = crypto.createHash("md5").update(previewKey).digest("hex").slice(0, 8);
+    const cacheFilename = `tiktok-${safeId}-${urlHash}.mp4`;
+    const cachePath = path.join(tempDir, cacheFilename);
+    const publicPreviewUrl = `/uploads/temp/videos/${cacheFilename}`;
+
+    if (fs.existsSync(cachePath) && fs.statSync(cachePath).size > 100 * 1024) {
+        return publicPreviewUrl;
+    }
+
+    const folderName = `preview_${safeId}_${Date.now()}`;
+    const targetFolder = path.join(slideDir, folderName);
+    if (!fs.existsSync(targetFolder)) fs.mkdirSync(targetFolder, { recursive: true });
+
+    try {
+        const localImages = [];
+        const downloadHeaders = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://www.tiktok.com/',
+            'Accept': '*/*'
+        };
+
+        for (let i = 0; i < images.length; i++) {
+            const imageUrl = images[i];
+            const imagePath = path.join(targetFolder, `img_${i + 1}.jpg`);
+            const writer = fs.createWriteStream(imagePath);
+            const resp = await axios({ url: imageUrl, method: 'get', responseType: 'stream', timeout: 20000, headers: downloadHeaders });
+            resp.data.pipe(writer);
+            await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+            localImages.push(imagePath);
+        }
+
+        let audioPath = null;
+        if (musicUrl) {
+            try {
+                audioPath = path.join(targetFolder, 'bgm.mp3');
+                const audioWriter = fs.createWriteStream(audioPath);
+                const audioResp = await axios({
+                    url: musicUrl,
+                    method: 'get',
+                    responseType: 'stream',
+                    timeout: 20000,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Referer': 'https://www.tiktok.com/',
+                        'Accept': '*/*'
+                    }
+                });
+                audioResp.data.pipe(audioWriter);
+                await new Promise((resolve, reject) => {
+                    audioWriter.on('finish', resolve);
+                    audioWriter.on('error', reject);
+                });
+            } catch (audioErr) {
+                console.warn(`⚠️ Audio download failed for slideshow preview: ${audioErr.message}. Generating silent slideshow instead.`);
+                audioPath = null;
+            }
+        }
+
+        const durationPerSlide = images.length === 1 ? 10 : 5;
+        await createSlideshow(localImages, audioPath, cachePath, durationPerSlide);
+
+        return publicPreviewUrl;
+    } catch (err) {
+        console.warn(`⚠️ Slideshow preview generation failed: ${err.message}`);
+        return null;
+    } finally {
+        setTimeout(() => fs.rm(targetFolder, { recursive: true, force: true }, () => { }), 10 * 60 * 1000);
+    }
+};
+
 /* -------------------------------------------------------------------------- */
 /* 🔍 POST /lookup — Single Video                                             */
 /* -------------------------------------------------------------------------- */
@@ -98,91 +208,259 @@ router.post("/lookup", requireAuth, async (req, res) => {
         const { url } = req.body;
         if (!url) return res.status(400).json({ success: false, error: "URL required" });
 
-        const cleanUrl = (url.match(/https?:\/\/[^\s]+/) || [url])[0];
-        let videoData = null;
+        const youtubedl = require("youtube-dl-exec");
+        let cleanUrl = (url.match(/https?:\/\/[^\s]+/) || [url])[0];
+        
+        // 🔄 Handle Short URLs (vt.tiktok.com) - Resolve redirects manually
+        if (cleanUrl.includes("vt.tiktok.com") || cleanUrl.includes("vm.tiktok.com")) {
+            try {
+                const headRes = await axios.head(cleanUrl, { 
+                    maxRedirects: 5,
+                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                });
+                cleanUrl = headRes.request.res.responseUrl || cleanUrl;
+            } catch (e) {
+                console.warn("    ⚠️ Redirect resolution failed, continuing with original URL");
+            }
+        }
 
-        // 1️⃣ yt-dlp (Internal First)
+        let videoData = null;
+        const videoIdMatch = cleanUrl.match(/\/video\/(\d+)/) || cleanUrl.match(/\/v\/(\d+)/);
+        const videoId = videoIdMatch ? videoIdMatch[1] : null;
+
+        // 1️⃣ yt-dlp (Internal Scraper)
         try {
-            console.log("    👉 Attempting yt-dlp (Internal Scraper)...");
-            const youtubedl = require("youtube-dl-exec");
-            const output = await youtubedl(cleanUrl, { dumpSingleJson: true, noWarnings: true }, { execPath: getBinaryPath() });
+            console.log("    👉 Attempting yt-dlp (Local Engine)...");
+            const proxy = process.env.TIKTOK_PROXY;
+            const mobileUA = "com.zhiliaoapp.musically/2022605040 (Linux; U; Android 13; en_US; Pixel 7; Build/TQ3A.230605.012; Cronet/58.0.2991.0)";
+            
+            const args = { 
+                dumpSingleJson: true, 
+                noWarnings: true,
+                noCheckCertificates: true,
+                userAgent: mobileUA,
+                addHeader: ['Referer:https://www.tiktok.com/']
+            };
+            if (proxy) args.proxy = proxy;
+
+            const output = await youtubedl(cleanUrl, args, { execPath: getBinaryPath() });
 
             const isSlide = output.vcodec === 'none' && (output.thumbnails?.length > 1);
+            const isH265 = output.vcodec?.includes('hvc1') || output.vcodec?.includes('hev1') || output.vcodec?.includes('hevc');
+
             videoData = {
                 id: output.id,
                 title: output.title,
                 cover: output.thumbnail,
                 no_watermark_url: output.url,
-                images: [],
+                playUrl: output.url,
+                images: isSlide ? output.thumbnails.map(t => t.url) : [],
                 type: isSlide ? 'slideshow' : 'video',
                 duration: output.duration,
-                author: { nickname: output.uploader },
-                stats: { plays: output.view_count, likes: output.like_count }
+                isH265: isH265, // 🛡️ Flag for frontend auto-fix
+                author: { 
+                    nickname: output.uploader || output.uploader_id || "TikTok User",
+                    unique_id: output.uploader_id,
+                    avatar: "" 
+                },
+                stats: { 
+                    plays: output.view_count || 0, 
+                    likes: output.like_count || 0,
+                    shares: output.repost_count || 0
+                },
+                web_url: output.webpage_url || cleanUrl
             };
-            console.log("    ✅ yt-dlp Success!");
+            console.log("    ✅ Local Engine Success!");
         } catch (e) {
-            console.warn("    ⚠️ yt-dlp failed:", e.message || "Unknown error", e.stderr || "");
-        }
-
-        // 2️⃣ TikWM Fallback
-        if (!videoData) {
+            const errorMsg = e.stderr?.toString() || e.message;
+            console.warn("    ⚠️ yt-dlp failed:", errorMsg.slice(0, 50));
+            const logPath = path.join(__dirname, "../../temp/yt-dlp-error.log");
+            fs.appendFileSync(logPath, `\n\n[LOOKUP] URL: ${cleanUrl}\nERROR: ${errorMsg}\nTIME: ${new Date().toISOString()}`);
+            
+            console.warn("    👉 Attempting Stealth Scraper (Local HTML Parser)...");
+            
+            // 2️⃣ Stealth Scraper (GitHub 2026 Method: Node Share + RENDER_DATA)
             try {
-                console.log("    👉 Attempting TikWM API...");
-                const response = await axios.post("https://www.tikwm.com/api/",
-                    new URLSearchParams({ url: cleanUrl, hd: 1 }),
-                    { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 8000 }
-                );
-                if (response.data.code === 0) {
-                    videoData = formatTikTokVideo(response.data.data);
-                    console.log("    ✅ TikWM Success!");
+                console.log("    👉 Attempting Stealth Scraper (GitHub 2026 Method)...");
+                const videoId = cleanUrl.match(/\/video\/(\d+)/)?.[1];
+                
+                // Try Node Share API first (Often less protected)
+                if (videoId) {
+                    try {
+                        const nodeUrl = `https://www.tiktok.com/node/share/video/${videoId}`;
+                        const nodeRes = await axios.get(nodeUrl, {
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                'Referer': 'https://www.tiktok.com/'
+                            },
+                            timeout: 5000
+                        });
+                        if (nodeRes.data?.itemInfo?.itemStruct) {
+                            const item = nodeRes.data.itemInfo.itemStruct;
+                            videoData = {
+                                id: item.id,
+                                title: item.desc,
+                                cover: item.video?.cover,
+                                no_watermark_url: item.video?.playAddr,
+                                playUrl: item.video?.playAddr,
+                                type: 'video',
+                                isH265: item.video?.codecType === 'h265',
+                                author: { nickname: item.author?.nickname, unique_id: item.author?.uniqueId },
+                                stats: { plays: item.stats?.playCount, likes: item.stats?.diggCount },
+                                web_url: cleanUrl
+                            };
+                            console.log("    ✅ Node Share Success!");
+                            return res.json({ success: true, video: videoData });
+                        }
+                    } catch (e) { console.warn("    ⚠️ Node Share failed, trying HTML parse..."); }
                 }
-            } catch (e) { console.warn("    ⚠️ TikWM failed"); }
-        }
 
-        // 3️⃣ Last Resort: LoveTik API (Best for Slideshows/Photos when TikWM is down)
-        // TikWM often fails 403, and yt-dlp doesn't support photos. LoveTik is our savior.
-        if (!videoData) {
-            try {
-                console.log("    👉 Attempting LoveTik API (Slideshow/Video Fallback)...");
-                const loveRes = await axios.post('https://lovetik.com/api/ajax/search',
-                    new URLSearchParams({ query: cleanUrl }).toString(),
-                    {
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                        },
-                        timeout: 10000
+                // Fallback to HTML RENDER_DATA parsing
+                const response = await axios.get(cleanUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                        'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+                        'sec-ch-ua-mobile': '?0',
+                        'sec-ch-ua-platform': '"Windows"',
+                        'Referer': 'https://www.google.com/'
+                    },
+                    timeout: 10000
+                });
+
+                const $ = cheerio.load(response.data);
+                const scriptData = $('#SIGI_STATE').html() || $('#__UNIVERSAL_DATA_FOR_REHYDRATION__').html() || $('script[id="sigi-data"]').html();
+                
+                if (scriptData) {
+                    const json = JSON.parse(scriptData);
+                    
+                    // 🔍 Try multiple JSON paths (TikTok changes these constantly)
+                    const item = json.ItemModule ? Object.values(json.ItemModule)[0] : 
+                                 (json.__DEFAULT_SCOPE__?.["webapp.video-detail"]?.itemInfo?.itemStruct || 
+                                  json.__DEFAULT_SCOPE__?.["webapp.video-detail-v2"]?.itemInfo?.itemStruct ||
+                                  json.webappItem?.[videoId]);
+                    
+                    if (item) {
+                        // 🛠️ FIX: Author extraction (Ensure strings, not objects)
+                        const authorObj = typeof item.author === 'object' ? item.author : { nickname: item.author, uniqueId: item.author };
+                        
+                        const musicUrl = item.music?.playUrl || item.music?.play || item.music?.url || item.music_info?.playUrl || item.music_info?.play || item.music_info?.music?.playUrl || item.music_info?.music?.play || item.music_info?.music?.url || "";
+                        videoData = {
+                            id: item.id || videoId,
+                            title: item.desc || item.title || "",
+                            cover: item.video?.cover || item.imagePost?.cover?.url_list?.[0] || item.imagePost?.cover?.urlList?.[0],
+                            no_watermark_url: item.video?.playAddr || item.video?.downloadAddr || "",
+                            playUrl: item.video?.playAddr || "",
+                            music: musicUrl,
+                            images: item.imagePost?.images?.map(img => img.imageURL?.urlList?.[0] || img.image_url?.url_list?.[0]) || [],
+                            type: (item.imagePost || item.image_post_info) ? 'slideshow' : 'video',
+                            author: {
+                                nickname: String(authorObj.nickname || authorObj.uniqueId || "TikTok User"),
+                                unique_id: String(authorObj.uniqueId || authorObj.nickname || ""),
+                                avatar: item.authorIcon || authorObj.avatarThumb || ""
+                            },
+                            stats: {
+                                plays: item.stats?.playCount || 0,
+                                likes: item.stats?.diggCount || 0
+                            },
+                            web_url: cleanUrl,
+                            originalUrl: cleanUrl
+                        };
+                        console.log("    ✅ Stealth Scraper Success!");
                     }
-                );
-
-                if (loveRes.data.status === 'ok') {
-                    const d = loveRes.data;
-                    const isSlideshow = d.images && d.images.length > 0;
-
-                    console.log(`    ✅ LoveTik Success: ${isSlideshow ? 'Slideshow (' + d.images.length + ' imgs)' : 'Video'}`);
-
-                    videoData = {
-                        id: d.vid || `tk_${Date.now()}`,
-                        title: d.desc || "TikTok Media",
-                        cover: d.cover,
-                        no_watermark_url: d.links ? d.links[0].a : "", // Video URL
-                        playUrl: d.links ? d.links[0].a : "",
-                        images: d.images || [], // Full Slideshow Support!
-                        type: isSlideshow ? 'slideshow' : 'video',
-                        author: {
-                            nickname: d.author_name || "Unknown",
-                            avatar: d.author_a || ""
-                        },
-                        stats: { plays: 0, likes: 0 }
-                    };
                 }
-            } catch (e) {
-                console.warn("    ⚠️ LoveTik failed:", e.message);
+            } catch (stealthErr) {
+                console.error("    ❌ Stealth Scraper also failed:", stealthErr.message);
+            }
+        }
+
+        // 3️⃣ Embed Scraper (Final Local Fallback)
+        if (!videoData && videoId) {
+            try {
+                console.log(`    👉 Attempting Embed Scraper (Local) for ID: ${videoId}...`);
+                const embedUrl = `https://www.tiktok.com/embed/v2/${videoId}`;
+                const response = await axios.get(embedUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Referer': 'https://www.tiktok.com/'
+                    }
+                });
+                
+                const $ = cheerio.load(response.data);
+                const scriptData = $('#__UNIVERSAL_DATA_FOR_REHYDRATION__').html() || $('#SIGI_STATE').html();
+                
+                if (scriptData) {
+                    const json = JSON.parse(scriptData);
+                    const item = json.__DEFAULT_SCOPE__?.["webapp.video-detail"]?.itemInfo?.itemStruct || 
+                                 json.ItemModule?.[videoId] || 
+                                 json.webappItem?.[videoId];
+                    
+                    if (item) {
+                        const musicUrl = item.music?.playUrl || item.music?.play || item.music?.url || item.music_info?.playUrl || item.music_info?.play || item.music_info?.music?.playUrl || item.music_info?.music?.play || item.music_info?.music?.url || "";
+                        const isH265 = item.video?.codecType === 'h265' || item.video?.definition === '720p' && !item.video?.playAddr?.includes('h264');
+
+                        videoData = {
+                            id: item.id || videoId,
+                            title: item.desc || "TikTok Video",
+                            cover: item.video?.cover || item.imagePost?.cover?.url_list?.[0] || "",
+                            no_watermark_url: item.video?.playAddr || item.video?.downloadAddr || "",
+                            playUrl: item.video?.playAddr || "",
+                            music: musicUrl,
+                            images: item.imagePost?.images?.map(img => img.imageURL?.urlList?.[0]) || [],
+                            type: item.imagePost ? 'slideshow' : 'video',
+                            isH265: isH265, // 🛡️ Flag for frontend auto-fix
+                            author: {
+                                nickname: String(item.author?.nickname || item.author || "TikTok User"),
+                                unique_id: String(item.author?.uniqueId || item.author || ""),
+                                avatar: item.author?.avatarThumb || ""
+                            },
+                            stats: {
+                                plays: item.stats?.playCount || 0,
+                                likes: item.stats?.diggCount || 0
+                            },
+                            web_url: cleanUrl,
+                            originalUrl: cleanUrl
+                        };
+                        console.log("    ✅ Embed Scraper Success!");
+                    }
+                }
+            } catch (embedErr) {
+                console.error("    ❌ Embed Scraper also failed:", embedErr.message);
+            }
+        }
+
+        // 4️⃣ TikWM API Fallback (Stage 4)
+        if (!videoData) {
+            try {
+                console.log("    👉 Attempting TikWM API Fallback (Lookup)...");
+                const tikwmRes = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(cleanUrl)}`);
+                const v = tikwmRes.data?.data;
+                if (v) {
+                    videoData = formatTikTokVideo(v);
+                    console.log("    ✅ TikWM API Success!");
+                }
+            } catch (tikwmErr) {
+                console.error("    ❌ TikWM API also failed:", tikwmErr.message);
             }
         }
 
         if (!videoData) {
-            return res.status(404).json({ success: false, error: "Media not found or unsupported URL" });
+            return res.status(422).json({ 
+                success: false, 
+                error: "Local engines blocked. Please try again later or provide the direct media link if you have it." 
+            });
+        }
+
+        if (videoData.type === 'slideshow' && videoData.images?.length > 0) {
+            const previewUrl = await createSlideshowPreview({
+                images: videoData.images,
+                musicUrl: videoData.music,
+                id: videoData.id,
+                title: videoData.title
+            });
+            if (previewUrl) {
+                videoData.previewUrl = previewUrl;
+            }
         }
 
         return res.json({ success: true, video: videoData });
@@ -212,37 +490,104 @@ router.post("/compatible", requireAuth, async (req, res) => {
 
         let videoUrlToDownload = cleanUrl;
         
-        // If it's a web URL, get the direct media link via yt-dlp
-        if (cleanUrl.includes('tiktok.com/@') || cleanUrl.includes('vt.tiktok.com')) {
-             const youtubedl = require("youtube-dl-exec");
-             try {
-                const output = await youtubedl(cleanUrl, { dumpSingleJson: true, noWarnings: true }, { execPath: getBinaryPath() });
+        // 🛠️ SMART RESOLUTION: If it's already a direct CDN link, use it. Otherwise, resolve.
+        const isDirectLink = cleanUrl.match(/(tiktokcdn|bytevc1|muscdn|akamaized|ibyteimg)/i);
+        
+        if (!isDirectLink) {
+            console.log("       🔍 Resolving direct media link...");
+            
+            // Try local yt-dlp
+            const youtubedl = require("youtube-dl-exec");
+            try {
+                const output = await youtubedl(cleanUrl, { 
+                    dumpSingleJson: true, 
+                    noWarnings: true,
+                    addHeader: ['Referer:https://www.tiktok.com/', 'User-Agent:Mozilla/5.0']
+                }, { execPath: getBinaryPath() });
                 if (output && output.url) videoUrlToDownload = output.url;
-             } catch(err) {
-                 console.warn("       yt-dlp failed to resolve direct link, using original:", err.message);
-             }
+            } catch(err) {
+                console.error("       ❌ Local Engine failed to resolve link:", err.message);
+                throw new Error("Local scraper failed. TikTok might be blocking the request.");
+            }
+        }
+        // 📥 Improved Download Strategy
+        const downloadUrl = url || videoUrlToDownload;
+        const videoId = downloadUrl.match(/\/video\/(\d+)/)?.[1];
+        
+        console.log(`       📥 Downloading video: ${downloadUrl} (ID: ${videoId})`);
+        
+        const ytDlpPath = getBinaryPath() || 'yt-dlp';
+        const proxy = process.env.TIKTOK_PROXY;
+        const proxyArg = proxy ? `--proxy "${proxy}"` : "";
+        const mobileUA = "com.zhiliaoapp.musically/2022605040 (Linux; U; Android 13; en_US; Pixel 7; Build/TQ3A.230605.012; Cronet/58.0.2991.0)";
+
+        let downloadSuccess = false;
+
+        // 🚀 Stage 1: Try yt-dlp Direct
+        try {
+            console.log("       👉 Stage 1: Attempting yt-dlp Direct...");
+            const cmd = `"${ytDlpPath}" -y ${proxyArg} -o "${inputPath}" "${downloadUrl}" --no-playlist --no-warnings --user-agent "${mobileUA}" --no-check-certificates --add-header "Referer:https://www.tiktok.com/"`;
+            execSync(cmd, { stdio: 'pipe' });
+            if (fs.existsSync(inputPath) && fs.statSync(inputPath).size > 100 * 1024) {
+                downloadSuccess = true;
+            }
+        } catch (e1) {
+            console.warn("       ⚠️ Stage 1 Failed, trying Stage 2 (Embed Link extraction)...");
         }
 
-        const writer = fs.createWriteStream(inputPath);
-        const response = await axios({
-            url: videoUrlToDownload,
-            method: 'GET',
-            responseType: 'stream',
-            timeout: 30000,
-            headers: { 
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                'Referer': 'https://www.tiktok.com/'
-            }
-        });
+        // 🚀 Stage 2: Embed Fallback
+        if (!downloadSuccess && videoId) {
+            try {
+                console.log("       👉 Stage 2: Fetching via Embed API...");
+                const embedUrl = `https://www.tiktok.com/embed/v2/${videoId}`;
+                const res = await axios.get(embedUrl, { headers: { 'User-Agent': mobileUA } });
+                const $ = cheerio.load(res.data);
+                const scriptData = $('#SIGI_STATE').html() || $('#__UNIVERSAL_DATA_FOR_REHYDRATION__').html() || $('script[id="sigi-data"]').html();
+                
+                let playAddr = "";
+                if (scriptData) {
+                    try {
+                        const json = JSON.parse(scriptData);
+                        playAddr = json.webappItem?.[videoId]?.video?.playAddr || 
+                                   json.ItemModule?.[videoId]?.video?.playAddr;
+                    } catch (e) {}
+                }
 
-        response.data.pipe(writer);
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-        });
+                if (playAddr) {
+                    console.log("       ✅ Embed Link Found, downloading...");
+                    const cmd = `"${ytDlpPath}" -y ${proxyArg} -o "${inputPath}" "${playAddr}" --no-playlist --no-warnings --user-agent "${mobileUA}" --no-check-certificates --add-header "Referer:https://www.tiktok.com/"`;
+                    execSync(cmd, { stdio: 'pipe' });
+                    if (fs.existsSync(inputPath)) downloadSuccess = true;
+                }
+            } catch (e2) {
+                console.error("       ❌ Stage 2 Failed:", e2.message);
+            }
+        }
+
+        // 🚀 Stage 3: TikWM API Fallback (Final Absolute Fallback)
+        if (!downloadSuccess) {
+            try {
+                console.log("       👉 Stage 3: Attempting TikWM API Fallback...");
+                const tikwmRes = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(downloadUrl)}`);
+                if (tikwmRes.data?.data?.play) {
+                    const playUrl = tikwmRes.data.data.play;
+                    console.log("       ✅ TikWM Link Found, downloading...");
+                    const cmd = `"${ytDlpPath}" -y ${proxyArg} -o "${inputPath}" "${playUrl}" --no-playlist --no-warnings --user-agent "${mobileUA}" --no-check-certificates`;
+                    execSync(cmd, { stdio: 'pipe' });
+                    if (fs.existsSync(inputPath)) downloadSuccess = true;
+                }
+            } catch (e3) {
+                console.error("       ❌ Stage 3 Failed:", e3.message);
+            }
+        }
+
+        if (!downloadSuccess) {
+            throw new Error("All local and API download methods failed. TikTok is heavily blocking this content.");
+        }
+
+        console.log("       ✅ Download complete.");
 
         // 2. Process with FFmpeg
-        const { execSync } = require('child_process');
         const ffmpegPath = require('ffmpeg-static');
         
         try {
@@ -307,29 +652,15 @@ router.post("/profile", requireAuth, async (req, res) => {
         let videos = [];
         let authorAvatar = "";
 
-        // 1️⃣ TikWM API
-        try {
-            const response = await axios.post("https://www.tikwm.com/api/user/posts",
-                new URLSearchParams({ unique_id: uniqueId, count: 30, cursor: 0 }),
-                { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 12000 }
-            );
-
-            if (response.data.code === 0) {
-                // ✅ ប្រើ Helper ដែលបានកែសម្រួល
-                videos = response.data.data.videos.map(v => formatTikTokVideo(v));
-
-                videos.sort((a, b) => b.timestamp - a.timestamp);
-                authorAvatar = response.data.data.author.avatar;
-
-                return res.json({ success: true, profile: { username: uniqueId, avatar: authorAvatar }, videos });
-            }
-        } catch (e) { console.warn("⚠️ TikWM Profile API unreachable (403/Down), switching to backup engine (yt-dlp)..."); }
-
-        // 2️⃣ yt-dlp Fallback
+        // yt-dlp Local Profile Scraper
         const youtubedl = require("youtube-dl-exec");
         try {
             const output = await youtubedl(`https://www.tiktok.com/@${uniqueId}`, {
-                dumpSingleJson: true, flatPlaylist: true, playlistEnd: 20, noWarnings: true
+                dumpSingleJson: true, 
+                flatPlaylist: true, 
+                playlistEnd: 20, 
+                noWarnings: true,
+                addHeader: ['Referer:https://www.tiktok.com/', 'User-Agent:Mozilla/5.0']
             }, { execPath: getBinaryPath() });
 
             if (output.entries) {
@@ -338,7 +669,7 @@ router.post("/profile", requireAuth, async (req, res) => {
                     title: v.title,
                     cover: v.thumbnails?.[0]?.url || "",
                     web_url: v.url,
-                    type: 'video', // yt-dlp flat playlist មិនអាចដឹង Slideshow ទេ
+                    type: 'video', 
                     duration: v.duration,
                     timestamp: 0,
                     stats: { plays: v.view_count || 0 }
@@ -346,7 +677,8 @@ router.post("/profile", requireAuth, async (req, res) => {
             }
             return res.json({ success: true, profile: { username: uniqueId, avatar: "" }, videos });
         } catch (ytErr) {
-            return res.status(422).json({ success: false, message: "Use direct video links." });
+            console.error("Local Profile Scraper Error:", ytErr.message);
+            return res.status(422).json({ success: false, message: "Profile lookup failed locally. Please use direct video links." });
         }
 
     } catch (err) {
@@ -360,42 +692,10 @@ router.post("/profile", requireAuth, async (req, res) => {
 router.post("/trending", requireAuth, async (req, res) => {
     try {
         const { region = "US", count = 20, type = 'music' } = req.body;
-        const apiEndpoint = type === 'capcut' ? "https://www.tikwm.com/api/feed/search" : "https://www.tikwm.com/api/feed/list";
-
-        const params = new URLSearchParams();
-        params.append('count', '30');
-        params.append('cursor', '0');
-        if (type === 'capcut') params.append('keywords', 'CapCut Template');
-        else params.append('region', region);
-
-        const response = await axios.post(apiEndpoint, params, { timeout: 10000 });
-
-        let videos = [];
-        if (response.data.data) {
-            const list = Array.isArray(response.data.data) ? response.data.data : (response.data.data.videos || []);
-
-            // ✅ ប្រើ Helper ដូចគ្នា ដើម្បីឱ្យ Trending ស្គាល់ Slideshow ដែរ
-            videos = list.map(v => {
-                const formatted = formatTikTokVideo(v);
-                // បន្ថែម Logic CapCut បើចាំបាច់
-                if (type === 'capcut') {
-                    formatted.isCapCut = true; // Mark as CapCut
-                    // CapCut តែងតែជា Video, ប៉ុន្តែ Logic ខាងលើមិនខូចអ្វីទេ
-                }
-                return formatted;
-            });
-        }
-
-        // Filter CapCut ជាក់លាក់
-        if (type === 'capcut') {
-            videos = videos.filter(v => JSON.stringify(v).toLowerCase().includes('capcut') || JSON.stringify(v).toLowerCase().includes('template'));
-        }
-
-        videos.sort((a, b) => b.stats.likes - a.stats.likes);
-        res.json({ success: true, videos });
-
+        // Trending is not supported locally without external APIs.
+        // We will return an empty list or a message to use direct search.
+        res.status(403).json({ success: false, error: "Trending feature requires external APIs and is currently disabled for privacy." });
     } catch (err) {
-        console.error("Trending Error:", err.message);
         res.status(500).json({ success: false, error: "Server Error" });
     }
 });
@@ -555,8 +855,8 @@ router.get("/stream", async (req, res) => {
         if (!id || id === 'undefined' || !url) return res.status(400).send("Missing parameters: id or url");
 
         // 🔐 Security: Domain Allowlist
-        if (!url.match(/(tiktokcdn|bytevc1|tikwm|douyin|muscdn|akamaized|local_merge)/i)) {
-            return res.status(403).send("Forbidden Source");
+        if (!url.match(/(tiktokcdn|tiktokv|tiktok|bytevc|tikwm|douyin|muscdn|akamaized|local_|local_merge)/i)) {
+            return res.status(403).send("Forbidden Source: " + url);
         }
 
         const safeId = id.replace(/[^a-z0-9]/gi, "_");
@@ -621,76 +921,109 @@ router.get("/stream", async (req, res) => {
             }
         }
 
-        // 2️⃣ CACHE MISS: Download & Stream (PassThrough)
-        console.log(`📥 [Stream] Caching new video: ${safeId} [${urlHash}]`);
+        
+        // 2️⃣ CACHE MISS: Download & Stream (Try direct media first for speed)
+        const mobileUA = "com.zhiliaoapp.musically/2022605040 (Linux; U; Android 13; en_US; Pixel 7; Build/TQ3A.230605.012; Cronet/58.0.2991.0)";
+        const isDirectMedia = url.match(/(tiktokcdn|tiktokv|bytevc|muscdn|akamaized|douyin|v19-webapp-prime\.tiktok\.com|v16-webapp\.tiktok\.com|playAddr)/i);
 
-        // Setup Streams
-        const { PassThrough } = require('stream');
-        const passThrough = new PassThrough();
+        if (isDirectMedia) {
+            console.log(`📥 [Stream] Direct media URL detected: ${url}`);
+            try {
+                const sourceRes = await axios({
+                    url,
+                    method: 'GET',
+                    responseType: 'stream',
+                    headers: {
+                        'User-Agent': mobileUA,
+                        'Referer': 'https://www.tiktok.com/'
+                    },
+                    timeout: 30000,
+                });
 
-        // Temp Write Stream (prevent race conditions)
-        const tempFilename = `tiktok-${safeId}-${urlHash}-${Date.now()}.tmp`;
-        const tempFilePath = path.join(tempDir, tempFilename);
-        const fileWriter = fs.createWriteStream(tempFilePath);
+                const contentLength = parseInt(sourceRes.headers['content-length'], 10);
+                res.writeHead(200, getCommonHeaders(isNaN(contentLength) ? null : contentLength));
 
-        try {
-            const headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            };
-            if (/tiktokcdn\.com|bytevc1\.com|tiktokv\.com|akamaized\.net/i.test(url)) {
-                headers['Referer'] = 'https://www.tiktok.com/';
+                const pass = new PassThrough();
+                sourceRes.data.pipe(pass);
+                pass.pipe(res);
+
+                const writer = fs.createWriteStream(cachePath);
+                pass.pipe(writer);
+                writer.on('finish', () => console.log(`✅ [Stream] Cached direct media: ${cacheFilename}`));
+                writer.on('error', (err) => console.warn(`⚠️ [Stream] Cache write failed: ${err.message}`));
+                return;
+            } catch (err) {
+                console.warn(`⚠️ [Stream] Direct media download failed: ${err.message}`);
+                // fallback to yt-dlp below
             }
+        }
 
-            const response = await axios({
-                method: 'get',
-                url: url,
-                responseType: 'stream',
-                headers: headers,
-                timeout: 15000,
-                validateStatus: (status) => status < 400
-            });
-
-            // Set Headers immediately
-            const responseSize = response.headers['content-length'];
-            res.writeHead(200, getCommonHeaders(responseSize));
-
-            // 🚿 Pipe Logic: Response -> PassThrough -> (Res + File)
-            response.data.pipe(passThrough);
-            passThrough.pipe(res);
-            passThrough.pipe(fileWriter);
-
-            // 🛑 Client Abort Handling (Memory Leak Fix)
-            req.on("close", () => {
-                if (!res.writableEnded) {
-                    // Client disconnected early
-                    passThrough.destroy();
-                    fileWriter.destroy();
-                    // Optional: Delete partial temp file if we want strict atomic only
-                    // fs.unlink(tempFilePath, () => {}); 
-                }
-            });
-
-            // Cleanup on finish
-            fileWriter.on('finish', () => {
-                setTimeout(() => {
-                    if (fs.existsSync(tempFilePath)) {
+        console.log(`📥 [Stream] Downloading via yt-dlp: ${safeId} [${urlHash}]`);
+        try {
+            const ytDlpPath = getBinaryPath() || 'yt-dlp';
+            const proxy = process.env.TIKTOK_PROXY;
+            const proxyArg = proxy ? `--proxy "${proxy}"` : "";
+            
+            // Start yt-dlp download in background
+            const cmd = `"${ytDlpPath}" -y ${proxyArg} -o "${cachePath}" "${url}" --no-playlist --no-warnings --user-agent "${mobileUA}"`;
+            
+            let downloadDone = false;
+            exec(cmd, async (error, stdout, stderr) => {
+                if (error) {
+                    console.error(`❌ [Stream] yt-dlp failed: ${error.message}`);
+                    
+                    // 🚀 Fallback to Axios download if it's a direct media link
+                    if (url.match(/(tiktokcdn|tiktokv|bytevc|muscdn|akamaized)/i)) {
+                        console.log("    👉 Attempting Axios Fallback Download...");
                         try {
-                            // Atomic Rename
-                            if (!fs.existsSync(cachePath)) fs.renameSync(tempFilePath, cachePath);
-                            else fs.unlinkSync(tempFilePath);
-                        } catch (e) { fs.unlink(tempFilePath, () => { }); }
+                            const writer = fs.createWriteStream(cachePath);
+                            const response = await axios({
+                                url: url,
+                                method: 'GET',
+                                responseType: 'stream',
+                                headers: {
+                                    'User-Agent': mobileUA,
+                                    'Referer': 'https://www.tiktok.com/'
+                                }
+                            });
+                            response.data.pipe(writer);
+                            await new Promise((resolve, reject) => {
+                                writer.on('finish', resolve);
+                                writer.on('error', reject);
+                            });
+                            console.log("    ✅ Axios Fallback Success!");
+                            downloadDone = true;
+                        } catch (axiosErr) {
+                            console.error(`    ❌ Axios Fallback also failed: ${axiosErr.message}`);
+                        }
                     }
-                }, 100);
+                    return;
+                }
+                console.log(`✅ [Stream] Download complete: ${cacheFilename}`);
+                downloadDone = true;
             });
 
-            // Cleanup on Error
-            fileWriter.on('error', () => fs.unlink(tempFilePath, () => { }));
+            // While downloading, we wait for the file to exist
+            let attempts = 0;
+            const checkFile = setInterval(() => {
+                attempts++;
+                if (fs.existsSync(cachePath)) {
+                    const stat = fs.statSync(cachePath);
+                    // Wait for at least 100KB to start streaming or if download is done
+                    if (stat.size > 100 * 1024 || downloadDone) {
+                        clearInterval(checkFile);
+                        res.writeHead(200, getCommonHeaders(downloadDone ? stat.size : null));
+                        fs.createReadStream(cachePath).pipe(res);
+                    }
+                } else if (attempts > 30) { // 30 seconds timeout
+                    clearInterval(checkFile);
+                    if (!res.headersSent) res.status(504).send("Download Timeout");
+                }
+            }, 1000);
 
         } catch (err) {
-            console.error(`❌ [Stream] Fetch Failed: ${err.message}`);
-            if (!res.headersSent) res.status(502).send("Upstream Error");
-            fileWriter.close();
-            fs.unlink(tempFilePath, () => { });
+            console.error(`❌ [Stream] Setup Failed: ${err.message}`);
+            if (!res.headersSent) res.status(500).send("Stream Setup Error");
         }
 
     } catch (e) {

@@ -69,16 +69,10 @@ const createSlideshow = (imagePaths, audioPath, outputPath, durationPerSlide = 5
 
         imagePaths.forEach((_, i) => {
             const label = `v${i}`;
-            
-            // 🚀 PREMIUM ZOOM EFFECT (Ken Burns)
-            // We scale up slightly first, then zoom in slowly.
-            // Safe duration: we use max 300 frames for zoom calculation to prevent crash
-            const zoomFrames = Math.min(slideDuration * 25, 300); 
-            
+
+            // 📸 Static image slideshow without zoom
             filters.push(
-                `[${i}:v]scale=1280:2276,crop=1080:1920,` + 
-                `zoompan=z='min(zoom+0.001,1.1)':d=${zoomFrames}:s=1080x1920:fps=25,` +
-                `setsar=1[${label}]`
+                `[${i}:v]scale=1280:2276,crop=1080:1920,setsar=1,fps=25[${label}]`
             );
             concatLabel.push(`[${label}]`);
         });

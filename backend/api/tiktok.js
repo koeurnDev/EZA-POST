@@ -20,12 +20,15 @@ router.post("/process", async (req, res) => {
         console.log(`🔄 Processing TikTok URL: ${url}`);
 
         // 1. Download Video
-        const videoBuffer = await tiktokDownloader.downloadTiktokVideo(url);
+        const downloadResult = await tiktokDownloader.downloadTiktokVideo(url);
+        if (!downloadResult || !downloadResult.buffer) {
+            throw new Error("TikTok download failed: no video buffer returned");
+        }
 
         // 2. Save to Temp File
         const tempFilename = `tiktok_${Date.now()}.mp4`;
         const tempFilePath = path.join(tempDir, tempFilename);
-        fs.writeFileSync(tempFilePath, videoBuffer);
+        fs.writeFileSync(tempFilePath, downloadResult.buffer);
 
         // 3. Upload to Cloudinary
         console.log(`📤 Uploading to Cloudinary...`);

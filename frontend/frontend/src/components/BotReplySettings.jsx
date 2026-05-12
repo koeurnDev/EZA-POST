@@ -463,8 +463,8 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           របៀបប្រើប្រាស់ (Quick Guide)
         </h3>
         <ol className="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-2">
-          <li><strong>បើកមុខងារ (Turn ON):</strong> ចុចបើកកុងតាក់ <span className="bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded shadow-sm text-xs border dark:border-gray-700 font-medium">Bot កំពុងដំណើរការ</span>។</li>
-          <li><strong>ជ្រើសរើសផេក (Select Pages):</strong> ជ្រើសរើស Page ដែលបងចង់ឱ្យ Bot ទៅជួយឆ្លើយខមិននៅត្រង់ <span className="bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded shadow-sm text-xs border dark:border-gray-700 font-medium">ជ្រើសរើស Page ដែលចង់ឱ្យ Bot ឆ្លើយតប</span>។</li>
+          <li><strong>បើកមុខងារ (Turn ON):</strong> ចុចបើកកុងតាក់ <span className="bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded shadow-sm text-[13px] border dark:border-gray-700 font-medium">Bot កំពុងដំណើរការ</span>។</li>
+          <li><strong>ជ្រើសរើសផេក (Select Pages):</strong> ជ្រើសរើស Page ដែលបងចង់ឱ្យ Bot ទៅជួយឆ្លើយខមិននៅត្រង់ <span className="bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded shadow-sm text-[13px] border dark:border-gray-700 font-medium">ជ្រើសរើស Page ដែលចង់ឱ្យ Bot ឆ្លើយតប</span>។</li>
           <li><strong>បង្កើតច្បាប់ (Create Rule):</strong> កំណត់ពាក្យដែលភ្ញៀវចូលចិត្តសួរ (Keyword) និងសារឆ្លើយតប (Reply Message) រួចចុច Save។</li>
         </ol>
       </div>
@@ -479,7 +479,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
               {isEnabled ? "Bot កំពុងដំណើរការ" : "Bot ត្រូវបានផ្អាក"}
             </h2>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
               {isEnabled ? "Bot កំពុងឆ្លើយតបខមិន។" : "បើកមុខងារនេះដើម្បីឱ្យ Bot ឆ្លើយតប។"}
             </p>
           </div>
@@ -541,7 +541,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                       <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
                         {page.name}
                       </p>
-                      <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate opacity-60">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate opacity-60">
                         {page.id}
                       </p>
                     </div>
@@ -574,7 +574,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           <button
             onClick={generateAISuggestions}
             disabled={generating}
-            className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-purple-200 dark:border-purple-800/50"
+            className="text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-purple-200 dark:border-purple-800/50"
             title="AI នឹងជួយបង្កើតច្បាប់ឆ្លើយតបដោយស្វ័យប្រវត្តិ។"
           >
             {generating ? "..." : "✨"}
@@ -586,11 +586,11 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Rule Type */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+              <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
                 ប្រភេទច្បាប់ (Rule Type)
                 <div className="group relative">
                   <span className="text-gray-400 cursor-help">(?)</span>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                     ជ្រើសរើសរបៀបដែល Bot ដំណើរការ។ Keyword គឺផ្អែកលើពាក្យ ចំណែក Regex គឺផ្អែកលើទម្រង់អក្សរ។
                   </div>
                 </div>
@@ -600,7 +600,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                   <button
                     key={type}
                     onClick={() => handleFormChange("ruleType", type)}
-                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${formData.ruleType === type
+                    className={`flex-1 py-2 text-base font-medium rounded-lg transition-all ${formData.ruleType === type
                       ? "bg-white dark:bg-gray-800 text-blue-600 shadow-sm"
                       : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
                       }`}
@@ -613,11 +613,11 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
 
             {/* Scope */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+              <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
                 វិសាលភាព (Scope)
                 <div className="group relative">
                   <span className="text-gray-400 cursor-help">(?)</span>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                     អនុវត្តលើគ្រប់ផុសទាំងអស់ ឬផុសណាមួយជាក់លាក់។
                   </div>
                 </div>
@@ -625,7 +625,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               <select
                 value={formData.scope}
                 onChange={(e) => handleFormChange("scope", e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full px-5 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               >
                 <option value="ALL">គ្រប់ផុសទាំងអស់ (All Posts)</option>
                 <option value="SPECIFIC">ផុសជាក់លាក់ (Specific Post)</option>
@@ -636,7 +636,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           {/* Post ID (Conditional) */}
           {formData.scope === "SPECIFIC" && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Post ID
               </label>
               <input
@@ -644,7 +644,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                 value={formData.postId}
                 onChange={(e) => handleFormChange("postId", e.target.value)}
                 placeholder="បញ្ជូល Facebook Post ID"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               />
             </div>
           )}
@@ -652,11 +652,11 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Keyword */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+              <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
                 {formData.ruleType === "KEYWORD" ? "Keyword (Optional)" : "Regex Pattern"}
                 <div className="group relative">
                   <span className="text-gray-400 cursor-help">(?)</span>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                     {formData.ruleType === "KEYWORD" ? "ទុកឱ្យនៅទំនេរដើម្បីឆ្លើយតបទៅកាន់គ្រប់ខមិនទាំងអស់។" : "ទម្រង់ Regex សម្រាប់ត្រួតពិនិត្យអត្ថបទ។"}
                   </div>
                 </div>
@@ -666,17 +666,17 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                 value={formData.keyword}
                 onChange={(e) => handleFormChange("keyword", e.target.value)}
                 placeholder={formData.ruleType === "KEYWORD" ? "ឧទាហរណ៍៖ តម្លៃ (ទុកឱ្យនៅទំនេរដើម្បីឆ្លើយគ្រប់ខមិន)" : "ឧទាហរណ៍៖ ^(hi|hello)$"}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               />
             </div>
 
             {/* Reply Message */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+              <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
                 សារឆ្លើយតប (Reply Message)
                 <div className="group relative">
                   <span className="text-gray-400 cursor-help">(?)</span>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                     សារដែល Bot នឹងផ្ញើទៅកាន់អតិថិជន។
                   </div>
                 </div>
@@ -686,7 +686,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                 value={formData.reply}
                 onChange={(e) => handleFormChange("reply", e.target.value)}
                 placeholder="ឧទាហរណ៍៖ សូមបងឆែកប្រអប់សារ!"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               />
             </div>
           </div>
@@ -737,7 +737,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                     <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
                       ចុចទីនេះដើម្បីបញ្ចូលរូបភាព
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">ប្រភេទ៖ JPG, PNG • ទំហំអតិបរមា៖ 5MB</p>
+                    <p className="text-sm text-gray-500 mt-1">ប្រភេទ៖ JPG, PNG • ទំហំអតិបរមា៖ 5MB</p>
                   </>
                 )}
                 <input type="file" className="hidden" accept="image/jpeg, image/png" onChange={handleImageUpload} disabled={uploading} />
@@ -749,13 +749,13 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
             <button
               onClick={resetForm}
-              className="w-full sm:w-auto px-6 py-3 sm:py-2.5 text-gray-600 dark:text-gray-400 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors border sm:border-0 border-gray-200 dark:border-gray-700"
+              className="w-full sm:w-auto px-8 py-4 sm:py-2.5 text-gray-600 dark:text-gray-400 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors border sm:border-0 border-gray-200 dark:border-gray-700"
             >
               បោះបង់
             </button>
             <button
               onClick={saveRule}
-              className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-4 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
             >
               <Save size={18} />
               {editingId ? "រក្សាទុក" : "បង្កើតថ្មី"}
@@ -775,7 +775,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               placeholder="ស្វែងរកច្បាប់..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full pl-9 pr-4 py-3.5 text-base rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
         </div>

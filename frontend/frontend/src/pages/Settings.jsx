@@ -61,7 +61,7 @@ export default function Settings() {
                 {/* Header */}
                 <div className="mb-8 md:mb-12 px-1">
                     <div className="flex items-center gap-2 mb-4">
-                        <div className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">
+                        <div className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-xs font-black text-blue-500 uppercase tracking-[0.2em]">
                             App Setup
                         </div>
                         <div className="h-px w-12 bg-blue-500/20" />
@@ -69,7 +69,7 @@ export default function Settings() {
                     <h1 className="text-4xl md:text-6xl font-black text-gray-900 dark:text-white tracking-tighter mb-4">
                         Settings <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Hub.</span>
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 font-medium text-sm md:text-lg max-w-2xl leading-relaxed">
+                    <p className="text-gray-500 dark:text-gray-400 font-medium text-base md:text-lg max-w-2xl leading-relaxed">
                         Set up your account, security, and preferences from this simple page.
                     </p>
                 </div>
@@ -86,7 +86,7 @@ export default function Settings() {
                                 <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white tracking-tight">Profile Setup</h3>
                                 <button 
                                     onClick={() => setIsEditModalOpen(true)}
-                                    className="h-10 px-4 md:px-6 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-blue-500/20"
+                                    className="h-10 px-4 md:px-6 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-blue-500/20"
                                 >
                                     Edit Profile
                                 </button>
@@ -98,8 +98,8 @@ export default function Settings() {
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tight">{user?.name || "User"}</h4>
-                                    <p className="text-gray-500 font-medium mt-1 text-sm md:text-base truncate max-w-[280px] md:max-w-none">{user?.email}</p>
-                                    <div className="mt-3 px-3 py-1 bg-emerald-500/10 text-emerald-500 w-fit mx-auto sm:mx-0 rounded text-[10px] font-black uppercase tracking-widest">
+                                    <p className="text-gray-500 font-medium mt-1 text-base truncate max-w-[280px] md:max-w-none">{user?.email}</p>
+                                    <div className="mt-3 px-3 py-1 bg-emerald-500/10 text-emerald-500 w-fit mx-auto sm:mx-0 rounded text-xs font-black uppercase tracking-widest">
                                         {user?.plan || "PRO"} PLAN
                                     </div>
                                 </div>
@@ -124,7 +124,7 @@ export default function Settings() {
                                 </h3>
                                 <button 
                                     onClick={() => window.location.href = "/connections"}
-                                    className="text-[10px] font-black text-blue-500 uppercase tracking-widest hover:underline"
+                                    className="text-xs font-black text-blue-500 uppercase tracking-widest hover:underline"
                                 >
                                     Manage
                                 </button>
@@ -137,15 +137,15 @@ export default function Settings() {
                                     </div>
                                 ) : pages.length === 0 ? (
                                     <div className="p-6 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl md:rounded-3xl">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">No pages connected</p>
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No pages connected</p>
                                     </div>
                                 ) : (
                                     pages.map(page => (
                                         <div key={page.id} className="flex items-center gap-4 p-3 md:p-4 bg-black/5 dark:bg-black/20 rounded-2xl border border-white/5">
                                             <img src={page.picture} alt="" className="w-10 h-10 rounded-xl object-cover" />
                                             <div className="flex-1 min-w-0">
-                                                <p className="font-black text-[11px] md:text-xs text-gray-900 dark:text-white truncate">{page.name}</p>
-                                                <p className="text-[8px] font-bold text-emerald-500 uppercase tracking-widest">Connected</p>
+                                                <p className="font-black text-xs md:text-sm text-gray-900 dark:text-white truncate">{page.name}</p>
+                                                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Connected</p>
                                             </div>
                                         </div>
                                     ))
@@ -170,8 +170,8 @@ export default function Settings() {
                                         {theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
                                     </div>
                                     <div>
-                                        <p className="font-black text-[9px] md:text-[10px] uppercase tracking-widest text-gray-900 dark:text-white">Dark Mode</p>
-                                        <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">{theme === "dark" ? "Active" : "Standby"}</p>
+                                        <p className="font-black text-[11px] md:text-xs uppercase tracking-widest text-gray-900 dark:text-white">Dark Mode</p>
+                                        <p className="text-[11px] md:text-xs font-bold text-gray-400 uppercase tracking-[0.15em]">{theme === "dark" ? "Active" : "Standby"}</p>
                                     </div>
                                 </div>
                                 <button

@@ -22,7 +22,6 @@ const FacebookDownloader = lazy(() => import("../pages/Tools/FacebookDownloader"
 const InstagramDownloader = lazy(() => import("../pages/Tools/InstagramDownloader")); // ✅ New
 const ThreadsDownloader = lazy(() => import("../pages/Tools/ThreadsDownloader")); // ✅ New
 const CapCutDownloader = lazy(() => import("../pages/Tools/CapCutDownloader")); // ✅ New
-const DropshipCenter = lazy(() => import("../pages/Tools/DropshipCenter")); // ✅ New
 const DocumentConverter = lazy(() => import("../pages/Tools/DocumentConverter")); // ✅ New
 const TikTokTrends = lazy(() => import("../pages/Tools/TikTokTrends")); // ✅ New
 const ViralFinder = lazy(() => import("../pages/Tools/ViralFinder")); // ✅ New
@@ -36,7 +35,6 @@ const Profile = lazy(() => import("../pages/Profile"));
 const Welcome = lazy(() => import("../pages/Welcome"));
 const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("../pages/ResetPassword"));
-const ComingSoon = lazy(() => import("../pages/ComingSoon"));
 
 // --- Loading Component ---
 const PageLoader = () => (
@@ -172,14 +170,6 @@ export default function AppRouter() {
           />
 
           <Route
-            path="/tools/dropship-center"
-            element={
-              <ProtectedRoute>
-                <DropshipCenter />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/tools/document-converter"
             element={
               <ProtectedRoute>
@@ -227,15 +217,6 @@ export default function AppRouter() {
             element={
               <ProtectedRoute>
                 <Guide />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/tools/facebook"
-            element={
-              <ProtectedRoute>
-                <FacebookDownloader />
               </ProtectedRoute>
             }
           />

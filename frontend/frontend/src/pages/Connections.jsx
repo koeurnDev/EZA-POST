@@ -111,7 +111,7 @@ export default function Connections() {
             <DashboardLayout>
                 <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
                     <div className="w-16 h-16 border-4 border-blue-500/10 border-t-blue-500 rounded-full animate-spin shadow-2xl shadow-blue-500/20" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500 animate-pulse">Connecting...</p>
+                    <p className="text-xs font-black uppercase tracking-[0.3em] text-blue-500 animate-pulse">Connecting...</p>
                 </div>
             </DashboardLayout>
         );
@@ -129,7 +129,7 @@ export default function Connections() {
                 {/* Header Section */}
                 <div className="mb-10 md:mb-16">
                     <div className="flex items-center gap-2 mb-3 md:mb-4">
-                        <div className="px-2.5 py-0.5 md:px-3 md:py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[9px] md:text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em]">
+                        <div className="px-2.5 py-0.5 md:px-3 md:py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[11px] md:text-xs font-black text-emerald-500 uppercase tracking-[0.2em]">
                             Sync Now
                         </div>
                         <div className="h-px w-8 md:w-12 bg-emerald-500/20" />
@@ -161,7 +161,7 @@ export default function Connections() {
                                     <div className="max-w-md">
                                         <div className="flex flex-col sm:flex-row items-center gap-2 md:gap-4 mb-2">
                                             <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tight">{platform.name}</h3>
-                                            <div className={`px-2.5 py-0.5 md:px-3 md:py-1 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors duration-500 ${platform.isConnected ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-white/5 dark:border-white/10'}`}>
+                                            <div className={`px-2.5 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-black uppercase tracking-widest border transition-colors duration-500 ${platform.isConnected ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-white/5 dark:border-white/10'}`}>
                                                 {platform.isConnected ? 'Connected' : 'Offline'}
                                             </div>
                                         </div>
@@ -180,7 +180,7 @@ export default function Connections() {
                                             >
                                                 <Button 
                                                     variant="secondary"
-                                                    className="w-full sm:w-auto h-12 md:h-14 px-6 md:px-10 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border-rose-500/20 text-rose-500 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all shadow-xl hover:shadow-rose-600/20 group/btn"
+                                                    className="w-full sm:w-auto h-12 md:h-14 px-6 md:px-10 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-widest border-rose-500/20 text-rose-500 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all shadow-xl hover:shadow-rose-600/20 group/btn"
                                                     onClick={() => handleConnect(platform.id)}
                                                 >
                                                     <X size={14} md:size={16} className="mr-2 group-hover/btn:rotate-90 transition-transform" />
@@ -196,7 +196,7 @@ export default function Connections() {
                                                 className="w-full sm:w-auto"
                                             >
                                                 <Button 
-                                                    className="w-full sm:w-auto h-12 md:h-14 px-8 md:px-12 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 shadow-2xl shadow-emerald-600/30 group/btn"
+                                                    className="w-full sm:w-auto h-12 md:h-14 px-8 md:px-12 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 shadow-2xl shadow-emerald-600/30 group/btn"
                                                     onClick={() => handleConnect(platform.id)}
                                                 >
                                                     <Zap size={14} md:size={16} className="mr-2 group-hover/btn:scale-125 transition-transform" />
@@ -225,7 +225,7 @@ export default function Connections() {
                             <div>
                                 <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2 md:gap-3">
                                     Your Facebook Pages
-                                    <span className="px-2 py-0.5 md:px-3 md:py-1 bg-emerald-500/10 text-emerald-500 text-[8px] md:text-[10px] rounded-full font-black tracking-widest uppercase">
+                                    <span className="px-2 py-0.5 md:px-3 md:py-1 bg-emerald-500/10 text-emerald-500 text-[10px] md:text-xs rounded-full font-black tracking-widest uppercase">
                                         {pages.length} Online
                                     </span>
                                 </h3>
@@ -268,7 +268,7 @@ export default function Connections() {
                                                         {page.name}
                                                     </h4>
                                                     <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 font-mono">ID: {page.id}</span>
+                                                        <span className="text-xs font-black uppercase tracking-widest text-gray-400 font-mono">ID: {page.id}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -283,7 +283,7 @@ export default function Connections() {
                                                 
                                                 <button 
                                                     onClick={() => handleTogglePage(page.id, page.isSelected)}
-                                                    className={`relative h-12 px-6 rounded-[1rem] flex items-center gap-3 transition-all font-black text-[10px] uppercase tracking-widest border ${page.isSelected ? "bg-emerald-600 border-emerald-600 text-white shadow-xl shadow-emerald-600/20" : "bg-white/5 border-white/10 text-gray-400"}`}
+                                                    className={`relative h-12 px-6 rounded-[1rem] flex items-center gap-3 transition-all font-black text-xs uppercase tracking-widest border ${page.isSelected ? "bg-emerald-600 border-emerald-600 text-white shadow-xl shadow-emerald-600/20" : "bg-white/5 border-white/10 text-gray-400"}`}
                                                 >
                                                     <Radio size={14} className={page.isSelected ? "animate-pulse" : ""} />
                                                     {page.isSelected ? "Connected" : "Off"}
@@ -310,8 +310,8 @@ export default function Connections() {
                                                                     <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-[1rem] flex items-center justify-center mb-3 md:mb-4 transition-all group-hover/setting:scale-110 ${setting.key === "enableBot" ? "bg-blue-500/10 text-blue-500" : setting.key === "enableSchedule" ? "bg-indigo-500/10 text-indigo-500" : "bg-emerald-500/10 text-emerald-500"}`}>
                                                                         <setting.icon size={18} md:size={22} />
                                                                     </div>
-                                                                    <span className="font-black text-gray-900 dark:text-white text-[10px] md:text-xs uppercase tracking-widest">{setting.label}</span>
-                                                                    <p className="text-[9px] md:text-[10px] text-gray-500 mt-1 font-medium">{setting.desc}</p>
+                                                                    <span className="font-black text-gray-900 dark:text-white text-xs md:text-sm uppercase tracking-widest">{setting.label}</span>
+                                                                    <p className="text-[11px] md:text-xs text-gray-500 mt-1 font-medium">{setting.desc}</p>
                                                                 </div>
                                                                 <div className="flex justify-end">
                                                                     <button 

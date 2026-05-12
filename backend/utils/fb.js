@@ -112,7 +112,7 @@ class FacebookAPI {
   /* ------------------------------------------------------------ */
   async waitForVideoProcessing(accessToken, videoId) {
     let attempts = 0;
-    const maxAttempts = 45; // ✅ Increased to 90 seconds (45 * 2s)
+    const maxAttempts = 150; // ✅ Increased to 5 minutes (150 * 2s)
     const delay = 2000;
 
     while (attempts < maxAttempts) {
@@ -496,20 +496,15 @@ class FacebookAPI {
         console.log(`✅ Carousel posted to ${account.name || account.id} (ID: ${res.data.id})`);
 
       } catch (err) {
-        const fbErr = err.response?.data?.error;
-        if (fbErr) {
-          console.error("❌ FB Carousel Error Details:", JSON.stringify(fbErr, null, 2));
-        }
-
-        const parsed = this.handleFacebookError(err);
+        const fbErr = err.response?.data?.error?.message || err.message;
+        console.error(`❌ Facebook Carousel Post Failed: ${fbErr}`);
         results.failedCount++;
         results.details.push({
           accountId: account.id,
           type: account.type,
           status: "failed",
-          error: parsed.message
+          error: fbErr
         });
-        console.error(`❌ Carousel failed for ${account.name}:`, parsed.message);
       }
     }
     return results;
@@ -587,8 +582,9 @@ class FacebookAPI {
       console.log(`✅ Found ${pages.length} Facebook pages`);
       return pages;
     } catch (err) {
-      console.error("❌ Failed to get pages:", err.message);
-      return [];
+      const fbError = err.response?.data?.error?.message || err.message;
+      console.error(`❌ Facebook Carousel Post Failed: ${fbError}`);
+      throw new Error(`Facebook API Error: ${fbError}`);
     }
   }
 

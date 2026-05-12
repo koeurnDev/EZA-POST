@@ -70,7 +70,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
                 flags.cookies = cookiesPath;
             }
 
-            const output = await ytdlp.lookup(url, flags);
+            let output = await ytdlp.lookup(url, flags);
 
             // 🔄 Handle Playlists (Stories often return a playlist)
             if (output._type === 'playlist' || (output.entries && output.entries.length > 0)) {
@@ -88,7 +88,7 @@ router.post("/lookup", requireAuth, async (req, res) => {
                 thumbnail: output.thumbnail,
                 duration: output.duration,
                 author: output.uploader,
-                url: output.url,
+                url: output.url || output.webpage_url || url,
                 type: 'video', // Explicit type
                 is_video: true
             };

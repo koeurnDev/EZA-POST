@@ -240,6 +240,7 @@ class TikTokDownloader {
       `https://www.tikwm.com/api/?url=${encodeURIComponent(videoUrl)}&hd=1`,
       `https://tikmate.app/api/lookup?url=${encodeURIComponent(videoUrl)}`,
       `https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(videoUrl)}`,
+      `https://api.tiklydown.me/api/download?url=${encodeURIComponent(videoUrl)}`,
       `https://api16-normal-c-useast1a.tiktokv.com/aweme/v1/feed/?url=${encodeURIComponent(videoUrl)}`
     ];
 

@@ -24,16 +24,11 @@ router.get("/rules", requireAuth, async (req, res) => {
     const status = await prisma.botStatus.findUnique({
       where: { userId: req.user.id }
     });
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { pageSettings: true }
-    });
-
     res.json({
       success: true,
       rules,
       enabled: status?.enabled ?? true,
-      pageSettings: user?.pageSettings || []
+      pageSettings: []
     });
   } catch (err) {
     console.error("❌ GET /rules error:", err.message);
@@ -49,14 +44,18 @@ router.get("/rules", requireAuth, async (req, res) => {
 router.put("/page-settings", requireAuth, async (req, res) => {
   const { pageId, enabled } = req.body;
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { pageSettings: true }
+    });
+
     let pageSettings = user.pageSettings;
-
-    // Ensure it's an array
-    if (!pageSettings || !Array.isArray(pageSettings)) {
-      pageSettings = [];
+    if (typeof pageSettings === 'string') {
+        try { pageSettings = JSON.parse(pageSettings); } catch(e) { pageSettings = []; }
     }
+    if (!Array.isArray(pageSettings)) pageSettings = [];
 
+    // Update or add
     const existingIdx = pageSettings.findIndex(s => s.pageId === pageId);
     if (existingIdx > -1) {
       pageSettings[existingIdx].enableBot = enabled;
@@ -66,7 +65,7 @@ router.put("/page-settings", requireAuth, async (req, res) => {
 
     await prisma.user.update({
       where: { id: req.user.id },
-      data: { pageSettings }
+      data: { pageSettings: pageSettings }
     });
 
     res.json({ success: true, message: "Page bot settings updated" });

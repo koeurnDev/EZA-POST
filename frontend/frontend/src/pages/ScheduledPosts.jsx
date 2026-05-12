@@ -110,7 +110,7 @@ export default function ScheduledPosts() {
         <DashboardLayout>
             <div className="flex flex-col items-center justify-center h-[70vh]">
                 <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="mt-4 text-gray-500 font-bold tracking-widest uppercase text-xs">Syncing Queue...</p>
+                <p className="mt-4 text-gray-500 font-bold tracking-widest uppercase text-[13px]">Syncing Queue...</p>
             </div>
         </DashboardLayout>
     );
@@ -130,7 +130,7 @@ export default function ScheduledPosts() {
                             </div>
                             Queue
                         </h1>
-                        <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-2 font-medium">Manage and optimize your upcoming content schedule.</p>
+                        <p className="text-base text-gray-500 dark:text-gray-400 mt-2 font-medium leading-relaxed">Manage and optimize your upcoming content schedule.</p>
                     </MotionDiv>
 
                     <MotionDiv 
@@ -154,7 +154,7 @@ export default function ScheduledPosts() {
                         </div>
                         <Button
                             onClick={() => window.location.href = "/dashboard"}
-                            className="w-full md:w-auto rounded-xl md:rounded-2xl px-6 h-12 md:h-14 shadow-xl text-xs md:text-sm font-black uppercase tracking-widest"
+                            className="w-full md:w-auto rounded-xl md:rounded-2xl px-6 h-12 md:h-14 shadow-xl text-sm md:text-base font-black uppercase tracking-widest"
                         >
                             <Plus size={18} md:size={20} className="mr-2" /> បង្កើតថ្មី
                         </Button>
@@ -181,9 +181,9 @@ export default function ScheduledPosts() {
                             return (
                                 <div key={groupKey}>
                                     <div className="flex items-center gap-4 mb-5 md:mb-6 px-1">
-                                        <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{title}</h3>
+                                        <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{title}</h3>
                                         <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800" />
-                                        <span className="text-[10px] md:text-xs font-black bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-full">{posts.length}</span>
+                                        <span className="text-xs md:text-sm font-black bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-full">{posts.length}</span>
                                     </div>
 
                                     <div className={`flex overflow-x-auto md:grid ${viewMode === 'grid' ? 'md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'} gap-4 md:gap-6 pb-6 md:pb-8 snap-x scrollbar-hide`}>
@@ -216,7 +216,7 @@ export default function ScheduledPosts() {
                                                         
                                                         {/* Status Overlay */}
                                                         <div className="absolute top-2 md:top-3 left-2 md:left-3">
-                                                            <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[8px] md:text-[10px] font-black uppercase tracking-tighter backdrop-blur-xl shadow-lg border border-white/20 ${q.status === 'scheduled' ? 'bg-blue-600/90 text-white' : 'bg-amber-500/90 text-white'}`}>
+                                                            <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-black uppercase tracking-tighter backdrop-blur-xl shadow-lg border border-white/20 ${q.status === 'scheduled' ? 'bg-blue-600/90 text-white' : 'bg-amber-500/90 text-white'}`}>
                                                                 {q.status}
                                                             </span>
                                                         </div>
@@ -231,14 +231,14 @@ export default function ScheduledPosts() {
                                                         <div className="flex items-center justify-between mt-auto">
                                                             <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded-lg md:rounded-xl border border-gray-100 dark:border-gray-700">
                                                                 <Clock size={12} md:size={14} className="text-blue-500" />
-                                                                <span className="text-[10px] md:text-xs font-black text-gray-600 dark:text-gray-300">
+                                                                <span className="text-xs md:text-sm font-black text-gray-600 dark:text-gray-300">
                                                                     {new Date(q.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                 </span>
                                                             </div>
 
                                                             <div className="flex items-center -space-x-1.5 md:-space-x-2">
                                                                 {q.accounts?.slice(0, 3).map((acc, i) => (
-                                                                    <div key={i} className="h-6 w-6 md:h-7 md:w-7 rounded-full bg-blue-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-[8px] md:text-[10px] font-black text-white">
+                                                                    <div key={i} className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-blue-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-[10px] md:text-xs font-black text-white">
                                                                         {acc.name?.[0]}
                                                                     </div>
                                                                 ))}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import axios from "axios";
 import DashboardLayout from "../layouts/DashboardLayout";
 import {
@@ -303,7 +303,6 @@ export default function Post() {
         video.preload = "metadata";
         video.onloadedmetadata = async () => {
             window.URL.revokeObjectURL(video.src);
-            if (video.duration > 60) return toast.error("Duration overflow (>60s).");
 
             setFile(selectedFile);
             const url = URL.createObjectURL(selectedFile);
@@ -344,16 +343,8 @@ export default function Post() {
                 setRawVideoUrl(data.video.url);
                 setFile(null);
 
-                // Request H.264 compatible stream for UI preview
-                let previewStream = data.video.url;
-                try {
-                    const compRes = await axios.post(`${API_BASE}/api/tools/tiktok/compatible`, { url: data.video.url }, { withCredentials: true });
-                    if (compRes.data.success) {
-                        previewStream = `${API_BASE}${compRes.data.url}`;
-                    }
-                } catch (e) { console.warn("Failed to get compatible stream", e); }
-                
-                setPreviewUrl(previewStream);
+                // Use the original playable URL for preview; compatibility conversion is optional and should not be forced.
+                setPreviewUrl(data.video.url);
 
                 // Use TikTok's cover if available, otherwise generate from video
                 if (data.video.cover) {
@@ -518,7 +509,7 @@ export default function Post() {
                         <h1 className="text-3xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter">
                             Main <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Home.</span>
                         </h1>
-                        <p className="text-xs md:text-sm text-gray-500 font-medium max-w-lg">គ្រប់គ្រង និងកំណត់ពេលផុសមាតិការបស់អ្នកដោយងាយស្រួល។</p>
+                        <p className="text-sm md:text-base text-gray-500 font-medium max-w-lg leading-relaxed">គ្រប់គ្រង និងកំណត់ពេលផុសមាតិការបស់អ្នកដោយងាយស្រួល។</p>
                     </div>
                 </div>
 
@@ -531,12 +522,12 @@ export default function Post() {
                         <button
                             key={tab.id}
                             onClick={() => setActiveView(tab.id)}
-                            className={`flex items-center gap-2 md:gap-3 px-4 md:px-8 py-2.5 md:py-3.5 rounded-xl md:rounded-[1.5rem] text-[9px] md:text-[11px] font-black uppercase tracking-widest transition-all ${activeView === tab.id
+                            className={`flex items-center gap-2 md:gap-3 px-4 md:px-8 py-2.5 md:py-3.5 rounded-xl md:rounded-[1.5rem] text-[11px] md:text-xs font-black uppercase tracking-widest transition-all ${activeView === tab.id
                                 ? "bg-white dark:bg-gray-900 text-blue-600 shadow-xl shadow-black/5 border border-gray-100 dark:border-white/10"
                                 : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                                 }`}
                         >
-                            <tab.icon size={14} md:size={16} />
+                            <tab.icon size={16} md:size={18} />
                             {tab.label}
                         </button>
                     ))}
@@ -557,7 +548,7 @@ export default function Post() {
                                 <div className="flex items-center justify-between mb-5 md:mb-6">
                                     <h3 className="text-sm md:text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight">ជ្រើសរើសផេក</h3>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-[7px] md:text-[8px] font-black text-gray-400 uppercase">កាតផេក</span>
+                                        <span className="text-[12px] md:text-sm font-black text-gray-400 uppercase">កាតផេក</span>
                                         <button
                                             onClick={() => setPageCardSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
                                             className={`w-8 md:w-10 h-4 md:h-5 rounded-full transition-all relative ${pageCardSettings.enabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-white/10'}`}
@@ -568,16 +559,16 @@ export default function Post() {
                                 </div>
 
                                 <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
-                                    {availablePages.map(page => (
+                                    {useMemo(() => availablePages.map(page => (
                                         <div
                                             key={page.id}
                                             onClick={() => handlePageSelection(page.id)}
                                             className={`flex items-center gap-2.5 md:gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl border cursor-pointer transition-all active:scale-[0.98] ${selectedPages.includes(page.id) ? 'bg-blue-500/10 border-blue-500/20 shadow-lg' : 'bg-gray-50 dark:bg-black border-transparent'}`}
                                         >
-                                            <img src={page.picture} className="w-7 h-7 md:w-10 md:h-10 rounded-full border border-white/10" />
-                                            <p className="text-[9px] md:text-[11px] font-black text-gray-900 dark:text-white uppercase truncate">{page.name}</p>
+                                            <img src={page.picture} className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-white/10" />
+                                            <p className="text-[12px] md:text-[13px] font-black text-gray-900 dark:text-white uppercase truncate">{page.name}</p>
                                         </div>
-                                    ))}
+                                    )), [availablePages, selectedPages])}
                                 </div>
                             </div>
 
@@ -586,8 +577,8 @@ export default function Post() {
                                 <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
                                     <div className="flex-1 w-full">
                                         <div className="flex items-center gap-2 mb-2 md:mb-3 px-1">
-                                            <LinkIcon size={12} md:size={14} className="text-pink-500" />
-                                            <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">ដាក់ Link វីដេអូ TikTok</label>
+                                            <LinkIcon size={14} md:size={16} className="text-pink-500" />
+                                            <label className="text-[12px] md:text-sm font-black text-gray-400 uppercase tracking-widest">ដាក់ Link វីដេអូ TikTok</label>
                                         </div>
                                         <div className="flex flex-col sm:flex-row gap-2.5 md:gap-4">
                                             <input
@@ -595,7 +586,7 @@ export default function Post() {
                                                 value={tiktokUrl || ""}
                                                 onChange={(e) => setTiktokUrl(e.target.value)}
                                                 placeholder="Paste TikTok Link..."
-                                                className="w-full bg-gray-100/50 dark:bg-white/5 rounded-xl md:rounded-2xl px-4 md:px-6 py-4 md:py-5 font-bold outline-none transition-all text-sm md:text-base text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 border-2 border-transparent focus:border-pink-500/30"
+                                                className="w-full bg-gray-100/50 dark:bg-white/5 rounded-xl md:rounded-2xl px-4 md:px-6 py-4 md:py-5 font-bold outline-none transition-all text-base text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 border-2 border-transparent focus:border-pink-500/30"
                                             />
                                             <Button onClick={handleLoadTiktok} isLoading={isLoadingVideo} className="h-14 md:h-16 px-6 md:px-10 rounded-xl md:rounded-2xl bg-pink-600 text-white shadow-lg shadow-pink-500/20 active:scale-95 transition-all text-sm md:text-base font-bold w-full sm:w-auto">
                                                 Fetch
@@ -610,15 +601,15 @@ export default function Post() {
                                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 md:mb-6 pb-4 border-b border-gray-100 dark:border-white/5 gap-4">
                                         <div className="flex items-center gap-3 select-none">
                                             <div className="w-8 h-8 bg-blue-500/10 text-blue-600 rounded-lg flex items-center justify-center">
-                                                <Layers size={14} md:size={16} />
+                                                <Layers size={16} md:size={18} />
                                             </div>
-                                            <h3 className="text-[9px] md:text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">ការបង្ហាញសាកល្បង (PREVIEW)</h3>
+                                            <h3 className="text-[12px] md:text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">ការបង្ហាញសាកល្បង (PREVIEW)</h3>
                                         </div>
                                         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                                             <div className="flex items-center gap-2 mr-2 bg-purple-500/10 px-2.5 py-1.5 rounded-xl border border-purple-500/20">
                                                 <div className="flex items-center gap-1.5">
-                                                    <MessageSquare size={10} md:size={12} className="text-purple-600" />
-                                                    <span className="text-[8px] md:text-[9px] font-black text-purple-600 uppercase tracking-tight">Bot</span>
+                                                    <MessageSquare size={12} md:size={14} className="text-purple-600" />
+                                                    <span className="text-[10px] md:text-[11px] font-black text-purple-600 uppercase tracking-tight">Bot</span>
                                                 </div>
                                                 <button
                                                     onClick={() => setAutoReplyBot(!autoReplyBot)}
@@ -639,7 +630,7 @@ export default function Post() {
                                                 className="p-2 md:p-2.5 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-white rounded-lg transition-all border border-gray-100 dark:border-white/5 shadow-sm active:scale-90"
                                                 title="បន្ថែម"
                                             >
-                                                <Plus size={14} md:size={16} />
+                                                <Plus size={18} md:size={20} />
                                             </button>
                                         </div>
                                     </div>
@@ -658,7 +649,7 @@ export default function Post() {
                                                 })()}
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-[13px] md:text-[14px] font-bold text-gray-900 dark:text-white leading-tight truncate">
+                                                <p className="text-sm md:text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
                                                     {availablePages.find(p => p.id === selectedPages[0])?.name || "ជ្រើសរើសផេក"}
                                                 </p>
                                             </div>
@@ -670,7 +661,7 @@ export default function Post() {
                                             value={caption}
                                             onChange={(e) => setCaption(e.target.value)}
                                             placeholder="សរសេររៀបរាប់មាតិការបស់អ្នក..."
-                                            className="w-full bg-transparent border-none p-0 text-[14px] md:text-[15px] font-normal text-gray-800 dark:text-gray-200 leading-[1.3] outline-none focus:ring-0 rounded-lg resize-none min-h-[40px] scrollbar-hide"
+                                            className="w-full bg-transparent border-none p-0 text-base md:text-[17px] font-normal text-gray-800 dark:text-gray-200 leading-relaxed outline-none focus:ring-0 rounded-lg resize-none min-h-[40px] scrollbar-hide"
                                             rows={2}
                                             spellCheck={false}
                                         />
@@ -690,8 +681,8 @@ export default function Post() {
                                                     <Plus className="text-blue-500" size={24} md:size={32} />
                                                 </div>
                                                 <div className="text-center px-4 md:px-6">
-                                                    <p className="text-xs md:text-[13px] font-bold text-gray-900 dark:text-white mb-1">បន្ថែមមាតិកា</p>
-                                                    <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">ចុចទីនេះដើម្បីដាក់វីដេអូ</p>
+                                                    <p className="text-sm md:text-[14px] font-bold text-gray-900 dark:text-white mb-1">បន្ថែមមាតិកា</p>
+                                                    <p className="text-[11px] text-gray-400 font-black uppercase tracking-widest">ចុចទីនេះដើម្បីដាក់វីដេអូ</p>
                                                 </div>
                                             </div>
                                         )}
@@ -735,7 +726,7 @@ export default function Post() {
                                                                 <div className="w-9 h-9 md:w-10 md:h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 text-white shadow-xl">
                                                                     <Upload size={16} md:size={18} />
                                                                 </div>
-                                                                <p className="text-[8px] md:text-[9px] font-bold text-white uppercase tracking-widest">ប្តូររូបភាព</p>
+                                                                <p className="text-[10px] md:text-[11px] font-bold text-white uppercase tracking-widest">ប្តូររូបភាព</p>
                                                             </div>
                                                         )}
                                                     </div>

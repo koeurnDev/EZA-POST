@@ -78,23 +78,23 @@ const DashboardLayout = ({ children }) => {
   ];
 
   return (
-    <div className={`min-h-screen flex flex-col ${isDarkMode ? "bg-[#050505] text-white" : "bg-[#f8f9fa] text-gray-900"} transition-colors duration-500`}>
+    <div className={`min-h-screen flex flex-col overflow-x-hidden ${isDarkMode ? "bg-[#050505] text-white" : "bg-[#f8f9fa] text-gray-900"} transition-colors duration-500`}>
 
-      <header className={`fixed top-0 left-0 right-0 h-16 md:h-20 z-40 px-3 md:px-6 flex items-center justify-between transition-all duration-300 ${scrolled ? (isDarkMode ? "bg-[#050505]/80 backdrop-blur-xl border-b border-white/5" : "bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm") : "bg-transparent"}`}>
-        <div className="flex items-center gap-2 md:gap-6">
+      <header className={`fixed top-0 left-0 right-0 h-16 md:h-20 z-40 px-3 md:px-6 flex items-center justify-between gap-2 transition-all duration-300 ${scrolled ? (isDarkMode ? "bg-[#050505]/80 backdrop-blur-xl border-b border-white/5" : "bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm") : "bg-transparent"}`}>
+        <div className="flex items-center gap-2 md:gap-6 min-w-0">
           <Link to="/dashboard" className="flex items-center gap-2 md:gap-3 group">
             <div className="w-8 h-8 md:w-11 md:h-11 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg md:rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/20 group-hover:rotate-6 transition-transform">
               <Zap className="text-white fill-white" size={16} md:size={22} />
             </div>
             <div className="flex flex-col">
               <span className="text-sm md:text-lg font-bold tracking-tight">EZA_POST</span>
-              <span className="hidden xs:block text-[7px] md:text-[10px] uppercase tracking-widest text-blue-500 font-bold opacity-80">Social Manager</span>
+              <span className="hidden sm:block text-[7px] md:text-[10px] uppercase tracking-widest text-blue-500 font-bold opacity-80">Social Manager</span>
             </div>
           </Link>
         </div>
 
-        <div className={`flex items-center gap-1 md:gap-2 p-1 md:p-1.5 rounded-lg md:rounded-2xl border ${isDarkMode ? "bg-white/5 border-white/5" : "bg-white border-gray-200 shadow-sm"} backdrop-blur-xl`}>
-          <div className="hidden sm:block">
+        <div className={`flex items-center gap-1 md:gap-2 p-1 md:p-1.5 rounded-lg md:rounded-2xl border ${isDarkMode ? "bg-white/5 border-white/5" : "bg-white border-gray-200 shadow-sm"} backdrop-blur-xl min-w-0`}>
+          <div className="hidden sm:block min-w-0">
             <NetworkStatus />
           </div>
           <button onClick={toggleTheme} className={`p-1.5 md:p-2.5 rounded-md md:rounded-xl transition-all ${isDarkMode ? "hover:bg-white/10 text-yellow-400" : "hover:bg-gray-100 text-gray-600"}`}>
@@ -113,7 +113,7 @@ const DashboardLayout = ({ children }) => {
         </div>
       </header>
 
-      <main className="flex-1 pt-20 md:pt-24 pb-32 px-3 md:px-6 max-w-[1600px] mx-auto w-full">
+      <main className="flex-1 pt-20 md:pt-24 pb-32 px-3 md:px-6 max-w-[1600px] mx-auto w-full min-w-0">
         <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }} className="relative z-10 motion-div-container">
           {children}
         </MotionDiv>
@@ -141,7 +141,7 @@ const DashboardLayout = ({ children }) => {
                   transition={{ type: "spring", damping: 25, stiffness: 200 }}
                   className={`
                     fixed bottom-20 md:bottom-24 left-1/2
-                    w-[calc(100vw-2rem)] md:w-full md:max-w-2xl p-4 md:p-8
+                    w-[calc(100%-2rem)] max-w-[calc(100%-2rem)] md:w-full md:max-w-2xl p-4 md:p-8
                     rounded-3xl md:rounded-[3rem] border backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.3)]
                     max-h-[75vh] overflow-y-auto custom-scrollbar 
                     ${isDarkMode ? "bg-[#0b0b0f]/90 border-white/10 shadow-blue-500/5" : "bg-white/95 border-gray-200 shadow-gray-200/20"}
@@ -164,8 +164,8 @@ const DashboardLayout = ({ children }) => {
                                 onClick={() => setIsMoreMenuOpen(false)}
                                 className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-all duration-300 ${isActiveItem ? (isDarkMode ? "bg-white/10 scale-105" : "bg-blue-50 scale-105") : (isDarkMode ? "hover:bg-white/5" : "hover:bg-gray-100 text-gray-700")}`}
                               >
-                                <div className={`w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center transition-all ${isActiveItem ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : (isDarkMode ? "bg-white/5 border border-white/10" : "bg-gray-50 border border-black/5")}`}>
-                                  {React.cloneElement(item.icon, { size: isActiveItem ? 20 : 18 })}
+                                <div className={`w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center transition-all ${isActiveItem ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : (isDarkMode ? "bg-white/5 border border-white/10" : "bg-gray-50 border border-black/5")}`}>
+                                  {React.cloneElement(item.icon, { size: isActiveItem ? 22 : 20 })}
                                 </div>
                                 <span className={`text-[8px] md:text-[10px] font-bold text-center leading-tight tracking-tight ${isActiveItem ? "text-blue-500" : "opacity-70"}`}>{item.label}</span>
                               </Link>
@@ -195,7 +195,7 @@ const DashboardLayout = ({ children }) => {
           {/* Main Dock Bar - Scrollable on Mobile */}
           <nav className={`
             flex items-center gap-1 p-1 md:p-1.5 rounded-full border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] transition-all
-            max-w-[95vw] md:max-w-none overflow-x-auto no-scrollbar
+            w-full max-w-[95vw] md:max-w-none overflow-x-auto no-scrollbar
             ${isDarkMode
               ? "bg-black/60 border-white/10 shadow-blue-500/5"
               : "bg-white/90 border-gray-200 shadow-gray-200/30"}
@@ -205,8 +205,8 @@ const DashboardLayout = ({ children }) => {
               {CORE_NAV.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
-                  <Link key={item.path} to={item.path} className={`relative flex items-center justify-center w-11 h-11 md:w-14 md:h-14 rounded-full transition-all duration-300 group ${isActive ? "bg-blue-600 text-white shadow-xl shadow-blue-600/40 scale-105" : (isDarkMode ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-500 hover:bg-black/5 hover:text-black")}`}>
-                    {React.cloneElement(item.icon, { size: 18 })}
+                  <Link key={item.path} to={item.path} className={`relative flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full transition-all duration-300 group ${isActive ? "bg-blue-600 text-white shadow-xl shadow-blue-600/40 scale-105" : (isDarkMode ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-500 hover:bg-black/5 hover:text-black")}`}>
+                    {React.cloneElement(item.icon, { size: 22 })}
                     <div className="hidden md:block absolute -top-14 px-3 py-1.5 rounded-xl bg-black text-white text-[11px] font-bold opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap shadow-2xl border border-white/10 scale-90 group-hover:scale-100">
                       {item.label}
                       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45 border-r border-b border-white/10"></div>
@@ -219,8 +219,8 @@ const DashboardLayout = ({ children }) => {
 
             <div className={`shrink-0 w-px h-6 md:h-8 mx-1 md:mx-2 ${isDarkMode ? "bg-white/10" : "bg-gray-200"}`}></div>
 
-            <button onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)} className={`shrink-0 relative flex items-center justify-center w-11 h-11 md:w-14 md:h-14 rounded-full transition-all duration-300 ${isMoreMenuOpen ? "bg-indigo-600 text-white shadow-xl shadow-indigo-600/40" : (isDarkMode ? "text-gray-400 hover:bg-white/10" : "text-gray-500 hover:bg-black/5")}`}>
-              {isMoreMenuOpen ? <X size={18} /> : <Grid size={18} />}
+            <button onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)} className={`shrink-0 relative flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full transition-all duration-300 ${isMoreMenuOpen ? "bg-indigo-600 text-white shadow-xl shadow-indigo-600/40" : (isDarkMode ? "text-gray-400 hover:bg-white/10" : "text-gray-500 hover:bg-black/5")}`}>
+              {isMoreMenuOpen ? <X size={22} /> : <Grid size={22} />}
             </button>
           </nav>
         </div>

@@ -75,4 +75,8 @@ router.post(
 const { fetchTikTokVideo } = require("../controllers/tiktokController");
 router.post("/tiktok/fetch", requireAuth, fetchTikTokVideo);
 
+// ✅ Job Status Route (Polling)
+const jobController = require("../controllers/jobController");
+router.get("/job-status/:jobId", requireAuth, jobController.getJobStatus);
+
 module.exports = router;

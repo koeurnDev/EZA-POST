@@ -175,20 +175,22 @@ async function getFacebookUserData(accessToken) {
 /* -------------------------------------------------------------------------- */
 function setAuthCookie(res, user) {
   const token = generateToken(user);
+  const isSecure = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
   res.cookie("token", token, {
     httpOnly: true,
-    sameSite: "none", // 🔴 CRITICAL: Must be 'none' for cross-site (Vercel -> Render)
-    secure: true,     // 🔴 CRITICAL: Must be true if sameSite is 'none'
+    sameSite: isSecure ? "none" : "lax",
+    secure: isSecure,
     maxAge: 24 * 60 * 60 * 1000, // 1 day
   });
   return token;
 }
 
 function clearAuthCookie(res) {
+  const isSecure = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
   res.clearCookie("token", {
     httpOnly: true,
-    sameSite: "none",
-    secure: true,
+    sameSite: isSecure ? "none" : "lax",
+    secure: isSecure,
   });
 }
 

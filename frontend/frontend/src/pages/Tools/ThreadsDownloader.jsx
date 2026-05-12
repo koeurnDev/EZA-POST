@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import { Search, Download, CheckCircle, X, Loader2, Image as ImageIcon, Video, AtSign, ExternalLink } from "lucide-react";
+import { 
+    Search, Download, CheckCircle, X, Loader2, 
+    Image as ImageIcon, Video, AtSign, ExternalLink, 
+    Sparkles, Zap, ChevronRight
+} from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../../utils/api";
 
@@ -19,25 +24,35 @@ const triggerDownload = (url, filename) => {
     document.body.removeChild(link);
 };
 
+// ✨ Motion Variants
+const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+        opacity: 1, 
+        y: 0,
+        transition: { duration: 0.6, ease: "easeOut", staggerChildren: 0.1 }
+    }
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0 }
+};
+
 export default function ThreadsDownloader() {
     const [url, setUrl] = useState("");
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState(null);
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => setMounted(true), []);
 
     const handleLookup = async () => {
         if (!url.match(/threads\.(net|com)/)) return toast.error("Please enter a valid Threads URL");
-
         setLoading(true);
         setData(null);
-
         try {
             const res = await api.post("/tools/threads/lookup", { url });
             if (res.data.success) {
                 setData(res.data.media);
-                toast.success("Threads post found!");
+                toast.success("Threads post found!", { icon: "✨" });
             }
         } catch (err) {
             toast.error(err.response?.data?.error || "Failed to find post");
@@ -72,186 +87,172 @@ export default function ThreadsDownloader() {
 
     return (
         <DashboardLayout>
-            {/* Ambient Background Blobs (Threads Black/White/Purple Theme) */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[120px] opacity-40 animate-blob" />
-                <div className="absolute top-[20%] right-[-10%] w-[30%] h-[30%] bg-blue-500/20 rounded-full blur-[120px] opacity-40 animate-blob animation-delay-2000" />
-                <div className="absolute bottom-[-10%] left-[20%] w-[35%] h-[35%] bg-gray-500/10 rounded-full blur-[120px] opacity-40 animate-blob animation-delay-4000" />
+            {/* 🌈 Modern Background Mesh (Threads Dark) */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-purple-500/10 to-blue-500/10 rounded-full blur-[120px] animate-pulse" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-gray-500/10 to-slate-500/10 rounded-full blur-[120px] animate-pulse delay-700" />
             </div>
 
-            <div className={`relative z-10 p-6 max-w-5xl mx-auto transition-opacity duration-700 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
-
-                {/* Header */}
-                <div className="text-center mb-10 space-y-3">
-                    <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-black dark:bg-white shadow-xl shadow-purple-500/10 mb-2">
-                        <AtSign size={32} className="text-white dark:text-black" />
-                    </div>
-                    <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                        Threads <span className="bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">Downloader</span>
-                    </h1>
-                    <p className="text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">
-                        Save Images, Videos, and GIFs from Threads.
-                    </p>
+            <motion.div 
+                initial="hidden"
+                animate="visible"
+                variants={containerVariants}
+                className="relative z-10 p-4 md:p-8 max-w-6xl mx-auto space-y-8 pb-24"
+            >
+                {/* 🏷️ Header */}
+                <div className="text-center space-y-3">
+                    <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/10 dark:bg-white/10 border border-black/20 dark:border-white/20 text-black dark:text-white text-xs font-bold uppercase tracking-wider">
+                        <AtSign size={14} /> Threads Premium
+                    </motion.div>
+                    <motion.h1 variants={itemVariants} className="text-3xl md:text-5xl font-black tracking-tight text-gray-900 dark:text-white">
+                        At <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600">Saver</span>
+                    </motion.h1>
+                    <motion.p variants={itemVariants} className="text-gray-500 dark:text-gray-400 max-w-md mx-auto text-sm md:text-base px-4">
+                        Download high-fidelity carousels, videos, and images from the Threads app.
+                    </motion.p>
                 </div>
 
-                {/* 🔍 Input Section */}
-                <div className="max-w-xl mx-auto space-y-6 mb-12">
-                    <div className="relative flex items-center bg-white/60 dark:bg-black/40 backdrop-blur-xl rounded-xl border border-white/20 dark:border-white/10 shadow-xl shadow-purple-500/5 hover:shadow-purple-500/10 transition-all duration-300">
-                        <div className="pl-5 pr-3 text-gray-400">
-                            <Search size={22} />
+                {/* 🔍 Search Input */}
+                <div className="max-w-2xl mx-auto relative group px-2">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-focus-within:opacity-50 transition duration-500" />
+                    <div className="relative flex items-center bg-white dark:bg-gray-900/80 backdrop-blur-2xl rounded-2xl border border-white/20 dark:border-white/10 shadow-2xl overflow-hidden">
+                        <div className="pl-4 md:pl-6 text-gray-400 shrink-0">
+                            <Search size={20} className="group-focus-within:text-purple-500 transition-colors" />
                         </div>
                         <input
                             type="text"
                             value={url}
-                            onChange={(e) => setUrl(e.target.value)}
+                            onChange={(e) => {
+                                setUrl(e.target.value);
+                                if (data) setData(null);
+                            }}
                             onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-                            placeholder="Paste Threads link..."
-                            className="w-full bg-transparent py-4 pr-4 text-base text-gray-900 dark:text-white placeholder:text-gray-400 border-none shadow-none outline-none font-medium"
-                            style={{ caretColor: '#8b5cf6' }}
+                            placeholder="Paste Threads link here..."
+                            className="w-full bg-transparent py-4 md:py-5 px-3 md:px-4 text-base md:text-lg border-none focus:ring-0 focus:outline-none focus-visible:outline-none outline-none text-gray-900 dark:text-white placeholder:text-gray-500 min-w-0"
                         />
-                        {url && (
-                            <button onClick={() => setUrl("")} className="p-2 mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                                <X size={20} />
-                            </button>
-                        )}
-                    </div>
-
-                    {!data && (
-                        <button
-                            onClick={handleLookup}
-                            disabled={!url || loading}
-                            className={`w-full py-4 bg-black hover:bg-gray-900 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-black rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${loading ? 'opacity-80' : ''}`}
-                        >
-                            {loading ? (
-                                <>
-                                    <Loader2 className="animate-spin" size={24} />
-                                    <span>Fetching Post...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Download size={24} />
-                                    Find Media
-                                </>
+                        <div className="flex items-center gap-1 md:gap-2 pr-2 md:pr-4 shrink-0">
+                            {url && (
+                                <button onClick={() => setUrl("")} className="p-1 md:p-2 text-gray-400 hover:text-purple-500 transition-colors">
+                                    <X size={18} />
+                                </button>
                             )}
-                        </button>
-                    )}
+                            <button 
+                                onClick={handleLookup}
+                                disabled={!url || loading}
+                                className="px-4 md:px-6 py-2 md:py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-xl font-bold text-xs md:text-sm transition-all flex items-center gap-2 disabled:opacity-50 shadow-lg"
+                            >
+                                {loading ? <Loader2 size={16} className="animate-spin" /> : "Fetch"}
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                {/* 🎥 Result Card */}
-                {data && (
-                    <div className="max-w-4xl mx-auto bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-3xl p-6 md:p-8 border border-white/20 dark:border-white/10 shadow-2xl shadow-purple-500/5 animate-in fade-in zoom-in-95 duration-300">
-
-                        <div className="flex flex-col gap-8">
-
-                            {/* Top Bar: User Info & Actions */}
-                            <div className="flex items-start justify-between">
+                {/* 🎥 Result View */}
+                <AnimatePresence>
+                    {data && (
+                        <motion.div 
+                            initial={{ opacity: 0, y: 40 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="max-w-5xl mx-auto space-y-8 px-2"
+                        >
+                            {/* Author Card */}
+                            <div className="bg-white/70 dark:bg-gray-900/50 backdrop-blur-3xl rounded-3xl p-6 border border-white/30 dark:border-white/10 shadow-xl flex items-center justify-between">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center border border-white/10">
-                                        <AtSign size={24} className="text-black dark:text-white" />
+                                    <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 p-1">
+                                        <div className="w-full h-full rounded-full bg-white dark:bg-black flex items-center justify-center border-2 border-white/20">
+                                            <AtSign size={32} className="text-gray-900 dark:text-white" />
+                                        </div>
                                     </div>
                                     <div>
-                                        <h2 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
-                                            {data.author.fullname || "Threads User"}
-                                        </h2>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                            @{data.author.username}
-                                        </p>
+                                        <h2 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white">{data.author.fullname || "Threads User"}</h2>
+                                        <p className="text-sm font-bold text-gray-500">@{data.author.username}</p>
                                     </div>
                                 </div>
-
-                                <button onClick={clearResult} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors text-sm font-medium flex items-center gap-1">
-                                    Clear <ExternalLink size={14} />
-                                </button>
+                                <button onClick={clearResult} className="p-3 text-gray-400 hover:text-red-500 transition-colors"><X size={24} /></button>
                             </div>
 
-                            <div className="h-px bg-gray-200 dark:bg-white/10 w-full" />
-
-                            {/* Content Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Media Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {/* Videos */}
-                                {data.videos.length > 0 && data.videos.map((vid, idx) => (
-                                    <div key={`vid-${idx}`} className="group relative bg-black rounded-2xl overflow-hidden shadow-lg border border-white/10">
-                                        <div className="aspect-[3/4] md:aspect-[4/5]">
-                                            <video src={getProxyUrl(vid.url, `preview.mp4`)} controls className="w-full h-full object-cover" />
-                                        </div>
-                                        <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md rounded-lg text-white text-[10px] font-black border border-white/10 tracking-wider uppercase flex items-center gap-1">
-                                            <Video size={10} /> VIDEO {idx + 1}
-                                        </div>
-                                        <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 to-transparent pt-12 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                            <button
+                                {data.videos.map((vid, idx) => (
+                                    <motion.div 
+                                        key={`vid-${idx}`} 
+                                        initial={{ opacity: 0, scale: 0.9 }} 
+                                        animate={{ opacity: 1, scale: 1, transition: { delay: idx * 0.1 } }}
+                                        className="group relative bg-black rounded-3xl overflow-hidden shadow-2xl border border-white/10"
+                                    >
+                                        <video src={getProxyUrl(vid.url, `preview.mp4`)} className="w-full aspect-[3/4] object-cover" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-6">
+                                            <button 
                                                 onClick={() => handleDownload(vid.url, 'video', idx)}
-                                                className="w-full py-3 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors shadow-lg"
+                                                className="w-full py-4 bg-white text-black rounded-2xl font-black flex items-center justify-center gap-2 shadow-2xl"
                                             >
-                                                <Download size={18} /> Download Video
+                                                <Download size={20} /> Download MP4
                                             </button>
                                         </div>
-                                    </div>
+                                        <div className="absolute top-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-md rounded-lg border border-white/20 text-[10px] font-black text-white flex items-center gap-1.5 shadow-lg tracking-tighter">
+                                            <Video size={12} className="text-purple-400" /> VIDEO {idx + 1}
+                                        </div>
+                                    </motion.div>
                                 ))}
 
                                 {/* Images */}
-                                {data.images.length > 0 && data.images.map((img, idx) => (
-                                    <div key={`img-${idx}`} className="group relative bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg border border-white/10">
-                                        <div className="aspect-square md:aspect-[4/5]">
-                                            <img src={getProxyUrl(img, `preview.jpg`)} alt="preview" className="w-full h-full object-cover" />
-                                        </div>
-                                        <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md rounded-lg text-white text-[10px] font-black border border-white/10 tracking-wider uppercase flex items-center gap-1">
-                                            <ImageIcon size={10} /> IMAGE {idx + 1}
-                                        </div>
-                                        <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 to-transparent pt-12 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                            <button
+                                {data.images.map((img, idx) => (
+                                    <motion.div 
+                                        key={`img-${idx}`} 
+                                        initial={{ opacity: 0, scale: 0.9 }} 
+                                        animate={{ opacity: 1, scale: 1, transition: { delay: idx * 0.1 } }}
+                                        className="group relative bg-gray-100 dark:bg-white/5 rounded-3xl overflow-hidden shadow-2xl border border-white/10"
+                                    >
+                                        <img src={getProxyUrl(img, `preview.jpg`)} className="w-full aspect-[3/4] object-cover" alt="Threads Post" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-6">
+                                            <button 
                                                 onClick={() => handleDownload(img, 'image', idx)}
-                                                className="w-full py-3 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors shadow-lg"
+                                                className="w-full py-4 bg-white text-black rounded-2xl font-black flex items-center justify-center gap-2 shadow-2xl"
                                             >
-                                                <Download size={18} /> Download Image
+                                                <Download size={20} /> Save Image
                                             </button>
                                         </div>
-                                    </div>
+                                        <div className="absolute top-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-md rounded-lg border border-white/20 text-[10px] font-black text-white flex items-center gap-1.5 shadow-lg tracking-tighter">
+                                            <ImageIcon size={12} className="text-blue-400" /> IMAGE {idx + 1}
+                                        </div>
+                                    </motion.div>
                                 ))}
                             </div>
-
-                            {/* Summary Footer */}
-                            <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 flex flex-wrap gap-4 items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-bold border border-green-500/20">
-                                        <CheckCircle size={12} /> Media Ready
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                        {data.videos.length + data.images.length} items found
-                                    </span>
-                                </div>
-                                <div className="flex gap-2">
-                                    {['High Res', 'No Watermark'].map(tag => (
-                                        <span key={tag} className="px-2 py-1 rounded-md bg-white dark:bg-black/20 text-gray-500 dark:text-gray-400 text-[10px] font-semibold border border-gray-200 dark:border-white/5">
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* Features Grid */}
                 {!data && !loading && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 max-w-4xl mx-auto">
+                    <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto pt-8">
                         {[
-                            { title: "Photos & Videos", desc: "Download carousels easily", icon: <ImageIcon size={20} /> },
-                            { title: "Original Quality", desc: "Highest resolution available", icon: <CheckCircle size={20} /> },
-                            { title: "Free & Fast", desc: "No limits, instant save", icon: <Download size={20} /> }
+                            { title: "Carousel Saver", desc: "Download all items in a post at once", icon: <Layers size={18} className="text-purple-500" /> },
+                            { title: "HD Resolution", desc: "Keep original quality for every file", icon: <Zap size={18} className="text-blue-500" /> },
+                            { title: "Pure Privacy", desc: "No tracking, direct proxy delivery", icon: <Sparkles size={18} className="text-gray-500" /> }
                         ].map((item, i) => (
-                            <div key={i} className="p-6 bg-white/40 dark:bg-white/5 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-2xl text-center hover:bg-white/60 dark:hover:bg-white/10 transition-colors group">
-                                <div className="w-12 h-12 mx-auto bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center text-black dark:text-white group-hover:scale-110 transition-transform mb-4">
+                            <div key={i} className="p-6 bg-white/40 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl text-center group hover:bg-white/60 dark:hover:bg-white/10 transition-all duration-300 shadow-xl">
+                                <div className="w-12 h-12 mx-auto bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                                     {item.icon}
                                 </div>
-                                <h3 className="font-bold text-gray-900 dark:text-white mb-1">{item.title}</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">{item.desc}</p>
+                                <h3 className="font-bold text-gray-900 dark:text-white mb-1 uppercase tracking-wide text-xs">{item.title}</h3>
+                                <p className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400">{item.desc}</p>
                             </div>
                         ))}
-                    </div>
+                    </motion.div>
                 )}
-
-            </div>
+            </motion.div>
         </DashboardLayout>
+    );
+}
+
+// Inline helper for Layers icon (if not imported)
+function Layers({ size, className }) {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+            <polyline points="2 17 12 22 22 17" />
+            <polyline points="2 12 12 17 22 12" />
+        </svg>
     );
 }

@@ -235,18 +235,7 @@ const routeModules = [
   ["tools/instagram", "./api/tools/instagram"],
   ["tools/capcut", "./api/tools/capcut"],
   ["tools/threads", "./api/tools/threads"],
-  ["tools/ecommerce", "./api/tools/ecommerce"],
   ["tools/document-converter", "./api/tools/document_converter"],
-  ["tools/video-creator", "./api/tools/video_creator", toolLimiter],
-  ["tools/script-writer", "./api/tools/script", toolLimiter],
-  ["tools/thumbnail-generator", "./api/tools/thumbnail", toolLimiter],
-  ["tools/magic-motion", "./api/tools/magic_motion", toolLimiter],
-  ["tools/censorship", "./api/tools/censorship"],
-  ["tools/label-swap", "./api/tools/label_swap"],
-  ["tools/subtitle-generator", "./api/tools/subtitle"],
-  ["tools/farm", "./api/tools/farm"],
-  ["tools/telegram-cloud", "./api/tools/telegram_cloud"],
-  ["tools/ai", "./api/tools/ai", toolLimiter], 
   ["debug", "./api/debug_python"],
 ];
 
@@ -298,6 +287,10 @@ app.get("/api/download", (req, res) => {
 // ------------------------------------------------------------
 // ✅ Health Check
 // ------------------------------------------------------------
+app.head("/api/health", (req, res) => {
+  res.sendStatus(200);
+});
+
 app.get("/api/health", async (req, res) => {
   try {
     // const { mongoose } = require("./config/mongodb"); // REMOVED
@@ -392,6 +385,9 @@ setTimeout(checkAndRefreshTokens, 10000);
 // 🧹 Start Temp Cleaner (Runs every 5 mins, deletes files older than 15 mins)
 const { startTempCleanupJob } = require("./utils/tempCleaner");
 startTempCleanupJob();
+
+// 👷 Start Background Worker (BullMQ)
+require("./workers/postWorker");
 
 // ------------------------------------------------------------
 // ✅ Start Server

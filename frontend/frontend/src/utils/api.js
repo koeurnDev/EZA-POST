@@ -419,6 +419,8 @@ const botAPI = {
   getRules: async () => (await api.get(API_ENDPOINTS.BOT.RULES)).data,
   updateSettings: async (settings) =>
     (await api.put(API_ENDPOINTS.BOT.SETTINGS, settings)).data,
+  updatePageSettings: async (pageId, enabled) =>
+    (await api.put("/bot/page-settings", { pageId, enabled })).data,
 };
 
 /* -------------------------------------------------------------------------- */
