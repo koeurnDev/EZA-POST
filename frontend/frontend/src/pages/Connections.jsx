@@ -28,28 +28,33 @@ export default function Connections() {
     useEffect(() => {
         if (user?.facebookId) {
             fetchPages();
+        } else {
+            setPages([]);
         }
     }, [user?.facebookId]);
 
-    const fetchPages = async () => {
+    const fetchPages = async (isManual = false) => {
         setIsLoadingPages(true);
         setPageError(null);
+        if (isManual) toast.loading("កំពុងទាញយកផេក...", { id: "fetch-pages" });
+
         try {
-            const res = await apiUtils.retryRequest(() => apiUtils.getUserPages());
+            const res = await apiUtils.getUserPages();
             if (res.data.success) {
-                // ✅ Prevent duplicate pages using ID mapping
                 const uniquePages = Array.from(new Map((res.data.accounts || []).map(p => [p.id, p])).values());
                 setPages(uniquePages);
+                if (isManual) toast.success("ទាញយកផេកបានជោគជ័យ", { id: "fetch-pages" });
             }
         } catch (err) {
             apiUtils.logError("Connections.fetchPages", err);
             const message = apiUtils.getUserErrorMessage(err);
             setPageError(message);
-            if (!apiUtils.isAuthError(err)) toast.error(message);
+            if (isManual) toast.error("មិនអាចទាញយកផេកបានទេ", { id: "fetch-pages" });
         } finally {
             setIsLoadingPages(false);
         }
     };
+
 
     const handleTogglePage = async (pageId, currentStatus) => {
         setPages(prev => prev.map(p => p.id === pageId ? { ...p, isSelected: !currentStatus } : p));

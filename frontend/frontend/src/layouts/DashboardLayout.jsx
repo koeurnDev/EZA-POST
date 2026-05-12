@@ -26,8 +26,38 @@ const DashboardLayout = ({ children }) => {
       setScrolled(window.scrollY > 10);
     };
     window.addEventListener("scroll", handleScroll);
+
+    // 🛡️ Global Notification Handler (for OAuth redirects, etc.)
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get("success");
+    const error = params.get("error");
+
+    if (success) {
+      if (success === "facebook_connected") {
+        toast.success("ភ្ជាប់គណនី Facebook ជោគជ័យ! 🎉");
+      } else {
+        toast.success("ប្រតិបត្តិការជោគជ័យ!");
+      }
+      // Clean URL
+      const newUrl = window.location.pathname + window.location.search.replace(/[\?&]success=[^&]+/, '').replace(/^&/, '?');
+      window.history.replaceState({}, document.title, newUrl);
+    }
+
+    if (error) {
+      if (error === "fb_auth_failed") {
+        toast.error("ការភ្ជាប់ Facebook បានបរាជ័យ។ សូមព្យាយាមម្តងទៀត។");
+      } else if (error === "session_expired") {
+        toast.error("Session របស់បងបានផុតកំណត់។ សូម Login ម្តងទៀត។");
+      } else {
+        toast.error("មានបញ្ហាអ្វីមួយ! សូមព្យាយាមម្តងទៀត។");
+      }
+      // Clean URL
+      const newUrl = window.location.pathname + window.location.search.replace(/[\?&]error=[^&]+/, '').replace(/^&/, '?');
+      window.history.replaceState({}, document.title, newUrl);
+    }
+
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [location.search]);
 
   const handleLogout = async () => {
     await logout();

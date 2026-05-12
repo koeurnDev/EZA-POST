@@ -266,11 +266,11 @@ router.get("/callback", async (req, res) => {
                     if (existingPage) {
                         await prisma.facebookPage.update({
                             where: { id: p.id }, // ID is unique per page globally usually, but standard here is page ID
-                            data: pageData
+                            data: { ...pageData, isSelected: existingPage.isSelected } // Keep user's preference if already exists
                         });
                     } else {
                         await prisma.facebookPage.create({
-                            data: pageData
+                            data: { ...pageData, isSelected: true } // Auto-select NEW pages by default
                         });
                     }
 
@@ -294,7 +294,7 @@ router.get("/callback", async (req, res) => {
         });
         
         // Pass token in URL for cross-domain localStorage sync (optional but helpful)
-        res.redirect(`${process.env.FRONTEND_URL}/settings?success=facebook_connected&token=${token}`);
+        res.redirect(`${process.env.FRONTEND_URL}/connections?success=facebook_connected&token=${token}`);
 
     } catch (err) {
         console.error("❌ CRITICAL FAILURE IN FB CALLBACK ❌");

@@ -1,0 +1,9 @@
+@echo off
+echo Staging changes...
+git add .
+echo Committing changes...
+git commit -m "Final Optimization: Mobile UI, TikTok Fix, and FB Sync"
+echo Pushing to GitHub...
+git push
+echo Done!
+pause

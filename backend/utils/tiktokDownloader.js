@@ -124,7 +124,7 @@ class TikTokDownloader {
       console.log("🔄 Trying yt-dlp (Internal)...");
       const youtubedl = require("youtube-dl-exec");
       
-      const prodPath = path.join(__dirname, '../../bin/yt-dlp');
+      const prodPath = path.join(__dirname, '../bin/yt-dlp');
       const execPath = (process.env.NODE_ENV === 'production' && fs.existsSync(prodPath)) ? prodPath : undefined;
 
       const output = await youtubedl(videoUrl, { 
@@ -185,7 +185,7 @@ class TikTokDownloader {
     // Method 0: yt-dlp
     try {
       const youtubedl = require("youtube-dl-exec");
-      const prodPath = path.join(__dirname, '../../bin/yt-dlp');
+      const prodPath = path.join(__dirname, '../bin/yt-dlp');
       const execPath = (process.env.NODE_ENV === 'production' && fs.existsSync(prodPath)) ? prodPath : undefined;
       const output = await youtubedl(videoUrl, { dumpSingleJson: true, noWarnings: true }, { execPath });
       if (output && output.url) return output.url;

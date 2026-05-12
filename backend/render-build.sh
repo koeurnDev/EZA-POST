@@ -21,3 +21,10 @@ ls -R node_modules/.prisma || echo "Prisma Client NOT FOUND in node_modules/.pri
 
 # 3. Install Python dependencies
 pip3 install -r requirements.txt
+
+# 4. Ensure yt-dlp binary is available (for production)
+echo "Downloading yt-dlp binary..."
+mkdir -p bin
+curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o bin/yt-dlp
+chmod a+rx bin/yt-dlp
+echo "yt-dlp binary downloaded to $(pwd)/bin/yt-dlp"

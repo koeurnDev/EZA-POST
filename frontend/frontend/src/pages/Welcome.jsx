@@ -90,7 +90,7 @@ export default function Welcome() {
 
                     <motion.h1 
                         initial="hidden" animate="visible" transition={{ delay: 0.1 }} variants={fadeInUp} 
-                        className="text-5xl sm:text-6xl md:text-8xl font-bold tracking-tighter leading-[1] mb-8"
+                        className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter leading-[1.1] mb-6 md:mb-8"
                     >
                         បដិវត្តន៍ការគ្រប់គ្រង <br className="hidden md:block" /> 
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-blue-600">បណ្តាញសង្គម</span> របស់អ្នក។
