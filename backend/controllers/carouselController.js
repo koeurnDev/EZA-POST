@@ -60,16 +60,33 @@ exports.createMixedCarousel = async (req, res) => {
             }
         };
 
-        // 🚀 Add to Queue
-        const job = await postQueue.add('process-carousel', jobPayload);
+        // 🚀 Add to Queue (with Fallback for environments without Redis)
+        try {
+            const job = await postQueue.add('process-carousel', jobPayload);
+            console.log(`✅ [Queue] Job ${job.id} created for user ${userId}`);
 
-        console.log(`✅ [Queue] Job ${job.id} created for user ${userId}`);
+            res.status(202).json({ 
+                success: true, 
+                message: "Post added to queue for processing",
+                jobId: job.id 
+            });
+        } catch (queueErr) {
+            if (queueErr.message.includes('ECONNREFUSED') || queueErr.message.includes('Redis')) {
+                console.warn("⚠️ [Fallback] Redis unreachable. Processing carousel synchronously...");
+                
+                // Process immediately (Synchronous)
+                const postService = require("../services/postService");
+                const results = await postService.processAndPostCarouselLogic({ userId, ...jobPayload.payload });
 
-        res.status(202).json({ 
-            success: true, 
-            message: "Post added to queue for processing",
-            jobId: job.id 
-        });
+                res.json({ 
+                    success: true, 
+                    message: "Post processed successfully (Synchronous Fallback)",
+                    results 
+                });
+            } else {
+                throw queueErr; // Re-throw if it's a different error
+            }
+        }
 
     } catch (err) {
         console.error("❌ Carousel Controller Error:", err.message);

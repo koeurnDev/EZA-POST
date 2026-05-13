@@ -368,14 +368,20 @@ setInterval(() => {
 }, 60 * 1000);
 
 // 🔄 Daily Token Refresh Check (Runs every 24 hours)
-// const { checkAndRefreshTokens } = require("./utils/tokenRefresher");
-/*
+const { checkAndRefreshTokens } = require("./utils/tokenRefresher");
 setInterval(() => {
   checkAndRefreshTokens();
 }, 24 * 60 * 60 * 1000); // 24 hours
 // Run once on startup to catch up
 setTimeout(checkAndRefreshTokens, 10000);
-*/
+
+// 🤖 Auto-Reply Bot Engine (Runs every 5 mins)
+const botEngine = require("./utils/botEngine");
+setInterval(() => {
+  botEngine.run();
+}, 5 * 60 * 1000); // 5 mins
+// Run once on startup
+setTimeout(() => botEngine.run(), 15000);
 
 // 📊 Metrics Sync Scheduler
 const { startMetricsScheduler, startCampaignMetricsScheduler } = require("./utils/metricsScheduler");

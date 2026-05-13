@@ -30,6 +30,10 @@ router.get("/rules", requireAuth, async (req, res) => {
       try { pageSettings = JSON.parse(pageSettings); } catch (e) { pageSettings = []; }
     }
 
+    const status = await prisma.botStatus.findUnique({
+      where: { userId: req.user.id }
+    });
+
     res.json({
       success: true,
       rules,

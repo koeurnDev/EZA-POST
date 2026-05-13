@@ -78,16 +78,32 @@ exports.createPost = async (req, res) => {
             }
         };
 
-        // 🚀 Add to Queue
-        const job = await postQueue.add('process-single-post', jobPayload);
+        // 🚀 Add to Queue (with Fallback)
+        try {
+            const job = await postQueue.add('process-single-post', jobPayload);
+            console.log(`✅ [Queue] Single post job ${job.id} created for user ${userId}`);
 
-        console.log(`✅ [Queue] Single post job ${job.id} created for user ${userId}`);
+            res.status(202).json({ 
+                success: true, 
+                message: "Single post added to queue",
+                jobId: job.id 
+            });
+        } catch (queueErr) {
+            if (queueErr.message.includes('ECONNREFUSED') || queueErr.message.includes('Redis')) {
+                console.warn("⚠️ [Fallback] Redis unreachable. Processing single post synchronously...");
+                
+                const postService = require("../services/postService");
+                const results = await postService.processSinglePostLogic({ userId, ...jobPayload.payload });
 
-        res.status(202).json({ 
-            success: true, 
-            message: "Single post added to queue",
-            jobId: job.id 
-        });
+                res.json({ 
+                    success: true, 
+                    message: "Post processed successfully (Synchronous Fallback)",
+                    results 
+                });
+            } else {
+                throw queueErr;
+            }
+        }
 
     } catch (err) {
         console.error("❌ Post Controller Error:", err.message);
