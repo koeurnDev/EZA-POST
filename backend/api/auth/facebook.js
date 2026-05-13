@@ -137,19 +137,23 @@ router.get("/callback", async (req, res) => {
 
         // 3️⃣ Find Current User
         currentStep = "FindLocalUser";
-        let userId = req.session?.user?.id;
+        let userId = req.session?.user?.id || req.session?.userId;
 
         if (!userId && req.cookies?.token) {
             try {
                 const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET || "supersecretkey");
                 userId = decoded.id;
-            } catch (err) { }
+                console.log(`✅ Recovered User ID from Cookie: ${userId}`);
+            } catch (err) { 
+                console.warn("⚠️ Failed to verify cookie token:", err.message);
+            }
         }
 
         // Fallback: Recover from state token if cookies/session failed
         if (!userId && state && state.includes("|")) {
-            const [action, stateToken] = state.split("|");
-            if (stateToken) {
+            const parts = state.split("|");
+            const stateToken = parts[parts.length - 1]; // Take the last part as token
+            if (stateToken && stateToken.length > 20) { // Basic sanity check for JWT length
                 try {
                     console.log("🔄 Step 3.5: Attempting to recover User ID from state token...");
                     const decoded = jwt.verify(stateToken, process.env.JWT_SECRET || "supersecretkey");
@@ -162,17 +166,16 @@ router.get("/callback", async (req, res) => {
         }
 
         if (!userId) {
-            console.error("❌ No authenticated user found (Session or JWT missing)");
-            console.log("   👉 Session User:", JSON.stringify(req.session?.user));
-            console.log("   👉 Cookies.token present:", !!req.cookies?.token);
-            console.log("   👉 State present:", !!state);
-            return res.redirect(`${process.env.FRONTEND_URL}/settings?error=session_expired`);
+            console.error("❌ CRITICAL: No authenticated user found (Session, Cookie, and State failed)");
+            console.log("   👉 State received:", state);
+            return res.redirect(`${process.env.FRONTEND_URL}/settings?error=session_expired&msg=Authentication+lost+during+redirect`);
         }
-        console.log(`✅ Found User ID: ${userId}`);
+        
+        console.log(`✅ Final User ID for DB Update: ${userId}`);
 
         // 4️⃣ Fetch Pages
         currentStep = "FetchPages";
-        console.log(`🔄 Step 4: Fetching Facebook Pages for token: ${access_token.substring(0, 10)}...`);
+        console.log(`🔄 Step 4: Fetching Facebook Pages for user ${userId}...`);
         const pagesRes = await axios.get("https://graph.facebook.com/v21.0/me/accounts", {
             params: {
                 access_token,
@@ -201,44 +204,44 @@ router.get("/callback", async (req, res) => {
         currentStep = "UpdateDB";
         console.log(`🔄 Step 5: Updating User ${userId} in DB...`);
 
-        const user = await prisma.user.findUnique({ where: { id: userId } });
+        const user = await prisma.user.findUnique({ where: { id: String(userId) } });
         
         if (user) {
             // 🔍 CHECK FOR DUPLICATE FB ID (Account Takeover Logic)
             // If another user already has this facebookId, disconnect them first to prevent Prisma error
-            const existingOwner = await prisma.user.findFirst({
-                where: { 
-                    facebookId: fbUser.id,
-                    id: { not: userId } // Not the current user
-                }
-            });
-
-            if (existingOwner) {
-                console.log(`⚠️ ACCOUNT TAKEOVER: FB ID ${fbUser.id} was linked to user ${existingOwner.id}. Disconnecting old link...`);
-                await prisma.user.update({
-                    where: { id: existingOwner.id },
-                    data: {
-                        facebookId: null,
-                        facebookAccessToken: null,
-                        facebookName: null,
-                        connectedPages: []
+            if (fbUser.id) {
+                const existingOwner = await prisma.user.findFirst({
+                    where: { 
+                        facebookId: fbUser.id,
+                        id: { not: String(userId) } // Not the current user
                     }
                 });
-                
-                // Also remove their pages from the FacebookPage table
-                await prisma.facebookPage.deleteMany({ where: { userId: existingOwner.id } });
+
+                if (existingOwner && existingOwner.id) {
+                    console.log(`⚠️ ACCOUNT TAKEOVER: FB ID ${fbUser.id} was linked to user ${existingOwner.id}. Disconnecting old link...`);
+                    await prisma.user.update({
+                        where: { id: existingOwner.id },
+                        data: {
+                            facebookId: null,
+                            facebookAccessToken: null,
+                            facebookName: null,
+                            connectedPages: []
+                        }
+                    });
+                    
+                    // Also remove their pages from the FacebookPage table
+                    await prisma.facebookPage.deleteMany({ where: { userId: existingOwner.id } });
+                }
             }
 
             // Update User Profile with FB details
             await prisma.user.update({
-                where: { id: userId },
+                where: { id: String(userId) },
                 data: {
                     facebookId: fbUser.id,
                     facebookAccessToken: encrypt(access_token), // 🔒 Encrypted!
                     facebookTokenExpiresAt: expiresAt,
                     facebookName: fbUser.name,
-                    // Store pages without access_tokens as a backup, 
-                    // real tokens are in FacebookPage table
                     connectedPages: myPages.map(p => ({ ...p, access_token: undefined })) 
                 }
             });
@@ -247,13 +250,13 @@ router.get("/callback", async (req, res) => {
             console.log("🔄 Syncing pages to FacebookPage table...");
             for (const p of myPages) {
                 try {
-                    // Check if page exists (upsert logic manually to handle explicit updates)
+                    // Check if page exists
                     const existingPage = await prisma.facebookPage.findFirst({
-                        where: { userId: userId, id: p.id }
+                        where: { userId: String(userId), id: p.id }
                     });
 
                     const pageData = {
-                        userId: userId,
+                        userId: String(userId),
                         id: p.id,
                         name: p.name,
                         accessToken: encrypt(p.access_token), // 🔒 Encrypt!
@@ -265,12 +268,12 @@ router.get("/callback", async (req, res) => {
 
                     if (existingPage) {
                         await prisma.facebookPage.update({
-                            where: { id: p.id }, // ID is unique per page globally usually, but standard here is page ID
-                            data: { ...pageData, isSelected: existingPage.isSelected } // Keep user's preference if already exists
+                            where: { id: p.id },
+                            data: { ...pageData, isSelected: existingPage.isSelected }
                         });
                     } else {
                         await prisma.facebookPage.create({
-                            data: { ...pageData, isSelected: true } // Auto-select NEW pages by default
+                            data: { ...pageData, isSelected: true }
                         });
                     }
 
@@ -281,7 +284,7 @@ router.get("/callback", async (req, res) => {
             console.log(`✅ Database update successful for ${myPages.length} pages`);
         } else {
             console.error(`❌ User ID ${userId} not found in DB`);
-            throw new Error(`User ${userId} not found in database`);
+            throw new Error(`User account (ID: ${userId}) not found in database. Please log in again.`);
         }
 
         // 6️⃣ Refresh JWT
