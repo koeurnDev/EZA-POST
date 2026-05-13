@@ -204,16 +204,20 @@ router.delete("/rules/:id", requireAuth, async (req, res) => {
 // ✅ Update bot settings (User-Specific Toggle)
 router.put("/settings", requireAuth, async (req, res) => {
   const { enabled } = req.body;
+  console.log(`📡 [PUT] /api/bot/settings - User: ${req.user.email} (ID: ${req.user.id}) - Set Enabled: ${enabled}`);
+  
   try {
-    await prisma.botStatus.upsert({
+    const status = await prisma.botStatus.upsert({
       where: { userId: req.user.id },
-      update: { enabled },
-      create: { userId: req.user.id, enabled }
+      update: { enabled: Boolean(enabled) },
+      create: { userId: req.user.id, enabled: Boolean(enabled) }
     });
-    res.json({ success: true, message: "Bot settings updated" });
+    
+    console.log(`✅ Bot status updated in DB for ${req.user.email}:`, status.enabled);
+    res.json({ success: true, message: "Bot settings updated", enabled: status.enabled });
   } catch (err) {
     console.error("❌ PUT /settings error:", err.message);
-    res.status(500).json({ success: false, message: "Failed to update bot settings" });
+    res.status(500).json({ success: false, message: "Failed to update bot settings", error: err.message });
   }
 });
 
@@ -281,6 +285,21 @@ router.delete("/monitored-posts/:id", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("❌ DELETE /monitored-posts error:", err.message);
     res.status(500).json({ success: false, message: "Failed to remove post" });
+  }
+});
+
+// ✅ Get bot reply history
+router.get("/history", requireAuth, async (req, res) => {
+  try {
+    const history = await prisma.botHistory.findMany({
+      where: { userId: req.user.id },
+      orderBy: { timestamp: 'desc' },
+      take: 50 // Show last 50 entries
+    });
+    res.json({ success: true, history });
+  } catch (err) {
+    console.error("❌ GET /history error:", err.message);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
