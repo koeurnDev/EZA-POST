@@ -272,6 +272,7 @@ model BotRule {
   scheduledTargetId String?
   keyword           String
   reply             String
+  postId            String?
   attachmentUrl     String?
   ruleType          BotRuleType   @default(KEYWORD)
   scope             BotRuleScope  @default(ALL)

@@ -123,13 +123,13 @@ async function processSinglePost(post) {
         .map(r => ({ accountId: r.accountId, postId: r.postId }));
     }
 
-    // Mark as completed
+    // Mark as published
     await prisma.scheduledPost.update({
       where: { id: post.id },
       data: {
-        status: "completed",
+        status: "published",
         postedAt: new Date(),
-        publishedIds: publishedIds // Prisma handles JSON if mapped correctly in schema or passed as object
+        publishedIds: publishedIds
       }
     });
 
@@ -174,7 +174,7 @@ exports.cleanupOldPosts = async () => {
     // 1. Find posts to delete first (to get file paths)
     const postsToDelete = await prisma.scheduledPost.findMany({
       where: {
-        status: { in: ["completed", "failed", "cancelled", "expired"] },
+        status: { in: ["published", "failed", "cancelled", "expired"] },
         updatedAt: { lt: twoDaysAgo },
       }
     });
