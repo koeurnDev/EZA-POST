@@ -358,10 +358,8 @@ const botEngine = require("./utils/botEngine");
 setInterval(() => {
   processScheduledPosts();
 
-  // Run bot every ~2 minutes (odd minutes) to spread load
-  if (new Date().getMinutes() % 2 !== 0) {
-    botEngine.run();
-  }
+  // ✅ Run bot every minute for faster response
+  botEngine.run();
 
   // Run cleanup occasionally (e.g., 1% chance or separate interval)
   if (Math.random() < 0.05) cleanupOldPosts();

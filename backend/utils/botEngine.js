@@ -142,17 +142,22 @@ const botEngine = {
         try {
             // 0. Check User's Bot Status
             const botStatus = await prisma.botStatus.findUnique({ where: { userId: user.id } });
-            if (!botStatus || !botStatus.enabled) return;
+            if (!botStatus || !botStatus.enabled) {
+                console.log(`   ⏩ Skipping user ${user.name}: Bot Master Switch is OFF.`);
+                return;
+            }
+
+            console.log(`   🤖 Processing user ${user.name}...`);
 
             // Validate Token
             const decryptedToken = decrypt(user.facebookAccessToken);
             const validation = await fb.validateAccessToken(decryptedToken);
             if (!validation.isValid) {
-                console.warn(`⚠️ Invalid token for user ${user.name} (ID: ${user.id})`);
+                console.warn(`   ⚠️ Invalid token for user ${user.name} (ID: ${user.id})`);
                 return;
             }
 
-            // Get Pages from DB (instead of fetching from FB every time)
+            // Get Pages from DB
             const dbPages = user.facebookPages || [];
             
             let pageSettings = user.pageSettings;
@@ -164,19 +169,33 @@ const botEngine = {
             const activePages = dbPages.filter(page => {
                 const settings = pageSettings.find(s => s.pageId === page.id);
                 const isBotEnabled = page.enableBot === true || settings?.enableBot === true;
-                return page.isSelected && isBotEnabled;
+                const isSelected = page.isSelected === true;
+                
+                if (!isSelected) console.log(`      ⏩ Page ${page.name} skipped: Not selected/connected.`);
+                else if (!isBotEnabled) console.log(`      ⏩ Page ${page.name} skipped: Bot not enabled for this page.`);
+                
+                return isSelected && isBotEnabled;
             }).map(page => ({
                 ...page,
                 access_token: decrypt(page.accessToken)
             }));
 
-            if (activePages.length === 0) return;
+            if (activePages.length === 0) {
+                console.log(`   ⏩ User ${user.name} has no active/connected pages with bot enabled.`);
+                return;
+            }
 
-            // Get Rules (Isolated by userId)
+            // Get Rules
             const rules = await prisma.botRule.findMany({ 
                 where: { userId: user.id, enabled: true } 
             });
-            if (rules.length === 0) return;
+            
+            if (rules.length === 0) {
+                console.log(`   ⏩ User ${user.name} has no active rules.`);
+                return;
+            }
+
+            console.log(`   ✅ User ${user.name} has ${activePages.length} active pages and ${rules.length} rules.`);
 
             for (const page of activePages) {
                 await botEngine.processPage(page, rules);
@@ -196,7 +215,7 @@ const botEngine = {
                 params: {
                     access_token: page.access_token,
                     fields: "id,message,comments{id,message,from,created_time}",
-                    limit: 5,
+                    limit: 20,
                 },
             });
 
@@ -322,11 +341,11 @@ const botEngine = {
                 // Get current pending count to adjust delay
                 const pendingCount = await prisma.pendingReply.count({ where: { status: "pending" } });
                 
-                let baseDelay = 60000; // 1 min default
-                if (pendingCount > 50) baseDelay = 120000; // 2 mins if busy
-                if (pendingCount > 100) baseDelay = 180000; // 3 mins if viral
+                let baseDelay = 30000; // 30s default (Faster)
+                if (pendingCount > 50) baseDelay = 60000; // 1 min if busy
+                if (pendingCount > 100) baseDelay = 120000; // 2 mins if viral
 
-                const randomExtra = Math.floor(Math.random() * 60000); // + 0-60s
+                const randomExtra = Math.floor(Math.random() * 30000); // + 0-30s
                 const delayMs = baseDelay + randomExtra;
                 const sendAt = new Date(Date.now() + delayMs);
 

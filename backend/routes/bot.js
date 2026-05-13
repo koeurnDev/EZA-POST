@@ -284,4 +284,58 @@ router.delete("/monitored-posts/:id", requireAuth, async (req, res) => {
   }
 });
 
+// ✅ Fetch recent posts from a specific page (The "Easier Way")
+router.get("/recent-posts/:pageId", requireAuth, async (req, res) => {
+  const { pageId } = req.params;
+  try {
+    // 1. Get Page Access Token from DB
+    const page = await prisma.facebookPage.findFirst({
+      where: { id: pageId, userId: req.user.id }
+    });
+
+    if (!page || !page.accessToken) {
+      return res.status(404).json({ success: false, message: "Page not found or not connected" });
+    }
+
+    const { decrypt } = require("../utils/crypto");
+    const axios = require("axios");
+    const fbToken = decrypt(page.accessToken);
+
+    // 2. Fetch last 30 posts with insights from FB Graph API
+    // Insights needed: post_impressions_unique (Reach), post_video_views (Views if video)
+    const fbRes = await axios.get(`https://graph.facebook.com/v21.0/${pageId}/feed`, {
+      params: {
+        access_token: fbToken,
+        fields: "id,message,created_time,full_picture,permalink_url,insights.metric(post_impressions_unique,post_video_views,post_reactions_by_type_total,post_comments_engagement)",
+        limit: 30
+      }
+    });
+
+    const posts = (fbRes.data.data || []).map(p => {
+        // Extract insights
+        const insights = p.insights?.data || [];
+        const reach = insights.find(i => i.name === 'post_impressions_unique')?.values[0]?.value || 0;
+        const views = insights.find(i => i.name === 'post_video_views')?.values[0]?.value || 0;
+        
+        return {
+            ...p,
+            reach,
+            views: views || 0
+        };
+    });
+
+    // Sort by reach or views descending
+    posts.sort((a, b) => (b.views + b.reach) - (a.views + a.reach));
+
+    res.json({ 
+      success: true, 
+      posts 
+    });
+
+  } catch (err) {
+    console.error("❌ GET /recent-posts error:", err.message);
+    res.status(500).json({ success: false, message: "Failed to fetch recent posts from Facebook" });
+  }
+});
+
 module.exports = router;
