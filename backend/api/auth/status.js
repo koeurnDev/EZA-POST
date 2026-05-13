@@ -22,7 +22,9 @@ router.get("/", async (req, res) => {
           facebookId: true,
           facebookName: true,
           avatar: true,
-          facebookPages: true
+          facebookPages: true,
+          credits: true,
+          plan: true
         }
       });
       if (foundUser) {
@@ -64,7 +66,9 @@ router.get("/", async (req, res) => {
               facebookId: true,
               facebookName: true,
               avatar: true,
-              facebookPages: true
+              facebookPages: true,
+              credits: true,
+              plan: true
             }
           });
 

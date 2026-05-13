@@ -62,8 +62,8 @@ const internalProcessVideo = (inputPath, outputDir, options = {}) => {
             }
             
             const duration = metadata.format.duration;
-            if (duration > 61) { // 1s buffer
-                return reject(new Error(`Video too long (${Math.round(duration)}s). Maximum allowed is 60s.`));
+            if (duration > 91) { // 1s buffer
+                return reject(new Error(`Video too long (${Math.round(duration)}s). Maximum allowed is 90s.`));
             }
 
             const command = ffmpeg(inputPath);

@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * 🚀 /api/posts/bulk — Bulk Create Posts
+ * 🚀 /api/posts/bulk — Bulk Create Scheduled Posts (Prisma Fix)
  * ============================================================
  */
 
@@ -10,7 +10,7 @@ const { requireAuth } = require("../../utils/auth");
 const prisma = require('../../utils/prisma');
 
 /* -------------------------------------------------------------------------- */
-/* ✅ POST /api/posts/bulk — Create multiple posts                            */
+/* ✅ POST /api/posts/bulk — Create multiple scheduled posts                  */
 /* -------------------------------------------------------------------------- */
 router.post("/", requireAuth, async (req, res) => {
     try {
@@ -22,34 +22,35 @@ router.post("/", requireAuth, async (req, res) => {
 
         console.log(`📦 Bulk creating ${posts.length} posts for user ${req.user.id}...`);
 
-        // Prepare posts for insertion
+        // Prepare posts for insertion (Mapping to ScheduledPost model)
         const postsToInsert = posts.map(post => ({
             userId: req.user.id,
-            caption: post.caption,
-            videoUrl: post.videoUrl,
-            accounts: post.accounts, // String[]
-            scheduleTime: post.scheduleTime || null,
-            status: post.scheduleTime ? "scheduled" : "created",
+            caption: post.caption || "",
+            videoUrl: post.videoUrl || null,
+            accounts: post.accounts || [], // Json field
+            scheduleTime: post.scheduleTime ? new Date(post.scheduleTime) : new Date(),
+            status: post.scheduleTime ? "scheduled" : "draft",
+            postType: post.postType || "video",
             createdAt: new Date(),
+            updatedAt: new Date()
         }));
 
-        // Bulk Insert
-        const result = await prisma.post.createMany({
+        // Prisma createMany (PostgreSQL)
+        const result = await prisma.scheduledPost.createMany({
             data: postsToInsert
         });
 
-        console.log(`✅ Successfully created ${result.count} posts.`);
+        console.log(`✅ Successfully created ${result.count} scheduled posts.`);
 
         res.status(201).json({
             success: true,
-            message: `Successfully scheduled ${result.count} posts.`,
-            count: result.count,
-            posts: postsToInsert // Prisma createMany doesn't return created objects, so we return payload
+            message: `Successfully created ${result.count} scheduled posts.`,
+            count: result.count
         });
 
     } catch (err) {
         console.error("❌ Bulk create failed:", err.message);
-        res.status(500).json({ success: false, error: "Failed to create posts" });
+        res.status(500).json({ success: false, error: "Failed to create posts", details: err.message });
     }
 });
 

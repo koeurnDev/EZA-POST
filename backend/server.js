@@ -377,10 +377,10 @@ setInterval(() => {
 setTimeout(checkAndRefreshTokens, 10000);
 */
 
-// 📊 Metrics Sync Scheduler (Disabled for Downloader Focus)
-// const { startMetricsScheduler, startCampaignMetricsScheduler } = require("./utils/metricsScheduler");
-// startMetricsScheduler();
-// startCampaignMetricsScheduler();
+// 📊 Metrics Sync Scheduler
+const { startMetricsScheduler, startCampaignMetricsScheduler } = require("./utils/metricsScheduler");
+startMetricsScheduler();
+startCampaignMetricsScheduler();
 
 // 🧹 Start Temp Cleaner (Runs every 5 mins, deletes files older than 15 mins)
 const { startTempCleanupJob } = require("./utils/tempCleaner");

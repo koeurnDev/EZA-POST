@@ -224,8 +224,7 @@ router.get("/callback", async (req, res) => {
                         data: {
                             facebookId: null,
                             facebookAccessToken: null,
-                            facebookName: null,
-                            connectedPages: []
+                            facebookName: null
                         }
                     });
                     
@@ -241,8 +240,7 @@ router.get("/callback", async (req, res) => {
                     facebookId: fbUser.id,
                     facebookAccessToken: encrypt(access_token), // 🔒 Encrypted!
                     facebookTokenExpiresAt: expiresAt,
-                    facebookName: fbUser.name,
-                    connectedPages: myPages.map(p => ({ ...p, access_token: undefined })) 
+                    facebookName: fbUser.name
                 }
             });
 
@@ -342,9 +340,7 @@ router.delete("/", async (req, res) => {
                 facebookId: null,
                 facebookAccessToken: null,
                 facebookName: null,
-                connectedPages: [], // reset to empty array
-                pageSettings: [],
-                selectedPages: []
+                pageSettings: []
             }
         });
 

@@ -121,6 +121,7 @@ model User {
   creditTransactions    CreditTransaction[]
   platformConfigs       PlatformConfig[]
   botMonitoredPosts     BotMonitoredPost[]
+  postLogs              PostLog[]
 
   @@map("users")
 }
@@ -166,6 +167,13 @@ model ScheduledPost {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
+  // Flat fields for easier access (Legacy compatibility)
+  videoUrl     String?
+  thumbnailUrl String?
+  mediaFiles   Json?          @default("[]")
+  accounts     Json?          @default("[]")
+  publishedIds Json?          @default("[]")
+
   user         User           @relation(fields: [userId], references: [id])
   mediaItems   ScheduledMedia[]
   targets      PostTarget[]
@@ -173,6 +181,23 @@ model ScheduledPost {
   @@index([status, scheduleTime])
   @@index([userId, status])
   @@map("scheduled_posts")
+}
+
+model PostLog {
+  id            String    @id @default(uuid())
+  userId        String
+  pageId        String
+  fbPostId      String
+  type          String    // e.g., "video", "carousel", "tiktok"
+  status        String    @default("published")
+  scheduledTime DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@map("post_logs")
 }
 
 model ScheduledMedia {
@@ -296,20 +321,20 @@ model BotHistory {
 }
 
 model PendingReply {
-  id                String      @id @default(uuid())
-  userId            String
-  pageId            String
-  facebookCommentId String      @unique
-  facebookPostId    String
-  replyMessage      String
-  attachmentUrl     String?
-  accessToken       String
-  sendAt            DateTime
-  status            ReplyStatus @default(pending)
-  attempts          Int         @default(0)
-  error             String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id            String      @id @default(uuid())
+  userId        String
+  pageId        String
+  commentId     String      @unique @map("facebook_comment_id")
+  postId        String      @map("facebook_post_id")
+  replyMessage  String
+  attachmentUrl String?
+  accessToken   String
+  sendAt        DateTime
+  status        ReplyStatus @default(pending)
+  attempts      Int         @default(0)
+  error         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   user              User        @relation(fields: [userId], references: [id])
   page              FacebookPage @relation(fields: [pageId], references: [id])
@@ -319,17 +344,17 @@ model PendingReply {
 }
 
 model RepliedComment {
-  id                String   @id @default(uuid())
-  facebookCommentId String   @unique
-  facebookPostId    String
-  userId            String
-  repliedAt         DateTime @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id            String   @id @default(uuid())
+  commentId     String   @unique @map("facebook_comment_id")
+  postId        String   @map("facebook_post_id")
+  userId        String
+  repliedAt     DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   user              User     @relation(fields: [userId], references: [id])
 
-  @@index([userId, facebookPostId])
+  @@index([userId, postId])
   @@map("replied_comments")
 }
 

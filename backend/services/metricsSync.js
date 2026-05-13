@@ -1,65 +1,52 @@
 // ============================================================
-// 🔄 Metrics Sync Service - Automated Post Metrics Syncing
+// 🔄 Metrics Sync Service - Automated Post Metrics Syncing (Prisma Version)
 // ============================================================
 
-const PostMetrics = require('../models/PostMetrics');
-const Post = require('../models/Post');
-const User = require('../models/User');
+const prisma = require('../utils/prisma');
 const { fetchPostInsights } = require('./facebookAds');
 const { calculateViralScore } = require('./viralScoreCalculator');
+const { decrypt } = require('../utils/crypto');
 
 /**
- * Sync metrics for a single post
- * @param {String} postId - MongoDB Post ID
+ * Sync metrics for a single PostTarget
+ * @param {String} targetId - Prisma PostTarget ID
  * @returns {Object} Updated metrics
  */
-async function syncPostMetrics(postId) {
+async function syncPostMetrics(targetId) {
     try {
-        const post = await Post.findById(postId);
-        if (!post) {
-            throw new Error('Post not found');
-        }
+        const target = await prisma.postTarget.findUnique({
+            where: { id: targetId },
+            include: { 
+                scheduledPost: true,
+                page: { include: { user: true } }
+            }
+        });
 
-        // Only sync published Facebook posts
-        const fbPlatform = post.platforms?.find(p => p.name === 'facebook' && p.status === 'published');
-        if (!fbPlatform || !fbPlatform.postId) {
-            console.log(`⏭️ Skipping post ${postId} - not published to Facebook`);
+        if (!target || !target.facebookPostId) {
+            console.log(`⏭️ Skipping target ${targetId} - not published to Facebook`);
             return null;
         }
 
-        // Get user and page token
-        const user = await User.findOne({ id: post.userId });
-        if (!user) {
-            throw new Error('User not found');
-        }
+        const user = target.page.user;
+        const page = target.page;
 
-        // Find the page this post was published to
-        const pageId = post.accounts[0]; // Assuming first account
-        const page = user.connectedPages.find(p => p.id === pageId);
-        if (!page) {
-            throw new Error('Page not found in user connections');
-        }
-
-        const pageToken = user.getDecryptedPageToken(pageId);
+        // Decrypt Page Token
+        const pageToken = decrypt(page.accessToken);
         if (!pageToken) {
-            throw new Error('Page access token not found');
+            throw new Error(`Page access token not found for page ${page.name}`);
         }
 
         // Fetch metrics from Facebook
-        console.log(`📊 Syncing metrics for post ${postId} (FB: ${fbPlatform.postId})`);
-        const metrics = await fetchPostInsights(fbPlatform.postId, pageToken);
+        console.log(`📊 Syncing metrics for target ${targetId} (FB: ${target.facebookPostId})`);
+        const metrics = await fetchPostInsights(target.facebookPostId, pageToken);
 
         // Calculate viral score
-        const { viralScore, viralTier, metadata } = calculateViralScore(metrics, post.createdAt);
+        const { viralScore, viralTier, metadata } = calculateViralScore(metrics, target.postedAt || target.createdAt);
 
         // Update or create PostMetrics document
-        const postMetrics = await PostMetrics.findOneAndUpdate(
-            { facebookPostId: fbPlatform.postId },
-            {
-                postId: post._id,
-                facebookPostId: fbPlatform.postId,
-                pageId,
-                userId: post.userId,
+        const postMetrics = await prisma.postMetrics.upsert({
+            where: { postTargetId: target.id },
+            update: {
                 likes: metrics.likes,
                 comments: metrics.comments,
                 shares: metrics.shares,
@@ -71,68 +58,86 @@ async function syncPostMetrics(postId) {
                 viralTier,
                 lastSyncedAt: new Date()
             },
-            { upsert: true, new: true }
-        );
-
-        // Update Post document with viral score
-        await Post.findByIdAndUpdate(postId, {
-            viralScore,
-            lastMetricsSync: new Date()
+            create: {
+                postTargetId: target.id,
+                pageId: target.pageId,
+                userId: user.id,
+                likes: metrics.likes,
+                comments: metrics.comments,
+                shares: metrics.shares,
+                reactions: metrics.reactions,
+                reach: metrics.reach,
+                impressions: metrics.impressions,
+                engagement: metrics.engagement,
+                viralScore,
+                viralTier,
+                lastSyncedAt: new Date()
+            }
         });
 
-        console.log(`✅ Synced metrics for post ${postId} - Viral Score: ${viralScore} (${viralTier})`);
+        // Update Target document with viral score
+        await prisma.postTarget.update({
+            where: { id: target.id },
+            data: {
+                updatedAt: new Date() // Trigger update
+            }
+        });
+
+        console.log(`✅ Synced metrics for target ${targetId} - Viral Score: ${viralScore} (${viralTier})`);
 
         return {
-            postId,
+            targetId,
             metrics: postMetrics,
             viralScore,
             viralTier,
             metadata
         };
     } catch (error) {
-        console.error(`❌ Error syncing metrics for post ${postId}:`, error.message);
+        console.error(`❌ Error syncing metrics for target ${targetId}:`, error.message);
         throw error;
     }
 }
 
 /**
- * Sync metrics for all published posts
- * @param {Number} limit - Maximum number of posts to sync (default: 50)
+ * Sync metrics for all published targets
+ * @param {Number} limit - Maximum number of targets to sync (default: 50)
  * @returns {Array} Sync results
  */
 async function syncAllPostMetrics(limit = 50) {
     try {
         console.log('🔄 Starting batch metrics sync...');
 
-        // Find all published Facebook posts that haven't been synced recently
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-        const posts = await Post.find({
-            'platforms.name': 'facebook',
-            'platforms.status': 'published',
-            $or: [
-                { lastMetricsSync: { $lt: oneHourAgo } },
-                { lastMetricsSync: null }
-            ]
-        })
-            .limit(limit)
-            .sort({ createdAt: -1 });
+        // Find targets that need syncing
+        const pendingTargets = await prisma.postTarget.findMany({
+            where: {
+                status: 'published',
+                facebookPostId: { not: null },
+                OR: [
+                    { metrics: { is: null } },
+                    { metrics: { lastSyncedAt: { lt: oneHourAgo } } }
+                ]
+            },
+            take: limit,
+            orderBy: { postedAt: 'desc' }
+        });
 
-        console.log(`📊 Found ${posts.length} posts to sync`);
+        console.log(`📊 Found ${pendingTargets.length} targets to sync`);
 
         const results = [];
         let successCount = 0;
         let errorCount = 0;
 
-        for (const post of posts) {
+        for (const target of pendingTargets) {
             try {
-                const result = await syncPostMetrics(post._id);
+                const result = await syncPostMetrics(target.id);
                 if (result) {
                     results.push(result);
                     successCount++;
                 }
             } catch (error) {
-                console.error(`❌ Failed to sync post ${post._id}:`, error.message);
+                console.error(`❌ Failed to sync target ${target.id}:`, error.message);
                 errorCount++;
             }
 
@@ -143,7 +148,7 @@ async function syncAllPostMetrics(limit = 50) {
         console.log(`✅ Batch sync complete: ${successCount} success, ${errorCount} errors`);
 
         return {
-            total: posts.length,
+            total: pendingTargets.length,
             success: successCount,
             errors: errorCount,
             results
@@ -155,20 +160,19 @@ async function syncAllPostMetrics(limit = 50) {
 }
 
 /**
- * Update viral scores for all posts (recalculation)
- * @returns {Number} Number of posts updated
+ * Update viral scores for all metrics (recalculation)
  */
 async function updateViralScores() {
     try {
         console.log('🔄 Recalculating viral scores...');
 
-        const metrics = await PostMetrics.find({});
+        const metrics = await prisma.postMetrics.findMany({
+            include: { postTarget: true }
+        });
+        
         let updateCount = 0;
 
         for (const metric of metrics) {
-            const post = await Post.findById(metric.postId);
-            if (!post) continue;
-
             const { viralScore, viralTier } = calculateViralScore({
                 likes: metric.likes,
                 comments: metric.comments,
@@ -176,16 +180,14 @@ async function updateViralScores() {
                 reactions: metric.reactions,
                 reach: metric.reach,
                 impressions: metric.impressions
-            }, post.createdAt);
+            }, metric.postTarget.postedAt || metric.postTarget.createdAt);
 
             // Update if score changed significantly (> 5 points)
             if (Math.abs(metric.viralScore - viralScore) > 5) {
-                await PostMetrics.findByIdAndUpdate(metric._id, {
-                    viralScore,
-                    viralTier
+                await prisma.postMetrics.update({
+                    where: { id: metric.id },
+                    data: { viralScore, viralTier }
                 });
-
-                await Post.findByIdAndUpdate(post._id, { viralScore });
                 updateCount++;
             }
         }

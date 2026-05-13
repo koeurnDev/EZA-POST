@@ -532,7 +532,7 @@ router.post("/compatible", requireAuth, async (req, res) => {
             const startTime = Date.now();
             // We use -t 60 to prevent infinite loops and limit processing to 60s
             // -headers passes necessary TikTok auth headers
-            const turboCmd = `"${ffmpegPath}" -y -headers "User-Agent: ${mobileUA}\r\nReferer: https://www.tiktok.com/\r\n" -i "${downloadUrl}" -t 60 -c:v libx264 -preset ultrafast -crf 28 -c:a copy -threads 0 "${outputPath}"`;
+            const turboCmd = `"${ffmpegPath}" -y -headers "User-Agent: ${mobileUA}\r\nReferer: https://www.tiktok.com/\r\n" -i "${downloadUrl}" -t 90 -c:v libx264 -preset ultrafast -crf 28 -c:a copy -threads 0 "${outputPath}"`;
             
             execSync(turboCmd, { stdio: 'pipe', timeout: 45000 }); // 45s timeout for transcode
             
