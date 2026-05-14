@@ -139,12 +139,12 @@ export default function Register() {
           </MotionDiv>
 
           <MotionDiv
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="relative"
           >
-            <div className="absolute -inset-4 bg-blue-600/5 blur-3xl -z-10 rounded-full" />
+            <div className="absolute -inset-4 bg-blue-600/5 blur-3xl -z-10 rounded-full hidden md:block" />
             <RegisterForm onSuccess={handleRegisterSuccess} />
           </MotionDiv>
 

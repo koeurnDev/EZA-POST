@@ -124,8 +124,8 @@ export default function Connections() {
 
     return (
         <DashboardLayout>
-            {/* Mesh Gradient Background */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20 dark:opacity-40">
+            {/* Mesh Gradient Background - Optimized for low-end devices */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20 dark:opacity-40 hidden md:block">
                 <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500 blur-[120px] rounded-full animate-pulse" />
                 <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-teal-600 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
             </div>
@@ -153,10 +153,10 @@ export default function Connections() {
                     ].map((platform, idx) => (
                         <MotionDiv
                             key={platform.id}
-                            initial={{ opacity: 0, y: 30 }}
+                            initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 30 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.1, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                            className="group relative overflow-hidden bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-white/20 dark:border-white/5 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl hover:shadow-emerald-500/5 transition-all duration-700"
+                            transition={{ delay: idx * 0.1, duration: window.innerWidth < 768 ? 0.3 : 0.8 }}
+                            className="group relative overflow-hidden bg-white dark:bg-black/40 md:backdrop-blur-2xl border border-gray-100 dark:border-white/5 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-xl md:shadow-2xl transition-all duration-700"
                         >
                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 md:gap-8 relative z-10">
                                 <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6 md:gap-8">

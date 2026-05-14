@@ -141,7 +141,7 @@ export default function Post() {
             // Save Global Preferences (Persistent)
             const prefsData = { carouselCtaText, cta };
             localStorage.setItem("postPreferences", JSON.stringify(prefsData));
-        }, 1000);
+        }, 3000); // 🚀 Increased to 3s to reduce jank while typing
         return () => clearTimeout(saveTimer);
     }, [caption, headline, targetLink, postFormat, selectedPages, isDraftLoaded, availablePages, carouselCtaText, cta, autoReplyBot]);
 
@@ -645,10 +645,10 @@ export default function Post() {
                     {activeView === 'create' ? (
                         <motion.div
                             key="create"
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                            exit={{ opacity: 0, y: window.innerWidth < 768 ? 0 : -20 }}
+                            transition={{ duration: window.innerWidth < 768 ? 0.3 : 0.5, ease: "linear" }}
                             className="space-y-4 md:space-y-10 w-full"
                         >
                             {/* 🎯 Destination: Multi-Select Dropdown */}

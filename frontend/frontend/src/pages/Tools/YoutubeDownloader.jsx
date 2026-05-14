@@ -163,8 +163,8 @@ export default function YoutubeDownloader() {
 
     return (
         <DashboardLayout>
-            {/* 🌈 Modern Background Mesh (YouTube Red) */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            {/* 🌈 Modern Background Mesh (YouTube Red) - Optimized for Mobile */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 hidden md:block">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-red-500/20 to-rose-500/20 rounded-full blur-[120px] animate-pulse" />
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-orange-500/20 to-red-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
             </div>

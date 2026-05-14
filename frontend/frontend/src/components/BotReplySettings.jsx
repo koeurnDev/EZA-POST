@@ -21,7 +21,14 @@ import {
   Filter,
   Image as ImageIcon,
   Loader,
-  HelpCircle
+  HelpCircle,
+  ExternalLink,
+  Zap,
+  History,
+  CheckCircle,
+  Bot,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import api, { botAPI } from "../utils/api";
 
@@ -130,6 +137,10 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     fetchPages();
   }, [fetchRules, fetchMonitoredPosts]);
 
+  // ✅ Performance: Limit items for mobile/2GB RAM
+  const [visibleCount, setVisibleCount] = useState(10);
+  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+
   // ✅ Notification helper
   const showNotify = useCallback((msg, type = "success") => {
     setNotification({ msg, type });
@@ -142,6 +153,8 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       (r.keyword || "").toLowerCase().includes(deferredSearch.toLowerCase()) ||
       (r.reply || "").toLowerCase().includes(deferredSearch.toLowerCase())
   );
+
+  const clearSearch = () => setSearchTerm("");
 
   // ✅ Handle Form Change
   const handleFormChange = (field, value) => {
@@ -184,10 +197,19 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     if (!reply.trim()) return showNotify("Reply Message is required", "error");
     if (scope === "SPECIFIC" && !postId.trim()) return showNotify("Post ID is required for Specific Post scope", "error");
 
+    // 🎯 Extract numeric ID if postId is a URL
+    let cleanPostId = postId.trim();
+    if (scope === "SPECIFIC" && cleanPostId.includes("facebook.com")) {
+      const matches = cleanPostId.match(/(\d{10,20})/g);
+      if (matches && matches.length > 0) {
+        cleanPostId = matches[matches.length - 1];
+      }
+    }
+
     const payload = {
       ruleType,
       scope,
-      postId: scope === "SPECIFIC" ? postId : undefined,
+      postId: scope === "SPECIFIC" ? cleanPostId : undefined,
       keyword: keyword.trim() || "*",
       reply: reply.trim(),
       attachmentUrl
@@ -304,6 +326,8 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       }
 
       await botAPI.updatePageSettings(pageId, checked);
+      
+      // Update local state for both pageSettings AND availablePages to keep UI in sync
       setPageSettings(prev => {
         const newSettings = [...prev];
         const idx = newSettings.findIndex(s => s.pageId === pageId);
@@ -311,11 +335,55 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
         else newSettings.push({ pageId, enableBot: checked });
         return newSettings;
       });
+
+      setAvailablePages(prev => prev.map(p => 
+        p.id === pageId ? { ...p, settings: { ...p.settings, enableBot: checked } } : p
+      ));
+
       showNotify(`Bot ${checked ? "enabled" : "disabled"} for this page`);
     } catch (err) {
       showNotify("Failed to update page bot status", "error");
     }
   }, [showNotify, isDemo]);
+
+  // ✅ Bulk Toggle Pages
+  const toggleAllPages = useCallback(async (enabled) => {
+    if (availablePages.length === 0) return;
+    
+    const pageIds = availablePages.map(p => p.id);
+    
+    try {
+      if (isDemo) {
+        setPageSettings(prev => pageIds.map(id => ({ pageId: id, enableBot: enabled })));
+        showNotify(`${enabled ? "Enabled" : "Disabled"} bot for all demo pages`);
+        return;
+      }
+
+      showNotify(enabled ? "កំពុងបើកគ្រប់ Page..." : "កំពុងបិទគ្រប់ Page...");
+      
+      await api.put("/bot/page-settings", { pageIds, enabled });
+      
+      // Update local state
+      setPageSettings(prev => {
+        const newSettings = [...prev];
+        pageIds.forEach(id => {
+          const idx = newSettings.findIndex(s => s.pageId === id);
+          if (idx > -1) newSettings[idx].enableBot = enabled;
+          else newSettings.push({ pageId: id, enableBot: enabled });
+        });
+        return newSettings;
+      });
+
+      setAvailablePages(prev => prev.map(p => ({
+        ...p,
+        settings: { ...p.settings, enableBot: enabled }
+      })));
+
+      showNotify(enabled ? "បានបើកគ្រប់ Page រួចរាល់" : "បានបិទគ្រប់ Page រួចរាល់");
+    } catch (err) {
+      showNotify("បរាជ័យក្នុងការកំណត់គ្រប់ Page", "error");
+    }
+  }, [availablePages, isDemo, showNotify]);
 
   // ✅ Generate AI Suggestions
   const generateAISuggestions = async () => {
@@ -412,6 +480,53 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     }
   };
 
+  // ✅ Recent Posts State (The "Easier Way")
+  const [recentPosts, setRecentPosts] = useState([]);
+  const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+  const [browsePageId, setBrowsePageId] = useState("");
+
+  const fetchRecentPosts = useCallback(async (pageId) => {
+    if (!pageId) return;
+    setIsLoadingRecent(true);
+    try {
+      const res = await api.get(`/bot/recent-posts/${pageId}`);
+      if (res.data.success) {
+        setRecentPosts(res.data.posts || []);
+      }
+    } catch (err) {
+      console.warn("⚠️ Recent posts fetch failed:", err);
+      showNotify("មិនអាចទាញយកផុសបានទេ", "error");
+    } finally {
+      setIsLoadingRecent(false);
+    }
+  }, [showNotify]);
+
+  useEffect(() => {
+    if (browsePageId) fetchRecentPosts(browsePageId);
+  }, [browsePageId, fetchRecentPosts]);
+
+  // ✅ Add Monitored Post by ID directly
+  const handleAddMonitoredById = async (postId, pageId) => {
+    setIsAddingMonitored(true);
+    try {
+        if (isDemo) {
+            setMonitoredPosts(prev => [{ id: Date.now().toString(), facebookPostId: postId, pageId: pageId, enabled: true, createdAt: new Date() }, ...prev]);
+            showNotify("បានបន្ថែមផុសសម្រាប់ Monitor (Demo)");
+        } else {
+            // Re-use existing endpoint with direct ID as URL
+            const res = await api.post("/bot/monitored-posts", { url: postId, pageId: pageId });
+            if (res.data.success) {
+                showNotify("បានបន្ថែមផុសសម្រាប់ Monitor រួចរាល់");
+                fetchMonitoredPosts();
+            }
+        }
+    } catch (err) {
+        showNotify(err.response?.data?.message || "បរាជ័យក្នុងការបន្ថែមផុស", "error");
+    } finally {
+        setIsAddingMonitored(false);
+    }
+  };
+
   // ✅ Delete Monitored Post
   const handleDeleteMonitored = async (id) => {
     if (!window.confirm("តើបងចង់ឈប់ Monitor ផុសនេះមែនទេ?")) return;
@@ -429,9 +544,37 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     }
   };
 
-  // ============================================================
-  // 🧱 Render UI
-  // ============================================================
+  // ✅ Bot History State
+  const [history, setHistory] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  const fetchHistory = useCallback(async () => {
+    if (isDemo) {
+        setHistory([
+            { id: '1', commentId: '123_456', replyMessage: 'Hi! How can we help?', pageId: '101', status: 'success', timestamp: new Date() },
+            { id: '2', commentId: '123_457', replyMessage: 'Pricing starts at $10.', pageId: '101', status: 'success', timestamp: new Date(Date.now() - 3600000) }
+        ]);
+        return;
+    }
+    setIsLoadingHistory(true);
+    try {
+        const res = await api.get("/bot/history");
+        if (res.data.success) {
+            setHistory(res.data.history || []);
+        }
+    } catch (err) {
+        console.warn("⚠️ History fetch failed:", err);
+    } finally {
+        setIsLoadingHistory(false);
+    }
+  }, [isDemo]);
+
+  useEffect(() => {
+    fetchHistory();
+    // Auto-refresh history every 30 seconds
+    const timer = setInterval(fetchHistory, 30000);
+    return () => clearInterval(timer);
+  }, [fetchHistory]);
   if (loading) {
     return (
       <div className="p-12 text-center text-gray-500 flex flex-col items-center gap-3">
@@ -498,15 +641,33 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
         </div>
       </div>
 
-      {/* 1.5️⃣ Middle Panel: Page-Specific Status */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <Filter size={20} className="text-blue-500" />
-          ជ្រើសរើស Page ដែលចង់ឱ្យ Bot ឆ្លើយតប
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-          ជ្រើសរើស Page ណាខ្លះដែលបងចង់ឱ្យ Bot តាមដាន និងឆ្លើយតបខមិនដោយស្វ័យប្រវត្តិ។
-        </p>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <Filter size={20} className="text-blue-500" />
+              ជ្រើសរើស Page ដែលចង់ឱ្យ Bot ឆ្លើយតប
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              ជ្រើសរើស Page ណាខ្លះដែលបងចង់ឱ្យ Bot តាមដាន និងឆ្លើយតបខមិន។
+            </p>
+          </div>
+          
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button 
+              onClick={() => toggleAllPages(true)}
+              className="flex-1 sm:flex-none px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              បើកគ្រប់ Page
+            </button>
+            <button 
+              onClick={() => toggleAllPages(false)}
+              className="flex-1 sm:flex-none px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              បិទគ្រប់ Page
+            </button>
+          </div>
+        </div>
 
         {isLoadingPages ? (
           <div className="flex items-center gap-2 text-sm text-gray-400 animate-pulse">
@@ -521,7 +682,8 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {availablePages.map((page) => {
               const settings = pageSettings.find(s => s.pageId === page.id);
-              const isPageBotEnabled = settings?.enableBot ?? false;
+              // ✅ Check both User.pageSettings AND FacebookPage.enableBot for consistency
+              const isPageBotEnabled = settings?.enableBot === true || page.settings?.enableBot === true;
 
               return (
                 <div
@@ -712,7 +874,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                 />
                 <div className="flex-1">
                   <p className="text-sm font-bold text-gray-900 dark:text-white">រូបភាពត្រូវបានដាក់បញ្ចូល</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">រូបភាពនេះនឹងផ្ញើទៅជាមួយសារឆ្លើយតប។</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">រូបភាពនេះនឹងផ្ញើទៅជាមួយសារឆ្លើយតប。</p>
                 </div>
                 <button
                   onClick={removeImage}
@@ -767,7 +929,19 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       {/* 3️⃣ Rule Table */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         <div className="p-4 md:p-5 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h3 className="font-bold text-gray-900 dark:text-white">បញ្ជីច្បាប់ដែលកំពុងប្រើ (Active Rules)</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <Filter size={18} className="text-blue-500" />
+              បញ្ជីច្បាប់ដែលកំពុងប្រើ (Active Rules)
+            </h3>
+            <button
+              onClick={fetchRules}
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
+              title="Refresh Rules"
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            </button>
+          </div>
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
@@ -775,125 +949,212 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               placeholder="ស្វែងរកច្បាប់..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-3.5 text-base rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full pl-9 pr-10 py-3.5 text-base rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none"
             />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          {/* Desktop Table View */}
-          <table className="hidden md:table w-full text-left">
-            <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-              <tr>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keyword / Reply</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-center">ស្ថានភាព</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-right">សកម្មភាព</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="3" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                    <div className="flex flex-col items-center gap-2">
-                      <Filter size={32} className="opacity-20" />
-                      <p>{searchTerm ? "មិនមានច្បាប់ដែលត្រូវនឹងការស្វែងរកទេ" : "មិនទាន់មានច្បាប់ឆ្លើយតបនៅឡើយទេ។"}</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r, idx) => {
-                  const ruleId = r._id || r.id || `temp-${idx}`;
-                  return (
-                    <tr key={ruleId} className={`hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors group ${r.enabled ? "bg-white dark:bg-gray-800" : "bg-gray-50/50 dark:bg-gray-900/20"}`}>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-900 dark:text-white">
-                              {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
-                            </span>
-                            <span className="text-[9px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">
-                              {r.ruleType || "KEYWORD"}
-                            </span>
-                          </div>
-                          <div className="flex items-start gap-3">
-                            {r.attachmentUrl && (
-                              <img src={r.attachmentUrl} alt="រូបភាព" className="w-10 h-10 rounded-lg object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0" />
-                            )}
-                            <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2 pt-0.5">{r.reply}</p>
-                          </div>
-                          {r.scope === "SPECIFIC" && (
-                            <span className="text-[9px] w-fit uppercase font-black text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded tracking-widest">
-                              ផុសជាក់លាក់៖ {r.postId}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => toggleRule(ruleId, r.enabled)}
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${r.enabled ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}
-                        >
-                          {r.enabled ? "បើក" : "បិទ"}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleEdit(r)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"><Edit2 size={16} /></button>
-                          <button onClick={() => deleteRule(ruleId)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-
-          {/* Mobile Card View */}
-          <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-700">
-            {filtered.length === 0 ? (
-              <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                <div className="flex flex-col items-center gap-2">
-                  <Filter size={32} className="opacity-20" />
-                  <p className="text-sm">{searchTerm ? "មិនមានច្បាប់ដែលត្រូវនឹងការស្វែងរកទេ" : "មិនទាន់មានច្បាប់ឆ្លើយតបនៅឡើយទេ។"}</p>
-                </div>
-              </div>
-            ) : (
-              filtered.map((r, idx) => {
-                const ruleId = r._id || r.id || `temp-${idx}`;
-                return (
-                  <div key={ruleId} className={`p-5 flex flex-col gap-4 ${r.enabled ? "bg-white dark:bg-gray-800" : "bg-gray-50/50 dark:bg-gray-900/20 opacity-80"}`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1.5">
-                        <span className="font-bold text-gray-900 dark:text-white leading-tight">
-                          {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
-                        </span>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-[8px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">{r.ruleType || "KEYWORD"}</span>
-                          {r.scope === "SPECIFIC" && <span className="text-[8px] uppercase font-black text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded tracking-widest">ID: {r.postId?.slice(-6)}</span>}
-                        </div>
-                      </div>
-                      <button onClick={() => toggleRule(ruleId, r.enabled)} className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-colors ${r.enabled ? "bg-green-500 text-white shadow-lg shadow-green-500/20" : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}>
-                        {r.enabled ? "On" : "Off"}
-                      </button>
-                    </div>
-                    <div className="flex items-start gap-3 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700/50">
-                      {r.attachmentUrl && <img src={r.attachmentUrl} alt="រូបភាព" className="w-12 h-12 rounded-lg object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-sm" />}
-                      <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed line-clamp-3">{r.reply}</p>
-                    </div>
-                    <div className="flex items-center justify-end gap-3 pt-1">
-                      <button onClick={() => handleEdit(r)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg transition-colors"><Edit2 size={14} /> កែប្រែ</button>
-                      <button onClick={() => deleteRule(ruleId)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={14} /> លុប</button>
-                    </div>
-                  </div>
-                );
-              })
+            {searchTerm && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={14} />
+              </button>
             )}
           </div>
         </div>
+
+          {/* Rules List Section */}
+          <div className="overflow-hidden">
+            {filtered.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl">
+                <div className="flex flex-col items-center gap-2">
+                  <Filter size={32} className="opacity-20" />
+                  <p>{searchTerm ? "មិនមានច្បាប់ដែលត្រូវនឹងការស្វែងរកទេ" : "មិនទាន់មានច្បាប់ឆ្លើយតបនៅឡើយទេ។"}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* 📱 Mobile Optimized List (Only rendered on mobile) */}
+                <div className="md:hidden space-y-3">
+                  {filtered.slice(0, visibleCount).map((r, idx) => (
+                    <div 
+                      key={r.id || idx} 
+                      className={`p-4 rounded-xl border transition-all active:scale-[0.98] will-change-transform ${r.enabled ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm" : "bg-gray-50 dark:bg-gray-900/40 border-gray-100 dark:border-gray-800 opacity-70"}`}
+                    >
+                       <div className="flex justify-between items-start mb-3">
+                         <div className="flex flex-col gap-1">
+                           <span className="font-bold text-gray-900 dark:text-white text-sm">
+                             {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
+                           </span>
+                           <div className="flex gap-2">
+                             <span className="text-[8px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">{r.ruleType || "KEYWORD"}</span>
+                           </div>
+                         </div>
+                         <button 
+                           onClick={() => toggleRule(r.id, r.enabled)}
+                           className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase transition-colors ${r.enabled ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}
+                         >
+                           {r.enabled ? "On" : "Off"}
+                         </button>
+                       </div>
+                       <p className="text-gray-600 dark:text-gray-400 text-xs line-clamp-2 mb-3 bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg">{r.reply}</p>
+                       <div className="flex justify-end gap-2">
+                         <button onClick={() => handleEdit(r)} className="p-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded-lg"><Edit2 size={14} /></button>
+                         <button onClick={() => deleteRule(r.id)} className="p-2 text-red-500 bg-red-50 dark:bg-red-500/10 rounded-lg"><Trash2 size={14} /></button>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 💻 Desktop Table View (Only rendered on desktop) */}
+                <div className="hidden md:block bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keyword / Reply</th>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-center">ស្ថានភាព</th>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-right">សកម្មភាព</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {filtered.slice(0, visibleCount).map((r, idx) => (
+                        <tr key={r.id || idx} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors group">
+                           <td className="px-6 py-4">
+                             <div className="flex flex-col gap-1">
+                               <div className="flex items-center gap-2">
+                                 <span className="font-bold text-gray-900 dark:text-white">
+                                   {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
+                                 </span>
+                                 <span className="text-[9px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">{r.ruleType || "KEYWORD"}</span>
+                               </div>
+                               <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-1">{r.reply}</p>
+                             </div>
+                           </td>
+                           <td className="px-6 py-4 text-center">
+                             <button onClick={() => toggleRule(r.id, r.enabled)} className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${r.enabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-500"}`}>
+                               {r.enabled ? "បើក" : "បិទ"}
+                             </button>
+                           </td>
+                           <td className="px-6 py-4 text-right">
+                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                               <button onClick={() => handleEdit(r)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 size={16} /></button>
+                               <button onClick={() => deleteRule(r.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                             </div>
+                           </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 🔘 Load More Button for Mobile Performance */}
+                {filtered.length > visibleCount && (
+                  <div className="flex justify-center pt-4">
+                    <button 
+                      onClick={() => setVisibleCount(prev => prev + 10)}
+                      className="px-6 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 transition-all shadow-sm"
+                    >
+                      បង្ហាញបន្ថែម ({filtered.length - visibleCount})
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
       </div>
 
-      {/* 4️⃣ Monitored Posts Management Section */}
+      {/* 4️⃣ Select Recent Posts (The "Easier Way") */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-blue-50/50 dark:bg-blue-900/10">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Search size={20} className="text-blue-500" />
+            ជ្រើសរើសផុសដែលទើបនឹងផុស (Pick Recent Posts)
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            រើស Page ដើម្បីមើលផុសថ្មីៗ រួចចុច Monitor លើផុសដែលបងចង់ឱ្យ Bot ជួយឆ្លើយ។
+          </p>
+        </div>
+
+        <div className="p-6">
+          <div className="w-full md:w-64 mb-6">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">រើស Page ដើម្បីឆែកមើល</label>
+            <select
+              value={browsePageId}
+              onChange={(e) => setBrowsePageId(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+            >
+              <option value="">-- រើស Page --</option>
+              {availablePages.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {isLoadingRecent ? (
+            <div className="flex items-center gap-2 text-sm text-gray-400 py-12 justify-center animate-pulse">
+              <Loader size={18} className="animate-spin" />
+              កំពុងទាញយកផុសថ្មីៗ...
+            </div>
+          ) : recentPosts.length === 0 ? (
+            <div className="py-12 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-2xl text-center text-gray-400 text-sm">
+              {browsePageId ? "មិនមានផុសថ្មីៗក្នុង Page នេះទេ" : "សូមរើស Page ដើម្បីមើលផុស"}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recentPosts.map(post => {
+                const isAlreadyMonitored = monitoredPosts.some(p => p.facebookPostId === post.id);
+                return (
+                  <div key={post.id} className="group relative bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden hover:shadow-xl transition-all">
+                    {post.full_picture && (
+                      <img 
+                        src={post.full_picture} 
+                        alt="Post" 
+                        loading="lazy"
+                        className="w-full h-32 object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
+                      />
+                    )}
+                    <div className="p-4">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-3 h-8">
+                        {post.message || <span className="italic opacity-50">(គ្មានចំណងជើង)</span>}
+                      </p>
+                      
+                      {/* Metrics Display */}
+                      <div className="flex items-center gap-4 mb-4 text-[11px] font-bold">
+                        <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">
+                          <span>👁️</span>
+                          {post.views?.toLocaleString() || 0} Views
+                        </div>
+                        <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded">
+                          <span>📢</span>
+                          {post.reach?.toLocaleString() || 0} Reach
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleAddMonitoredById(post.id, browsePageId)}
+                        disabled={isAlreadyMonitored || isAddingMonitored}
+                        className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${isAlreadyMonitored 
+                          ? "bg-green-100 text-green-600 cursor-default" 
+                          : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"}`}
+                      >
+                        {isAlreadyMonitored ? (
+                          <>✅ កំពុង Monitor</>
+                        ) : (
+                          <>
+                            {isAddingMonitored ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
+                            Monitor ផុសនេះ
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 5️⃣ Manual Monitor Section (The Old Way) */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mt-8">
         <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -933,7 +1194,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               <button
                 onClick={handleAddMonitored}
                 disabled={isAddingMonitored}
-                className="w-full md:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
+                className="w-full md:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
               >
                 {isAddingMonitored ? <Loader size={18} className="animate-spin" /> : <Plus size={18} />}
                 បន្ថែម
@@ -955,7 +1216,9 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                         <div key={post.id} className="p-4 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-xl flex items-center justify-between group">
                             <div className="overflow-hidden">
                                 <p className="text-sm font-bold text-gray-900 dark:text-white truncate">Post ID: {post.facebookPostId}</p>
-                                <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Page ID: {post.pageId}</p>
+                                <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">
+                                    Page: {availablePages.find(ap => ap.id === post.pageId)?.name || post.pageId}
+                                </p>
                             </div>
                             <button 
                                 onClick={() => handleDeleteMonitored(post.id)}
@@ -969,6 +1232,90 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                 </div>
             )}
           </div>
+        </div>
+      </div>
+      {/* 6️⃣ Bot History Section (New) */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mt-8">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <History size={18} className="text-gray-400" />
+              Reply History (ប្រវត្តិនៃការឆ្លើយតប)
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              បញ្ជីឈ្មោះ និងសារដែល Bot បានជួយឆ្លើយតបថ្មីៗបំផុត។
+            </p>
+          </div>
+          <button 
+            onClick={fetchHistory}
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500"
+            title="Refresh History"
+          >
+            <Loader size={18} className={isLoadingHistory ? "animate-spin" : ""} />
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          {isLoadingHistory && history.length === 0 ? (
+            <div className="py-12 text-center animate-pulse text-gray-400 text-sm">កំពុងទាញយកប្រវត្តិ...</div>
+          ) : history.length === 0 ? (
+            <div className="py-12 text-center text-gray-400 text-sm italic">
+              មិនទាន់មានប្រវត្តិឆ្លើយតបនៅឡើយទេ។
+            </div>
+          ) : (
+            <>
+              {/* Desktop View */}
+              <table className="hidden md:table w-full text-left">
+                <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                  <tr>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">ពេលវេលា</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Page / User</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">សារដែលបានតប</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">ស្ថានភាព</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {history.map((h) => (
+                    <tr key={h.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-750 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                        {new Date(h.timestamp).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-gray-900 dark:text-white">ID: {h.commentId?.includes('_') ? h.commentId.split('_').pop() : h.commentId || 'Unknown'}</span>
+                          <span className="text-[10px] text-gray-400">Page: {h.pageId}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1 italic">"{h.replyMessage}"</p>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${h.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {h.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Mobile View */}
+              <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-700">
+                {history.map((h) => (
+                  <div key={h.id} className="p-4 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-gray-400">{new Date(h.timestamp).toLocaleString()}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${h.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        {h.status}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-gray-900 dark:text-white">ID: {h.commentId}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 italic">"{h.replyMessage}"</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

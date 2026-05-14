@@ -52,7 +52,7 @@ router.get("/rules", requireAuth, async (req, res) => {
 
 // ✅ Update bot settings for a specific page
 router.put("/page-settings", requireAuth, async (req, res) => {
-  const { pageId, enabled } = req.body;
+  const { pageId, pageIds, enabled } = req.body;
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -65,20 +65,33 @@ router.put("/page-settings", requireAuth, async (req, res) => {
     }
     if (!Array.isArray(pageSettings)) pageSettings = [];
 
-    // Update or add
-    const existingIdx = pageSettings.findIndex(s => s.pageId === pageId);
-    if (existingIdx > -1) {
-      pageSettings[existingIdx].enableBot = enabled;
-    } else {
-      pageSettings.push({ pageId, enableBot: enabled });
+    const targetIds = pageIds || [pageId];
+
+    for (const id of targetIds) {
+      if (!id) continue;
+      const existingIdx = pageSettings.findIndex(s => s.pageId === id);
+      if (existingIdx > -1) {
+        pageSettings[existingIdx].enableBot = enabled;
+      } else {
+        pageSettings.push({ pageId: id, enableBot: enabled });
+      }
     }
 
+    // ✅ Update User model pageSettings JSON
     await prisma.user.update({
       where: { id: req.user.id },
       data: { pageSettings: pageSettings }
     });
 
-    res.json({ success: true, message: "Page bot settings updated" });
+    // ✅ Sync with FacebookPage model for botEngine redundancy
+    await Promise.all(targetIds.map(id => 
+      prisma.facebookPage.updateMany({
+        where: { id, userId: req.user.id },
+        data: { enableBot: enabled }
+      })
+    ));
+
+    res.json({ success: true, message: "Page bot settings updated", pageSettings });
   } catch (err) {
     console.error("❌ PUT /page-settings error:", err.message);
     res.status(500).json({ success: false, message: "Failed to update page bot settings" });
@@ -104,7 +117,22 @@ router.post("/rules", requireAuth, async (req, res) => {
   if (!reply)
     return res.status(400).json({ success: false, message: "Reply is required" });
 
+  // 🛡️ Regex Validation
+  if (ruleType === "REGEX") {
+    try {
+      new RegExp(keyword);
+    } catch (e) {
+      return res.status(400).json({ success: false, message: "Invalid Regular Expression pattern" });
+    }
+  }
+
   try {
+    // 🛡️ Limit total rules per user (Anti-spam/Performance)
+    const ruleCount = await prisma.botRule.count({ where: { userId: req.user.id } });
+    if (ruleCount >= 50) {
+      return res.status(400).json({ success: false, message: "បងបង្កើតច្បាប់បានច្រើនបំផុតត្រឹម ៥០ ប៉ុណ្ណោះ។" });
+    }
+
     const rule = await prisma.botRule.create({
       data: {
         userId: req.user.id,
@@ -135,6 +163,15 @@ router.put("/rules/:id", requireAuth, async (req, res) => {
       where: { id: id, userId: req.user.id }
     });
     if (!rule) return res.status(404).json({ success: false, message: "Rule not found" });
+
+    // 🛡️ Regex Validation
+    if (ruleType === "REGEX") {
+      try {
+        new RegExp(keyword);
+      } catch (e) {
+        return res.status(400).json({ success: false, message: "Invalid Regular Expression pattern" });
+      }
+    }
 
     const updatedRule = await prisma.botRule.update({
       where: { id: id },
@@ -213,8 +250,8 @@ router.put("/settings", requireAuth, async (req, res) => {
       create: { userId: req.user.id, enabled: Boolean(enabled) }
     });
     
-    console.log(`✅ Bot status updated in DB for ${req.user.email}:`, status.enabled);
-    res.json({ success: true, message: "Bot settings updated", enabled: status.enabled });
+    console.log(`✅ Bot status updated in DB for ${req.user.email}:`, Boolean(enabled));
+    res.json({ success: true, message: "Bot settings updated", enabled: Boolean(enabled) });
   } catch (err) {
     console.error("❌ PUT /settings error:", err.message);
     res.status(500).json({ success: false, message: "Failed to update bot settings", error: err.message });

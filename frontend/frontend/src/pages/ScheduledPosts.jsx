@@ -190,14 +190,13 @@ export default function ScheduledPosts() {
                                         <MotionAnimatePresence>
                                             {posts.map((q, idx) => (
                                                 <MotionDiv
-                                                    layout
                                                     key={q.id}
-                                                    initial={{ opacity: 0, y: 20 }}
+                                                    initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 20 }}
                                                     animate={{ opacity: 1, y: 0 }}
                                                     exit={{ opacity: 0, scale: 0.9 }}
-                                                    transition={{ delay: idx * 0.05 }}
+                                                    transition={{ delay: idx * 0.05, duration: 0.3 }}
                                                     className={`min-w-[260px] w-[80%] md:w-full snap-center flex-shrink-0 group relative bg-white dark:bg-gray-800 rounded-2xl md:rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-500 ${viewMode === 'list' ? 'flex items-center gap-4 md:gap-6 p-3 md:p-4' : 'flex flex-col overflow-hidden'}`}
-                                                >
+                                                 >
                                                     {/* Media Preview */}
                                                     <div className={`${viewMode === 'list' ? 'w-24 h-16 md:w-32 md:h-20 rounded-xl md:rounded-2xl' : 'w-full h-40 md:h-48'} bg-gray-50 dark:bg-gray-900 relative overflow-hidden flex-shrink-0`}>
                                                         {q.thumbnailUrl ? (

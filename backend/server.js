@@ -349,7 +349,7 @@ app.use((err, req, res, next) => {
 });
 
 // ------------------------------------------------------------
-// ✅ Scheduler & Bot Loop (Runs every 60 seconds)
+// ✅ Scheduler & Bot Loop (Runs every 5 minutes instead of 60 seconds)
 // ------------------------------------------------------------
 const { processScheduledPosts, cleanupOldPosts } = require("./utils/scheduler");
 const botEngine = require("./utils/botEngine");
@@ -358,12 +358,12 @@ const botEngine = require("./utils/botEngine");
 setInterval(() => {
   processScheduledPosts();
 
-  // ✅ Run bot every minute for faster response
+  // ✅ Run bot every 5 minutes for better performance (reduced from 60s)
   botEngine.run();
 
   // Run cleanup occasionally (e.g., 1% chance or separate interval)
   if (Math.random() < 0.05) cleanupOldPosts();
-}, 60 * 1000);
+}, 5 * 60 * 1000); // Changed from 60 * 1000 to 5 * 60 * 1000
 
 // Run bot once on startup after 15s
 setTimeout(() => botEngine.run(), 15000);

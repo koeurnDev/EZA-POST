@@ -108,9 +108,9 @@ const DashboardLayout = ({ children }) => {
   ];
 
   return (
-    <div className={`min-h-screen flex flex-col overflow-x-hidden ${isDarkMode ? "bg-[#050505] text-white" : "bg-[#f8f9fa] text-gray-900"} transition-colors duration-500`}>
+    <div className={`min-h-screen flex flex-col overflow-x-hidden ${isDarkMode ? "bg-[#050505] text-white" : "bg-[#f8f9fa] text-gray-900"} md:transition-colors md:duration-500`}>
 
-      <header className={`fixed top-0 left-0 right-0 h-16 md:h-20 z-40 px-3 md:px-6 flex items-center justify-between gap-2 transition-all duration-300 ${scrolled ? (isDarkMode ? "bg-[#050505]/80 backdrop-blur-xl border-b border-white/5" : "bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm") : "bg-transparent"}`}>
+      <header className={`fixed top-0 left-0 right-0 h-16 md:h-20 z-40 px-3 md:px-6 flex items-center justify-between gap-2 transition-all duration-300 ${scrolled ? (isDarkMode ? "bg-[#050505] md:backdrop-blur-xl border-b border-white/5" : "bg-white md:backdrop-blur-xl border-b border-gray-100 shadow-sm") : "bg-transparent"}`}>
         <div className="max-w-[1400px] mx-auto w-full flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 md:gap-6 min-w-0">
             <Link to="/dashboard" className="flex items-center gap-2 md:gap-3 group">
@@ -124,7 +124,7 @@ const DashboardLayout = ({ children }) => {
             </Link>
           </div>
 
-          <div className={`flex items-center gap-1 md:gap-2 p-1 md:p-1.5 rounded-lg md:rounded-2xl border ${isDarkMode ? "bg-white/5 border-white/5" : "bg-white border-gray-200 shadow-sm"} backdrop-blur-xl min-w-0`}>
+          <div className={`flex items-center gap-1 md:gap-2 p-1 md:p-1.5 rounded-lg md:rounded-2xl border ${isDarkMode ? "bg-white/5 border-white/5" : "bg-white border-gray-200 shadow-sm"} md:backdrop-blur-xl min-w-0`}>
             <div className="hidden sm:block min-w-0">
               <NetworkStatus />
             </div>
@@ -146,7 +146,12 @@ const DashboardLayout = ({ children }) => {
       </header>
 
       <main className="flex-1 pt-20 md:pt-24 pb-32 px-3 md:px-6 max-w-[1400px] mx-auto w-full min-w-0">
-        <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }} className="relative z-10 motion-div-container">
+        <MotionDiv 
+          initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: window.innerWidth < 768 ? 0.3 : 0.6, ease: "easeOut" }} 
+          className="relative z-10 motion-div-container"
+        >
           {children}
         </MotionDiv>
       </main>
@@ -170,7 +175,7 @@ const DashboardLayout = ({ children }) => {
                   initial={{ opacity: 0, y: 30, scale: 0.95, x: "-50%" }}
                   animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
                   exit={{ opacity: 0, y: 30, scale: 0.95, x: "-50%" }}
-                  transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                  transition={{ duration: window.innerWidth < 768 ? 0.2 : 0.4 }}
                   className={`
                     fixed bottom-20 md:bottom-24 left-1/2
                     w-[calc(100%-2rem)] max-w-[calc(100%-2rem)] md:w-full md:max-w-2xl p-4 md:p-8
@@ -226,7 +231,7 @@ const DashboardLayout = ({ children }) => {
 
           {/* Main Dock Bar - Scrollable on Mobile */}
           <nav className={`
-            flex items-center justify-center gap-1 p-1 md:p-1.5 rounded-full border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] transition-all
+            flex items-center justify-center gap-1 p-1 md:p-1.5 rounded-full border md:backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] transition-all
             w-full max-w-[95vw] md:max-w-fit mx-auto overflow-x-auto no-scrollbar
             ${isDarkMode
               ? "bg-black/60 border-white/10 shadow-blue-500/5"
@@ -273,14 +278,29 @@ const DashboardLayout = ({ children }) => {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         @media (max-width: 768px) {
-          main { padding-left: 0.75rem; padding-right: 0.75rem; }
-          .backdrop-blur-3xl, .backdrop-blur-2xl, .backdrop-blur-xl, .backdrop-blur-md, .backdrop-blur-sm {
-            backdrop-filter: blur(12px) !important;
-            -webkit-backdrop-filter: blur(12px) !important;
+          main { padding-left: 0.5rem; padding-right: 0.5rem; }
+          
+          /* 🚀 Ultra-Performance: Disable blurs and heavy animations on low-end mobile */
+          * {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
           }
           
-          .shadow-2xl, .shadow-xl {
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
+          .animate-pulse, .animate-bounce, .animate-spin {
+            animation-duration: 0.8s !important; /* Slow down instead of killing for better feel */
+          }
+
+          /* Hardware acceleration for mobile */
+          .fixed, .absolute, nav, header, .motion-div-container {
+            will-change: transform;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            perspective: 1000;
+          }
+          
+          /* Simplify shadows for memory */
+          .shadow-2xl, .shadow-xl, .shadow-lg {
+             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
           }
         }
 

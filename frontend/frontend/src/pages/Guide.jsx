@@ -80,7 +80,7 @@ const Guide = () => {
                 {/* Header */}
                 <div className="mb-16 text-center">
                     <MotionDiv 
-                        initial={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-600 rounded-full text-xs font-black uppercase tracking-widest mb-6"
                     >

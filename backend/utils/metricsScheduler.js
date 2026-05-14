@@ -11,8 +11,7 @@ const { decrypt } = require('./crypto');
  * Start the metrics sync scheduler
  */
 function startMetricsScheduler() {
-    const SYNC_INTERVAL = parseInt(process.env.METRICS_SYNC_INTERVAL || 15) * 60 * 1000; 
-
+    const SYNC_INTERVAL = parseInt(process.env.METRICS_SYNC_INTERVAL || 60) * 60 * 1000; // Increased default from 15 to 60 minutes
     console.log(`📊 Starting metrics scheduler (interval: ${SYNC_INTERVAL / 60000} minutes)`);
 
     setTimeout(async () => {

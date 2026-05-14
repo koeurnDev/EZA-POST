@@ -26,11 +26,21 @@ export const generateThumbnailFromVideo = (videoFile) => {
         };
 
         video.onseeked = () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-            if (videoFile instanceof File) URL.revokeObjectURL(video.src);
+            // 🚀 Optimization: Scale down large videos to prevent memory jank
+            const MAX_WIDTH = 640;
+            let width = video.videoWidth;
+            let height = video.videoHeight;
+
+            if (width > MAX_WIDTH) {
+                height = (MAX_WIDTH / width) * height;
+                width = MAX_WIDTH;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(video, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.75); // Lower quality for preview speed
+            if (videoFile instanceof File || videoFile instanceof Blob) URL.revokeObjectURL(video.src);
             resolve(dataUrl);
         };
 
@@ -69,10 +79,20 @@ export const generateGalleryFromVideo = (videoFile, count = 6) => {
                 const timestamp = i * interval;
                 await new Promise((res) => {
                     video.onseeked = () => {
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        frames.push(canvas.toDataURL("image/jpeg", 0.7));
+                        // 🚀 Optimization: Scale down gallery frames
+                        const MAX_WIDTH = 480;
+                        let width = video.videoWidth;
+                        let height = video.videoHeight;
+
+                        if (width > MAX_WIDTH) {
+                            height = (MAX_WIDTH / width) * height;
+                            width = MAX_WIDTH;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(video, 0, 0, width, height);
+                        frames.push(canvas.toDataURL("image/jpeg", 0.6));
                         res();
                     };
                     video.currentTime = timestamp;

@@ -253,8 +253,8 @@ export default function TikTokDownloader() {
 
     return (
         <DashboardLayout>
-            {/* 🌈 Modern Background Mesh */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            {/* 🌈 Modern Background Mesh - Hidden on mobile for performance */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 hidden md:block">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-pink-500/20 to-purple-500/20 rounded-full blur-[120px] animate-pulse" />
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-blue-500/20 to-emerald-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
             </div>

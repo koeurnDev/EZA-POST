@@ -4,15 +4,31 @@ const axios = require("axios");
 const fb = require("./fb");
 
 const botEngine = {
+    isRunning: false, // 🛡️ Lock to prevent overlapping runs
     /**
      * 🚀 Main Bot Loop
      */
     run: async () => {
+        if (botEngine.isRunning) {
+            console.log("⏳ Bot Engine: Previous run still in progress. Skipping this cycle.");
+            return;
+        }
+
         try {
+            botEngine.isRunning = true;
             console.log("🤖 Bot Engine: Starting run cycle...");
 
             // 1️⃣ Process Pending Replies (Queue)
             await botEngine.processPendingReplies();
+
+            // 2️⃣ Maintenance: Cleanup old history/logs (> 30 days) to keep DB fast 🧹
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            
+            await Promise.all([
+                prisma.botHistory.deleteMany({ where: { timestamp: { lt: thirtyDaysAgo } } }),
+                prisma.repliedComment.deleteMany({ where: { createdAt: { lt: thirtyDaysAgo } } })
+            ]);
 
             // 3️⃣ Get All Users with Facebook Connected
             // In Prisma, we check if facebookAccessToken is not null
@@ -22,12 +38,24 @@ const botEngine = {
             });
             console.log(`🤖 Bot Engine: Found ${users.length} users with FB tokens.`);
 
-            for (const user of users) {
-                await botEngine.processUser(user);
+            // 🚀 4️⃣ Process users in chunks (Batch of 10) to prevent memory overload
+            const chunkSize = 10;
+            for (let i = 0; i < users.length; i += chunkSize) {
+                const chunk = users.slice(i, i + chunkSize);
+                await Promise.allSettled(chunk.map(async (user) => {
+                    try {
+                        const botStatus = await prisma.botStatus.findUnique({ where: { userId: user.id } });
+                        if (botStatus && !botStatus.enabled) return;
+
+                        await botEngine.processUser(user);
+                    } catch (err) {
+                        console.error(`   ❌ Error processing user ${user.name}:`, err.message);
+                    }
+                }));
             }
             console.log("🤖 Bot Engine: Run cycle complete.");
-        } catch (err) {
-            console.error("❌ Bot Engine Error:", err.message);
+        } finally {
+            botEngine.isRunning = false;
         }
     },
 
@@ -39,8 +67,9 @@ const botEngine = {
             const now = new Date();
             const pendingReplies = await prisma.pendingReply.findMany({
                 where: {
-                    status: "pending",
-                    sendAt: { lte: now }
+                    status: 'pending',
+                    sendAt: { lte: now },
+                    attempts: { lt: 5 } // 🚀 Only attempt 5 times
                 },
                 take: 10
             });
@@ -88,7 +117,7 @@ const botEngine = {
                     await prisma.repliedComment.create({
                         data: {
                             commentId: reply.commentId,
-                            postId: reply.commentId.split('_')[0],
+                            postId: reply.postId, // 🎯 Use the field directly
                             userId: reply.userId
                         }
                     });
@@ -96,24 +125,15 @@ const botEngine = {
                     console.log(`      ✅ Reply sent successfully!`);
 
                 } catch (err) {
-                    console.error(`      ❌ Failed to send pending reply:`, err.message);
-
-                    let attempts = reply.attempts + 1;
-                    let status = "failed";
-                    let sendAt = reply.sendAt;
-
-                    if (attempts < 3) {
-                        status = "pending";
-                        sendAt = new Date(Date.now() + 5 * 60 * 1000); // Retry in 5 mins
-                    }
-
+                    const fbError = err.response?.data || err.message;
+                    console.error(`   ❌ Failed to send reply ${reply.id}:`, fbError);
+                    // 📝 Update attempt count and error message
                     await prisma.pendingReply.update({
                         where: { id: reply.id },
                         data: {
-                            status,
-                            error: err.message,
-                            attempts,
-                            sendAt
+                            attempts: { increment: 1 },
+                            error: typeof fbError === 'string' ? fbError : JSON.stringify(fbError),
+                            status: reply.attempts >= 4 ? 'failed' : 'pending'
                         }
                     });
 
@@ -124,7 +144,7 @@ const botEngine = {
                             replyMessage: reply.replyMessage,
                             pageId: reply.pageId,
                             status: "failed",
-                            error: err.message,
+                            error: typeof fbError === 'string' ? fbError : JSON.stringify(fbError),
                             timestamp: new Date()
                         }
                     });
@@ -140,13 +160,6 @@ const botEngine = {
      */
     processUser: async (user) => {
         try {
-            // 0. Check User's Bot Status
-            const botStatus = await prisma.botStatus.findUnique({ where: { userId: user.id } });
-            if (!botStatus || !botStatus.enabled) {
-                console.log(`   ⏩ Skipping user ${user.name}: Bot Master Switch is OFF.`);
-                return;
-            }
-
             console.log(`   🤖 Processing user ${user.name}...`);
 
             // Validate Token
@@ -168,7 +181,8 @@ const botEngine = {
 
             const activePages = dbPages.filter(page => {
                 const settings = pageSettings.find(s => s.pageId === page.id);
-                const isBotEnabled = page.enableBot === true || settings?.enableBot === true;
+                // ✅ Fix: Prioritize User.pageSettings (settings), fallback to FacebookPage.enableBot
+                const isBotEnabled = settings?.enableBot ?? page.enableBot ?? false;
                 const isSelected = page.isSelected === true;
                 
                 if (!isSelected) console.log(`      ⏩ Page ${page.name} skipped: Not selected/connected.`);
@@ -187,7 +201,8 @@ const botEngine = {
 
             // Get Rules
             const rules = await prisma.botRule.findMany({ 
-                where: { userId: user.id, enabled: true } 
+                where: { userId: user.id, enabled: true },
+                orderBy: { createdAt: 'desc' } // ✅ Newest rules first
             });
             
             if (rules.length === 0) {
@@ -197,9 +212,14 @@ const botEngine = {
 
             console.log(`   ✅ User ${user.name} has ${activePages.length} active pages and ${rules.length} rules.`);
 
-            for (const page of activePages) {
-                await botEngine.processPage(page, rules);
-            }
+            // 🚀 Process all active pages in parallel
+            await Promise.allSettled(activePages.map(async (page) => {
+                try {
+                    await botEngine.processPage(page, rules);
+                } catch (err) {
+                    console.error(`      ❌ Error processing page ${page.name}:`, err.message);
+                }
+            }));
         } catch (err) {
             console.error(`❌ Error processing user ${user.name}:`, err.message);
         }
@@ -210,12 +230,12 @@ const botEngine = {
      */
     processPage: async (page, rules) => {
         try {
-            // 1️⃣ Fetch recent posts (Last 5)
+            // 1️⃣ Fetch recent posts (Last 10 instead of 20, reduced for performance)
             const res = await axios.get(`${fb.graph}/${page.id}/feed`, {
                 params: {
                     access_token: page.access_token,
-                    fields: "id,message,comments{id,message,from,created_time}",
-                    limit: 20,
+                    fields: "id,message,created_time,comments.limit(50).order(chronological){id,message,from,created_time}",
+                    limit: 10, // Reduced from 20 to 10
                 },
             });
 
@@ -233,7 +253,7 @@ const botEngine = {
                         const mRes = await axios.get(`${fb.graph}/${mPost.facebookPostId}`, {
                             params: {
                                 access_token: page.access_token,
-                                fields: "id,message,comments{id,message,from,created_time}",
+                                fields: "id,message,comments.limit(100).order(chronological){id,message,from,created_time}",
                             }
                         });
                         if (mRes.data) {
@@ -297,7 +317,7 @@ const botEngine = {
 
         const commentText = (comment.message || "").toLowerCase();
         // Post ID format in comment is usually POSTID_COMMENTID
-        const currentPostId = comment.id.split('_')[0];
+        const currentPostId = comment.postId || comment.id.split('_')[0];
 
         const matchedRules = rules.filter((r) => {
             // Check scope
@@ -330,9 +350,12 @@ const botEngine = {
         // 🚀 6. Queue Reply (Smart Delay)
         if (replyMessage) {
             try {
+                // --- 👤 Variable Support: [[name]] ---
+                let finalReply = replyMessage.replace(/\[\[name\]\]/g, comment.from?.name || "ភ្ញៀវ");
+
                 // --- 🧠 Spintax Support {good|hi|hello} ---
                 const spintaxRegex = /\{([^{}|]+(?:\|[^{}|]+)+)\}/g;
-                let finalReply = replyMessage.replace(spintaxRegex, (match, options) => {
+                finalReply = finalReply.replace(spintaxRegex, (match, options) => {
                     const choices = options.split('|');
                     return choices[Math.floor(Math.random() * choices.length)];
                 });
@@ -355,6 +378,7 @@ const botEngine = {
                     data: {
                         userId: userId,
                         commentId: comment.id,
+                        postId: comment.postId || comment.id.split('_')[0], // 🎯 Added missing field!
                         replyMessage: finalReply,
                         attachmentUrl: attachmentUrl,
                         pageId: page.id,

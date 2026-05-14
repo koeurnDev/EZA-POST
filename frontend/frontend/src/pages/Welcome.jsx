@@ -8,31 +8,34 @@ export default function Welcome() {
     const { user } = useAuth();
     const navigate = useNavigate();
 
+    const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+
     const fadeInUp = {
-        hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
+        hidden: { opacity: 0, y: isMobile ? 0 : 20 },
+        visible: { opacity: 1, y: 0, transition: { duration: isMobile ? 0.3 : 0.6 } }
     };
 
     const containerVariants = {
         hidden: { opacity: 0 },
         visible: {
             opacity: 1,
-            transition: { staggerChildren: 0.1, delayChildren: 0.2 }
+            transition: { staggerChildren: isMobile ? 0.05 : 0.1, delayChildren: 0.1 }
         }
     };
 
     return (
         <div className="min-h-screen bg-[#050505] text-white overflow-hidden selection:bg-blue-600 selection:text-white font-['Kantumruy_Pro']">
             
-            {/* 🌌 Animated Background Elements */}
+            {/* 🌌 Optimized Background - Noise filter removed on mobile, animations simplified */}
             <div className="fixed inset-0 pointer-events-none z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[120px] md:animate-pulse" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/10 rounded-full blur-[120px] md:animate-pulse delay-1000" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')] opacity-[0.03] mix-blend-overlay" />
+                <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[120px] hidden md:block md:animate-pulse" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/10 rounded-full blur-[120px] hidden md:block md:animate-pulse delay-1000" />
+                {/* 🛑 Noise filter disabled for performance */}
+                <div className="absolute inset-0 bg-black" />
             </div>
 
             {/* 🌟 Navigation */}
-            <nav className="fixed top-0 w-full z-[100] border-b border-white/5 backdrop-blur-xl bg-black/20">
+            <nav className="fixed top-0 w-full z-[100] border-b border-white/5 md:backdrop-blur-xl bg-black/80 md:bg-black/20">
                 <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 md:h-20 flex items-center justify-between">
                     <motion.div 
                         initial={{ opacity: 0, x: -20 }}

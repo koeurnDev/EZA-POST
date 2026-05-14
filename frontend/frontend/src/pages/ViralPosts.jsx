@@ -113,10 +113,9 @@ const ViralPosts = () => {
                             {viralPosts.map((item, index) => (
                                 <MotionDiv
                                     key={item.post._id}
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    initial={{ opacity: 0, scale: window.innerWidth < 768 ? 1 : 0.9 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: index * 0.05 }}
+                                    transition={{ delay: index * 0.05, duration: 0.3 }}
                                     className="group relative bg-white dark:bg-gray-800 rounded-3xl md:rounded-[2.5rem] border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-2xl hover:shadow-orange-500/10 transition-all duration-500"
                                 >
                                     {/* Video Preview */}

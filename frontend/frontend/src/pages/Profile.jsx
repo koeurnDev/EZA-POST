@@ -189,9 +189,9 @@ export default function Profile() {
                             {stats.map((stat, idx) => (
                                 <MotionDiv
                                     key={idx}
-                                    initial={{ opacity: 0, y: 20 }}
+                                    initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 20 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.2 + idx * 0.1 }}
+                                    transition={{ delay: 0.1 + idx * 0.05, duration: 0.3 }}
                                     className="bg-white dark:bg-gray-800 p-8 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center group hover:shadow-xl hover:shadow-blue-500/5 transition-all"
                                 >
                                     <div className={`p-4 rounded-2xl mb-4 bg-${stat.color}-500/10 text-${stat.color}-600 group-hover:scale-110 transition-transform`}>
@@ -242,9 +242,9 @@ export default function Profile() {
                     {/* Right Panel: Activity Feed */}
                     <div className="lg:col-span-4">
                         <MotionDiv 
-                            initial={{ opacity: 0, x: 20 }}
+                            initial={{ opacity: 0, x: window.innerWidth < 768 ? 0 : 20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.6 }}
+                            transition={{ delay: 0.3, duration: 0.4 }}
                             className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 shadow-sm border border-gray-100 dark:border-gray-700 h-full"
                         >
                             <h3 className="text-xl font-black text-gray-900 dark:text-white mb-8 flex items-center gap-3">

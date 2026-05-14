@@ -78,8 +78,8 @@ export default function ViralFinder() {
 
     return (
         <DashboardLayout>
-            {/* 🌈 Optimized Background Mesh (Less heavy on mobile) */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            {/* 🌈 Optimized Background Mesh (Hidden on mobile for performance) */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 hidden md:block">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-pink-500/10 to-violet-500/10 rounded-full blur-[60px] md:blur-[120px] md:animate-pulse" />
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-rose-500/10 to-purple-500/10 rounded-full blur-[60px] md:blur-[120px] md:animate-pulse delay-700" />
             </div>

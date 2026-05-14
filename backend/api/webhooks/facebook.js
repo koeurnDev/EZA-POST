@@ -9,6 +9,40 @@ const axios = require("axios");
 const { decrypt } = require("../../utils/crypto");
 const prisma = require("../../utils/prisma");
 const botEngine = require("../../utils/botEngine");
+const crypto = require("crypto");
+
+const FB_APP_SECRET = process.env.FB_APP_SECRET;
+
+/**
+ * 🛡️ Verify Facebook Webhook Signature
+ */
+function verifySignature(req, res, next) {
+    const signature = req.headers["x-hub-signature-256"];
+
+    if (!signature) {
+        console.warn("⚠️ No signature found on webhook request");
+        return res.sendStatus(401);
+    }
+
+    if (!FB_APP_SECRET) {
+        console.error("❌ FB_APP_SECRET not configured. Skipping verification (DANGEROUS)");
+        return next();
+    }
+
+    const elements = signature.split("=");
+    const signatureHash = elements[1];
+    const expectedHash = crypto
+        .createHmac("sha256", FB_APP_SECRET)
+        .update(JSON.stringify(req.body)) // Note: ideally use rawBody buffer
+        .digest("hex");
+
+    if (signatureHash !== expectedHash) {
+        console.error("❌ Webhook Signature mismatch!");
+        return res.sendStatus(401);
+    }
+
+    next();
+}
 
 
 // ============================================================
@@ -40,7 +74,7 @@ router.get("/", (req, res) => {
 // ✅ POST /api/webhooks/facebook
 // Handle Incoming Events (Comments, etc.)
 // ============================================================
-router.post("/", async (req, res) => {
+router.post("/", verifySignature, async (req, res) => {
     const body = req.body;
 
     // 1️⃣ Check if it's a page event
@@ -62,6 +96,7 @@ router.post("/", async (req, res) => {
                     // 🎯 Detect New Comment
                     if (item === "comment" && verb === "add") {
                         const commentId = value.comment_id;
+                        const postId = value.post_id || value.parent_id; // 🎯 Get Post ID
                         const message = value.message;
                         const senderId = value.from?.id;
                         const senderName = value.from?.name;
@@ -72,7 +107,7 @@ router.post("/", async (req, res) => {
                         console.log(`💬 New Comment on Page ${pageId}: "${message}" from ${senderName}`);
 
                         // 🤖 Trigger Auto-Reply via Bot Engine
-                        await handleWebhookComment(pageId, commentId, message, senderId, senderName);
+                        await handleWebhookComment(pageId, commentId, postId, message, senderId, senderName);
                     }
                 }
             }
@@ -85,7 +120,7 @@ router.post("/", async (req, res) => {
 /**
  * 🤖 Handle Webhook Comment -> Pass to Bot Engine
  */
-async function handleWebhookComment(pageId, commentId, message, senderId, senderName) {
+async function handleWebhookComment(pageId, commentId, postId, message, senderId, senderName) {
     try {
         const prisma = require("../../utils/prisma");
 
@@ -112,13 +147,17 @@ async function handleWebhookComment(pageId, commentId, message, senderId, sender
         const pageToken = decrypt(pageRecord.accessToken);
         if (!pageToken) return;
 
-        // 2️⃣ Get Rules
-        const rules = await prisma.botRule.findMany({ where: { enabled: true } });
+        // 2️⃣ Get Rules (Scoped to User! 🔒)
+        const rules = await prisma.botRule.findMany({
+            where: { userId: user.id, enabled: true },
+            orderBy: { createdAt: 'desc' }
+        });
         if (rules.length === 0) return;
 
         // 3️⃣ Construct Comment Object
         const commentObj = {
             id: commentId,
+            postId: postId, // 🎯 Pass Post ID for rule scoping
             message: message,
             from: {
                 id: senderId,
@@ -133,7 +172,7 @@ async function handleWebhookComment(pageId, commentId, message, senderId, sender
             name: pageRecord.name
         };
 
-        await botEngine.processComment(commentObj, pageForEngine, rules);
+        await botEngine.processComment(commentObj, pageForEngine, rules, user.id);
         console.log(`🔄 Webhook comment processed by Bot Engine: ${commentId}`);
 
     } catch (err) {

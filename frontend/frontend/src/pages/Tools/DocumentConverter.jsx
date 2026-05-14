@@ -103,8 +103,8 @@ export default function DocumentConverter() {
 
     return (
         <DashboardLayout>
-            {/* 🌈 Modern Background Mesh (Emerald/Teal) */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            {/* 🌈 Modern Background Mesh (Emerald/Teal) - Optimized for Mobile */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 hidden md:block">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full blur-[120px] animate-pulse" />
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-cyan-500/20 to-emerald-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
             </div>

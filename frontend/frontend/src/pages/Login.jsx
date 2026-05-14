@@ -26,12 +26,13 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-6 overflow-hidden font-['Kantumruy_Pro'] relative">
       
-      {/* 🌌 Immersive Immersive Background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+      {/* 🌌 Immersive Background - Optimized for low-end devices */}
+      <div className="fixed inset-0 pointer-events-none z-0 hidden md:block">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[150px] animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[150px] animate-pulse delay-1000" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')] opacity-[0.05] mix-blend-overlay" />
       </div>
+      <div className="fixed inset-0 pointer-events-none z-0 block md:hidden bg-black" />
 
       {/* 🔙 Back to Home */}
       <Link 

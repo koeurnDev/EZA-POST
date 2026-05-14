@@ -91,7 +91,7 @@ export default function BuyCredits() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 mb-12 md:mb-16">
                     {/* Balance Card */}
                     <MotionDiv 
-                        initial={{ opacity: 0, scale: 0.95 }}
+                        initial={{ opacity: 0, scale: window.innerWidth < 768 ? 1 : 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="lg:col-span-4 bg-gradient-to-br from-gray-900 to-black rounded-[2rem] md:rounded-[3rem] p-8 md:p-10 text-white relative overflow-hidden shadow-2xl shadow-amber-500/5 border border-white/5 group"
                     >
@@ -130,9 +130,9 @@ export default function BuyCredits() {
                             {packages.map((pkg, i) => (
                                 <MotionDiv
                                     key={pkg._id}
-                                    initial={{ opacity: 0, y: 20 }}
+                                    initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 20 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.1 }}
+                                    transition={{ delay: i * 0.05, duration: 0.3 }}
                                     className={`group relative bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-3xl md:rounded-[2.5rem] p-6 md:p-8 hover:shadow-2xl hover:shadow-blue-500/5 transition-all duration-500 ${pkg.popular ? 'ring-2 ring-blue-500/20 shadow-blue-500/5' : ''}`}
                                 >
                                     {pkg.popular && (

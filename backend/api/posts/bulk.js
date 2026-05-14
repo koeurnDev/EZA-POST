@@ -20,6 +20,10 @@ router.post("/", requireAuth, async (req, res) => {
             return res.status(400).json({ success: false, error: "No posts provided" });
         }
 
+        if (posts.length > 50) {
+            return res.status(400).json({ success: false, error: "បងអាចបង្ហោះ Bulk បានច្រើនបំផុតត្រឹម ៥០ ផុសប៉ុណ្ណោះក្នុងម្តង។" });
+        }
+
         console.log(`📦 Bulk creating ${posts.length} posts for user ${req.user.id}...`);
 
         // Prepare posts for insertion (Mapping to ScheduledPost model)

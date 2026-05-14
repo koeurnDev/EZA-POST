@@ -51,8 +51,8 @@ export default function Settings() {
 
     return (
         <DashboardLayout>
-            {/* Mesh Gradient Background */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20 dark:opacity-40">
+            {/* Mesh Gradient Background - Optimized for low-end devices */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20 dark:opacity-40 hidden md:block">
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500 blur-[120px] rounded-full animate-pulse" />
                 <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
             </div>
