@@ -359,25 +359,37 @@ router.get("/recent-posts/:pageId", requireAuth, async (req, res) => {
 
     // 2. Fetch last 30 posts with insights from FB Graph API
     // Insights needed: post_impressions_unique (Reach), post_video_views (Views if video)
-    const fbRes = await axios.get(`https://graph.facebook.com/v21.0/${pageId}/feed`, {
-      params: {
-        access_token: fbToken,
-        fields: "id,message,created_time,full_picture,permalink_url,insights.metric(post_impressions_unique,post_video_views,post_reactions_by_type_total,post_comments_engagement)",
-        limit: 30
-      }
-    });
+    let fbRes;
+    try {
+      fbRes = await axios.get(`https://graph.facebook.com/v21.0/${pageId}/feed`, {
+        params: {
+          access_token: fbToken,
+          fields: "id,message,created_time,full_picture,permalink_url,insights.metric(post_impressions_unique,post_video_views,post_reactions_by_type_total,post_comments_engagement)",
+          limit: 30
+        }
+      });
+    } catch (err) {
+      const fbError = err.response?.data || err.message;
+      console.warn("⚠️ /recent-posts insights fetch failed, retrying without insights:", fbError);
+      fbRes = await axios.get(`https://graph.facebook.com/v21.0/${pageId}/feed`, {
+        params: {
+          access_token: fbToken,
+          fields: "id,message,created_time,full_picture,permalink_url",
+          limit: 30
+        }
+      });
+    }
 
     const posts = (fbRes.data.data || []).map(p => {
-        // Extract insights
-        const insights = p.insights?.data || [];
-        const reach = insights.find(i => i.name === 'post_impressions_unique')?.values[0]?.value || 0;
-        const views = insights.find(i => i.name === 'post_video_views')?.values[0]?.value || 0;
-        
-        return {
-            ...p,
-            reach,
-            views: views || 0
-        };
+      const insights = p.insights?.data || [];
+      const reach = insights.find(i => i.name === 'post_impressions_unique')?.values?.[0]?.value || 0;
+      const views = insights.find(i => i.name === 'post_video_views')?.values?.[0]?.value || 0;
+
+      return {
+        ...p,
+        reach,
+        views: views || 0
+      };
     });
 
     // Sort by reach or views descending
@@ -389,8 +401,13 @@ router.get("/recent-posts/:pageId", requireAuth, async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ GET /recent-posts error:", err.message);
-    res.status(500).json({ success: false, message: "Failed to fetch recent posts from Facebook" });
+    const fbError = err.response?.data || err.message;
+    console.error("❌ GET /recent-posts error:", fbError);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch recent posts from Facebook",
+      error: typeof fbError === 'string' ? fbError : JSON.stringify(fbError)
+    });
   }
 });
 
