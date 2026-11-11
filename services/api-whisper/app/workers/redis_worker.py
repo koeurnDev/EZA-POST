@@ -87,7 +87,7 @@ def run_worker():
             elif media_url:
                 # Full URL or relative Cloudflare URL
                 if media_url.startswith("/"):
-                    full_url = f"https://khmersub-cf-worker.koeurnseab630.workers.dev{media_url}"
+                    full_url = f"https://eza-post-api.koeurnseab630.workers.dev{media_url}"
                 else:
                     full_url = media_url
 

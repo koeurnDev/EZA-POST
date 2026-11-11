@@ -7,6 +7,7 @@ import bot from "./routes/bot.js";
 import credits from "./routes/credits.js";
 import analytics from "./routes/analytics.js";
 import tools from "./routes/tools.js";
+import subtitles from "./routes/subtitles.ts";
 import { proxyToBackend } from "./lib/proxy.js";
 import { processScheduledPosts } from "./lib/scheduled-posts.js";
 
@@ -16,6 +17,17 @@ app.get("/healthz", (c) =>
   c.json({
     status: "ok",
     runtime: "cloudflare-workers",
+  })
+);
+
+app.get("/health", (c) =>
+  c.json({
+    status: "ok",
+    service: "EZA POST Unified API & Subtitles AI - Cloudflare Edge Worker",
+    version: "1.0.0",
+    edge_location: c.req.raw.cf?.colo || "local-edge",
+    r2_ready: Boolean(c.env.MEDIA_BUCKET),
+    ai_ready: Boolean(c.env.AI),
   })
 );
 
@@ -38,6 +50,7 @@ app.route("/api/bot", bot);
 app.route("/api/credits", credits);
 app.route("/api/analytics", analytics);
 app.route("/api/tools", tools);
+app.route("/", subtitles);
 app.all("/api/*", proxyToBackend);
 app.all("/uploads/*", proxyToBackend);
 

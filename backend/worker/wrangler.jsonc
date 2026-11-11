@@ -16,5 +16,32 @@
 			"fallthrough": true
 		}
 	],
-	"workers_dev": true
+	"workers_dev": true,
+	"ai": {
+		"binding": "AI"
+	},
+	"r2_buckets": [
+		{
+			"binding": "MEDIA_BUCKET",
+			"bucket_name": "khmersub-media",
+			"preview_bucket_name": "khmersub-media-dev"
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "khmersub_db",
+			"database_id": "7ac481f9-ec56-456b-9049-523c032b1dad"
+		}
+	],
+	"vars": {
+		"ENVIRONMENT": "production",
+		"BAKONG_ACCOUNT_ID": "seab_koeurn@bkrt",
+		"BAKONG_MERCHANT_NAME": "EZA POST",
+		"WHISPER_EDGE_MODEL": "@cf/openai/whisper-large-v3-turbo",
+		"MAX_UPLOAD_MB": "150",
+		"UPSTASH_REDIS_REST_URL": "https://sharp-newt-86747.upstash.io",
+		"UPSTASH_REDIS_REST_TOKEN": "gQAAAAAAAVLbAAIgcDJkYjI0ODY4NWY4MTY0ODcyOTA1MjkxMTA1Y2JkMjJiMg",
+		"GEMINI_API_KEY": "AIzaSyAY4fBEABDGIaFfQPn-TnpE8JadBGr0H0E"
+	}
 }

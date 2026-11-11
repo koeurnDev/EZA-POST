@@ -71,7 +71,7 @@ export default defineConfig(({ command, mode }) => {
       cors: true,
       proxy: {
         "/api/v1": {
-          target: "https://khmersub-cf-worker.koeurnseab630.workers.dev",
+          target: "https://eza-post-api.koeurnseab630.workers.dev",
           changeOrigin: true,
           secure: true,
         },

@@ -1,9 +1,9 @@
 export async function proxyToApi(request, env) {
   const incoming = new URL(request.url);
 
-  // 🚀 Route Khmer AI Subtitle Studio (/api/v1/*) directly to Cloudflare Edge Worker
+  // 🚀 Route Subtitle Studio (/api/v1/*) directly to Unified Cloudflare Edge Worker
   if (incoming.pathname.startsWith("/api/v1/")) {
-    const edgeWorkerOrigin = env.KHMERSUB_API_ORIGIN || "https://khmersub-cf-worker.koeurnseab630.workers.dev";
+    const edgeWorkerOrigin = env.KHMERSUB_API_ORIGIN || "https://eza-post-api.koeurnseab630.workers.dev";
     const destination = new URL(`${incoming.pathname}${incoming.search}`, edgeWorkerOrigin);
     const headers = new Headers(request.headers);
     headers.delete("host");
