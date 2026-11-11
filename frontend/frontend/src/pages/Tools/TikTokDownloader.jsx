@@ -5,7 +5,7 @@ import DashboardLayout from "../../layouts/DashboardLayout";
 import { 
     Search, Download, Check, Play, X, ChevronRight, Loader2, 
     Image as ImageIcon, Video, Music, Layers, Sparkles, 
-    Zap, Trash2
+    Zap, Trash2, ExternalLink
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../../utils/api";
@@ -173,24 +173,27 @@ export default function TikTokDownloader() {
     };
 
     const handleVideoDownload = async () => {
-        if (!videoData?.downloadUrl) {
-            return toast.error("TikTok did not provide a publicly accessible media URL.");
-        }
+        const targetDownloadUrl = videoData?.downloadUrl || 
+            `/tools/tiktok/download?url=${encodeURIComponent(videoData?.originalUrl || videoData?.web_url || url)}`;
 
         setIsVideoDownloading(true);
         try {
-            const response = await api.get(videoData.downloadUrl, {
+            const response = await api.get(targetDownloadUrl, {
                 responseType: "blob",
                 timeout: 120000,
             });
             const objectUrl = URL.createObjectURL(response.data);
             const link = document.createElement("a");
             link.href = objectUrl;
-            link.download = `tiktok-${videoData.id}.mp4`;
+            const safeName = String(videoData?.title || videoData?.id || "tiktok_video")
+                .replace(/[^a-zA-Z0-9_\u1780-\u17FF]/g, "_")
+                .slice(0, 40);
+            link.download = `${safeName || "tiktok"}.mp4`;
             document.body.appendChild(link);
             link.click();
             link.remove();
             window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+            toast.success("Download started!", { icon: "📥" });
         } catch (err) {
             let message = err.response?.data?.error;
             if (err.response?.data instanceof Blob) {
@@ -475,80 +478,80 @@ export default function TikTokDownloader() {
                                                     </div>
 
                                                     <div className="mt-auto grid grid-cols-1 gap-3">
-                                                        {videoData.embedUrl ? (
-                                                            <>
-                                                                <a
-                                                                    href={videoData.web_url}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className="h-12 md:h-14 bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-gray-100 rounded-2xl font-black text-sm md:text-base shadow-xl transition-all flex items-center justify-center gap-2"
-                                                                >
-                                                                    Open on TikTok
-                                                                </a>
-                                                                {videoData.downloadUrl && (
-                                                                    <>
-                                                                        <button
-                                                                            onClick={handleVideoDownload}
-                                                                            disabled={isVideoDownloading}
-                                                                            className="h-12 md:h-14 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-2xl font-black text-sm md:text-base shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-                                                                        >
-                                                                            {isVideoDownloading ? <Loader2 className="animate-spin" /> : <Download size={18} />}
-                                                                            {isVideoDownloading ? "Checking TikTok access..." : "Download Video"}
-                                                                        </button>
-                                                                        <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                                                                            TikTok may block media downloads; the player remains available.
-                                                                        </p>
-                                                                    </>
-                                                                )}
-                                                            </>
-                                                        ) : videoData.type === 'slideshow' ? (
+                                                        {videoData.type === 'slideshow' && !videoData.downloadUrl && !videoData.no_watermark_url ? (
                                                             <button
                                                                 onClick={handleCombine}
                                                                 disabled={isCombining}
-                                                                className="group relative h-12 md:h-14 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-2xl font-black text-sm md:text-base shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 overflow-hidden"
+                                                                className="group relative h-12 md:h-14 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-2xl font-black text-sm md:text-base shadow-xl shadow-pink-500/25 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 overflow-hidden cursor-pointer"
                                                             >
                                                                 {isCombining ? <Loader2 className="animate-spin" /> : <Video size={18} />}
                                                                 Generate HD Video Slideshow
                                                             </button>
                                                         ) : (
                                                             <button
-                                                                onClick={() => {
-                                                                    const name = `${String(videoData.title || videoData.id).replace(/[^a-z0-9]/gi, '_').slice(0, 30)}.mp4`;
-                                                                    triggerDownload(`${API_BASE}/api/tools/tiktok/stream?id=${videoData.id}&url=${encodeURIComponent(videoData.no_watermark_url)}&filename=${encodeURIComponent(name)}`, name);
-                                                                }}
-                                                                className="h-12 md:h-14 bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-gray-100 rounded-2xl font-black text-sm md:text-base shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                                                onClick={handleVideoDownload}
+                                                                disabled={isVideoDownloading}
+                                                                className="h-12 md:h-14 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-2xl font-black text-sm md:text-base shadow-xl shadow-pink-500/25 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                                                             >
-                                                                <Download size={18} /> Download HD Video
+                                                                {isVideoDownloading ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
+                                                                <span>{isVideoDownloading ? "កំពុងទាញយក... (Downloading...)" : "ទាញយកវីដេអូ (Download MP4)"}</span>
                                                             </button>
                                                         )}
 
-                                                        {!videoData.embedUrl && (
-                                                            <div className="grid grid-cols-2 gap-2 md:gap-3">
-                                                                {videoData.images?.length > 0 && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            videoData.images.forEach((img, i) => {
-                                                                                setTimeout(() => {
-                                                                                    triggerDownload(getProxyUrl(img, { filename: `photo_${i+1}.jpg` }), `photo_${i+1}.jpg`);
-                                                                                }, i * 800);
-                                                                            });
-                                                                            toast.success(`Downloading ${videoData.images.length} photos...`);
-                                                                        }}
-                                                                        className="h-10 md:h-12 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-[10px] md:text-xs hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2"
-                                                                    >
-                                                                        <ImageIcon size={14} /> All Photos
-                                                                    </button>
-                                                                )}
+                                                        {/* 🎛️ Secondary Actions */}
+                                                        <div className="grid grid-cols-2 gap-2 md:gap-3">
+                                                            {videoData.music ? (
                                                                 <button
                                                                     onClick={() => {
-                                                                        if (!videoData.music) return toast.error("No audio found.");
-                                                                        triggerDownload(getProxyUrl(videoData.music, { filename: "audio.mp3", type: "audio/mpeg" }), "audio.mp3");
+                                                                        triggerDownload(getProxyUrl(videoData.music, { filename: `audio-${videoData.id}.mp3`, type: "audio/mpeg" }), `audio-${videoData.id}.mp3`);
                                                                     }}
-                                                                    className="h-10 md:h-12 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-[10px] md:text-xs hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                                                                    className="h-10 md:h-12 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-[11px] md:text-xs hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                                                                 >
-                                                                    <Music size={14} /> Save Audio
+                                                                    <Music size={15} className="text-pink-500 shrink-0" />
+                                                                    <span className="truncate">Save Audio (MP3)</span>
                                                                 </button>
-                                                            </div>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (videoData.no_watermark_url) {
+                                                                            const name = `tiktok-${videoData.id}.mp4`;
+                                                                            triggerDownload(`${API_BASE}/api/tools/tiktok/stream?id=${videoData.id}&url=${encodeURIComponent(videoData.no_watermark_url)}&filename=${encodeURIComponent(name)}`, name);
+                                                                        } else {
+                                                                            handleVideoDownload();
+                                                                        }
+                                                                    }}
+                                                                    className="h-10 md:h-12 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-[11px] md:text-xs hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                                                                >
+                                                                    <Download size={14} className="shrink-0" />
+                                                                    <span className="truncate">Download HD</span>
+                                                                </button>
+                                                            )}
+
+                                                            <a
+                                                                href={videoData.web_url || url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="h-10 md:h-12 bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-gray-100 rounded-xl font-bold text-[11px] md:text-xs shadow-md transition-all flex items-center justify-center gap-2"
+                                                            >
+                                                                <ExternalLink size={14} className="shrink-0" />
+                                                                <span className="truncate">Open on TikTok</span>
+                                                            </a>
+                                                        </div>
+
+                                                        {videoData.images?.length > 0 && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    videoData.images.forEach((img, i) => {
+                                                                        setTimeout(() => {
+                                                                            triggerDownload(getProxyUrl(img, { filename: `photo_${i+1}.jpg` }), `photo_${i+1}.jpg`);
+                                                                        }, i * 800);
+                                                                    });
+                                                                    toast.success(`Downloading ${videoData.images.length} photos...`);
+                                                                }}
+                                                                className="h-10 md:h-12 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-[10px] md:text-xs hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                                            >
+                                                                <ImageIcon size={14} /> All Photos ({videoData.images.length})
+                                                            </button>
                                                         )}
 
                                                         {videoData.isH265 && !videoData.isFixed && !videoData.type?.includes('slide') && (

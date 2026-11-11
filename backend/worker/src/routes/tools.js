@@ -129,14 +129,18 @@ export function extractTikTokVideoData(html, expectedId) {
     nodesVisited += 1;
     if (!current || typeof current !== "object") continue;
 
+    const playAddr = current.playAddr || current.video?.playAddr;
+    const downloadAddr = current.downloadAddr || current.video?.downloadAddr;
+    const cover = current.cover || current.video?.cover || current.origin_cover;
     if (
       String(current.id ?? current.videoId ?? "") === expectedId &&
-      (typeof current.playAddr === "string" ||
-        typeof current.downloadAddr === "string")
+      (typeof playAddr === "string" || typeof downloadAddr === "string")
     ) {
       const mediaUrl =
-        validateTikTokMediaUrl(current.playAddr) ??
-        validateTikTokMediaUrl(current.downloadAddr);
+        validateTikTokMediaUrl(playAddr) ??
+        validateTikTokMediaUrl(downloadAddr);
+      const nickname = current.author?.nickname || "";
+      const uniqueId = current.author?.uniqueId || current.author?.unique_id || "";
       return {
         id: expectedId,
         title:
@@ -144,14 +148,17 @@ export function extractTikTokVideoData(html, expectedId) {
             ? current.desc.trim().slice(0, 300)
             : `TikTok video ${expectedId}`,
         cover:
-          typeof current.cover === "string" && current.cover.startsWith("https://")
-            ? current.cover
+          typeof cover === "string" && cover.startsWith("https://")
+            ? cover
             : "",
         type: "video",
         embedUrl: `https://www.tiktok.com/player/v1/${expectedId}`,
         web_url: "",
-        author: { nickname: "", unique_id: "" },
-        stats: { plays: 0, likes: 0 },
+        author: { nickname, unique_id: uniqueId },
+        stats: {
+          plays: Number(current.stats?.playCount || current.statsV2?.playCount || 0),
+          likes: Number(current.stats?.diggCount || current.statsV2?.diggCount || 0),
+        },
         mediaUrl,
       };
     }
@@ -168,7 +175,11 @@ async function fetchTikTokPage(pageUrl) {
   let url = pageUrl;
   for (let redirects = 0; redirects <= 3; redirects += 1) {
     const response = await fetch(url, {
-      headers: { Accept: "text/html,application/xhtml+xml" },
+      headers: {
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
       redirect: "manual",
       signal: AbortSignal.timeout(12_000),
     });
@@ -268,27 +279,9 @@ async function extractTikTokVideo(pageUrl, originalInputUrl) {
   const match = pageUrl.pathname.match(/^\/@[^/]+\/video\/(\d+)\/?$/);
   const videoId = match ? match[1] : "";
   const creator = match ? pageUrl.pathname.split("/")[1].slice(1) : "";
-
-  // 1. Try native public-page extraction
-  try {
-    const html = await fetchTikTokPage(pageUrl);
-    const video = extractTikTokVideoData(html, videoId);
-    video.web_url = pageUrl.href;
-    video.author = {
-      nickname: creator,
-      unique_id: creator,
-    };
-    video.downloadUrl = video.mediaUrl
-      ? `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}`
-      : null;
-    delete video.mediaUrl;
-    return video;
-  } catch (nativeErr) {
-    console.warn("Native TikTok page scraping failed, trying TikWM fallback:", nativeErr?.message);
-  }
-
-  // 2. Fallback to TikWM
   const targetUrl = originalInputUrl || pageUrl.href;
+
+  // 1. Try TikWM first (fastest, direct HD MP4 without watermark)
   const tikwm = await extractFromTikWM(targetUrl);
   if (tikwm) {
     const isSlideshow = Array.isArray(tikwm.images) && tikwm.images.length > 0;
@@ -300,7 +293,7 @@ async function extractTikTokVideo(pageUrl, originalInputUrl) {
     return {
       id: resolvedId,
       title: tikwm.title || `TikTok video by @${authorId}`,
-      cover: tikwm.cover || "",
+      cover: tikwm.origin_cover || tikwm.cover || "",
       type: isSlideshow ? "slideshow" : "video",
       embedUrl: `https://www.tiktok.com/player/v1/${resolvedId}`,
       web_url: pageUrl.href || targetUrl,
@@ -308,6 +301,7 @@ async function extractTikTokVideo(pageUrl, originalInputUrl) {
         nickname: authorName,
         unique_id: authorId,
       },
+      music: tikwm.music || null,
       stats: {
         plays: Number(tikwm.play_count || 0),
         likes: Number(tikwm.digg_count || 0),
@@ -315,10 +309,24 @@ async function extractTikTokVideo(pageUrl, originalInputUrl) {
       images: tikwm.images || [],
       no_watermark_url: playMediaUrl,
       playUrl: playMediaUrl,
-      downloadUrl: playMediaUrl
-        ? `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}&direct=${encodeURIComponent(playMediaUrl)}`
-        : null,
+      downloadUrl: `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href || targetUrl)}&direct=${encodeURIComponent(playMediaUrl || "")}`,
     };
+  }
+
+  // 2. Fallback to native public-page extraction
+  try {
+    const html = await fetchTikTokPage(pageUrl);
+    const video = extractTikTokVideoData(html, videoId);
+    video.web_url = pageUrl.href;
+    video.author = {
+      nickname: creator,
+      unique_id: creator,
+    };
+    video.downloadUrl = `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}`;
+    delete video.mediaUrl;
+    return video;
+  } catch (nativeErr) {
+    console.warn("Native TikTok page scraping failed, trying oEmbed fallback:", nativeErr?.message);
   }
 
   // 3. Fallback to oEmbed + Preview player
@@ -336,7 +344,7 @@ async function extractTikTokVideo(pageUrl, originalInputUrl) {
       unique_id: fallbackCreator,
     },
     stats: { plays: 0, likes: 0 },
-    downloadUrl: null,
+    downloadUrl: `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}`,
   };
 }
 
@@ -381,7 +389,10 @@ tools.post("/tiktok/lookup", requireAuth, async (c) => {
       status: error?.status,
     });
     try {
-      const preview = createTikTokPreview(pageUrl);
+      const preview = {
+        ...createTikTokPreview(pageUrl),
+        downloadUrl: `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}`,
+      };
       return c.json({ success: true, video: preview });
     } catch {
       return c.json(
@@ -417,6 +428,14 @@ tools.get("/tiktok/download", requireAuth, async (c) => {
       sourceUrl = validateTikTokMediaUrl(directUrl);
     }
 
+    if (!sourceUrl && (pageUrl || rawUrl)) {
+      const target = pageUrl ? pageUrl.href : rawUrl;
+      const tikwm = await extractFromTikWM(target);
+      if (tikwm) {
+        sourceUrl = validateTikTokMediaUrl(tikwm.play || tikwm.hdplay);
+      }
+    }
+
     if (!sourceUrl && pageUrl) {
       try {
         const html = await fetchTikTokPage(pageUrl);
@@ -426,15 +445,7 @@ tools.get("/tiktok/download", requireAuth, async (c) => {
           sourceUrl = validateTikTokMediaUrl(extracted.mediaUrl);
         }
       } catch (nativeErr) {
-        console.warn("Native download extraction failed, trying TikWM:", nativeErr?.message);
-      }
-    }
-
-    if (!sourceUrl && (pageUrl || rawUrl)) {
-      const target = pageUrl ? pageUrl.href : rawUrl;
-      const tikwm = await extractFromTikWM(target);
-      if (tikwm) {
-        sourceUrl = validateTikTokMediaUrl(tikwm.play || tikwm.hdplay);
+        console.warn("Native download extraction failed:", nativeErr?.message);
       }
     }
 
