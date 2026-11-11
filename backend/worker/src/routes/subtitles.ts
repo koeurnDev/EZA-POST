@@ -222,15 +222,19 @@ async function handleUploadAndTranscribe(c: any) {
   // Stream full media file into Cloudflare R2
   const arrayBuffer = await file.arrayBuffer();
   if (c.env.MEDIA_BUCKET) {
-    await c.env.MEDIA_BUCKET.put(r2Key, arrayBuffer, {
-      httpMetadata: {
-        contentType: file.type || (isVideo ? 'video/mp4' : 'audio/wav')
-      },
-      customMetadata: {
-        originalName: file.name,
-        jobId: jobId
-      }
-    });
+    try {
+      await c.env.MEDIA_BUCKET.put(r2Key, arrayBuffer, {
+        httpMetadata: {
+          contentType: file.type || (isVideo ? 'video/mp4' : 'audio/mpeg')
+        },
+        customMetadata: {
+          originalName: encodeURIComponent(file.name),
+          jobId: jobId
+        }
+      });
+    } catch (r2Err) {
+      console.warn('R2 media upload warning:', r2Err);
+    }
   }
 
   // Get audio buffer for Whisper (use extracted 16kHz WAV audio if available)
@@ -252,11 +256,28 @@ async function handleUploadAndTranscribe(c: any) {
   await saveJob(c.env, jobId, jobRecord);
 
   // Direct Edge AI Transcription (Gemini Flash Cloud + Whisper Fallback)
-  c.executionCtx.waitUntil(
-    runEdgeWhisperTranscription(c.env, jobId, r2Key, audioBuffer, language, initialPrompt)
+  const transcribePromise = runEdgeWhisperTranscription(
+    c.env,
+    jobId,
+    r2Key,
+    audioBuffer,
+    language,
+    initialPrompt
   );
+  if (c.executionCtx && typeof c.executionCtx.waitUntil === 'function') {
+    c.executionCtx.waitUntil(transcribePromise);
+  }
 
-  return c.json(jobRecord, 201);
+  // For audio/video under 15MB, wait up to 14s inline so fast Gemini Flash Lite (3s) completes within active request!
+  if (audioBuffer.byteLength <= 15 * 1024 * 1024) {
+    await Promise.race([
+      transcribePromise,
+      new Promise((resolve) => setTimeout(resolve, 14000))
+    ]);
+  }
+
+  const latestJob = (await getJob(c.env, jobId)) || jobRecord;
+  return c.json(latestJob, 201);
 }
 
 // 1. Upload & Transcribe Endpoints (Supports both paths)
@@ -323,11 +344,11 @@ function isCorruptedKhmerOutput(text: string): boolean {
   // 3. Reject extreme single character repetition (e.g. 5+ identical chars in a row)
   if (/(.)\1{4,}/.test(text)) return true;
   // 4. Reject illegal Khmer Coeng (ជើងអក្សរ \u17D2) orthography violations:
-  // - Coeng must be preceded by a Khmer consonant (\u1780-\u17A2)
+  // - Coeng cannot follow whitespace, punctuation, or dependent vowels (allows valid ឱ្យ \u17B1\u17D2\u1799)
   // - Coeng must be followed by a Khmer consonant (\u1780-\u17A2)
   // - Double Coengs (\u17D2\u17D2) are invalid
   // - Coeng cannot be at start or end
-  if (/[^\u1780-\u17A2]\u17D2/.test(text)) return true;
+  if (/[\s។៕.,!?\u17B6-\u17C5]\u17D2/.test(text)) return true;
   if (/\u17D2[^\u1780-\u17A2]/.test(text)) return true;
   if (/^\u17D2|\u17D2$/.test(text)) return true;
   if (/\u17D2{2,}/.test(text)) return true;
@@ -338,16 +359,21 @@ function isCorruptedKhmerOutput(text: string): boolean {
   return false;
 }
 
-// 2.5 Direct Google Gemini Flash Edge Ingestion (Instant 5-7s accurate transcription)
+// 2.5 Direct Google Gemini Flash Edge Ingestion (Instant 3s accurate transcription)
 async function runGeminiEdgeTranscription(
   env: Env,
   jobId: string,
   buffer: ArrayBuffer,
   mimeType: string,
-  customPrompt?: string
+  customPrompt?: string,
+  debugLogs?: string[]
 ): Promise<SubtitleSegment[] | null> {
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) return null;
+  const apiKey = (env.GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '');
+  if (!apiKey) {
+    debugLogs?.push('No GEMINI_API_KEY in env');
+    return null;
+  }
+  debugLogs?.push(`Key len=${apiKey.length}, prefix=${apiKey.slice(0, 6)}, buf=${buffer.byteLength}`);
 
   try {
     const base64Data = uint8ToBase64(new Uint8Array(buffer));
@@ -356,19 +382,17 @@ async function runGeminiEdgeTranscription(
       validMime = 'audio/mp3';
     }
 
-    const systemPrompt = `You are an expert Khmer speech-to-text and subtitle synchronization engine.
-Transcribe the speech in this audio/video directly into high-accuracy, natural Khmer subtitles.
+    const systemPrompt = `You are an expert Khmer speech-to-text subtitle synchronization engine.
+Transcribe the speech in this audio/video directly into high-accuracy, natural Khmer subtitle segments.
 Output ONLY a valid JSON array of subtitle segments without markdown blocks or preamble.
 Each segment must have:
 - "id": integer starting from 1
 - "start": float seconds (e.g. 0.0)
-- "end": float seconds (e.g. 2.45)
-- "text": natural clean Khmer sentence or clause (keep segments 2.0 to 5.0 seconds)
-- "words": array of {"word": string, "start": float, "end": float} for accurate karaoke word highlighting
+- "end": float seconds (e.g. 2.5)
+- "text": natural clean Khmer sentence or phrase (keep segments 2.0 to 5.0 seconds)
 ${customPrompt ? `Special terminology / context: ${customPrompt}` : ''}
 Output ONLY the JSON array.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
     const payload = {
       contents: [{
         parts: [
@@ -382,20 +406,44 @@ Output ONLY the JSON array.`;
       }
     };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    const models = [
+      'gemini-flash-lite-latest',
+      'gemini-3.8-flash',
+      'gemini-3.5-flash-lite'
+    ];
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.warn('Gemini Edge API error:', res.status, errText);
-      return null;
+    let rawText: string | null = null;
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          debugLogs?.push(`${model} HTTP ${res.status}: ${errText.slice(0, 180)}`);
+          console.warn(`Gemini Edge API (${model}) error:`, res.status, errText.slice(0, 200));
+          continue;
+        }
+
+        const data = await res.json() as any;
+        rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+        if (rawText) {
+          debugLogs?.push(`${model} OK len=${rawText.length}`);
+          console.log(`Job ${jobId}: Gemini (${model}) responded successfully.`);
+          break;
+        } else {
+          debugLogs?.push(`${model} empty candidates: ${JSON.stringify(data).slice(0, 150)}`);
+        }
+      } catch (modelErr: any) {
+        debugLogs?.push(`${model} exception: ${modelErr?.message || String(modelErr)}`);
+        console.warn(`Gemini Edge (${model}) timeout/error:`, modelErr?.message || String(modelErr));
+      }
     }
 
-    const data = await res.json() as any;
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) return null;
 
     let cleanJson = rawText.trim();
@@ -416,9 +464,9 @@ Output ONLY the JSON array.`;
       const txt = normalizeKhmerText(String(item.text || '').trim());
       if (txt && !isCorruptedKhmerOutput(txt)) {
         const seg: SubtitleSegment = {
-          id: i + 1,
+          id: segments.length + 1,
           start: Math.round(Number(item.start || 0) * 100) / 100,
-          end: Math.round(Number(item.end || item.start + 2) * 100) / 100,
+          end: Math.round(Number(item.end || Number(item.start || 0) + 2) * 100) / 100,
           text: txt
         };
         if (Array.isArray(item.words) && item.words.length > 0) {
@@ -431,11 +479,15 @@ Output ONLY the JSON array.`;
             }));
         }
         segments.push(seg);
+      } else {
+        debugLogs?.push(`Rejected segment: ${txt.slice(0, 60)}`);
       }
     }
 
+    debugLogs?.push(`Parsed=${parsed.length}, Kept=${segments.length}`);
     return segments.length > 0 ? segments : null;
-  } catch (err) {
+  } catch (err: any) {
+    debugLogs?.push(`Outer catch: ${err?.message || String(err)}`);
     console.warn('Gemini Edge Transcription exception:', err);
     return null;
   }
@@ -469,6 +521,7 @@ async function runEdgeWhisperTranscription(
     }
 
     // 1. TIER 1: Ultra-Fast Gemini 2.5 Flash on Edge (under 20MB payload)
+    const debugLogs: string[] = [];
     if (audioBuffer.byteLength <= 20 * 1024 * 1024) {
       const ext = r2Key.substring(r2Key.lastIndexOf('.')).toLowerCase();
       let mimeType = 'audio/mp3';
@@ -479,7 +532,7 @@ async function runEdgeWhisperTranscription(
       else if (ext === '.ogg') mimeType = 'audio/ogg';
 
       console.log(`Job ${jobId}: Invoking Gemini 2.5 Flash Edge ASR (${(audioBuffer.byteLength / (1024 * 1024)).toFixed(2)} MB)...`);
-      const geminiSegments = await runGeminiEdgeTranscription(env, jobId, audioBuffer, mimeType, customPrompt);
+      const geminiSegments = await runGeminiEdgeTranscription(env, jobId, audioBuffer, mimeType, customPrompt, debugLogs);
       if (geminiSegments && geminiSegments.length > 0) {
         console.log(`Job ${jobId}: Gemini Edge succeeded with ${geminiSegments.length} segments.`);
         const updatedJob = (await getJob(env, jobId)) || job;

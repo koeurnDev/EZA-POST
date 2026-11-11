@@ -42,6 +42,9 @@ export function cleanGarbledUnicode(text: string): string {
   // 4. Collapse illegal consecutive Khmer dependent vowels ([\u17B6-\u17C5])
   text = text.replace(/([\u17B6-\u17C5]){2,}/g, '$1');
 
+  // 4.5 Repair common ASR omitted base 'អ' before 'ីក៏' (e.g. 'ីក៏ IT ដែរ' -> 'អីក៏ IT ដែរ')
+  text = text.replace(/(^|\s)\u17B8ក៏/g, '$1អីក៏');
+
   // 5. Remove orphan diacritics/signs that appear without a base consonant or vowel
   text = text.replace(/(^|\s)([\u17B6-\u17D3]+)/g, '$1');
 
@@ -92,6 +95,7 @@ export function phoneticKhmerToUnicode(text: string): string {
   processed = processed.replace(/(ប្រើសរណ៍|ប្រោស័រ|ប្រាវស័រ|ប្រូស័រ|ប្រើសិល)/g, 'Browser');
   processed = processed.replace(/(រីពរ\s*គីតហាប់|គីតហាប់)/g, 'GitHub');
   processed = processed.replace(/បោះខ្ញុំ/g, 'របស់ខ្ញុំ');
+  processed = processed.replace(/កាហ្វោ/g, 'កាហ្វេ');
   processed = processed.replace(/(ពិចនល់អីជី|ស្ពីចណាឡូជី|speakknowlegy)/gi, 'Speech Technology');
   processed = processed.replace(/\bmanager\s*agent\b/gi, 'Manager Agent');
   processed = processed.replace(/\bsoftware\s*project\b/gi, 'Software Project');

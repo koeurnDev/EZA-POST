@@ -149,6 +149,24 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
             // Generate instant local blob URL for 0ms video preview loading
             const localMediaUrl = URL.createObjectURL(selectedFile);
 
+            // If Gemini Flash Lite already completed inline during upload, finish immediately!
+            if (jobData.status === 'COMPLETED' && Array.isArray(jobData.segments)) {
+              setCurrentStep(3);
+              setIsProcessing(false);
+              setProgressStatus('');
+              setUploadProgress(100);
+              onJobCompleted({
+                ...jobData,
+                srt_url: jobData.srt_url || `/api/v1/jobs/${jobId}/export/srt`,
+                vtt_url: jobData.vtt_url || `/api/v1/jobs/${jobId}/export/vtt`,
+                ass_url: jobData.ass_url || `/api/v1/jobs/${jobId}/export/ass`,
+                txt_url: jobData.txt_url || `/api/v1/jobs/${jobId}/export/txt`,
+                media_url: localMediaUrl || jobData.media_url,
+                media_type: isVideo ? 'video' : 'audio'
+              });
+              return;
+            }
+
             // Fast poll for job completion
             let pollAttempts = 0;
             const interval = setInterval(async () => {
