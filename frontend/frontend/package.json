@@ -24,7 +24,7 @@
     "react-dropzone": "^14.3.8",
     "react-hot-toast": "^2.6.0",
     "react-markdown": "^10.1.0",
-    "react-router-dom": "^6.29.0",
+    "react-router-dom": "^7.18.5",
     "recharts": "^3.6.0"
   },
   "devDependencies": {
