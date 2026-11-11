@@ -365,7 +365,7 @@ function isCorruptedKhmerOutput(text: string): boolean {
   return false;
 }
 
-// 2.5 Direct Google Gemini 2.5 Flash Edge Ingestion (Instant 5-7s accurate transcription)
+// 2.5 Direct Google Gemini Flash Edge Ingestion (Instant 5-7s accurate transcription)
 async function runGeminiEdgeTranscription(
   env: Env,
   jobId: string,
@@ -374,7 +374,7 @@ async function runGeminiEdgeTranscription(
   customPrompt?: string
 ): Promise<SubtitleSegment[] | null> {
   const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey || apiKey.includes('H0E')) return null;
+  if (!apiKey) return null;
 
   try {
     const base64Data = uint8ToBase64(new Uint8Array(buffer));
@@ -395,7 +395,7 @@ Each segment must have:
 ${customPrompt ? `Special terminology / context: ${customPrompt}` : ''}
 Output ONLY the JSON array.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
     const payload = {
       contents: [{
         parts: [
