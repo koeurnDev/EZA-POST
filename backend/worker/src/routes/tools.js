@@ -245,32 +245,65 @@ export async function resolveTikTokUrl(input) {
   return null;
 }
 
-async function extractFromTikWM(url) {
-  try {
-    const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(7_000),
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    if (json?.code === 0 && json?.data) {
-      return json.data;
+async function extractFromTikWM(url, env) {
+  const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      let res;
+      if (attempt === 1 && env?.GEMINI_PROXY) {
+        const doId = env.GEMINI_PROXY.idFromName("gemini-us-west-1");
+        const stub = env.GEMINI_PROXY.get(doId, { locationHint: "wnam" });
+        res = await stub.fetch("https://gemini-proxy/forward", {
+          method: "GET",
+          headers: {
+            "x-gemini-target-url": apiUrl,
+            "x-proxy-method": "GET",
+            Accept: "application/json",
+          },
+        });
+      } else {
+        res = await fetch(apiUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            Accept: "application/json",
+          },
+          signal: AbortSignal.timeout(7_000),
+        });
+      }
+      if (!res.ok) continue;
+      const json = await res.json();
+      if (json?.code === 0 && json?.data) {
+        return json.data;
+      }
+      if (json?.code === -1 && attempt === 0) {
+        await new Promise((r) => setTimeout(r, 1100));
+      }
+    } catch (err) {
+      console.warn("TikWM lookup failed:", err.message);
     }
-  } catch (err) {
-    console.warn("TikWM lookup failed:", err.message);
   }
   return null;
 }
 
-async function extractFromOEmbed(url) {
+async function extractFromOEmbed(url, env) {
+  const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
   try {
-    const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, {
-      headers: { Accept: "application/json" },
+    let res = await fetch(oembedUrl, {
+      headers: { Accept: "application/json", "User-Agent": BROWSER_UA },
       signal: AbortSignal.timeout(5_000),
     });
+    if (!res.ok && env?.GEMINI_PROXY) {
+      const doId = env.GEMINI_PROXY.idFromName("gemini-us-west-1");
+      const stub = env.GEMINI_PROXY.get(doId, { locationHint: "wnam" });
+      res = await stub.fetch("https://gemini-proxy/forward", {
+        method: "GET",
+        headers: {
+          "x-gemini-target-url": oembedUrl,
+          "x-proxy-method": "GET",
+          Accept: "application/json",
+        },
+      });
+    }
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -278,20 +311,23 @@ async function extractFromOEmbed(url) {
   }
 }
 
-async function extractTikTokVideo(pageUrl, originalInputUrl) {
+async function extractTikTokVideo(pageUrl, originalInputUrl, env) {
   const match = pageUrl.pathname.match(/^\/@[^/]+\/video\/(\d+)\/?$/);
   const videoId = match ? match[1] : "";
   const creator = match ? pageUrl.pathname.split("/")[1].slice(1) : "";
   const targetUrl = originalInputUrl || pageUrl.href;
 
   // 1. Try TikWM first (fastest, direct HD MP4 without watermark)
-  const tikwm = await extractFromTikWM(targetUrl);
+  const tikwm = await extractFromTikWM(targetUrl, env);
   if (tikwm) {
     const isSlideshow = Array.isArray(tikwm.images) && tikwm.images.length > 0;
     const resolvedId = String(tikwm.id || videoId);
     const authorName = tikwm.author?.nickname || creator || "TikTok User";
     const authorId = tikwm.author?.unique_id || creator || "user";
-    const playMediaUrl = tikwm.play || tikwm.hdplay || null;
+    const playMediaUrl =
+      tikwm.play ||
+      tikwm.hdplay ||
+      (resolvedId ? `https://www.tikwm.com/video/media/play/${resolvedId}.mp4` : null);
 
     return {
       id: resolvedId,
@@ -332,22 +368,30 @@ async function extractTikTokVideo(pageUrl, originalInputUrl) {
     console.warn("Native TikTok page scraping failed, trying oEmbed fallback:", nativeErr?.message);
   }
 
-  // 3. Fallback to oEmbed + Preview player
-  const oembed = await extractFromOEmbed(pageUrl.href);
+  // 3. Fallback to oEmbed + direct TikWM media redirect
+  const oembed = await extractFromOEmbed(pageUrl.href, env);
   const fallbackCreator = oembed?.author_name || creator || "user";
+  const resolvedId = videoId || String(oembed?.embed_product_id || "");
+  const fallbackDirectUrl = /^\d+$/.test(resolvedId)
+    ? `https://www.tikwm.com/video/media/play/${resolvedId}.mp4`
+    : "";
   return {
-    id: videoId || String(oembed?.embed_product_id || ""),
+    id: resolvedId,
     title: oembed?.title || `TikTok video by @${fallbackCreator}`,
     cover: oembed?.thumbnail_url || "",
-    type: "preview",
-    embedUrl: `https://www.tiktok.com/player/v1/${videoId || oembed?.embed_product_id}`,
+    type: fallbackDirectUrl ? "video" : "preview",
+    embedUrl: `https://www.tiktok.com/player/v1/${resolvedId}`,
     web_url: pageUrl.href,
     author: {
       nickname: fallbackCreator,
       unique_id: fallbackCreator,
     },
     stats: { plays: 0, likes: 0 },
-    downloadUrl: `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}`,
+    no_watermark_url: fallbackDirectUrl || null,
+    playUrl: fallbackDirectUrl || null,
+    downloadUrl: fallbackDirectUrl
+      ? `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}&direct=${encodeURIComponent(fallbackDirectUrl)}`
+      : `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}`,
   };
 }
 
@@ -370,7 +414,7 @@ tools.post("/tiktok/lookup", requireAuth, async (c) => {
   }
 
   if (!pageUrl) {
-    const tikwm = await extractFromTikWM(rawUrl.trim());
+    const tikwm = await extractFromTikWM(rawUrl.trim(), c.env);
     if (tikwm && tikwm.id) {
       const authorId = tikwm.author?.unique_id || "tiktok";
       try {
@@ -384,7 +428,7 @@ tools.post("/tiktok/lookup", requireAuth, async (c) => {
   }
 
   try {
-    const video = await extractTikTokVideo(pageUrl, rawUrl);
+    const video = await extractTikTokVideo(pageUrl, rawUrl, c.env);
     return c.json({ success: true, video });
   } catch (error) {
     console.error("TikTok public video lookup failed:", {
@@ -433,7 +477,7 @@ tools.get("/tiktok/download", requireAuth, async (c) => {
 
     if (!sourceUrl && (pageUrl || rawUrl)) {
       const target = pageUrl ? pageUrl.href : rawUrl;
-      const tikwm = await extractFromTikWM(target);
+      const tikwm = await extractFromTikWM(target, c.env);
       if (tikwm) {
         sourceUrl = validateTikTokMediaUrl(tikwm.play || tikwm.hdplay);
       }
@@ -450,6 +494,10 @@ tools.get("/tiktok/download", requireAuth, async (c) => {
       } catch (nativeErr) {
         console.warn("Native download extraction failed:", nativeErr?.message);
       }
+    }
+
+    if (!sourceUrl && /^\d+$/.test(videoId)) {
+      sourceUrl = validateTikTokMediaUrl(`https://www.tikwm.com/video/media/play/${videoId}.mp4`);
     }
 
     if (!sourceUrl) {
@@ -544,6 +592,9 @@ tools.get("/tiktok/download", requireAuth, async (c) => {
     );
   }
 });
+
+tools.get("/tiktok/stream", (c) => streamEdgeMedia(c, null, "tiktok-video.mp4"));
+tools.get("/tiktok/proxy", (c) => streamEdgeMedia(c, null, "tiktok-media.mp4"));
 
 // ============================================================
 // 🌐 UNIVERSAL NATIVE EDGE STREAM PROXY

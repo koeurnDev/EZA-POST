@@ -88,17 +88,24 @@ export class GeminiProxyDO {
     if (!targetUrl) {
       return Response.json({ error: "Missing x-gemini-target-url" }, { status: 400 });
     }
-    const body = await request.text();
+    const method = request.headers.get("x-proxy-method") || request.method || "POST";
+    const contentType = request.headers.get("content-type") || "application/json";
+    const body = method !== "GET" && method !== "HEAD" ? await request.text() : undefined;
     const res = await fetch(targetUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method,
+      headers: {
+        "Content-Type": contentType,
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        Accept: request.headers.get("accept") || "application/json, text/plain, */*",
+      },
       body,
     });
     const text = await res.text();
     return new Response(text, {
       status: res.status,
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": res.headers.get("Content-Type") || "application/json",
       },
     });
   }

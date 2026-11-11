@@ -139,6 +139,43 @@ export default function TikTokDownloader() {
         }
     };
 
+    const fetchTikwmClientFallback = async (targetUrl) => {
+        try {
+            const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`);
+            if (!res.ok) return null;
+            const json = await res.json();
+            if (json?.code === 0 && json?.data) {
+                const d = json.data;
+                const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
+                const playMediaUrl = d.play || d.hdplay || null;
+                return {
+                    id: String(d.id || ""),
+                    title: d.title || `TikTok video by @${d.author?.unique_id || "user"}`,
+                    cover: d.origin_cover || d.cover || "",
+                    type: isSlideshow ? "slideshow" : "video",
+                    embedUrl: `https://www.tiktok.com/player/v1/${d.id}`,
+                    web_url: targetUrl,
+                    author: {
+                        nickname: d.author?.nickname || "TikTok User",
+                        unique_id: d.author?.unique_id || "user",
+                    },
+                    music: d.music || null,
+                    stats: {
+                        plays: Number(d.play_count || 0),
+                        likes: Number(d.digg_count || 0),
+                    },
+                    images: d.images || [],
+                    no_watermark_url: playMediaUrl,
+                    playUrl: playMediaUrl,
+                    downloadUrl: `/tools/tiktok/download?url=${encodeURIComponent(targetUrl)}&direct=${encodeURIComponent(playMediaUrl || "")}`,
+                };
+            }
+        } catch {
+            // ignore client fallback failure
+        }
+        return null;
+    };
+
     const handleLookup = async (targetUrl = url) => {
         if (typeof targetUrl !== 'string') {
             targetUrl = url;
@@ -151,13 +188,30 @@ export default function TikTokDownloader() {
         setVideoData(null);
         setVideoError(false);
         try {
-            const res = await api.post("/tools/tiktok/lookup", { url: targetUrl });
-            if (res.data.success) {
-                const data = res.data.video;
+            let data = null;
+            try {
+                const res = await api.post("/tools/tiktok/lookup", { url: targetUrl });
+                if (res.data?.success) {
+                    data = res.data.video;
+                }
+            } catch (apiErr) {
+                data = null;
+            }
+
+            if (!data || !data.no_watermark_url || data.type === "preview" || !data.cover) {
+                const clientData = await fetchTikwmClientFallback(targetUrl);
+                if (clientData) {
+                    data = { ...(data || {}), ...clientData };
+                }
+            }
+
+            if (data) {
                 data.originalUrl = targetUrl;
                 setUrl(targetUrl);
                 setVideoData(data);
                 toast.success("Video Found!", { icon: "✨" });
+            } else {
+                toast.error("Failed to find video");
             }
         } catch (err) {
             const details = err?.details || err?.response?.data;
@@ -173,11 +227,24 @@ export default function TikTokDownloader() {
     };
 
     const handleVideoDownload = async () => {
-        const targetDownloadUrl = videoData?.downloadUrl || 
-            `/tools/tiktok/download?url=${encodeURIComponent(videoData?.originalUrl || videoData?.web_url || url)}`;
+        const rawTarget = videoData?.originalUrl || videoData?.web_url || url;
+        let directMedia = videoData?.no_watermark_url || videoData?.playUrl || "";
 
         setIsVideoDownloading(true);
         try {
+            if (!directMedia && rawTarget) {
+                const enriched = await fetchTikwmClientFallback(rawTarget);
+                if (enriched?.no_watermark_url) {
+                    directMedia = enriched.no_watermark_url;
+                    setVideoData((prev) => (prev ? { ...prev, ...enriched } : prev));
+                }
+            }
+
+            let targetDownloadUrl = videoData?.downloadUrl || `/tools/tiktok/download?url=${encodeURIComponent(rawTarget)}`;
+            if (directMedia && !targetDownloadUrl.includes("direct=")) {
+                targetDownloadUrl += `${targetDownloadUrl.includes("?") ? "&" : "?"}direct=${encodeURIComponent(directMedia)}`;
+            }
+
             const response = await api.get(targetDownloadUrl, {
                 responseType: "blob",
                 timeout: 120000,
@@ -406,25 +473,17 @@ export default function TikTokDownloader() {
                                                 {/* Preview Section */}
                                                 <div className="w-full md:w-80 shrink-0">
                                                     <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-black shadow-2xl relative border border-white/20">
-                                                        {videoData.embedUrl ? (
-                                                            <iframe
-                                                                src={videoData.embedUrl}
-                                                                title={videoData.title || "TikTok video preview"}
-                                                                className="w-full h-full border-0"
-                                                                allow="encrypted-media; fullscreen; picture-in-picture"
-                                                                allowFullScreen
-                                                                referrerPolicy="strict-origin-when-cross-origin"
-                                                            />
-                                                        ) : (videoData.type === 'slideshow' || videoData.images?.length > 0) ? (
+                                                        {(videoData.type === 'slideshow' || videoData.images?.length > 0) ? (
                                                             <img 
                                                                 src={videoData.images?.[0] || videoData.cover} 
                                                                 className="w-full h-full object-cover" 
                                                                 referrerPolicy="no-referrer"
                                                                 alt="Preview"
                                                             />
-                                                        ) : (
+                                                        ) : ((videoData.no_watermark_url || videoData.playUrl) && !videoError) ? (
                                                             <video
-                                                                src={`${API_BASE}/api/tools/tiktok/stream?id=${videoData.id}&url=${encodeURIComponent(videoData.no_watermark_url || videoData.playUrl)}`}
+                                                                src={videoData.no_watermark_url || videoData.playUrl}
+                                                                poster={videoData.cover || undefined}
                                                                 className="w-full h-full object-cover"
                                                                 controls
                                                                 autoPlay
@@ -433,14 +492,23 @@ export default function TikTokDownloader() {
                                                                 playsInline
                                                                 onError={() => setVideoError(true)}
                                                             />
-                                                        )}
+                                                        ) : videoData.embedUrl ? (
+                                                            <iframe
+                                                                src={videoData.embedUrl}
+                                                                title={videoData.title || "TikTok video preview"}
+                                                                className="w-full h-full border-0"
+                                                                allow="accelerometer; autoplay; encrypted-media; gyroscope; fullscreen; picture-in-picture"
+                                                                allowFullScreen
+                                                                referrerPolicy="strict-origin-when-cross-origin"
+                                                            />
+                                                        ) : null}
                                                         <div className="absolute top-4 left-4">
                                                             <div className="px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg border border-white/20 text-[10px] font-black text-white flex items-center gap-1.5 shadow-lg">
                                                                 <Zap size={12} className="text-yellow-400 fill-yellow-400" />
                                                                 {videoData.type?.toUpperCase() || 'VIDEO'}
                                                             </div>
                                                         </div>
-                                                        {videoError && !videoData.isFixed && (
+                                                        {videoError && !videoData.embedUrl && !videoData.isFixed && (
                                                             <div className="absolute inset-0 bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center p-6 md:p-8 text-center animate-pulse">
                                                                 <Loader2 size={32} className="text-pink-500 animate-spin mb-4" />
                                                                 <p className="text-white font-bold mb-1 text-sm md:text-base">Optimizing playback...</p>
