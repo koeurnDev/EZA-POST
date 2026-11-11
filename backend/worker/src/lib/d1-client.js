@@ -299,6 +299,11 @@ export function createD1Client(db) {
     hasTimestamps: false,
   });
 
+  const bioPageModel = createModel("bio_pages", {
+    boolFields: ["isActive"],
+    jsonFields: ["contacts", "businessHours", "products"],
+  });
+
   return {
     user: userModel,
     facebookPage: facebookPageModel,
@@ -306,6 +311,7 @@ export function createD1Client(db) {
     post: postModel,
     botRule: botRuleModel,
     creditTransaction: creditTransactionModel,
+    bioPage: bioPageModel,
 
     platformConfig: {
       findMany: async () => [],

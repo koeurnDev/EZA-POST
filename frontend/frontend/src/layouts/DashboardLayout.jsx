@@ -7,7 +7,7 @@ import NetworkStatus from "../components/NetworkStatus";
 import {
   LayoutDashboard, Send, Layers, Clock, BarChart2, HelpCircle, Link as LinkIcon, MessageSquare, Zap, Settings, LogOut, Sun, Moon, User, Grid, Search, Bell, MoreHorizontal, X,
   Download, Video, Instagram, AtSign, Facebook, Images, Scissors, ShoppingBag, Music, TrendingUp, Film, FileText, ImagePlus, Wand2, EyeOff, Repeat, Languages, Users, Cloud, Eraser,
-  Radio, Trash2
+  Radio, Trash2, QrCode, Store
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -71,9 +71,16 @@ const DashboardLayout = ({ children }) => {
     { label: "អក្សររត់ AI", icon: <Languages size={22} />, path: "/subtitles" },
     { label: "បញ្ជីពេលវេល", icon: <Clock size={22} />, path: "/posts" },
     { label: "ឆ្លើយតបស្វ័យប្រវត្តិ", icon: <MessageSquare size={22} />, path: "/bot" },
+    { label: "Bio អាជីវកម្ម", icon: <QrCode size={22} />, path: "/bio" },
   ];
 
   const TOOL_CATEGORIES = [
+    {
+      title: "អាជីវកម្ម & កាតឌីជីថល (Noonlai Bio)",
+      items: [
+        { label: "កាតអាជីវកម្ម (Bio Link & QR)", icon: <QrCode size={18} />, path: "/bio" },
+      ]
+    },
     {
       title: "ឧបករណ៍សង្គម",
       items: [

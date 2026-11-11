@@ -102,3 +102,34 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
   description TEXT,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS bio_pages (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  businessName TEXT NOT NULL,
+  category TEXT,
+  bio TEXT,
+  avatarUrl TEXT,
+  coverUrl TEXT,
+  theme TEXT DEFAULT 'dark',
+  contacts TEXT DEFAULT '{}',
+  businessHours TEXT DEFAULT '{}',
+  googleMapsUrl TEXT,
+  address TEXT,
+  youtubeUrl TEXT,
+  khqrString TEXT,
+  khqrImage TEXT,
+  khqrBankName TEXT,
+  khqrAccountName TEXT,
+  products TEXT DEFAULT '[]',
+  views INTEGER DEFAULT 0,
+  qrScans INTEGER DEFAULT 0,
+  clicks INTEGER DEFAULT 0,
+  isActive INTEGER DEFAULT 1,
+  createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_bio_pages_slug ON bio_pages(slug);
+CREATE INDEX IF NOT EXISTS idx_bio_pages_user ON bio_pages(userId);

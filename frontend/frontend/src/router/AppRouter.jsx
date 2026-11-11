@@ -40,6 +40,10 @@ const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("../pages/ResetPassword"));
 const AuthCallback = lazy(() => import("../pages/AuthCallback"));
 
+// 📱 Digital Business Card & Storefront (Noonlai-Equivalent + Bakong KHQR)
+const BioBuilder = lazy(() => import("../pages/BioBuilder"));
+const PublicBio = lazy(() => import("../pages/PublicBio"));
+
 // --- Loading Component ---
 const PageLoader = () => (
   <div className="flex items-center justify-center h-screen bg-gray-50">
@@ -61,6 +65,10 @@ export default function AppRouter() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
+          {/* 📱 Public Digital Business Card & Storefront */}
+          <Route path="/b/:slug" element={<PublicBio />} />
+          <Route path="/bio/:slug" element={<PublicBio />} />
+
           {/* Redirect /dashboard to /post */}
           <Route path="/dashboard" element={<Navigate to="/post" replace />} />
           <Route path="/" element={<Navigate to="/post" replace />} />
@@ -81,6 +89,16 @@ export default function AppRouter() {
             element={
               <ProtectedRoute redirectPath="/welcome">
                 <SubtitleStudio />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 📱 Digital Business Card / Bio Builder */}
+          <Route
+            path="/bio"
+            element={
+              <ProtectedRoute redirectPath="/welcome">
+                <BioBuilder />
               </ProtectedRoute>
             }
           />
