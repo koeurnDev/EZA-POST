@@ -3,6 +3,7 @@ import { requireAuth } from "./auth.js";
 import { deleteScheduledMedia, scheduledUploadLimitBytes, uploadScheduledMedia } from "../lib/cloudinary.js";
 import { getPrisma } from "../lib/prisma.js";
 import { proxyRequestToBackend, proxyToBackend } from "../lib/proxy.js";
+import { processScheduledPosts } from "../lib/scheduled-posts.js";
 
 const posts = new Hono();
 
@@ -194,11 +195,9 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
   const allowedFields = new Set([
     "caption", "accounts", "scheduleTime", "enableBot", "videoUrl",
     "carouselCards", "aiOptions", "platforms", "staggerDelay",
-    "video", "thumbnail", "rightSideImage",
+    "video", "thumbnail", "rightSideImage", "postType", "publishMode",
+    "headline", "targetLink", "cardDescription", "cta", "subtitles"
   ]);
-  if ([...form.keys()].some((key) => !allowedFields.has(key))) {
-    return c.json({ success: false, error: "Unexpected mixed-carousel field." }, 400);
-  }
   const aiOptionsValue = form.get("aiOptions");
   if (typeof aiOptionsValue === "string" && aiOptionsValue) {
     let aiOptions;
@@ -207,7 +206,8 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
     } catch {
       return c.json({ success: false, error: "Invalid AI transformation options." }, 400);
     }
-    if (aiOptions && ["flip", "pitchShift", "safeMode", "noise", "speedChange", "squarePad"]
+    // FFmpeg transforms need the optional Node backend; without it, publish the original media.
+    if (c.env.BACKEND_ORIGIN && aiOptions && ["flip", "pitchShift", "safeMode", "noise", "speedChange", "squarePad"]
       .some((option) => aiOptions[option] === true)) {
       return proxyRequestToBackend(c, originalRequest);
     }
@@ -293,9 +293,13 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
   }
 
   const scheduleTimeValue = form.get("scheduleTime");
-  const scheduleTime = scheduleTimeValue ? new Date(scheduleTimeValue) : new Date();
-  if (Number.isNaN(scheduleTime.getTime()) || scheduleTime < new Date()) {
-    return c.json({ success: false, error: "Invalid or past schedule time." }, 400);
+  let scheduleTime = new Date();
+  if (scheduleTimeValue) {
+    const parsedTime = new Date(scheduleTimeValue);
+    if (Number.isNaN(parsedTime.getTime()) || parsedTime.getTime() < Date.now() - 60000) {
+      return c.json({ success: false, error: "Invalid or past schedule time." }, 400);
+    }
+    scheduleTime = parsedTime;
   }
 
   const uniqueAccounts = [...new Set(accounts)];
@@ -309,11 +313,11 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
     const prisma = getPrisma(c.env);
     const userId = c.get("authUser").id;
     const pages = await prisma.facebookPage.findMany({
-      where: { userId, id: { in: uniqueAccounts }, isConnected: true },
+      where: { userId, id: { in: uniqueAccounts } },
       select: { id: true, picture: true },
     });
-    if (pages.length !== uniqueAccounts.length) {
-      return c.json({ success: false, error: "One or more selected Facebook Pages are unavailable." }, 400);
+    if (!pages || pages.length === 0) {
+      return c.json({ success: false, error: "សូមជ្រើសរើសផេក ឬគណនី Facebook យ៉ាងហោចណាស់មួយ។" }, 400);
     }
 
     const videoAsset = videoFile ? await uploadScheduledMedia(videoFile, c.env) : null;
@@ -372,6 +376,10 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
         publishedIds: [],
       },
     });
+
+    if (scheduleTime.getTime() <= Date.now() + 5000 && c.executionCtx && typeof c.executionCtx.waitUntil === "function") {
+      c.executionCtx.waitUntil(processScheduledPosts(c.env));
+    }
 
     return c.json({
       success: true,

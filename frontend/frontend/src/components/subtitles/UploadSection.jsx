@@ -209,15 +209,20 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
       }
 
       // 🚀 TIER 1: Ultra-fast direct Gemini 3.8 Flash transcription from user's browser (bypasses server region blocks)
-      const targetBlob = audioBlob || (selectedFile.size <= 15 * 1024 * 1024 ? selectedFile : null);
+      const targetBlob = audioBlob || (selectedFile.size <= 25 * 1024 * 1024 ? selectedFile : null);
       if (targetBlob) {
         try {
           setCurrentStep(2);
           setProgressStatus('⚡ AI Gemini 3.8 Flash កំពុងស្តាប់ និងបម្លែងសំឡេងខ្មែរ...');
-          const cfgRes = await fetch('/api/v1/gemini-config').catch(() => null);
-          const cfg = cfgRes ? await cfgRes.json().catch(() => null) : null;
-          if (cfg?.ok && cfg?.key) {
-            const clientSegments = await transcribeWithGeminiFlash(targetBlob, cfg.key, cfg.model || 'gemini-3.8-flash', customGlossary);
+          const token = localStorage.getItem("token") || localStorage.getItem("eza_post_token");
+          const headers = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          const cfgRes = await fetch('/api/v1/gemini-config', { credentials: 'include', headers }).catch(() => null);
+          const cfg = cfgRes?.ok ? await cfgRes.json().catch(() => null) : null;
+          const geminiKey = cfg?.key;
+          
+          if (geminiKey) {
+            const clientSegments = await transcribeWithGeminiFlash(targetBlob, geminiKey, cfg?.model || 'gemini-3.8-flash', customGlossary);
             if (clientSegments && clientSegments.length > 0) {
               setCurrentStep(3);
               setIsProcessing(false);

@@ -3,6 +3,8 @@ import { cors } from 'hono/cors';
 import { normalizeKhmerText, mergeShortSubtitleSegments, type SubtitleSegment } from '../lib/subtitles/khmer_normalizer.ts';
 import { generateSrt, generateVtt, generateAss } from '../lib/subtitles/subtitles.ts';
 import { generateBakongKhqr } from '../lib/subtitles/khqr.ts';
+// @ts-ignore - JS module
+import { requireAuth } from './auth.js';
 
 export interface Env {
   AI: any;
@@ -177,34 +179,15 @@ app.get('/api/v1/test-whisper', async (c) => {
   }
 });
 
+// Direct client Gemini config: browser calls Gemini directly because Google blocks Worker edge node IPs (HKG)
 app.get('/api/v1/gemini-config', (c) => {
   const key = (c.env.GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '');
+  c.header('Cache-Control', 'no-store');
   return c.json({
     ok: Boolean(key),
     key: key || null,
     model: 'gemini-3.8-flash'
   });
-});
-
-app.get('/api/v1/test-gemini', async (c) => {
-  const apiKey = (c.env.GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '');
-  if (!apiKey) {
-    return c.json({ ok: false, error: 'No GEMINI_API_KEY' });
-  }
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-
-  try {
-    const res = await fetch(url);
-    const text = await res.text();
-    return c.json({
-      status: res.status,
-      keyPrefix: apiKey.slice(0, 6),
-      response: text.slice(0, 1000)
-    });
-  } catch (err: any) {
-    return c.json({ ok: false, error: err?.message || String(err) }, 500);
-  }
 });
 
 function uint8ToBase64(bytes: Uint8Array): string {
@@ -404,6 +387,8 @@ function isCorruptedKhmerOutput(text: string): boolean {
   if (/[\u17A3-\u17B3][\u17B6-\u17C5]/.test(text)) return true;
   // 6. Reject hallucinated repetitive syllable loops (e.g. ានានា, កាកាកា)
   if (/(.{2,6})\1{3,}/.test(text)) return true;
+  // 7. Reject repetitive Whisper stutter loops
+  if (/(..+?)\1{2,}/.test(text)) return true;
   return false;
 }
 

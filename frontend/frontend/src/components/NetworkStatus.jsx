@@ -27,21 +27,24 @@ const NetworkStatus = ({
 
       let success = false;
       for (const endpoint of endpoints) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
         try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 5000);
           const res = await fetch(endpoint, {
             method: endpoint.endsWith('/health') ? 'GET' : 'HEAD',
             cache: "no-store",
             signal: controller.signal,
           });
-          clearTimeout(timeout);
+          // Release the unread body so a later abort can't reject an orphaned stream
+          res.body?.cancel().catch(() => {});
           if (res.ok) {
             success = true;
             break;
           }
         } catch {
           continue;
+        } finally {
+          clearTimeout(timeout);
         }
       }
 

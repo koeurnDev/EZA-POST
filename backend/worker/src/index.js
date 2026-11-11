@@ -66,8 +66,10 @@ app.route("/api/analytics", analytics);
 app.route("/api/tools", tools);
 app.route("/api/bio", bio);
 app.route("/", subtitles);
-app.all("/api/*", proxyToBackend);
-app.all("/uploads/*", proxyToBackend);
+const proxyOrNotFound = (c) =>
+  c.env.BACKEND_ORIGIN ? proxyToBackend(c) : c.json({ error: "Not found" }, 404);
+app.all("/api/*", proxyOrNotFound);
+app.all("/uploads/*", proxyOrNotFound);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 
