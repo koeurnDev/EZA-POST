@@ -23,13 +23,30 @@ const itemVariants = {
     visible: { opacity: 1, y: 0 }
 };
 
+const isFacebookUrl = (value) => {
+    try {
+        const url = new URL(value.trim());
+        const host = url.hostname.toLowerCase();
+        return url.protocol === "https:" &&
+            !url.username &&
+            !url.password &&
+            !url.port &&
+            (host === "facebook.com" ||
+                host.endsWith(".facebook.com") ||
+                host === "fb.watch" ||
+                host === "fb.me");
+    } catch {
+        return false;
+    }
+};
+
 export default function FacebookDownloader() {
     const [url, setUrl] = useState("");
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
 
     const handleDownload = async () => {
-        if (!url.includes("facebook.com") && !url.includes("fb.watch")) {
+        if (!isFacebookUrl(url)) {
             return toast.error("Invalid Facebook Link");
         }
         setLoading(true);

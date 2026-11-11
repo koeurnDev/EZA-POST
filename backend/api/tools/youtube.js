@@ -9,9 +9,11 @@ const express = require("express");
 const router = express.Router();
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const { requireAuth } = require("../../utils/auth");
-const youtubedl = require("youtube-dl-exec");
+const youtubedl = require("../../utils/ytdlp");
 const ffmpegPath = require("ffmpeg-static"); // ✅ Required for merging 1080p+ Video & Audio
+const { normalizeQuality, normalizeYouTubeUrl } = require("../../utils/youtubeUrl");
 
 // 🗂️ Temp directory
 const tempDir = path.join(__dirname, "../../temp/videos");
@@ -32,7 +34,7 @@ const getBinaryPath = () => {
 /* -------------------------------------------------------------------------- */
 router.post("/lookup", requireAuth, async (req, res) => {
     try {
-        const { url } = req.body;
+        const url = normalizeYouTubeUrl(req.body?.url);
         if (!url) return res.status(400).json({ success: false, error: "Invalid YouTube URL" });
 
         console.log(`📺 Lookup YouTube (yt-dlp): ${url}`);
@@ -114,21 +116,25 @@ router.post("/lookup", requireAuth, async (req, res) => {
 /* -------------------------------------------------------------------------- */
 router.post("/download", requireAuth, async (req, res) => {
     try {
-        const { url, quality, format } = req.body; // format: 'mp4' | 'mp3'
-        if (!url) return res.status(400).json({ success: false, error: "No URL provided" });
+        const url = normalizeYouTubeUrl(req.body?.url);
+        const { quality, format } = req.body || {}; // format: 'mp4' | 'mp3'
+        if (!url) return res.status(400).json({ success: false, error: "Invalid YouTube URL" });
+        if (format !== undefined && !["mp4", "mp3"].includes(format)) {
+            return res.status(400).json({ success: false, error: "Format must be mp4 or mp3" });
+        }
 
         const isAudio = format === 'mp3';
-        const safeTitle = `youtube-${Date.now()}`;
+        const safeTitle = `youtube-${Date.now()}-${crypto.randomUUID()}`;
         const outputTemplate = path.join(tempDir, `${safeTitle}.%(ext)s`);
 
-        const parseQualityValue = (value) => {
-            if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-            if (typeof value !== 'string') return null;
-            const numeric = parseInt(value.toString().replace(/[^0-9]/g, ''), 10);
-            return Number.isFinite(numeric) ? numeric : null;
-        };
-
-        const requestedQuality = parseQualityValue(quality);
+        const qualityResult = normalizeQuality(quality, format);
+        if (qualityResult.error) {
+            return res.status(400).json({
+                success: false,
+                error: isAudio ? "Audio quality is not supported" : "Video quality is not supported",
+            });
+        }
+        const requestedQuality = qualityResult.value;
         const qualityLabel = isAudio
             ? (requestedQuality ? `${requestedQuality}kbps` : (quality || 'Best Audio'))
             : (requestedQuality ? `${requestedQuality}p` : (quality || 'Best Video'));

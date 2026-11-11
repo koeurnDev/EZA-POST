@@ -1,8 +1,13 @@
+require('dotenv').config();
 const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
 
-const connectionString = process.env.DATABASE_URL;
+const rawConnectionString = process.env.DATABASE_URL || 'postgresql://localhost:5432/ezapost';
+// Clean parameters for node-postgres (pg) pool compatibility
+const connectionString = rawConnectionString
+    .replace(/([?&])channel_binding=req(&|$)/g, (m, p1, p2) => p2 ? p1 : "")
+    .replace(/\?$/, "");
 
 // ⚙️ Configure PG Pool
 const pool = new Pool({

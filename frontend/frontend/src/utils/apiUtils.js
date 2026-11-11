@@ -12,6 +12,12 @@ import axios from "axios";
 /* ----------------------------------------------- */
 let csrfToken = null;
 
+export const isWorkerNativeApiRequest = (url = "") => {
+  const path = url.split(/[?#]/, 1)[0];
+  return /(?:^|\/)(?:api\/)?(?:auth|posts|user|upload|bot|credits|analytics)(?:\/|$)/i.test(path) ||
+    /(?:^|\/)(?:api\/)?tools\/tiktok\/(?:lookup|download)$/i.test(path);
+};
+
 export const fetchCsrfToken = async () => {
   try {
     const res = await axios.get(getFullUrl("/csrf-token"), { withCredentials: true });
@@ -32,8 +38,10 @@ axios.interceptors.request.use(async (config) => {
 
   // Only attach for state-changing methods
   if (['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase())) {
-    if (!csrfToken) await fetchCsrfToken();
-    if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken;
+    if (!isWorkerNativeApiRequest(config.url)) {
+      if (!csrfToken) await fetchCsrfToken();
+      if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken;
+    }
   }
   return config;
 }, (error) => Promise.reject(error));
@@ -229,6 +237,7 @@ const apiUtils = {
   handleApiError,
   // Facebook Pages
   getUserPages: () => axios.get(getFullUrl("/user/pages"), { withCredentials: true }),
+  connectFacebookCookie: (cookieOrToken) => axios.post(getFullUrl("/user/pages/connect-cookie"), { cookieOrToken }, { withCredentials: true }),
   getUserConnections: () => axios.get(getFullUrl("/user/connections"), { withCredentials: true }), // ✅ Get Connections
   toggleUserPage: (pageId, isSelected) => axios.post(getFullUrl("/user/pages/toggle"), { pageId, isSelected }, { withCredentials: true }),
   updatePageSettings: (pageId, settings) => axios.post(getFullUrl("/user/pages/settings"), { pageId, settings }, { withCredentials: true }),

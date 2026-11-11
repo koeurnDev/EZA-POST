@@ -4,6 +4,9 @@ const tiktokDownloader = require("../utils/tiktokDownloader");
 const { uploadFile } = require("../utils/cloudinary");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
+const { requireAuth } = require("../utils/auth");
+const { isTikTokPageUrl } = require("../utils/tiktokSource");
 
 // 🗂️ Ensure temp directory exists
 const tempDir = path.join(__dirname, "../../temp/videos");
@@ -12,62 +15,49 @@ if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 // ============================================================
 // ✅ POST /api/tiktok/process (Download & Upload to Cloudinary)
 // ============================================================
-router.post("/process", async (req, res) => {
-    const { url } = req.body;
-    if (!url) return res.status(400).json({ success: false, error: "URL required" });
+router.post("/process", requireAuth, async (req, res) => {
+    const { url } = req.body || {};
+    if (!isTikTokPageUrl(url)) {
+        return res.status(400).json({ success: false, error: "Enter a valid HTTPS TikTok link." });
+    }
+    const tempFilePath = path.join(tempDir, `tiktok_${crypto.randomUUID()}.mp4`);
 
     try {
-        console.log(`🔄 Processing TikTok URL: ${url}`);
-
-        // 1. Download Video
         const downloadResult = await tiktokDownloader.downloadTiktokVideo(url);
         if (!downloadResult || !downloadResult.buffer) {
             throw new Error("TikTok download failed: no video buffer returned");
         }
-
-        // 2. Save to Temp File
-        const tempFilename = `tiktok_${Date.now()}.mp4`;
-        const tempFilePath = path.join(tempDir, tempFilename);
-        fs.writeFileSync(tempFilePath, downloadResult.buffer);
-
-        // 3. Upload to Cloudinary
-        console.log(`📤 Uploading to Cloudinary...`);
+        tiktokDownloader.validateVideoBuffer(downloadResult.buffer);
+        await fs.promises.writeFile(tempFilePath, downloadResult.buffer, { flag: "wx" });
         const result = await uploadFile(tempFilePath, "kr_post/videos", "video");
-
-        // 4. Return Result
-        res.json({
+        return res.json({
             success: true,
             url: result.url,
             publicId: result.publicId,
-            size: result.size
+            size: result.size,
         });
-
     } catch (err) {
-        console.error("❌ TikTok processing failed:", err.message);
-        
-        // Fallback to local if Cloudinary fails
-        const localUrl = `${process.env.API_BASE_URL || "http://localhost:5001"}/uploads/temp/videos/tiktok_fallback_${Date.now()}.mp4`;
-        
-        if (err.message.includes("API key") || err.message.includes("Cloudinary")) {
-            return res.json({
-                success: true,
-                url: localUrl,
-                isLocalFallback: true,
-                error: "Cloudinary upload failed, using local fallback."
-            });
+        console.error("TikTok processing failed:", err.message);
+        return res.status(502).json({ success: false, error: "TikTok download or upload failed." });
+    } finally {
+        try {
+            await fs.promises.unlink(tempFilePath);
+        } catch (error) {
+            if (error.code !== "ENOENT") {
+                console.error("Failed to clean up TikTok temp file:", error.message);
+            }
         }
-        
-        res.status(500).json({ success: false, error: err.message });
     }
-
 });
 
 // ============================================================
 // ✅ POST /api/tiktok/validate
 // ============================================================
-router.post("/validate", async (req, res) => {
-    const { url } = req.body;
-    if (!url) return res.status(400).json({ valid: false, error: "URL required" });
+router.post("/validate", requireAuth, async (req, res) => {
+    const { url } = req.body || {};
+    if (!isTikTokPageUrl(url)) {
+        return res.status(400).json({ valid: false, error: "Enter a valid HTTPS TikTok link." });
+    }
 
     try {
         const id = await tiktokDownloader.extractVideoId(url);
@@ -80,9 +70,11 @@ router.post("/validate", async (req, res) => {
 // ============================================================
 // ✅ GET /api/tiktok/info
 // ============================================================
-router.get("/info", async (req, res) => {
+router.get("/info", requireAuth, async (req, res) => {
     const { url } = req.query;
-    if (!url) return res.status(400).json({ error: "URL required" });
+    if (!isTikTokPageUrl(url)) {
+        return res.status(400).json({ success: false, error: "Enter a valid HTTPS TikTok link." });
+    }
 
     try {
         const metadata = await tiktokDownloader.getVideoMetadata(url);
@@ -97,15 +89,15 @@ router.get("/info", async (req, res) => {
 // ============================================================
 router.get("/preview", async (req, res) => {
     const { url } = req.query;
-    if (!url) return res.status(400).send("URL required");
+    if (!isTikTokPageUrl(url)) return res.status(400).send("Invalid TikTok URL.");
 
     try {
         const videoUrl = await tiktokDownloader.getPlayableUrl(url);
-        // Redirect to the actual video file
-        res.redirect(videoUrl);
+        res.set("Cache-Control", "private, no-store");
+        return res.redirect(videoUrl);
     } catch (err) {
         console.error("Preview error:", err.message);
-        res.status(500).send("Failed to load video preview");
+        return res.status(502).send("Failed to load TikTok video preview.");
     }
 });
 

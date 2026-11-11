@@ -309,20 +309,35 @@ class FacebookAPI {
       return results;
     }
 
+    const fs = require("fs");
+
     for (const account of accounts) {
       try {
         console.log(`🚀 Posting to ${account.name} (${account.type})...`);
         let postResult;
 
+        // 🌊 Ensure videoInput and thumbnail are fresh per account (prevent stream draining)
+        let freshVideoInput = videoInput;
+        if (videoInput && typeof videoInput.pipe === 'function' && videoInput.path && fs.existsSync(videoInput.path)) {
+          freshVideoInput = fs.createReadStream(videoInput.path);
+        } else if (typeof videoInput === 'string' && !videoInput.startsWith('http') && fs.existsSync(videoInput)) {
+          freshVideoInput = fs.createReadStream(videoInput);
+        }
+
+        let freshThumbBuffer = thumbnail?.buffer || null;
+        if (!freshThumbBuffer && thumbnail && typeof thumbnail.pipe === 'function' && thumbnail.path && fs.existsSync(thumbnail.path)) {
+          freshThumbBuffer = fs.readFileSync(thumbnail.path);
+        }
+
         if (account.type === "page") {
-          if (videoInput) {
+          if (freshVideoInput) {
             // 🎥 Video/Image Post
             postResult = await this.uploadVideoToFacebook(
               account.access_token || accessToken,
               account.id,
-              videoInput,
+              freshVideoInput,
               caption,
-              thumbnail?.buffer,
+              freshThumbBuffer,
               options
             );
           } else if (options.link) {
@@ -660,6 +675,252 @@ class FacebookAPI {
     } catch (err) {
       console.error("❌ Failed to fetch profile:", err.message);
       return null;
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* 🔔 Subscribe Page to Webhooks (Feed & Messages)             */
+  /* ------------------------------------------------------------ */
+  async subscribePage(pageId, pageAccessToken) {
+    try {
+      console.log(`🔔 Subscribing page ${pageId} to webhooks (feed, messages)...`);
+      const res = await this.http.post(
+        `${this.graph}/${pageId}/subscribed_apps`,
+        null,
+        {
+          params: {
+            access_token: pageAccessToken,
+            subscribed_fields: "feed,messages",
+          },
+        }
+      );
+      console.log(`✅ Page ${pageId} subscribed to webhooks:`, res.data);
+      return { success: true, data: res.data };
+    } catch (err) {
+      console.error(
+        `⚠️ Failed to subscribe page ${pageId} to webhooks:`,
+        err.response?.data || err.message
+      );
+      return {
+        success: false,
+        error: err.response?.data?.error?.message || err.message,
+      };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* 🔕 Unsubscribe Page from Webhooks                           */
+  /* ------------------------------------------------------------ */
+  async unsubscribePage(pageId, pageAccessToken) {
+    try {
+      console.log(`🔕 Unsubscribing page ${pageId} from webhooks...`);
+      const res = await this.http.delete(
+        `${this.graph}/${pageId}/subscribed_apps`,
+        {
+          params: { access_token: pageAccessToken },
+        }
+      );
+      return { success: true, data: res.data };
+    } catch (err) {
+      console.error(`⚠️ Failed to unsubscribe page ${pageId}:`, err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* 📬 Send Private Reply via Messenger Send API (comment_id)     */
+  /* ------------------------------------------------------------ */
+  async sendPrivateReply(pageId, commentId, text, pageAccessToken) {
+    try {
+      console.log(`📬 Sending private reply from page ${pageId} to comment ${commentId}...`);
+      const res = await this.http.post(
+        `${this.graph}/${pageId}/messages`,
+        {
+          recipient: { comment_id: commentId },
+          message: { text: text },
+        },
+        {
+          params: { access_token: pageAccessToken },
+        }
+      );
+      console.log(`✅ Private reply sent successfully! Message ID: ${res.data?.message_id}`);
+      return { success: true, messageId: res.data?.message_id };
+    } catch (err) {
+      const fbError = err.response?.data?.error;
+      console.error(
+        `❌ Private reply failed for comment ${commentId}:`,
+        fbError || err.message
+      );
+      return {
+        success: false,
+        error: fbError?.message || err.message,
+        code: fbError?.code,
+      };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* 📄 Fetch Published Posts for a Page                          */
+  /* ------------------------------------------------------------ */
+  async getPublishedPosts(pageId, pageAccessToken, options = {}) {
+    try {
+      const { limit = 25, after = null, before = null, since = null, until = null } = options;
+      const params = {
+        access_token: pageAccessToken,
+        fields: "id,message,story,created_time,full_picture,permalink_url,shares,comments.summary(total_count),reactions.summary(total_count),attachments{media,type,title,url}",
+        limit: Math.min(Number(limit) || 25, 100),
+      };
+      if (after) params.after = after;
+      if (before) params.before = before;
+      if (since) params.since = since;
+      if (until) params.until = until;
+
+      const res = await this.http.get(`${this.graph}/${pageId}/published_posts`, { params });
+      return {
+        success: true,
+        data: res.data?.data || [],
+        paging: res.data?.paging || null,
+      };
+    } catch (err) {
+      console.error(`❌ getPublishedPosts failed for page ${pageId}:`, err.message);
+      return {
+        success: false,
+        error: err.response?.data?.error?.message || err.message,
+        data: [],
+      };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* 🗑️ Batch Delete Posts via Facebook Graph API Batch (Max 50)   */
+  /* ------------------------------------------------------------ */
+  async batchDeletePosts(pageAccessToken, postIds = []) {
+    if (!Array.isArray(postIds) || postIds.length === 0) {
+      return { success: true, total: 0, deletedCount: 0, failedCount: 0, results: [] };
+    }
+
+    const chunkSize = 50; // Meta limit per batch request
+    const results = [];
+
+    for (let i = 0; i < postIds.length; i += chunkSize) {
+      const chunk = postIds.slice(i, i + chunkSize);
+      const batchRequests = chunk.map((id) => ({
+        method: "DELETE",
+        relative_url: id,
+      }));
+
+      try {
+        const bodyParams = new URLSearchParams();
+        bodyParams.append("access_token", pageAccessToken);
+        bodyParams.append("batch", JSON.stringify(batchRequests));
+
+        const res = await this.http.post(`${this.graph}`, bodyParams.toString(), {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        });
+
+        const batchResponses = res.data; // Array of { code: 200, body: "{\"success\":true}" }
+        chunk.forEach((postId, idx) => {
+          const item = batchResponses?.[idx];
+          const isSuccess = item && (item.code === 200 || item.code === 204);
+          let bodyObj = null;
+          try {
+            bodyObj = JSON.parse(item?.body || "{}");
+          } catch (e) {
+            bodyObj = { raw: item?.body };
+          }
+
+          results.push({
+            id: postId,
+            success: Boolean(isSuccess && bodyObj?.success !== false),
+            code: item?.code,
+            error: isSuccess ? null : (bodyObj?.error?.message || `HTTP ${item?.code || "Unknown"}`),
+          });
+        });
+      } catch (err) {
+        console.error("❌ Batch delete request failed:", err.message);
+        chunk.forEach((postId) => {
+          results.push({
+            id: postId,
+            success: false,
+            error: err.response?.data?.error?.message || err.message,
+          });
+        });
+      }
+    }
+
+    const deletedCount = results.filter((r) => r.success).length;
+    return {
+      success: true,
+      total: postIds.length,
+      deletedCount,
+      failedCount: postIds.length - deletedCount,
+      results,
+    };
+  }
+
+  /* ------------------------------------------------------------ */
+  /* 🔴 Create Facebook Live Video Container (RTMP / RTMPS)        */
+  /* ------------------------------------------------------------ */
+  async createLiveVideo(pageId, pageAccessToken, options = {}) {
+    try {
+      const { title = "Live Broadcast", description = "", status = "LIVE_NOW" } = options;
+      console.log(`🔴 Creating Live Video for Page ${pageId}...`);
+
+      const res = await this.http.post(
+        `${this.graph}/${pageId}/live_videos`,
+        {
+          title,
+          description,
+          status, // LIVE_NOW or UNPUBLISHED
+        },
+        {
+          params: { access_token: pageAccessToken },
+        }
+      );
+
+      const liveVideoId = res.data?.id;
+      const streamUrl = res.data?.secure_stream_url || res.data?.stream_url;
+
+      console.log(`✅ Live video created! ID: ${liveVideoId}, Stream URL available.`);
+      return {
+        success: true,
+        liveVideoId,
+        streamUrl,
+        data: res.data,
+      };
+    } catch (err) {
+      console.error(`❌ createLiveVideo failed for page ${pageId}:`, err.response?.data?.error || err.message);
+      return {
+        success: false,
+        error: err.response?.data?.error?.message || err.message,
+        code: err.response?.data?.error?.code,
+      };
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ⏹️ End Live Video Broadcast                                  */
+  /* ------------------------------------------------------------ */
+  async endLiveVideo(liveVideoId, pageAccessToken) {
+    try {
+      console.log(`⏹️ Ending Live Video ${liveVideoId}...`);
+      const res = await this.http.post(
+        `${this.graph}/${liveVideoId}`,
+        {
+          end_live_video: true,
+        },
+        {
+          params: { access_token: pageAccessToken },
+        }
+      );
+      console.log(`✅ Live video ${liveVideoId} ended successfully.`);
+      return { success: true, data: res.data };
+    } catch (err) {
+      console.warn(`⚠️ Failed to end live video ${liveVideoId}:`, err.response?.data?.error?.message || err.message);
+      return {
+        success: false,
+        error: err.response?.data?.error?.message || err.message,
+      };
     }
   }
 

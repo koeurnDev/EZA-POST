@@ -23,13 +23,28 @@ const itemVariants = {
     visible: { opacity: 1, y: 0 }
 };
 
+const isCapCutUrl = (value) => {
+    try {
+        const url = new URL(value.trim());
+        const host = url.hostname.toLowerCase();
+        return url.protocol === "https:" &&
+            !url.username &&
+            !url.password &&
+            !url.port &&
+            (host === "capcut.com" || host.endsWith(".capcut.com")) &&
+            url.pathname !== "/";
+    } catch {
+        return false;
+    }
+};
+
 export default function CapCutDownloader() {
     const [url, setUrl] = useState("");
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
 
     const handleDownload = async () => {
-        if (!url.includes("capcut.com")) {
+        if (!isCapCutUrl(url)) {
             return toast.error("Invalid CapCut Link");
         }
         setLoading(true);

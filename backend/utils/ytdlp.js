@@ -1,50 +1,155 @@
-// 🛠️ Wrapper for youtube-dl-exec to ensure consistent binary usage
-const youtubedl = require('youtube-dl-exec');
+/**
+ * ============================================================
+ * 🛠️ Native Space-Safe Wrapper for yt-dlp
+ * ============================================================
+ * Replaces tinyspawn / youtube-dl-exec which crashes on paths
+ * with spaces (e.g. "D:\EZA POST") due to buggy `input.split(' ')`.
+ * 
+ * Uses Node child_process.execFile and spawn directly.
+ * ============================================================
+ */
+
+const { execFile, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-// Helper to get binary path (useful for production/Render)
-const getBinaryPath = () => {
-    // Check for explicit local binary override or production path
-    return process.env.NODE_ENV === 'production'
-        ? path.join(__dirname, '../bin/yt-dlp')
-        : undefined; // Local dev: use node_modules binary from youtube-dl-exec
-};
+let ffmpegPath = null;
+try {
+    ffmpegPath = require('ffmpeg-static');
+} catch (e) {}
 
 /**
- * Executes yt-dlp with arguments and returns JSON output (Promisified)
+ * 🔍 Locate yt-dlp binary across environments
  */
-const lookup = async (url, options = {}) => {
-    try {
-        const flags = {
-            dumpSingleJson: true,
-            noWarnings: true,
-            noCheckCertificates: true,
-            preferFreeFormats: true,
-            noPlaylist: true,
-            ffmpegLocation: require('ffmpeg-static')
+function getBinaryPath() {
+    // 1. Explicit environment variable override
+    if (process.env.YTDLP_PATH && fs.existsSync(process.env.YTDLP_PATH)) {
+        return process.env.YTDLP_PATH;
+    }
+
+    // 2. Production / Render binary directory
+    const prodBin = path.join(__dirname, '../bin/yt-dlp');
+    if (fs.existsSync(prodBin)) return prodBin;
+    if (fs.existsSync(prodBin + '.exe')) return prodBin + '.exe';
+
+    // 3. Bundled node_modules binary from youtube-dl-exec
+    const nmBinWin = path.join(__dirname, '../node_modules/youtube-dl-exec/bin/yt-dlp.exe');
+    if (fs.existsSync(nmBinWin)) return nmBinWin;
+
+    const nmBin = path.join(__dirname, '../node_modules/youtube-dl-exec/bin/yt-dlp');
+    if (fs.existsSync(nmBin)) return nmBin;
+
+    // 4. Fallback to system PATH
+    return 'yt-dlp';
+}
+
+/**
+ * Convert JS flags object to CLI arguments
+ */
+function flagsToArgs(flags = {}) {
+    const args = [];
+    for (const [key, val] of Object.entries(flags)) {
+        if (key === 'execPath' || val === undefined || val === null) continue;
+
+        // Convert camelCase to kebab-case
+        const kebab = key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+
+        if (val === true) {
+            args.push(`--${kebab}`);
+        } else if (val === false) {
+            if (kebab.startsWith('no-')) {
+                args.push(`--yes-${kebab.slice(3)}`);
+            } else {
+                args.push(`--no-${kebab}`);
+            }
+        } else {
+            args.push(`--${kebab}`, String(val));
+        }
+    }
+    return args;
+}
+
+/**
+ * 🚀 Callable Function: Matches youtube-dl-exec signature
+ * ytdlp(url, flags, options)
+ */
+function ytdlp(url, flags = {}, options = {}) {
+    return new Promise((resolve, reject) => {
+        const bin = options.execPath || getBinaryPath();
+        const cliArgs = [];
+
+        // Add auto ffmpeg location if available
+        if (ffmpegPath && !flags.ffmpegLocation) {
+            flags.ffmpegLocation = ffmpegPath;
+        }
+
+        cliArgs.push(...flagsToArgs(flags));
+        if (url) cliArgs.push(url);
+
+        const execOptions = {
+            maxBuffer: 50 * 1024 * 1024, // 50MB for large channel metadata
+            windowsHide: true,
+            ...options
         };
 
-        // Handles options
-        if (options.flatPlaylist) flags.flatPlaylist = true;
-        if (options.playlistEnd) flags.playlistEnd = options.playlistEnd;
-        if (options.userAgent) flags.userAgent = options.userAgent;
-        if (options.cookies) flags.cookies = options.cookies;
-        if (options.ignoreErrors) flags.ignoreErrors = true;
+        execFile(bin, cliArgs, execOptions, (error, stdout, stderr) => {
+            if (error) {
+                const enhancedError = new Error(stderr || error.message);
+                enhancedError.code = error.code;
+                enhancedError.stderr = stderr;
+                enhancedError.stdout = stdout;
+                return reject(enhancedError);
+            }
 
-        const output = await youtubedl(url, flags, { execPath: getBinaryPath() });
-        return output;
-    } catch (err) {
-        throw new Error(`yt-dlp lookup failed: ${err.message}`);
-    }
-};
+            const trimmed = (stdout || '').trim();
+            if (flags.dumpSingleJson || flags.dumpJson) {
+                try {
+                    return resolve(JSON.parse(trimmed));
+                } catch (parseErr) {
+                    return resolve(trimmed);
+                }
+            }
+            resolve(trimmed);
+        });
+    });
+}
 
 /**
- * Streams video content.
- * Returns the child process.
+ * 🔍 Lookup: Returns parsed video/playlist JSON metadata
  */
-const stream = (url, res) => {
-    // For streaming, we use .exec() to get the subprocess
+async function lookup(url, options = {}) {
+    const flags = {
+        dumpSingleJson: true,
+        noWarnings: true,
+        noCheckCertificates: true,
+        preferFreeFormats: true,
+        noPlaylist: !options.flatPlaylist,
+        ...options
+    };
+
+    return ytdlp(url, flags, { execPath: getBinaryPath() });
+}
+
+/**
+ * 📥 Download: Saves video directly to outputPath
+ */
+async function download(url, outputPath, options = {}) {
+    const flags = {
+        output: outputPath,
+        noWarnings: true,
+        noCheckCertificates: true,
+        noPlaylist: true,
+        ...options
+    };
+
+    return ytdlp(url, flags, { execPath: getBinaryPath() });
+}
+
+/**
+ * 🌊 Stream: Pipes stdout video stream directly to response
+ */
+function stream(url, res, options = {}) {
+    const bin = options.execPath || getBinaryPath();
     const flags = {
         output: '-',
         format: 'best',
@@ -53,47 +158,32 @@ const stream = (url, res) => {
         noCheckCertificates: true,
         noWarnings: true,
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        ffmpegLocation: require('ffmpeg-static')
+        ...options
     };
 
-    // Direct stream
-    const subprocess = youtubedl.exec(url, flags, { execPath: getBinaryPath() });
+    if (ffmpegPath && !flags.ffmpegLocation) {
+        flags.ffmpegLocation = ffmpegPath;
+    }
 
-    // Pipe stdout to response
+    const cliArgs = [...flagsToArgs(flags), url];
+    const subprocess = spawn(bin, cliArgs, { windowsHide: true });
+
     subprocess.stdout.pipe(res);
 
-    subprocess.stderr.on('data', (data) => {
-        const msg = data.toString();
-        // Ignore progress bars
-        if (msg.includes('ERROR')) console.error("❌ yt-dlp stream stderr:", msg);
+    subprocess.stderr.on('data', (chunk) => {
+        const msg = chunk.toString();
+        if (msg.includes('ERROR')) {
+            console.error('❌ yt-dlp stream error:', msg);
+        }
     });
 
     return subprocess;
-};
+}
 
-/**
- * Downloads file to local path
- */
-const download = (url, outputPath, options = {}) => {
-    const flags = {
-        output: outputPath,
-        noWarnings: true,
-        noCheckCertificates: true,
-        ffmpegLocation: require('ffmpeg-static')
-    };
-
-    if (options.format) flags.format = options.format;
-    if (options.cookies) flags.cookies = options.cookies;
-    if (options.userAgent) flags.userAgent = options.userAgent;
-    if (options.noPlaylist) flags.noPlaylist = true;
-    if (options.ignoreErrors) flags.ignoreErrors = true;
-
-    // Returns Promise
-    return youtubedl(url, flags, { execPath: getBinaryPath() });
-};
-
-module.exports = {
-    lookup,
-    stream,
-    download
-};
+// Support both callable function and named methods
+module.exports = ytdlp;
+module.exports.ytdlp = ytdlp;
+module.exports.lookup = lookup;
+module.exports.download = download;
+module.exports.stream = stream;
+module.exports.getBinaryPath = getBinaryPath;

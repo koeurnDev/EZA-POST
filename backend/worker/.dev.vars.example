@@ -1,0 +1,13 @@
+BACKEND_ORIGIN=https://your-legacy-backend.example.com
+JWT_SECRET=replace-with-the-same-secret-used-by-render
+DATABASE_URL=postgresql://user:password@host:5432/database
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+FB_APP_ID=your-facebook-app-id
+FB_APP_SECRET=your-facebook-app-secret
+FRONTEND_URL=https://your-pages-domain.example
+FACEBOOK_REDIRECT_URI=https://your-pages-domain.example/api/auth/facebook/callback
+RESEND_API_KEY=re_your-resend-api-key
+EMAIL_FROM=EZA POST <no-reply@example.com>
+GEMINI_API_KEY=your-gemini-api-key

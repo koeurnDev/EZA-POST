@@ -1,0 +1,26 @@
+{
+  "name": "eza-post-api-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run generate:prisma && wrangler dev",
+    "generate:prisma": "node scripts/generate-prisma-client.js",
+    "build": "npm run generate:prisma && wrangler deploy --dry-run",
+    "deploy": "npm run generate:prisma && wrangler deploy",
+    "pretest": "npm run generate:prisma",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.2.0",
+    "@prisma/client": "7.2.0",
+    "bcryptjs": "^3.0.3",
+    "hono": "^4.13.13",
+    "jose": "^6.2.12",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "prisma": "7.2.0",
+    "wrangler": "^4.55.0"
+  }
+}

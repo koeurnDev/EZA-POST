@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { Facebook, Check, X, Link as LinkIcon, ExternalLink, ShieldCheck, Activity, ChevronRight, Globe, Lock, Zap, Shield, Share2 } from "lucide-react";
+import { 
+    Facebook, Check, X, Link as LinkIcon, ExternalLink, ShieldCheck, Activity, ChevronRight, 
+    Globe, Lock, Zap, Shield, Share2, Key, Sparkles, HelpCircle, Info, Loader2 
+} from "lucide-react";
 import api from "../utils/api";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,12 +28,13 @@ export default function Connections() {
     const [pageError, setPageError] = useState(null);
     const [expandedPageId, setExpandedPageId] = useState(null);
 
+    // 🍪 Cookie / Token Import State
+    const [showCookieModal, setShowCookieModal] = useState(false);
+    const [cookieOrTokenInput, setCookieOrTokenInput] = useState("");
+    const [importingCookie, setImportingCookie] = useState(false);
+
     useEffect(() => {
-        if (user?.facebookId) {
-            fetchPages();
-        } else {
-            setPages([]);
-        }
+        fetchPages();
     }, [user?.facebookId]);
 
     const fetchPages = async (isManual = false) => {
@@ -111,6 +115,34 @@ export default function Connections() {
         }
     };
 
+    const handleImportCookieOrToken = async (e) => {
+        if (e) e.preventDefault();
+        const input = cookieOrTokenInput.trim();
+        if (!input) {
+            return toast.error("សូមបញ្ចូល Facebook Cookie ឬ Access Token");
+        }
+
+        try {
+            setImportingCookie(true);
+            const res = await apiUtils.connectFacebookCookie(input);
+            if (res.data?.success) {
+                toast.success(`🎉 បានទាញយក ${res.data.pagesCount || 0} Pages ដោយជោគជ័យ!`, {
+                    duration: 5000,
+                    icon: "🚀",
+                });
+                setShowCookieModal(false);
+                setCookieOrTokenInput("");
+                await fetchPages(true);
+            } else {
+                toast.error(res.data?.error || "មិនអាចទាញយក Pages បានទេ");
+            }
+        } catch (err) {
+            toast.error("កំហុស: " + (err.response?.data?.error || err.message));
+        } finally {
+            setImportingCookie(false);
+        }
+    };
+
     if (loading) {
         return (
             <DashboardLayout>
@@ -149,7 +181,7 @@ export default function Connections() {
 
                 <div className="grid grid-cols-1 gap-8">
                     {[
-                        { id: 'facebook', name: 'Facebook Network', icon: Facebook, color: 'from-blue-600 to-indigo-700', isConnected: !!user?.facebookId, desc: 'Connect to auto post and manage Facebook Pages.' }
+                        { id: 'facebook', name: 'Facebook Network', icon: Facebook, color: 'from-blue-600 to-indigo-700', isConnected: (!!user?.facebookId || pages.length > 0), desc: 'Connect to auto post and manage Facebook Pages.' }
                     ].map((platform, idx) => (
                         <MotionDiv
                             key={platform.id}
@@ -173,7 +205,7 @@ export default function Connections() {
                                         <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 font-medium leading-relaxed">{platform.desc}</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center justify-center sm:justify-start gap-4">
+                                <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-3">
                                     <MotionAnimatePresence mode="wait">
                                         {platform.isConnected ? (
                                             <MotionDiv
@@ -181,15 +213,23 @@ export default function Connections() {
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.9 }}
                                                 key="connected"
-                                                className="w-full sm:w-auto"
+                                                className="flex flex-wrap items-center gap-3 w-full sm:w-auto"
                                             >
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowCookieModal(true)}
+                                                    className="h-12 md:h-14 px-5 md:px-7 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-wider bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-xl shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Sparkles size={16} className="text-yellow-300" />
+                                                    + បន្ថែម Pages តាម Cookie
+                                                </button>
                                                 <Button 
                                                     variant="secondary"
-                                                    className="w-full sm:w-auto h-12 md:h-14 px-6 md:px-10 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-widest border-rose-500/20 text-rose-500 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all shadow-xl hover:shadow-rose-600/20 group/btn"
+                                                    className="h-12 md:h-14 px-5 md:px-7 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-widest border-rose-500/20 text-rose-500 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all shadow-xl hover:shadow-rose-600/20 group/btn"
                                                     onClick={() => handleConnect(platform.id)}
                                                 >
-                                                    <X size={14}  className="mr-2 group-hover/btn:rotate-90 transition-transform" />
-                                                    Remove
+                                                    <X size={14} className="mr-2 group-hover/btn:rotate-90 transition-transform" />
+                                                    Disconnect
                                                 </Button>
                                             </MotionDiv>
                                         ) : (
@@ -198,14 +238,23 @@ export default function Connections() {
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.9 }}
                                                 key="disconnected"
-                                                className="w-full sm:w-auto"
+                                                className="flex flex-wrap items-center gap-3 w-full sm:w-auto"
                                             >
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowCookieModal(true)}
+                                                    className="w-full sm:w-auto h-12 md:h-14 px-6 md:px-8 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-wider bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-2xl shadow-blue-600/30 transition-all flex items-center justify-center gap-2 transform active:scale-95 group/btn"
+                                                >
+                                                    <Sparkles size={16} className="text-yellow-300 group-hover/btn:rotate-12 transition-transform" />
+                                                    ភ្ជាប់តាម Cookie / Token (MMO)
+                                                </button>
                                                 <Button 
-                                                    className="w-full sm:w-auto h-12 md:h-14 px-8 md:px-12 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 shadow-2xl shadow-emerald-600/30 group/btn"
+                                                    variant="secondary"
+                                                    className="w-full sm:w-auto h-12 md:h-14 px-5 md:px-6 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-bold border border-white/10 hover:bg-white/5 opacity-70 hover:opacity-100 transition-all"
                                                     onClick={() => handleConnect(platform.id)}
                                                 >
-                                                    <Zap size={14}  className="mr-2 group-hover/btn:scale-125 transition-transform" />
-                                                    Connect Now
+                                                    <Zap size={14} className="mr-1.5" />
+                                                    OAuth Login
                                                 </Button>
                                             </MotionDiv>
                                         )}
@@ -220,13 +269,13 @@ export default function Connections() {
                 </div>
 
 
-                {user?.facebookId && (
+                {(user?.facebookId || pages.length > 0) && (
                     <MotionDiv 
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="mt-12 bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 dark:border-white/5 overflow-hidden shadow-xl"
                     >
-                        <div className="p-5 md:p-8 border-b border-white/10 dark:border-white/5 flex items-center justify-between">
+                        <div className="p-5 md:p-8 border-b border-white/10 dark:border-white/5 flex flex-wrap items-center justify-between gap-4">
                             <div>
                                 <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2 md:gap-3">
                                     Your Facebook Pages
@@ -235,12 +284,22 @@ export default function Connections() {
                                     </span>
                                 </h3>
                             </div>
-                            <button 
-                                onClick={() => fetchPages(true)} 
-                                className="w-9 h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-emerald-500 transition-all border border-white/10 shadow-inner"
-                            >
-                                <RefreshCw size={16}  className={isLoadingPages ? "animate-spin text-emerald-500" : ""} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setShowCookieModal(true)}
+                                    className="h-9 md:h-10 px-3 md:px-4 rounded-lg md:rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition"
+                                >
+                                    <Key size={14} />
+                                    + បញ្ចូល Cookie/Token
+                                </button>
+                                <button 
+                                    onClick={() => fetchPages(true)} 
+                                    className="w-9 h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-emerald-500 transition-all border border-white/10 shadow-inner"
+                                    title="Refresh Pages"
+                                >
+                                    <RefreshCw size={16} className={isLoadingPages ? "animate-spin text-emerald-500" : ""} />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="p-8 space-y-6">
@@ -367,6 +426,115 @@ export default function Connections() {
                     </div>
                 </MotionDiv>
             </div>
+
+            {/* 🍪 Cookie / Token Import Modal (MMO Bypass) */}
+            <AnimatePresence>
+                {showCookieModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-gray-900 border border-indigo-500/30 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl relative"
+                        >
+                            <button
+                                onClick={() => {
+                                    setShowCookieModal(false);
+                                    setCookieOrTokenInput("");
+                                }}
+                                disabled={importingCookie}
+                                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition"
+                            >
+                                <X size={16} />
+                            </button>
+
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
+                                    <Sparkles size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-white">ភ្ជាប់ Pages តាម Cookie ឬ Token</h3>
+                                    <p className="text-xs text-indigo-300">Bypass Facebook Developer App (MMO Mode)</p>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleImportCookieOrToken} className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-300 flex items-center justify-between">
+                                        <span>បញ្ចូល Facebook Cookie ឬ Access Token៖</span>
+                                        <span className="text-[10px] text-blue-400 font-normal">គាំទ្រ Cookie / EAAG / EAAB</span>
+                                    </label>
+                                    <textarea
+                                        rows={4}
+                                        placeholder={`បិទភ្ជាប់ (Paste) ត្រង់នេះ៖\n• Cookie: c_user=1000...; xs=...; datr=...\n• ឬ Access Token: EAAG... / EAAB...`}
+                                        value={cookieOrTokenInput}
+                                        onChange={(e) => setCookieOrTokenInput(e.target.value)}
+                                        disabled={importingCookie}
+                                        className="w-full bg-black/50 border border-white/10 rounded-2xl p-3.5 text-xs font-mono text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none leading-relaxed"
+                                    />
+                                </div>
+
+                                {/* ⚡ Official EZA-POST Extension Helper */}
+                                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-900/30 via-indigo-900/20 to-transparent border border-purple-500/30 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-xl bg-purple-600/30 text-purple-300 flex items-center justify-center font-bold text-sm">
+                                            ⚡
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-white leading-tight">EZA-POST Chrome Extension</p>
+                                            <p className="text-[10px] text-purple-300">Sync ផេកអូតូតាម ១ ឃ្លីក (Folder: <code>extension/</code>)</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[9px] font-bold text-purple-300 px-2 py-1 rounded-md bg-purple-500/20 border border-purple-500/30">
+                                        1-Click Sync
+                                    </span>
+                                </div>
+
+                                {/* Tips Box */}
+                                <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-200 space-y-1.5 leading-relaxed">
+                                    <div className="flex items-center gap-1.5 font-bold text-blue-300">
+                                        <Info size={14} />
+                                        <span>របៀបយក Cookie ឬ Token ងាយៗ៖</span>
+                                    </div>
+                                    <p>• <strong>Cookie</strong>: បើក Facebook លើ Chrome &rarr; ប្រើ Extension <em>"Cookie-Editor"</em> ចុច <strong>Export</strong> &rarr; ជ្រើសរើស <strong>Header String</strong> (ឬ <strong>JSON</strong>) រួច Paste ទីនេះ។</p>
+                                    <p>• <strong>Token</strong>: ចូល <a href="https://business.facebook.com" target="_blank" rel="noreferrer" className="underline text-blue-300">business.facebook.com</a> ឬ Ads Manager រួច Copy Token ផ្តើមដោយ <code>EAAG...</code> ឬ <code>EAAB...</code>។</p>
+                                </div>
+
+                                <div className="flex items-center gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowCookieModal(false);
+                                            setCookieOrTokenInput("");
+                                        }}
+                                        disabled={importingCookie}
+                                        className="flex-1 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold transition"
+                                    >
+                                        បោះបង់
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={importingCookie || !cookieOrTokenInput.trim()}
+                                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-bold shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+                                    >
+                                        {importingCookie ? (
+                                            <>
+                                                <Loader2 size={16} className="animate-spin" />
+                                                កំពុងទាញយក Pages...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles size={16} />
+                                                ទាញយក Pages ទាំងអស់
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </DashboardLayout>
     );
 }

@@ -8,7 +8,10 @@ const MAX_FILE_AGE_MS = 15 * 60 * 1000;    // Keep files for 15 minutes
 // 📂 Target Directories
 const TARGET_DIRS = [
     path.join(__dirname, '../temp/videos'),
-    path.join(__dirname, '../temp/slideshows')
+    path.join(__dirname, '../temp/slideshows'),
+    path.join(__dirname, '../temp/instagram'),
+    path.join(__dirname, '../temp/downloads'),
+    path.join(__dirname, '../temp/capcut')
 ];
 
 /**

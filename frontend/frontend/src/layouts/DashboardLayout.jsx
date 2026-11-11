@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import NetworkStatus from "../components/NetworkStatus";
 import {
   LayoutDashboard, Send, Layers, Clock, BarChart2, HelpCircle, Link as LinkIcon, MessageSquare, Zap, Settings, LogOut, Sun, Moon, User, Grid, Search, Bell, MoreHorizontal, X,
-  Download, Video, Instagram, AtSign, Facebook, Images, Scissors, ShoppingBag, Music, TrendingUp, Film, FileText, ImagePlus, Wand2, EyeOff, Repeat, Languages, Users, Cloud, Eraser
+  Download, Video, Instagram, AtSign, Facebook, Images, Scissors, ShoppingBag, Music, TrendingUp, Film, FileText, ImagePlus, Wand2, EyeOff, Repeat, Languages, Users, Cloud, Eraser,
+  Radio, Trash2
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -67,6 +68,7 @@ const DashboardLayout = ({ children }) => {
 
   const CORE_NAV = [
     { label: "បង្កើតផុស", icon: <Send size={22} />, path: "/post" },
+    { label: "អក្សររត់ AI", icon: <Languages size={22} />, path: "/subtitles" },
     { label: "បញ្ជីពេលវេល", icon: <Clock size={22} />, path: "/posts" },
     { label: "ឆ្លើយតបស្វ័យប្រវត្តិ", icon: <MessageSquare size={22} />, path: "/bot" },
   ];
@@ -93,8 +95,16 @@ const DashboardLayout = ({ children }) => {
       ]
     },
     {
+      title: "Facebook MMO & ផ្សាយផ្ទាល់",
+      items: [
+        { label: "Live Stream ច្រើនផេក", icon: <Radio size={18} />, path: "/tools/live-stream" },
+        { label: "សម្អាតផុស (Bulk Delete)", icon: <Trash2 size={18} />, path: "/tools/page-cleaner" },
+      ]
+    },
+    {
       title: "ឧបករណ៍ច្នៃប្រឌិត",
       items: [
+        { label: "អក្សររត់ AI (Subtitles)", icon: <Languages size={18} />, path: "/subtitles" },
         { label: "ឯកសារ", icon: <FileText size={18} />, path: "/tools/document-converter" },
       ]
     },

@@ -89,11 +89,38 @@ const botEngine = {
                     console.log(`      💬 Sending delayed reply to ${reply.commentId}: "${reply.replyMessage}"`);
 
                     const decryptedToken = decrypt(reply.accessToken);
-                    await axios.post(`${fb.graph}/${reply.commentId}/comments`, {
-                        message: reply.replyMessage,
-                        access_token: decryptedToken,
-                        attachment_url: reply.attachmentUrl || undefined,
-                    });
+
+                    // 1️⃣ Send Public Comment Reply (if replyMessage exists)
+                    if (reply.replyMessage && reply.replyMessage.trim()) {
+                        await axios.post(`${fb.graph}/${reply.commentId}/comments`, {
+                            message: reply.replyMessage,
+                            access_token: decryptedToken,
+                            attachment_url: reply.attachmentUrl || undefined,
+                        });
+                        console.log(`      💬 Public comment reply posted: ${reply.commentId}`);
+                    }
+
+                    // 2️⃣ Send Private Reply / DM via Messenger Send API (if sendDm is true)
+                    let dmResultStatus = null;
+                    if (reply.sendDm && reply.dmMessage && reply.dmMessage.trim()) {
+                        try {
+                            const dmRes = await fb.sendPrivateReply(
+                                reply.pageId,
+                                reply.commentId,
+                                reply.dmMessage,
+                                decryptedToken
+                            );
+                            if (dmRes.success) {
+                                dmResultStatus = "success";
+                                console.log(`      📬 Private message (DM) delivered for comment ${reply.commentId}`);
+                            } else {
+                                dmResultStatus = `failed: ${dmRes.error}`;
+                            }
+                        } catch (dmErr) {
+                            dmResultStatus = `failed: ${dmErr.message}`;
+                            console.warn(`      ⚠️ Private reply warning:`, dmErr.message);
+                        }
+                    }
 
                     // Success
                     await prisma.pendingReply.update({
@@ -106,7 +133,9 @@ const botEngine = {
                         data: {
                             userId: reply.userId,
                             commentId: reply.commentId,
-                            replyMessage: reply.replyMessage,
+                            replyMessage: reply.replyMessage || "",
+                            dmMessage: reply.dmMessage || null,
+                            dmStatus: dmResultStatus,
                             pageId: reply.pageId,
                             status: "success",
                             timestamp: new Date()
@@ -341,48 +370,60 @@ const botEngine = {
         });
 
         // 🎯 5.1 Pick ONE rule randomly if multiple match (Rule Rotation)
+        let replyMessage = null;
+        let attachmentUrl = null;
+        let dmMessage = null;
+        let sendDm = false;
+
         if (matchedRules.length > 0) {
             const pickedRule = matchedRules[Math.floor(Math.random() * matchedRules.length)];
             replyMessage = pickedRule.reply;
             attachmentUrl = pickedRule.attachmentUrl;
+            dmMessage = pickedRule.dmReply || null;
+            sendDm = Boolean(pickedRule.enableDm && pickedRule.dmReply);
         }
 
         // 🚀 6. Queue Reply (Smart Delay)
-        if (replyMessage) {
+        if (replyMessage || (sendDm && dmMessage)) {
             try {
-                // --- 👤 Variable Support: [[name]] ---
-                let finalReply = replyMessage.replace(/\[\[name\]\]/g, comment.from?.name || "ភ្ញៀវ");
+                const commenterName = comment.from?.name || "ភ្ញៀវ";
+                const formatText = (text) => {
+                    if (!text) return "";
+                    let formatted = text.replace(/\[\[name\]\]/g, commenterName);
+                    const spintaxRegex = /\{([^{}|]+(?:\|[^{}|]+)+)\}/g;
+                    return formatted.replace(spintaxRegex, (match, options) => {
+                        const choices = options.split('|');
+                        return choices[Math.floor(Math.random() * choices.length)];
+                    });
+                };
 
-                // --- 🧠 Spintax Support {good|hi|hello} ---
-                const spintaxRegex = /\{([^{}|]+(?:\|[^{}|]+)+)\}/g;
-                finalReply = finalReply.replace(spintaxRegex, (match, options) => {
-                    const choices = options.split('|');
-                    return choices[Math.floor(Math.random() * choices.length)];
-                });
+                const finalCommentReply = formatText(replyMessage);
+                const finalDmReply = formatText(dmMessage);
 
-                // --- ⏳ Smart Delay Calculation ---
-                // Get current pending count to adjust delay
+                // --- ⏳ Smart Delay Calculation (Fast & Responsive) ---
                 const pendingCount = await prisma.pendingReply.count({ where: { status: "pending" } });
                 
-                let baseDelay = 30000; // 30s default (Faster)
-                if (pendingCount > 50) baseDelay = 60000; // 1 min if busy
-                if (pendingCount > 100) baseDelay = 120000; // 2 mins if viral
+                let baseDelay = 15000; // 15s default
+                if (pendingCount > 50) baseDelay = 30000;
+                if (pendingCount > 100) baseDelay = 60000;
 
-                const randomExtra = Math.floor(Math.random() * 30000); // + 0-30s
+                const randomExtra = Math.floor(Math.random() * 15000); // + 0-15s
                 const delayMs = baseDelay + randomExtra;
                 const sendAt = new Date(Date.now() + delayMs);
 
-                console.log(`      ⏳ Queued (${pendingCount} pending): ${finalReply.substring(0,20)}... (Delay: ${Math.round(delayMs / 1000)}s)`);
+                console.log(`      ⏳ Queued (${pendingCount} pending): Comment="${finalCommentReply.substring(0,20)}...", DM=${sendDm ? `"${finalDmReply.substring(0,20)}..."` : 'disabled'} (Delay: ${Math.round(delayMs / 1000)}s)`);
 
                 await prisma.pendingReply.create({
                     data: {
                         userId: userId,
                         commentId: comment.id,
-                        postId: comment.postId || comment.id.split('_')[0], // 🎯 Added missing field!
-                        replyMessage: finalReply,
+                        postId: comment.postId || comment.id.split('_')[0],
+                        replyMessage: finalCommentReply || "",
+                        dmMessage: finalDmReply || null,
+                        sendDm: sendDm,
                         attachmentUrl: attachmentUrl,
                         pageId: page.id,
-                        accessToken: encrypt(page.access_token), // 🔒 Encrypt!
+                        accessToken: encrypt(page.access_token),
                         sendAt: sendAt,
                         status: "pending"
                     }

@@ -1,0 +1,32 @@
+name = "khmersub-cf-worker"
+main = "src/index.ts"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 1. Cloudflare Workers AI Binding (Serverless GPU Inference)
+[ai]
+binding = "AI"
+
+# 2. Cloudflare R2 Storage (Zero-Egress Direct Media Storage)
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "khmersub-media"
+preview_bucket_name = "khmersub-media-dev"
+
+# 3. Cloudflare D1 Serverless SQL Database
+[[d1_databases]]
+binding = "DB"
+database_name = "khmersub_db"
+database_id = "7ac481f9-ec56-456b-9049-523c032b1dad"
+
+# 4. Environment Variables
+[vars]
+ENVIRONMENT = "production"
+BAKONG_ACCOUNT_ID = "seab_koeurn@bkrt"
+BAKONG_MERCHANT_NAME = "EZA POST"
+WHISPER_EDGE_MODEL = "@cf/openai/whisper-large-v3-turbo"
+MAX_UPLOAD_MB = 150
+UPSTASH_REDIS_REST_URL = "https://sharp-newt-86747.upstash.io"
+UPSTASH_REDIS_REST_TOKEN = "gQAAAAAAAVLbAAIgcDJkYjI0ODY4NWY4MTY0ODcyOTA1MjkxMTA1Y2JkMjJiMg"
+GEMINI_API_KEY = "AIzaSyAY4fBEABDGIaFfQPn-TnpE8JadBGr0H0E"
+

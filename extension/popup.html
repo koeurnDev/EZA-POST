@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EZA-POST Sync Helper</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="card">
+    <!-- Header -->
+    <div class="header">
+      <div class="brand">
+        <div class="logo-box">⚡</div>
+        <div class="brand-text">
+          <span class="brand-name">EZA-POST</span>
+          <span class="brand-sub">Facebook Sync Helper</span>
+        </div>
+      </div>
+      <span class="badge" id="fbStatusBadge">កំពុងពិនិត្យ...</span>
+    </div>
+
+    <!-- Facebook Session Card -->
+    <div class="session-card" id="sessionCard">
+      <div class="session-info">
+        <span class="label">ស្ថានភាព Facebook Session:</span>
+        <div class="status-row">
+          <span class="dot" id="statusDot"></span>
+          <span class="user-text" id="fbUserText">កំពុងស្វែងរកគណនី...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Action Button -->
+    <button class="btn-sync" id="btnSync">
+      <span class="btn-icon">⚡</span>
+      <span class="btn-text" id="btnSyncText">Sync Pages ទៅកាន់ EZA-POST (1-Click)</span>
+    </button>
+
+    <!-- Secondary Quick Copy Actions -->
+    <div class="action-grid">
+      <button class="btn-secondary" id="btnCopyCookie">
+        <span>📋</span> Copy Cookie
+      </button>
+      <button class="btn-secondary" id="btnOpenDashboard">
+        <span>🌐</span> បើក EZA-POST
+      </button>
+    </div>
+
+    <!-- Feedback Message Box -->
+    <div class="message-box hidden" id="messageBox">
+      <div class="message-content" id="messageContent"></div>
+    </div>
+
+    <!-- Settings Drawer (Server URL) -->
+    <div class="settings-section">
+      <details>
+        <summary>⚙️ ការកំណត់ Server URL (កម្រិតខ្ពស់)</summary>
+        <div class="settings-body">
+          <label for="serverUrl">EZA-POST API Endpoint:</label>
+          <input type="text" id="serverUrl" value="http://localhost:5000">
+          <button class="btn-save-settings" id="btnSaveSettings">រក្សាទុក</button>
+        </div>
+      </details>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>🔒 Safe & Encrypted Local Handshake</span>
+      <span>v1.0.0</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+

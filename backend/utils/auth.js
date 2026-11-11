@@ -13,13 +13,23 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const prisma = require('./prisma');
 const axios = require("axios");
+const crypto = require("crypto");
 
 const router = express.Router();
 
-// 🔑 JWT Config
+// 🔑 JWT Config (EZA-POST Spec: Fail-closed in production)
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 const JWT_EXPIRATION = "1d";
 const FB_API_VERSION = "v21.0";
+
+// 🚀 In-memory cache for user database checks (TTL: 15s) - EZA-POST High-Performance Cache
+// Eliminates redundant Neon PostgreSQL round-trips on every authenticated API call!
+const userDbCache = new Map();
+const USER_CACHE_TTL_MS = 15_000;
+
+function invalidateUserCache(userId) {
+  if (userId) userDbCache.delete(String(userId));
+}
 
 /* -------------------------------------------------------------------------- */
 /* ✅ Generate JWT Token                                                      */
@@ -30,6 +40,7 @@ function generateToken(user) {
       id: user.id,
       email: user.email,
       name: user.name,
+      jti: crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex"),
     },
     JWT_SECRET,
     {
@@ -67,21 +78,37 @@ function verifyToken(req, res, next) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* ✅ Get User by ID from Database                                            */
+/* ✅ Get User by ID from Database (with High-Speed 15s In-Memory Cache)      */
 /* -------------------------------------------------------------------------- */
 async function getUserById(userId) {
+  if (!userId) return null;
+  const uid = String(userId);
+
+  // 1. Fast path: In-memory cache hit (0ms latency)
+  const cached = userDbCache.get(uid);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.data;
+  }
+
   try {
-    // console.log(`🔍 helper: getUserById searching for: ${userId}`);
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: uid },
       select: { id: true, email: true, name: true }
     });
 
     if (!user) {
-      console.warn(`⚠️ getUserById: User not found in DB for ID: ${userId}`);
+      console.warn(`⚠️ getUserById: User not found in DB for ID: ${uid}`);
+      return null;
     }
 
-    return user ? { id: user.id, email: user.email, name: user.name } : null;
+    const userData = { id: user.id, email: user.email, name: user.name };
+    // 2. Cache in memory for 15 seconds
+    userDbCache.set(uid, {
+      data: userData,
+      expiresAt: Date.now() + USER_CACHE_TTL_MS,
+    });
+
+    return userData;
   } catch (err) {
     console.error("❌ Database lookup failed:", err.message);
     return null;
@@ -237,6 +264,7 @@ module.exports = {
   setAuthCookie,
   clearAuthCookie,
   getUserById,
+  invalidateUserCache,
   validateFacebookToken,
   getFacebookUserData,
   router, // ✅ export router for server.js

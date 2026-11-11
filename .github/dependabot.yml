@@ -1,0 +1,32 @@
+version: 2
+updates:
+  # 1. Backend Node.js npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "security"
+      - "backend"
+
+  # 2. Frontend React npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/frontend/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "security"
+      - "frontend"
+
+  # 3. Backend Python dependencies (pip)
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "security"
+      - "python"
+

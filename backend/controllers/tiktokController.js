@@ -19,18 +19,12 @@ exports.fetchTikTokVideo = async (req, res) => {
             const videoId = cleanUrl.match(/\/video\/(\d+)/)?.[1];
             
             console.log("    👉 Attempting Metadata Fetch (yt-dlp)...");
-            const youtubedl = require("youtube-dl-exec");
+            const youtubedl = require("../utils/ytdlp");
             const path = require("path");
             const fs = require("fs");
             const axios = require("axios");
             
-            const getBinaryPath = () => {
-                const prodPath = path.join(__dirname, '../../bin/yt-dlp');
-                const nodePath = path.join(__dirname, '../../node_modules/youtube-dl-exec/bin/yt-dlp.exe');
-                if (fs.existsSync(prodPath)) return prodPath;
-                if (fs.existsSync(nodePath)) return nodePath;
-                return 'yt-dlp';
-            };
+            const getBinaryPath = () => youtubedl.getBinaryPath();
 
             // 🚀 FAST PATH: Get H.264 URL from TikWM immediately for playback
             let compatibleUrl = "";

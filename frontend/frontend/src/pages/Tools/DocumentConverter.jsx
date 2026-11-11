@@ -8,6 +8,15 @@ import {
 import api from "../../utils/api";
 import toast from "react-hot-toast";
 
+const supportedTargets = {
+    pdf: ["docx", "pptx"],
+    doc: ["pdf", "pptx"],
+    docx: ["pdf", "pptx"],
+    ppt: ["pdf"],
+    pptx: ["pdf"]
+};
+const maxFileSize = 25 * 1024 * 1024;
+
 // ✨ Motion Variants
 const containerVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -31,24 +40,29 @@ export default function DocumentConverter() {
     const [progress, setProgress] = useState(0);
     const [targetFormat, setTargetFormat] = useState('pdf');
 
-    const handleFileChange = (e) => {
-        if (e.target.files?.[0]) {
-            const f = e.target.files[0];
-            setFile(f);
-            setResult(null);
-            setTargetFormat(f.name.toLowerCase().endsWith('.pdf') ? 'docx' : 'pdf');
+    const selectFile = (candidate) => {
+        const extension = candidate.name.split('.').pop().toLowerCase();
+        if (!supportedTargets[extension]) {
+            toast.error("Please select a PDF, DOC, DOCX, PPT, or PPTX file.");
+            return;
         }
+        if (candidate.size > maxFileSize) {
+            toast.error("Files must be 25 MiB or smaller.");
+            return;
+        }
+        setFile(candidate);
+        setResult(null);
+        setTargetFormat(extension === "pdf" ? "docx" : "pdf");
+    };
+
+    const handleFileChange = (e) => {
+        if (e.target.files?.[0]) selectFile(e.target.files[0]);
     };
 
     const handleDrop = (e) => {
         e.preventDefault();
         setIsDragging(false);
-        if (e.dataTransfer.files?.[0]) {
-            const f = e.dataTransfer.files[0];
-            setFile(f);
-            setResult(null);
-            setTargetFormat(f.name.toLowerCase().endsWith('.pdf') ? 'docx' : 'pdf');
-        }
+        if (e.dataTransfer.files?.[0]) selectFile(e.dataTransfer.files[0]);
     };
 
     const handleConvert = async () => {
@@ -81,7 +95,16 @@ export default function DocumentConverter() {
             setResult({ url, filename: fileName });
             toast.success("Conversion Successful!", { icon: "✨" });
         } catch (err) {
-            toast.error("Conversion Failed. Please try again.");
+            let message = "Conversion failed. Please check the file and try again.";
+            if (err.response?.data instanceof Blob) {
+                try {
+                    const response = JSON.parse(await err.response.data.text());
+                    if (response.error) message = response.error;
+                } catch {
+                    // Keep the user-facing fallback for non-JSON proxy errors.
+                }
+            }
+            toast.error(message);
             setProgress(0);
         } finally {
             setLoading(false);
@@ -173,7 +196,7 @@ export default function DocumentConverter() {
                                         <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Premium Quality</span>
                                     </div>
                                     <div className="flex gap-3">
-                                        {['pdf', 'docx', 'pptx'].map(fmt => (
+                                        {(supportedTargets[file.name.split('.').pop().toLowerCase()] || []).map(fmt => (
                                             <button
                                                 key={fmt}
                                                 onClick={() => setTargetFormat(fmt)}
@@ -183,6 +206,9 @@ export default function DocumentConverter() {
                                             </button>
                                         ))}
                                     </div>
+                                    <p className="text-xs text-gray-500">
+                                        Production conversions use Google Drive to process documents; uploaded files are deleted after conversion.
+                                    </p>
                                 </div>
                                 <button onClick={handleConvert} className="w-full h-16 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-sm transition-all shadow-xl flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98]">
                                     <Zap size={20} /> Start Conversion

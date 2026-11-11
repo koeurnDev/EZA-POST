@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const prisma = require("../../utils/prisma");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 // ✅ POST /api/auth/reset-password
 router.post("/", async (req, res) => {
@@ -17,9 +18,10 @@ router.post("/", async (req, res) => {
         }
 
         // Find user with valid token
+        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
         const user = await prisma.user.findFirst({
             where: {
-                resetPasswordToken: token,
+                resetPasswordToken: { in: [token, tokenHash] },
                 resetPasswordExpires: { gt: new Date() }, // Token must not be expired
             }
         });

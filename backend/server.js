@@ -32,7 +32,12 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({
+  limit: "50mb",
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // 🛡️ Security Middlewares
@@ -94,6 +99,8 @@ app.use(
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-csrf-token', 'X-CSRF-Token'],
+    exposedHeaders: ['Content-Length', 'Cache-Control', 'X-CSRF-Token', 'Server-Timing'],
+    maxAge: 86400, // ⚡ Cache CORS preflight for 24h (EZA-POST Spec: Reduces network round-trips)
   })
 );
 
@@ -218,25 +225,26 @@ const routeModules = [
   // ["upload/error-log", "./api/upload/error-log"],
   ["upload/bot-image", "./api/upload/botImage"],
   ["bot", "./routes/bot"],
-  ["tiktok", "./api/tiktok"], // Keep for downloader preview if needed
+  ["tiktok", "./api/tiktok", toolLimiter], // Legacy TikTok downloader endpoints
   ["user/pages", "./api/user/pages"],
   ["user/update", "./api/user/update"],
   ["user/stats", "./api/user/stats"],
   ["user/connections", "./api/user/connections"],
   ["analytics", "./api/analytics"],               
-  ["tools/tiktok", "./api/tools/tiktok"],
+  ["tools/tiktok", "./api/tools/tiktok", toolLimiter],
   // ["auth/youtube", "./api/auth/youtube"], 
   // ["auth/tiktok", "./api/auth/tiktok"],   
   // ["auth/instagram", "./api/auth/instagram"], 
-  ["tools/pinterest", "./api/tools/pinterest"],
-  ["tools/youtube", "./api/tools/youtube"],
+  ["tools/pinterest", "./api/tools/pinterest", toolLimiter],
+  ["tools/youtube", "./api/tools/youtube", toolLimiter],
   ["webhooks/facebook", "./api/webhooks/facebook"], 
-  ["tools/facebook", "./api/tools/facebook"],
-  ["tools/instagram", "./api/tools/instagram"],
-  ["tools/capcut", "./api/tools/capcut"],
-  ["tools/threads", "./api/tools/threads"],
-  ["tools/document-converter", "./api/tools/document_converter"],
-  ["debug", "./api/debug_python"],
+  ["tools/facebook", "./api/tools/facebook", toolLimiter],
+  ["tools/instagram", "./api/tools/instagram", toolLimiter],
+  ["tools/capcut", "./api/tools/capcut", toolLimiter],
+  ["tools/threads", "./api/tools/threads", toolLimiter],
+  ["tools/document-converter", "./api/tools/document_converter", toolLimiter],
+  ["page-cleaner", "./routes/pageCleanerRoutes"],
+  ["live-stream", "./routes/liveStreamRoutes"],
 ];
 
 for (const [route, file, limiter] of routeModules) {
@@ -316,8 +324,17 @@ app.get("/api/health", async (req, res) => {
 // ------------------------------------------------------------
 const distPath = path.join(__dirname, "../frontend/frontend/dist");
 if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
-  console.log("✅ Serving frontend from dist folder");
+  // ⚡ High-Performance Static Caching (EZA-POST Spec): Immutable 1-year cache for hashed JS/CSS chunks
+  app.use(express.static(distPath, {
+    maxAge: "1y",
+    immutable: true,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith("index.html")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      }
+    }
+  }));
+  console.log("✅ Serving frontend from dist folder (High-speed caching enabled)");
 }
 
 // ✅ Serve Temp Files (Required for TikTok Previews)
@@ -367,6 +384,11 @@ setInterval(() => {
 
 // Run bot once on startup after 15s
 setTimeout(() => botEngine.run(), 15000);
+
+// ⚡ Fast Bot Queue Worker: Processes pending replies every 10 seconds for real-time response
+setInterval(() => {
+  botEngine.processPendingReplies();
+}, 10 * 1000);
 
 // 🔄 Daily Token Refresh Check (Runs every 24 hours)
 const { checkAndRefreshTokens } = require("./utils/tokenRefresher");

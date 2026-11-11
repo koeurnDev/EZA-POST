@@ -3,7 +3,7 @@
 // ============================================================
 
 import axios from "axios";
-import { getUserData, saveUserData, clearUserData, fetchCsrfToken } from "./apiUtils";
+import { getUserData, saveUserData, clearUserData, fetchCsrfToken, isWorkerNativeApiRequest } from "./apiUtils";
 
 /* -------------------------------------------------------------------------- */
 /* ✅ Default Constants                                                       */
@@ -90,7 +90,10 @@ api.interceptors.request.use(
     }
 
     // 🛡️ Attach CSRF Token for state-changing methods
-    if (['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase())) {
+    if (
+      ['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase()) &&
+      !isWorkerNativeApiRequest(config.url)
+    ) {
       const csrfToken = await fetchCsrfToken();
       if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken;
     }

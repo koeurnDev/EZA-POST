@@ -62,6 +62,7 @@ export default function TikTokDownloader() {
     const [url, setUrl] = useState("");
     const [loading, setLoading] = useState(false);
     const [videoData, setVideoData] = useState(null);
+    const [isVideoDownloading, setIsVideoDownloading] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
     const [isCombining, setIsCombining] = useState(false);
     const [isFixing, setIsFixing] = useState(false);
@@ -159,9 +160,49 @@ export default function TikTokDownloader() {
                 toast.success("Video Found!", { icon: "✨" });
             }
         } catch (err) {
-            toast.error(err.response?.data?.error || "Failed to find video");
+            const details = err?.details || err?.response?.data;
+            const message = [
+                details?.error || err?.message || "Failed to find video",
+                details?.errorCode ? `Code: ${details.errorCode}` : null,
+                details?.diagnosticId ? `Reference: ${details.diagnosticId}` : null,
+            ].filter(Boolean).join(" | ");
+            toast.error(message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleVideoDownload = async () => {
+        if (!videoData?.downloadUrl) {
+            return toast.error("TikTok did not provide a publicly accessible media URL.");
+        }
+
+        setIsVideoDownloading(true);
+        try {
+            const response = await api.get(videoData.downloadUrl, {
+                responseType: "blob",
+                timeout: 120000,
+            });
+            const objectUrl = URL.createObjectURL(response.data);
+            const link = document.createElement("a");
+            link.href = objectUrl;
+            link.download = `tiktok-${videoData.id}.mp4`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        } catch (err) {
+            let message = err.response?.data?.error;
+            if (err.response?.data instanceof Blob) {
+                try {
+                    message = JSON.parse(await err.response.data.text()).error;
+                } catch {
+                    message = null;
+                }
+            }
+            toast.error(message || "TikTok did not allow this video to be downloaded.");
+        } finally {
+            setIsVideoDownloading(false);
         }
     };
 
@@ -268,13 +309,13 @@ export default function TikTokDownloader() {
                 {/* 🏷️ Header */}
                 <div className="text-center space-y-3">
                     <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-600 dark:text-pink-400 text-xs font-bold uppercase tracking-wider">
-                        <Sparkles size={14} /> Premium Downloader
+                        <Sparkles size={14} /> TikTok Preview
                     </motion.div>
                     <motion.h1 variants={itemVariants} className="text-3xl md:text-5xl font-black tracking-tight text-gray-900 dark:text-white">
-                        TikTok <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">Saver</span>
+                        TikTok <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">Preview</span>
                     </motion.h1>
                     <motion.p variants={itemVariants} className="text-gray-500 dark:text-gray-400 max-w-md mx-auto text-sm md:text-base px-4">
-                        Get high-quality content without watermarks. Pro-level tools for creators.
+                        Preview public TikTok videos. Downloading and profile tools require the Node backend.
                     </motion.p>
                 </div>
 
@@ -285,9 +326,11 @@ export default function TikTokDownloader() {
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
+                                disabled={tab === "profile"}
+                                title={tab === "profile" ? "Profile tools require the Node backend." : undefined}
                                 className={`relative px-4 md:px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
                                     activeTab === tab ? "text-gray-900 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                                }`}
+                                } ${tab === "profile" ? "cursor-not-allowed opacity-50" : ""}`}
                             >
                                 {activeTab === tab && (
                                     <motion.div 
@@ -295,7 +338,7 @@ export default function TikTokDownloader() {
                                         className="absolute inset-0 bg-white dark:bg-white/10 shadow-lg rounded-xl z-0"
                                     />
                                 )}
-                                <span className="relative z-10 capitalize">{tab === 'single' ? 'Single Video' : 'Profile & Bulk'}</span>
+                                <span className="relative z-10 capitalize">{tab === 'single' ? 'Single Video' : 'Profile & Bulk (Node)'}</span>
                             </button>
                         ))}
                     </div>
@@ -360,7 +403,16 @@ export default function TikTokDownloader() {
                                                 {/* Preview Section */}
                                                 <div className="w-full md:w-80 shrink-0">
                                                     <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-black shadow-2xl relative border border-white/20">
-                                                        {(videoData.type === 'slideshow' || videoData.images?.length > 0) ? (
+                                                        {videoData.embedUrl ? (
+                                                            <iframe
+                                                                src={videoData.embedUrl}
+                                                                title={videoData.title || "TikTok video preview"}
+                                                                className="w-full h-full border-0"
+                                                                allow="encrypted-media; fullscreen; picture-in-picture"
+                                                                allowFullScreen
+                                                                referrerPolicy="strict-origin-when-cross-origin"
+                                                            />
+                                                        ) : (videoData.type === 'slideshow' || videoData.images?.length > 0) ? (
                                                             <img 
                                                                 src={videoData.images?.[0] || videoData.cover} 
                                                                 className="w-full h-full object-cover" 
@@ -411,7 +463,10 @@ export default function TikTokDownloader() {
                                                             {videoData.title || "Untitled Masterpiece"}
                                                         </h2>
                                                         <div className="flex flex-wrap gap-2">
-                                                            {['No Watermark', 'HD Quality', 'Original Audio'].map(tag => (
+                                                            {(videoData.embedUrl
+                                                                ? ["TikTok player", "Public-page extractor"]
+                                                                : ['No Watermark', 'HD Quality', 'Original Audio']
+                                                            ).map(tag => (
                                                                 <span key={tag} className="px-2.5 py-1 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[9px] md:text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
                                                                     {tag}
                                                                 </span>
@@ -420,7 +475,33 @@ export default function TikTokDownloader() {
                                                     </div>
 
                                                     <div className="mt-auto grid grid-cols-1 gap-3">
-                                                        {videoData.type === 'slideshow' ? (
+                                                        {videoData.embedUrl ? (
+                                                            <>
+                                                                <a
+                                                                    href={videoData.web_url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="h-12 md:h-14 bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-gray-100 rounded-2xl font-black text-sm md:text-base shadow-xl transition-all flex items-center justify-center gap-2"
+                                                                >
+                                                                    Open on TikTok
+                                                                </a>
+                                                                {videoData.downloadUrl && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={handleVideoDownload}
+                                                                            disabled={isVideoDownloading}
+                                                                            className="h-12 md:h-14 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-2xl font-black text-sm md:text-base shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                                                                        >
+                                                                            {isVideoDownloading ? <Loader2 className="animate-spin" /> : <Download size={18} />}
+                                                                            {isVideoDownloading ? "Checking TikTok access..." : "Download Video"}
+                                                                        </button>
+                                                                        <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                                                                            TikTok may block media downloads; the player remains available.
+                                                                        </p>
+                                                                    </>
+                                                                )}
+                                                            </>
+                                                        ) : videoData.type === 'slideshow' ? (
                                                             <button
                                                                 onClick={handleCombine}
                                                                 disabled={isCombining}
@@ -441,32 +522,34 @@ export default function TikTokDownloader() {
                                                             </button>
                                                         )}
 
-                                                        <div className="grid grid-cols-2 gap-2 md:gap-3">
-                                                            {videoData.images?.length > 0 && (
+                                                        {!videoData.embedUrl && (
+                                                            <div className="grid grid-cols-2 gap-2 md:gap-3">
+                                                                {videoData.images?.length > 0 && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            videoData.images.forEach((img, i) => {
+                                                                                setTimeout(() => {
+                                                                                    triggerDownload(getProxyUrl(img, { filename: `photo_${i+1}.jpg` }), `photo_${i+1}.jpg`);
+                                                                                }, i * 800);
+                                                                            });
+                                                                            toast.success(`Downloading ${videoData.images.length} photos...`);
+                                                                        }}
+                                                                        className="h-10 md:h-12 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-[10px] md:text-xs hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                                                                    >
+                                                                        <ImageIcon size={14} /> All Photos
+                                                                    </button>
+                                                                )}
                                                                 <button
                                                                     onClick={() => {
-                                                                        videoData.images.forEach((img, i) => {
-                                                                            setTimeout(() => {
-                                                                                triggerDownload(getProxyUrl(img, { filename: `photo_${i+1}.jpg` }), `photo_${i+1}.jpg`);
-                                                                            }, i * 800);
-                                                                        });
-                                                                        toast.success(`Downloading ${videoData.images.length} photos...`);
+                                                                        if (!videoData.music) return toast.error("No audio found.");
+                                                                        triggerDownload(getProxyUrl(videoData.music, { filename: "audio.mp3", type: "audio/mpeg" }), "audio.mp3");
                                                                     }}
                                                                     className="h-10 md:h-12 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-[10px] md:text-xs hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2"
                                                                 >
-                                                                    <ImageIcon size={14} /> All Photos
+                                                                    <Music size={14} /> Save Audio
                                                                 </button>
-                                                            )}
-                                                            <button
-                                                                onClick={() => {
-                                                                    if (!videoData.music) return toast.error("No audio found.");
-                                                                    triggerDownload(getProxyUrl(videoData.music, { filename: "audio.mp3", type: "audio/mpeg" }), "audio.mp3");
-                                                                }}
-                                                                className="h-10 md:h-12 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-[10px] md:text-xs hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2"
-                                                            >
-                                                                <Music size={14} /> Save Audio
-                                                            </button>
-                                                        </div>
+                                                            </div>
+                                                        )}
 
                                                         {videoData.isH265 && !videoData.isFixed && !videoData.type?.includes('slide') && (
                                                             <button

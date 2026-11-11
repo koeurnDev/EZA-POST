@@ -27,6 +27,33 @@ const uploadFile = async (filePath, folder = "eza-post", resourceType = "auto", 
     try {
         if (!filePath) throw new Error("File path is required");
 
+        // 🛡️ Fallback to local storage if Cloudinary is not configured (or using Cloudflare R2 / local CDN)
+        if (!process.env.CLOUDINARY_CLOUD_NAME) {
+            const fileName = path.basename(filePath);
+            const subFolder = folder.replace(/^eza-post\/?/, "") || "media";
+            const targetFolder = path.join(__dirname, "../uploads", subFolder);
+            if (!fs.existsSync(targetFolder)) fs.mkdirSync(targetFolder, { recursive: true });
+            const targetPath = path.join(targetFolder, fileName);
+            if (filePath !== targetPath && fs.existsSync(filePath)) {
+                fs.copyFileSync(filePath, targetPath);
+                if (deleteAfterUpload) {
+                    try { fs.unlinkSync(filePath); } catch (e) {}
+                }
+            }
+            const relativePath = `/uploads/${subFolder}/${fileName}`.replace(/\/+/g, "/");
+            const baseUrl = process.env.API_BASE_URL || "http://localhost:3001";
+            const fullUrl = `${baseUrl.replace(/\/$/, "")}${relativePath}`;
+            return {
+                success: true,
+                url: fullUrl,
+                publicId: fileName,
+                width: 1080,
+                height: 1080,
+                format: path.extname(fileName).replace(".", ""),
+                resourceType: resourceType,
+            };
+        }
+
         const options = {
             folder: folder,
             resource_type: resourceType,
@@ -79,6 +106,10 @@ const uploadFile = async (filePath, folder = "eza-post", resourceType = "auto", 
 const deleteFile = async (publicId, resourceType = "image") => {
     try {
         if (!publicId) return;
+        if (!process.env.CLOUDINARY_CLOUD_NAME) {
+            console.log(`ℹ️ Local file delete check for ${publicId}`);
+            return;
+        }
         await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
         console.log(`🗑️ Deleted from Cloudinary: ${publicId}`);
     } catch (error) {

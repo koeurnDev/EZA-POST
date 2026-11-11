@@ -1,0 +1,20 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "eza-post-api",
+	"account_id": "f6004fb8e0ca2a70515fa76d694e4cad",
+	"main": "src/index.js",
+	"compatibility_date": "2026-10-04",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"rules": [
+		{
+			"type": "CompiledWasm",
+			"globs": [
+				"**/*.wasm"
+			],
+			"fallthrough": true
+		}
+	],
+	"workers_dev": true
+}

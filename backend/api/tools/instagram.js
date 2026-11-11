@@ -13,6 +13,14 @@ const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
 const ytdlp = require("../../utils/ytdlp");
 const axios = require("axios");
+const crypto = require("crypto");
+const { Transform } = require("stream");
+const { pipeline } = require("stream/promises");
+const {
+    isInstagramMediaUrl,
+    maxInstagramMediaBytes,
+    normalizeInstagramPostUrl,
+} = require("../../utils/instagramUrl");
 
 // 🗂️ Temp directory
 const tempDir = path.join(__dirname, "../../temp/instagram");
@@ -23,17 +31,14 @@ if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 /* -------------------------------------------------------------------------- */
 router.post("/download", requireAuth, async (req, res) => {
     try {
-        const { url } = req.body;
-        if (!url || !url.includes("instagram.com")) {
+        const cleanUrl = normalizeInstagramPostUrl(req.body?.url);
+        if (!cleanUrl) {
             return res.status(400).json({ success: false, error: "Invalid Instagram URL" });
         }
 
-        // 🧹 Clean URL (remove query params like utm_source or trailing artifacts)
-        const cleanUrl = url.split("?")[0];
-
         console.log(`📸 Downloading Instagram Media: ${cleanUrl}`);
 
-        const safeId = `ig-${Date.now()}`;
+        const safeId = `ig-${Date.now()}-${crypto.randomUUID()}`;
         const outputTemplate = path.join(tempDir, `${safeId}.%(ext)s`);
 
         // 🍪 Cookies File (for improved access)
@@ -62,8 +67,9 @@ router.post("/download", requireAuth, async (req, res) => {
 
         // Find the generated file
         const files = fs.readdirSync(tempDir);
-        // Find file starting with safeId (handling different extensions like .mp4, .jpg)
-        const foundFile = files.find(f => f.startsWith(safeId));
+        const foundFile = files.find(f =>
+            f.startsWith(`${safeId}.`) && !f.endsWith(".part") && !f.endsWith(".ytdl")
+        );
 
         if (foundFile) {
             console.log("✅ Instagram Download Complete:", foundFile);
@@ -181,28 +187,60 @@ router.post("/download", requireAuth, async (req, res) => {
 
             const targetUrl = info.url || info.thumbnail;
 
-            if (targetUrl) {
+            if (isInstagramMediaUrl(targetUrl)) {
                 console.log("📸 Found Image/Video URL via metadata:", targetUrl);
 
-                // Determine extension (default jpg for images)
-                const ext = info.ext || 'jpg';
+                const ext = "jpg";
                 const fallbackFilename = `${safeId}.${ext}`;
                 const fallbackPath = path.join(tempDir, fallbackFilename);
 
-                // Download with Axios
-                const writer = fs.createWriteStream(fallbackPath);
-                const response = await axios({
-                    url: targetUrl,
-                    method: 'GET',
-                    responseType: 'stream'
-                });
+                let bytesWritten = 0;
+                try {
+                    const response = await axios({
+                        url: targetUrl,
+                        method: "GET",
+                        responseType: "stream",
+                        timeout: 30000,
+                        maxRedirects: 0,
+                        maxContentLength: maxInstagramMediaBytes,
+                        headers: { "User-Agent": flags.userAgent },
+                    });
+                    const contentType = response.headers["content-type"] || "";
+                    const contentLength = Number(response.headers["content-length"]);
+                    if (!contentType.toLowerCase().startsWith("image/")) {
+                        response.data.destroy();
+                        throw new Error("Instagram image fallback returned a non-image response");
+                    }
+                    if (Number.isFinite(contentLength) && contentLength > maxInstagramMediaBytes) {
+                        response.data.destroy();
+                        throw new Error("Instagram image exceeds the download size limit");
+                    }
 
-                response.data.pipe(writer);
-
-                await new Promise((resolve, reject) => {
-                    writer.on('finish', resolve);
-                    writer.on('error', reject);
-                });
+                    const sizeLimit = new Transform({
+                        transform(chunk, encoding, callback) {
+                            bytesWritten += chunk.length;
+                            if (bytesWritten > maxInstagramMediaBytes) {
+                                callback(new Error("Instagram image exceeds the download size limit"));
+                                return;
+                            }
+                            callback(null, chunk);
+                        },
+                    });
+                    await pipeline(
+                        response.data,
+                        sizeLimit,
+                        fs.createWriteStream(fallbackPath, { flags: "wx" })
+                    );
+                } catch (error) {
+                    try {
+                        await fs.promises.unlink(fallbackPath);
+                    } catch (cleanupError) {
+                        if (cleanupError.code !== "ENOENT") {
+                            console.error("Failed to remove partial Instagram media:", cleanupError);
+                        }
+                    }
+                    throw error;
+                }
 
                 console.log("✅ Fallback Download Complete:", fallbackFilename);
 
@@ -226,6 +264,8 @@ router.post("/download", requireAuth, async (req, res) => {
                     }
                 });
 
+            } else if (targetUrl) {
+                throw new Error("Instagram returned a media URL outside the supported CDN hosts.");
             } else {
                 throw new Error("File not found and no direct URL in metadata. Account might be private.");
             }

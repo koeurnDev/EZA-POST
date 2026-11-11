@@ -112,4 +112,29 @@ router.post("/settings", requireAuth, async (req, res) => {
     }
 });
 
+// ✅ POST /api/user/pages/connect-cookie
+// Import pages using Facebook Cookie or Direct Access Token (Bypass Developer App)
+const facebookCookieExtractor = require("../../services/facebookCookieExtractor");
+
+router.post("/connect-cookie", requireAuth, async (req, res) => {
+    try {
+        const { cookieOrToken } = req.body;
+        if (!cookieOrToken || !cookieOrToken.trim()) {
+            return res.status(400).json({
+                success: false,
+                error: "សូមបញ្ចូល Facebook Cookie ឬ Access Token",
+            });
+        }
+
+        const result = await facebookCookieExtractor.importPages(req.user.id, cookieOrToken);
+        res.json(result);
+    } catch (err) {
+        console.error("❌ [Connect Cookie] Error:", err.message);
+        res.status(400).json({
+            success: false,
+            error: err.response?.data?.error?.message || err.message,
+        });
+    }
+});
+
 module.exports = router;

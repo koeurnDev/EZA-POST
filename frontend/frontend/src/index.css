@@ -345,3 +345,57 @@
 .js-focus-visible :focus:not(.focus-visible) {
   outline: none;
 }
+
+/* -------------------- KHMER SUBTITLE STUDIO STYLES -------------------- */
+.khmer-font {
+  font-family: 'Noto Sans Khmer', 'Kantumruy Pro', 'Battambang', sans-serif;
+}
+
+.khmer-subtitle {
+  font-family: 'Noto Sans Khmer', 'Kantumruy Pro', sans-serif;
+  line-height: 1.7;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  max-width: 92%;
+  margin-inline: auto;
+}
+
+.font-noto {
+  font-family: 'Noto Sans Khmer', sans-serif;
+}
+
+.font-kantumruy {
+  font-family: 'Kantumruy Pro', sans-serif;
+}
+
+.font-battambang {
+  font-family: 'Battambang', sans-serif;
+}
+
+.font-moul {
+  font-family: 'Moul', serif;
+}
+
+@keyframes word-pop {
+  0% {
+    transform: scale(0.82);
+    opacity: 0.85;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-word-pop {
+  display: inline-block;
+  animation: word-pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  transform-origin: center bottom;
+  will-change: transform, opacity;
+}

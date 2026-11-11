@@ -16,7 +16,7 @@ const { postQueue } = require("../utils/queue");
 exports.createMixedCarousel = async (req, res) => {
     req.setTimeout(600000);
     try {
-        const { caption, accounts, scheduleTime, enableBot, videoUrl, carouselCards, aiOptions } = req.body;
+        const { caption, accounts, scheduleTime, staggerDelay, enableBot, videoUrl, carouselCards, aiOptions } = req.body;
         const userId = req.user?.id;
 
         if (!accounts) return res.status(400).json({ success: false, error: "Missing accounts" });
@@ -51,6 +51,7 @@ exports.createMixedCarousel = async (req, res) => {
                 accountsArray,
                 caption,
                 scheduleTime,
+                staggerDelay: staggerDelay || 0,
                 videoUrl,
                 videoFilePath: videoFile?.path || null,
                 thumbnailFilePath: thumbnailFile?.path || null,

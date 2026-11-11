@@ -6,6 +6,8 @@ const express = require("express");
 const router = express.Router();
 const prisma = require("../utils/prisma");
 const ai = require("../utils/ai");
+const fb = require("../utils/fb");
+const { decrypt } = require("../utils/crypto");
 const { requireAuth } = require("../utils/auth"); // ✅ Auth Middleware
 
 // ✅ No global initialization needed, created per user on first use
@@ -91,6 +93,27 @@ router.put("/page-settings", requireAuth, async (req, res) => {
       })
     ));
 
+    // 🔔 Auto Subscribe / Unsubscribe Page Webhook via Meta Graph API
+    for (const id of targetIds) {
+      try {
+        const page = await prisma.facebookPage.findFirst({
+          where: { id, userId: req.user.id }
+        });
+        if (page && page.accessToken) {
+          const decryptedToken = decrypt(page.accessToken);
+          if (decryptedToken) {
+            if (enabled) {
+              await fb.subscribePage(page.id, decryptedToken);
+            } else {
+              await fb.unsubscribePage(page.id, decryptedToken);
+            }
+          }
+        }
+      } catch (subErr) {
+        console.warn(`⚠️ Webhook subscription sync warning for page ${id}:`, subErr.message);
+      }
+    }
+
     res.json({ success: true, message: "Page bot settings updated", pageSettings });
   } catch (err) {
     console.error("❌ PUT /page-settings error:", err.message);
@@ -111,11 +134,11 @@ router.post("/suggestions", requireAuth, async (req, res) => {
 
 // ✅ Add new rule
 router.post("/rules", requireAuth, async (req, res) => {
-  const { reply, ruleType, scope, postId, attachmentUrl } = req.body;
+  const { reply, dmReply, enableDm, ruleType, scope, postId, attachmentUrl } = req.body;
   const keyword = req.body.keyword || "*";
 
-  if (!reply)
-    return res.status(400).json({ success: false, message: "Reply is required" });
+  if (!reply && !dmReply)
+    return res.status(400).json({ success: false, message: "Reply or Private DM is required" });
 
   // 🛡️ Regex Validation
   if (ruleType === "REGEX") {
@@ -137,7 +160,9 @@ router.post("/rules", requireAuth, async (req, res) => {
       data: {
         userId: req.user.id,
         keyword,
-        reply,
+        reply: reply || "",
+        dmReply: dmReply || null,
+        enableDm: Boolean(enableDm),
         ruleType: ruleType || "KEYWORD",
         scope: scope || "ALL",
         postId: postId || null,
@@ -155,7 +180,7 @@ router.post("/rules", requireAuth, async (req, res) => {
 // ✅ Update rule
 router.put("/rules/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { reply, ruleType, scope, postId, attachmentUrl } = req.body;
+  const { reply, dmReply, enableDm, ruleType, scope, postId, attachmentUrl } = req.body;
   const keyword = req.body.keyword || "*";
   try {
     // Ensure user owns the rule
@@ -177,7 +202,9 @@ router.put("/rules/:id", requireAuth, async (req, res) => {
       where: { id: id },
       data: {
         keyword,
-        reply,
+        reply: reply !== undefined ? reply : rule.reply,
+        dmReply: dmReply !== undefined ? dmReply : rule.dmReply,
+        enableDm: enableDm !== undefined ? Boolean(enableDm) : rule.enableDm,
         ruleType: ruleType || "KEYWORD",
         scope: scope || "ALL",
         postId: postId || null,

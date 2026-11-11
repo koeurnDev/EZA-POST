@@ -31,13 +31,16 @@ function verifySignature(req, res, next) {
 
     const elements = signature.split("=");
     const signatureHash = elements[1];
+    
+    // 🛡️ Use rawBody buffer captured by express.json verify middleware
+    const payloadBuffer = req.rawBody || Buffer.from(JSON.stringify(req.body));
     const expectedHash = crypto
         .createHmac("sha256", FB_APP_SECRET)
-        .update(JSON.stringify(req.body)) // Note: ideally use rawBody buffer
+        .update(payloadBuffer)
         .digest("hex");
 
     if (signatureHash !== expectedHash) {
-        console.error("❌ Webhook Signature mismatch!");
+        console.error("❌ Webhook Signature mismatch! Rejecting request.");
         return res.sendStatus(401);
     }
 

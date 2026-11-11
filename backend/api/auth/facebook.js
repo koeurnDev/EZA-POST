@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const prisma = require("../../utils/prisma");
 const { encrypt } = require("../../utils/crypto");
 const { setAuthCookie } = require("../../utils/auth");
+const fb = require("../../utils/fb");
 
 // ============================================================
 // 📘 Facebook OAuth (Connect Account)
@@ -248,9 +249,9 @@ router.get("/callback", async (req, res) => {
             console.log("🔄 Syncing pages to FacebookPage table...");
             for (const p of myPages) {
                 try {
-                    // Check if page exists
-                    const existingPage = await prisma.facebookPage.findFirst({
-                        where: { userId: String(userId), id: p.id }
+                    // Check if page exists globally by id to prevent unique constraint conflicts
+                    const existingPage = await prisma.facebookPage.findUnique({
+                        where: { id: p.id }
                     });
 
                     const pageData = {
@@ -274,6 +275,9 @@ router.get("/callback", async (req, res) => {
                             data: { ...pageData, isSelected: true }
                         });
                     }
+
+                    // 🔔 Subscribe page to Webhooks on connect
+                    await fb.subscribePage(p.id, p.access_token);
 
                 } catch (pageErr) {
                     console.error(`❌ Failed to save page ${p.name}:`, pageErr.message);

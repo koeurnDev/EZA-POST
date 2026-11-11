@@ -23,13 +23,30 @@ const itemVariants = {
     visible: { opacity: 1, y: 0 }
 };
 
+const isPinterestUrl = (value) => {
+    try {
+        const url = new URL(value.trim());
+        const host = url.hostname.toLowerCase();
+        return url.protocol === "https:" &&
+            !url.username &&
+            !url.password &&
+            !url.port &&
+            (host === "pin.it" ||
+                host === "pinterest.com" ||
+                host.endsWith(".pinterest.com")) &&
+            url.pathname !== "/";
+    } catch {
+        return false;
+    }
+};
+
 export default function PinterestDownloader() {
     const [url, setUrl] = useState("");
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
 
     const handleDownload = async () => {
-        if (!url.includes("pinterest.com") && !url.includes("pin.it")) {
+        if (!isPinterestUrl(url)) {
             return toast.error("Invalid Pinterest Link");
         }
         setLoading(true);

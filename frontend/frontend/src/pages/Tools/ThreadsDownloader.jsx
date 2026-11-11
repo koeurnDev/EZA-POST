@@ -39,13 +39,31 @@ const itemVariants = {
     visible: { opacity: 1, y: 0 }
 };
 
+const isThreadsPostUrl = (value) => {
+    try {
+        const url = new URL(value.trim());
+        const host = url.hostname.toLowerCase();
+        return url.protocol === "https:" &&
+            !url.username &&
+            !url.password &&
+            !url.port &&
+            (host === "threads.net" ||
+                host.endsWith(".threads.net") ||
+                host === "threads.com" ||
+                host.endsWith(".threads.com")) &&
+            url.pathname !== "/";
+    } catch {
+        return false;
+    }
+};
+
 export default function ThreadsDownloader() {
     const [url, setUrl] = useState("");
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState(null);
 
     const handleLookup = async () => {
-        if (!url.match(/threads\.(net|com)/)) return toast.error("Please enter a valid Threads URL");
+        if (!isThreadsPostUrl(url)) return toast.error("Please enter a valid HTTPS Threads post URL");
         setLoading(true);
         setData(null);
         try {

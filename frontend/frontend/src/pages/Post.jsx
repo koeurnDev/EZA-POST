@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import DashboardLayout from "../layouts/DashboardLayout";
 import {
     Upload, Link as LinkIcon, X, Calendar, Clock, Layers, Plus, Trash2,
     ChevronDown, Share2, Youtube, Instagram, Facebook, Zap, Shield,
-    Maximize2, Volume2, VolumeX, MessageSquare, EyeOff, Loader2, AlertCircle, Search
+    Maximize2, Volume2, VolumeX, MessageSquare, EyeOff, Loader2, AlertCircle, Search,
+    Languages, Sparkles
 } from "lucide-react";
 import apiUtils, { fetchCsrfToken } from "../utils/apiUtils";
 import { postsAPI } from "../utils/api";
@@ -19,8 +21,10 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/,
 
 export default function Post() {
     const { user } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
 
-    const [postFormat] = useState("carousel"); // Forced to carousel
+    const [postFormat, setPostFormat] = useState("carousel"); // "carousel" or "single"
     const [videoTab, setVideoTab] = useState("upload");
 
     const [platforms, setPlatforms] = useState({
@@ -86,6 +90,18 @@ export default function Post() {
     const [isPreviewMuted, setIsPreviewMuted] = useState(true);
     const carouselRef = useRef(null);
     const fileInputRef = useRef(null);
+
+    // 🎬 Capture Video and Subtitles passed from SubtitleStudio
+    useEffect(() => {
+        if (location.state?.videoUrl) {
+            setPreviewUrl(location.state.videoUrl);
+            if (location.state.rawVideoUrl) setRawVideoUrl(location.state.rawVideoUrl);
+            if (location.state.suggestedCaption && !caption) {
+                setCaption(location.state.suggestedCaption);
+            }
+            toast.success("បានទទួលវីដេអូពី Subtitle Studio រួចរាល់! 🎉", { duration: 4000 });
+        }
+    }, [location.state]);
 
     useEffect(() => {
         const loadDraft = async () => {
@@ -169,7 +185,18 @@ export default function Post() {
                     setConnectedPlatforms(connRes.data.connections);
                 }
             } catch (err) {
-                console.error("Data synchronization failed", err);
+                const details = err?.details || err?.response?.data;
+                const diagnostic = [
+                    details?.error || err?.message,
+                    details?.errorCode ? `Code: ${details.errorCode}` : null,
+                    details?.diagnosticId ? `Reference: ${details.diagnosticId}` : null,
+                ].filter(Boolean).join(" | ");
+                console.error("Data synchronization failed", {
+                    status: err?.response?.status,
+                    details,
+                    error: err,
+                });
+                toast.error(diagnostic || "Failed to synchronize account data. Please try again.");
             }
         };
         fetchInitialData();
@@ -495,11 +522,22 @@ export default function Post() {
     };
 
     const handleSubmit = async () => {
-        if (selectedPages.length === 0) return toast.error("No target nodes selected.");
-        if (!file && !previewUrl) return toast.error("No media payload.");
+        if (selectedPages.length === 0) return toast.error("សូមជ្រើសរើសផេកយ៉ាងតិច ១ ដើម្បីបង្ហោះ!");
+        if (!file && !previewUrl) return toast.error("សូមដាក់បញ្ចូលវីដេអូ ឬរូបភាព!");
+
+        if (publishMode === 'schedule') {
+            if (!scheduleTime) {
+                return toast.error("សូមជ្រើសរើសថ្ងៃ និងម៉ោងត្រូវបង្ហោះ (Schedule Time)!");
+            }
+            const schedDate = new Date(scheduleTime);
+            const diffMinutes = (schedDate.getTime() - Date.now()) / (1000 * 60);
+            if (diffMinutes < 10) {
+                return toast.error("Meta Graph API តម្រូវឱ្យកក់ពេលយ៉ាងតិច ១០ នាទីមុនពេលផុស (សូមរើសយ៉ាងតិច ១០ នាទីបន្ទាប់ពីនេះ)!");
+            }
+        }
 
         setIsSubmitting(true);
-        const toastId = toast.loading("Executing distribution protocol...");
+        const toastId = toast.loading("កំពុងដំណើរការបង្ហោះទៅកាន់ Facebook Pages...");
 
         try {
             const formData = new FormData();
@@ -518,36 +556,40 @@ export default function Post() {
             formData.append("aiOptions", JSON.stringify(aiOptions));
             formData.append("enableBot", autoReplyBot);
 
-
-            // Force carousel endpoint
             let endpoint = `${API_BASE}/api/posts/mixed-carousel`;
-            const cardsPayload = [
-                ...mediaItems.map(item => ({
-                    id: item.id,
-                    type: item.type,
-                    headline: item.type === 'video' ? headline : carouselCtaText.replace(/\n/g, ' '),
-                    description: item.type === 'video' ? (cardDescription || "Swipe to see more") : "",
-                    cta,
-                    isPageCard: item.isPageCard,
-                    imageUrl: item.imageUrl,
-                    isRightSide: item.isRightSide
-                })),
-                {
-                    id: 'card-destination-final',
-                    type: 'image',
-                    isPageCard: true,
-                    headline: 'មើលច្រើនទៀតនៅ',
-                    description: 'FACEBOOK.COM',
-                    link: targetLink,
-                    cta: cta || 'LEARN_MORE'
-                }
-            ];
-            formData.append("carouselCards", JSON.stringify(cardsPayload));
+            if (postFormat === 'single') {
+                endpoint = `${API_BASE}/api/posts`;
+                formData.append("postType", "single");
+            } else {
+                formData.append("postType", "carousel");
+                const cardsPayload = [
+                    ...mediaItems.map(item => ({
+                        id: item.id,
+                        type: item.type,
+                        headline: item.type === 'video' ? headline : carouselCtaText.replace(/\n/g, ' '),
+                        description: item.type === 'video' ? (cardDescription || "Swipe to see more") : "",
+                        cta,
+                        isPageCard: item.isPageCard,
+                        imageUrl: item.imageUrl,
+                        isRightSide: item.isRightSide
+                    })),
+                    {
+                        id: 'card-destination-final',
+                        type: 'image',
+                        isPageCard: true,
+                        headline: 'មើលច្រើនទៀតនៅ',
+                        description: 'FACEBOOK.COM',
+                        link: targetLink,
+                        cta: cta || 'LEARN_MORE'
+                    }
+                ];
+                formData.append("carouselCards", JSON.stringify(cardsPayload));
+            }
 
             const response = await axios.post(endpoint, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 withCredentials: true,
-                timeout: 120000 // 2 minute timeout for UI response
+                timeout: 300000 // 5 minute timeout for multi-page transcoding
             });
 
             const data = response.data;
@@ -651,6 +693,32 @@ export default function Post() {
                             transition={{ duration: window.innerWidth < 768 ? 0.3 : 0.5, ease: "linear" }}
                             className="space-y-4 md:space-y-10 w-full"
                         >
+                            {/* 🎛️ Post Format Selector (Carousel vs Single Video) */}
+                            <div className="flex items-center gap-2 p-1.5 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 w-fit">
+                                <button
+                                    type="button"
+                                    onClick={() => setPostFormat("carousel")}
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                                        postFormat === "carousel"
+                                            ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                                            : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                    }`}
+                                >
+                                    <span>🎠 Mixed Carousel (វីដេអូ + កាតផេក)</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPostFormat("single")}
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                                        postFormat === "single"
+                                            ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                                            : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                    }`}
+                                >
+                                    <span>🎥 Single Video / Reel (វីដេអូទោល)</span>
+                                </button>
+                            </div>
+
                             {/* 🎯 Destination: Multi-Select Dropdown */}
                             <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-2xl md:rounded-[2.5rem] p-5 md:p-10 shadow-xl relative">
                                 <div className="flex items-center justify-between mb-6">
@@ -830,6 +898,14 @@ export default function Post() {
                                                 title="បន្ថែម"
                                             >
                                                 <Plus size={18}  />
+                                            </button>
+                                            <button
+                                                onClick={() => navigate('/subtitles', { state: { videoUrl: previewUrl, file } })}
+                                                className="px-2.5 py-1.5 md:py-2 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg transition-all border border-indigo-500/20 shadow-sm active:scale-95 flex items-center gap-1.5 text-xs font-bold font-khmer"
+                                                title="កាត់ត Subtitle ខ្មែរជាមួយ AI"
+                                            >
+                                                <Languages size={15} />
+                                                <span className="hidden sm:inline">អក្សររត់ AI</span>
                                             </button>
                                         </div>
                                     </div>

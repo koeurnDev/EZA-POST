@@ -1,172 +1,212 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const driveService = require('../../services/driveService');
-const fs = require('fs');
-const path = require('path');
-const multer = require('multer');
+const driveService = require("../../services/driveService");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const multer = require("multer");
+const { spawn } = require("child_process");
+const { requireAuth } = require("../../utils/auth");
+const {
+    getOfficeMimeType,
+    isSupportedConversion,
+    matchesDocumentSignature,
+    outputFormats,
+} = require("../../utils/documentConversion");
 
-// Configure Multer for temp storage
-const upload = multer({ dest: 'uploads/' });
+const maxInputBytes = 25 * 1024 * 1024;
+const conversionTempDir = path.join(os.tmpdir(), "eza-post-document-conversions");
+fs.mkdirSync(conversionTempDir, { recursive: true });
 
-const { spawn } = require('child_process');
+const upload = multer({
+    dest: conversionTempDir,
+    limits: { fileSize: maxInputBytes, files: 1, fields: 2 },
+});
 
-const { requireAuth } = require('../../utils/auth');
+function handleUpload(req, res, next) {
+    upload.single("file")(req, res, (error) => {
+        if (!error) return next();
+        if (error instanceof multer.MulterError) {
+            const status = error.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+            return res.status(status).json({
+                success: false,
+                error: error.code === "LIMIT_FILE_SIZE"
+                    ? "Files must be 25 MiB or smaller."
+                    : "Invalid document upload.",
+            });
+        }
+        return next(error);
+    });
+}
 
-// @route   POST /api/tools/document-converter/convert
-// @desc    Convert document to PDF using Local Microsoft Office
-router.post('/convert', requireAuth, upload.single('file'), async (req, res) => {
+async function removeTemporaryFile(filePath) {
+    try {
+        await fs.promises.unlink(filePath);
+    } catch (error) {
+        if (error.code !== "ENOENT") {
+            console.error("Failed to clean up document conversion file:", error);
+        }
+    }
+}
+
+async function readFileHeader(filePath) {
+    const fileHandle = await fs.promises.open(filePath, "r");
+    const buffer = Buffer.alloc(1024);
+    let bytesRead;
+    try {
+        ({ bytesRead } = await fileHandle.read(buffer, 0, buffer.length, 0));
+    } finally {
+        await fileHandle.close();
+    }
+    return buffer.subarray(0, bytesRead);
+}
+
+router.post("/convert", requireAuth, handleUpload, async (req, res) => {
     if (!req.file) {
-        return res.status(400).json({ success: false, error: 'No file uploaded' });
+        return res.status(400).json({ success: false, error: "No file uploaded" });
     }
 
-    const originalName = req.file.originalname;
-    const ext = path.extname(originalName).toLowerCase();
-
-    // Rename temp file to have correct extension
-    let localFilePath = path.resolve(req.file.path);
-    const newFilePath = localFilePath + ext;
-    fs.renameSync(localFilePath, newFilePath);
-    localFilePath = newFilePath;
-
-    // Determine Output Format
-    const targetFormat = req.body.format || 'pdf'; // Default to PDF
-    let outputExtension = '.' + targetFormat;
-    let mimeType = 'application/pdf';
-
-    if (targetFormat === 'docx') {
-        mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    } else if (targetFormat === 'pptx') {
-        mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-    }
-
-    const outputFilePath = path.resolve(req.file.path + '_converted' + outputExtension);
+    const inputPath = req.file.path;
+    const inputExtension = path.extname(req.file.originalname).toLowerCase();
+    const targetFormat = typeof req.body?.format === "string" ? req.body.format.toLowerCase() : "pdf";
+    const outputFormat = outputFormats[targetFormat];
+    let outputPath;
+    let intermediatePath;
+    let driveFileId;
 
     try {
-        console.log(`Processing conversion: ${originalName} -> ${outputExtension} (Env: ${process.env.NODE_ENV})`);
-
-        // --------------------------------------------------------------------------
-        // 1. CHOOSE CONVERSION METHOD
-        // --------------------------------------------------------------------------
-
-        // 🟢 METHOD A: PDF to DOCX/PPTX (Uses Python's pdf2docx)
-        if (ext === '.pdf' && (targetFormat === 'docx' || targetFormat === 'pptx')) {
-            const pythonCmd = process.env.NODE_ENV === 'production' ? 'python3' : 'python';
-            const pyScript = path.resolve(__dirname, '../../scripts/pdf_to_docx_py.py');
-
-            // Step 1: PDF -> DOCX
-            const tempDocx = targetFormat === 'docx' ? outputFilePath : path.resolve(req.file.path + '_temp.docx');
-
-            await new Promise((resolve, reject) => {
-                const py = spawn(pythonCmd, [pyScript, localFilePath, tempDocx]);
-                py.on('close', (code) => code === 0 ? resolve() : reject(new Error(`Python failed: ${code}`)));
-                py.on('error', reject);
+        if (!outputFormat || !isSupportedConversion(inputExtension, targetFormat)) {
+            return res.status(400).json({
+                success: false,
+                error: "This source and target format combination is not supported.",
             });
+        }
 
-            // Step 2: DOCX -> PPTX (If requested)
-            if (targetFormat === 'pptx') {
-                if (process.env.NODE_ENV === 'production') {
-                    // ☁️ Production (Linux): Use Google Drive for DOCX -> PPTX (Indirect)
-                    const uploaded = await driveService.uploadFile(tempDocx, null, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.google-apps.document');
-                    const buffer = await driveService.convertFile(uploaded.id, 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-                    fs.writeFileSync(outputFilePath, buffer);
-                    await driveService.deleteFile(uploaded.id);
+        const fileHeader = await readFileHeader(inputPath);
+        if (!matchesDocumentSignature(inputExtension, fileHeader)) {
+            return res.status(415).json({
+                success: false,
+                error: "The uploaded file content does not match its supported document extension.",
+            });
+        }
+
+        outputPath = `${inputPath}_converted${outputFormat.extension}`;
+        intermediatePath = `${inputPath}_intermediate.docx`;
+        const originalFilename = path.basename(req.file.originalname.replace(/[\\/]/g, path.sep));
+        const finalFilename = `${path.basename(originalFilename, inputExtension)}${outputFormat.extension}`;
+
+        console.log(`Processing document conversion: ${inputExtension} -> ${outputFormat.extension}`);
+
+        if (inputExtension === ".pdf" && ["docx", "pptx"].includes(targetFormat)) {
+            const pythonCmd = process.env.NODE_ENV === "production" ? "python3" : "python";
+            const pyScript = path.resolve(__dirname, "../../scripts/pdf_to_docx_py.py");
+            const docxPath = targetFormat === "docx" ? outputPath : intermediatePath;
+            await runProcess(pythonCmd, [pyScript, inputPath, docxPath]);
+
+            if (targetFormat === "pptx") {
+                if (process.env.NODE_ENV === "production") {
+                    const uploaded = await driveService.uploadFile(
+                        docxPath,
+                        null,
+                        outputFormats.docx.mimeType,
+                        "application/vnd.google-apps.document"
+                    );
+                    driveFileId = uploaded.id;
+                    const buffer = await driveService.convertFile(
+                        uploaded.id,
+                        outputFormat.mimeType
+                    );
+                    await fs.promises.writeFile(outputPath, buffer);
                 } else {
-                    // 💻 Local (Windows): Use PowerShell
-                    const psScript = path.resolve(__dirname, '../../scripts/convert_office.ps1');
-                    await runPowerShell(psScript, tempDocx, outputFilePath);
+                    const psScript = path.resolve(__dirname, "../../scripts/convert_office.ps1");
+                    await runPowerShell(psScript, docxPath, outputPath);
                 }
             }
-        }
-
-        // 🟢 METHOD B: Office to PDF/Other
-        else {
-            if (process.env.NODE_ENV === 'production') {
-                // ☁️ Production (Linux): Use Google Drive API
-                console.log("☁️ Using Google Drive for cloud conversion...");
-
-                // Map local MIME to Google Apps MIME for auto-conversion on upload
-                let uploadMime = 'application/octet-stream';
-                let googleAppsMime = null;
-
-                if (ext === '.docx' || ext === '.doc') {
-                    uploadMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-                    googleAppsMime = 'application/vnd.google-apps.document';
-                } else if (ext === '.pptx' || ext === '.ppt') {
-                    uploadMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-                    googleAppsMime = 'application/vnd.google-apps.presentation';
-                }
-
-                // Upload & Convert to Google Doc/Slide
-                const uploaded = await driveService.uploadFile(localFilePath, null, uploadMime, googleAppsMime);
-
-                // Export as PDF
-                const exportMime = 'application/pdf';
-                const buffer = await driveService.convertFile(uploaded.id, exportMime);
-
-                fs.writeFileSync(outputFilePath, buffer);
-
-                // Cleanup Drive
-                await driveService.deleteFile(uploaded.id);
-
-            } else {
-                // 💻 Local (Windows): Use PowerShell + MS Office
-                console.log("💻 Using Local MS Office via PowerShell...");
-                const psScript = path.resolve(__dirname, '../../scripts/convert_office.ps1');
-                await runPowerShell(psScript, localFilePath, outputFilePath);
-            }
-        }
-
-        // --------------------------------------------------------------------------
-        // 2. SEND THE CONVERTED FILE
-        // --------------------------------------------------------------------------
-        if (fs.existsSync(outputFilePath)) {
-            const fileData = fs.readFileSync(outputFilePath);
-            res.setHeader('Content-Type', mimeType);
-            const finalFilename = `${path.basename(originalName, path.extname(originalName))}${outputExtension}`;
-            const utf8Name = encodeURIComponent(finalFilename);
-            const asciiName = finalFilename.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
-            res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`);
-            res.send(fileData);
-
-            // Housekeeping
-            setTimeout(() => {
-                if (fs.existsSync(outputFilePath)) fs.unlinkSync(outputFilePath);
-                const tempDocxFallback = path.resolve(req.file.path + '_temp.docx');
-                if (fs.existsSync(tempDocxFallback)) fs.unlinkSync(tempDocxFallback);
-            }, 2000);
+        } else if (process.env.NODE_ENV === "production") {
+            const sourceMimeType = getOfficeMimeType(inputExtension);
+            const googleMimeType = [".doc", ".docx"].includes(inputExtension)
+                ? "application/vnd.google-apps.document"
+                : "application/vnd.google-apps.presentation";
+            const uploaded = await driveService.uploadFile(
+                inputPath,
+                null,
+                sourceMimeType,
+                googleMimeType
+            );
+            driveFileId = uploaded.id;
+            const buffer = await driveService.convertFile(uploaded.id, outputFormat.mimeType);
+            await fs.promises.writeFile(outputPath, buffer);
         } else {
-            throw new Error("Conversion engine failed to produce output.");
+            const psScript = path.resolve(__dirname, "../../scripts/convert_office.ps1");
+            await runPowerShell(psScript, inputPath, outputPath);
         }
 
-    } catch (err) {
-        console.error('Conversion Error:', err);
-        res.status(500).json({ success: false, error: "Conversion Failed: " + err.message });
+        const outputStats = await fs.promises.stat(outputPath);
+        if (!outputStats.isFile() || outputStats.size === 0) {
+            throw new Error("Conversion did not produce a valid output file.");
+        }
+        if (!matchesDocumentSignature(outputFormat.extension, await readFileHeader(outputPath))) {
+            throw new Error("Conversion produced a file with an unexpected format.");
+        }
+
+        await new Promise((resolve, reject) => {
+            res.download(outputPath, finalFilename, (error) => {
+                if (error) reject(error);
+                else resolve();
+            });
+        });
+    } catch (error) {
+        console.error("Document conversion failed:", error);
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: "Document conversion failed. Check the file and try again.",
+            });
+        } else {
+            res.destroy(error);
+        }
     } finally {
-        // 3. Cleanup Input File
-        if (fs.existsSync(localFilePath)) {
-            fs.unlinkSync(localFilePath);
+        try {
+            if (driveFileId) await driveService.deleteFile(driveFileId);
+        } finally {
+            await Promise.all([
+                removeTemporaryFile(inputPath),
+                outputPath && removeTemporaryFile(outputPath),
+                intermediatePath && removeTemporaryFile(intermediatePath),
+            ].filter(Boolean));
         }
     }
 });
 
-// Helper for PS
-function runPowerShell(scriptPath, inputFile, outputFile) {
-    const { spawn } = require('child_process');
+function runProcess(command, args) {
     return new Promise((resolve, reject) => {
-        const ps = spawn('powershell', [
-            '-ExecutionPolicy', 'Bypass',
-            '-File', scriptPath,
-            '-InputFile', inputFile,
-            '-OutputFile', outputFile
-        ]);
-        ps.stdout.on('data', d => console.log(`PS: ${d}`));
-        ps.stderr.on('data', d => console.error(`PS Err: ${d}`));
-        ps.on('close', (code) => {
-            if (code === 0) resolve();
-            else reject(new Error(`PowerShell exited with code ${code}`));
+        const child = spawn(command, args, { windowsHide: true });
+        let stderr = "";
+        child.stderr.on("data", (chunk) => {
+            stderr += chunk.toString();
+            if (stderr.length > 4000) stderr = stderr.slice(-4000);
         });
-        ps.on('error', reject);
+        child.on("error", reject);
+        child.on("close", (code) => {
+            if (code === 0) resolve();
+            else reject(new Error(`${path.basename(command)} exited with code ${code}: ${stderr}`));
+        });
     });
+}
+
+function runPowerShell(scriptPath, inputFile, outputFile) {
+    return runProcess("powershell", [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        scriptPath,
+        "-InputFile",
+        inputFile,
+        "-OutputFile",
+        outputFile,
+    ]);
 }
 
 module.exports = router;

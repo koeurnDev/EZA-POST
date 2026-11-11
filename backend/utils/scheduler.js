@@ -40,6 +40,20 @@ async function processSinglePost(post) {
   try {
     console.log(`🚀 Running post ${post.id}: ${post.caption?.slice(0, 60)}...`);
 
+    // 🛑 Check if this post was already scheduled or published on Meta Graph API
+    let existingPublished = post.publishedIds;
+    if (typeof existingPublished === 'string') {
+      try { existingPublished = JSON.parse(existingPublished); } catch (e) { }
+    }
+    if (Array.isArray(existingPublished) && existingPublished.length > 0) {
+      console.log(`⏩ Post ${post.id} already registered on Meta Graph API. Marking as published.`);
+      await prisma.scheduledPost.update({
+        where: { id: post.id },
+        data: { status: "published", postedAt: new Date() }
+      });
+      return;
+    }
+
     // Mark as processing
     await prisma.scheduledPost.update({
       where: { id: post.id },
@@ -64,7 +78,7 @@ async function processSinglePost(post) {
     }
 
     // If it's a local file (legacy support or fallback), read it
-    if (post.videoUrl.startsWith("/uploads")) {
+    if (post.videoUrl && post.videoUrl.startsWith("/uploads")) {
       const fs = require('fs');
       const path = require('path');
       const filePath = path.join(__dirname, "..", post.videoUrl);
@@ -75,7 +89,7 @@ async function processSinglePost(post) {
         // If file missing, maybe it's a full URL?
         console.warn(`⚠️ Local file not found: ${post.videoUrl}. Trying as URL...`);
       }
-    } else if (!post.videoUrl.startsWith("http")) {
+    } else if (post.videoUrl && !post.videoUrl.startsWith("http")) {
       console.log(`ℹ️ Using video URL: ${post.videoUrl}`);
     }
 
@@ -84,8 +98,16 @@ async function processSinglePost(post) {
 
     if (!user) throw new Error(`User not found (ID: ${post.userId})`);
 
-    // Check Page Settings
-    const accountId = post.accounts[0]; // Assuming array of strings (legacy Mongoose pattern saved as array)
+    // Parse accounts safely (support string, JSON string, or array)
+    let accountsList = post.accounts;
+    if (typeof accountsList === 'string') {
+      try { accountsList = JSON.parse(accountsList); } catch (e) { accountsList = [post.accounts]; }
+    }
+    if (!Array.isArray(accountsList)) accountsList = [];
+
+    if (accountsList.length === 0) {
+      throw new Error(`Scheduled post ${post.id} has no target accounts`);
+    }
 
     // Parse pageSettings if stored as string (legacy)
     let pageSettings = user.pageSettings;
@@ -94,33 +116,66 @@ async function processSinglePost(post) {
     }
     if (!Array.isArray(pageSettings)) pageSettings = [];
 
-    const settings = pageSettings.find(s => s.pageId === accountId);
-    if (settings && settings.enableSchedule === false) {
-      throw new Error("Scheduled posting is disabled for this page");
+    // 🔑 Resolve individual Page Access Tokens (Meta Graph API requires Page Token for posting)
+    const accountObjects = [];
+    for (const accId of accountsList) {
+      const settings = pageSettings.find(s => s.pageId === accId);
+      if (settings && settings.enableSchedule === false) {
+        console.warn(`⏩ Scheduled posting is disabled for page ${accId}. Skipping.`);
+        continue;
+      }
+
+      const page = await prisma.facebookPage.findFirst({
+        where: { id: accId, userId: user.id }
+      });
+
+      if (page && page.accessToken) {
+        const decryptedPageToken = decrypt(page.accessToken);
+        if (decryptedPageToken) {
+          accountObjects.push({
+            id: page.id,
+            name: page.name,
+            type: 'page',
+            access_token: decryptedPageToken
+          });
+        }
+      }
     }
 
-    // Get Token
-    const fbToken = decrypt(user.facebookAccessToken);
-    if (!fbToken) throw new Error("User has no Facebook Access Token");
+    if (accountObjects.length === 0) {
+      throw new Error("No valid Facebook Pages with active tokens found for this scheduled post.");
+    }
 
-    console.log(`📤 Uploading to Facebook (User: ${user.name})...`);
-
-    // Convert string IDs to objects for uploader
-    const accountObjects = post.accounts.map(id => ({ id, type: 'page' }));
+    console.log(`📤 Uploading scheduled post to ${accountObjects.length} pages for User ${user.name}...`);
 
     const results = await fb.postToFB(
-      fbToken,
+      null, // Each account object has its own decrypted Page Access Token
       accountObjects,
-      videoInput, // ✅ Pass URL or Buffer
+      videoInput, // URL or Buffer
       post.caption
     );
 
-    // Save published IDs
+    // Save published IDs & update PostTarget records
     let publishedIds = [];
     if (results.details && results.details.length > 0) {
-      publishedIds = results.details
-        .filter(r => r.status === 'success' && r.postId)
-        .map(r => ({ accountId: r.accountId, postId: r.postId }));
+      for (const r of results.details) {
+        if (r.status === 'success' && r.postId) {
+          publishedIds.push({ accountId: r.accountId, postId: r.postId });
+        }
+        try {
+          await prisma.postTarget.updateMany({
+            where: { scheduledPostId: post.id, pageId: r.accountId },
+            data: {
+              status: r.status === 'success' ? 'published' : 'failed',
+              facebookPostId: r.postId || null,
+              postedAt: r.status === 'success' ? new Date() : null,
+              error: r.error || null
+            }
+          });
+        } catch (targetErr) {
+          console.warn("Could not update postTarget status:", targetErr.message);
+        }
+      }
     }
 
     // Mark as published
@@ -166,8 +221,10 @@ async function processSinglePost(post) {
 // ============================================================
 exports.cleanupOldPosts = async () => {
   try {
-    // 🧹 Run Hard Delete for Cloudinary Assets (Phase 2)
-    await deleteExpiredAssets();
+    // 🧹 Run Hard Delete for Cloudinary Assets (Phase 2 - only if Cloudinary is configured)
+    if (process.env.CLOUDINARY_CLOUD_NAME) {
+      await deleteExpiredAssets();
+    }
 
     const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 

@@ -11,6 +11,12 @@ const path = require("path");
 const fs = require("fs");
 const { requireAuth } = require("../../utils/auth");
 const axios = require("axios");
+const { Transform } = require("stream");
+const {
+    isThreadsMediaUrl,
+    maxThreadsMediaBytes,
+    normalizeThreadsPostUrl,
+} = require("../../utils/threadsUrl");
 
 // ⚙️ Helper: Get Binary Path
 const getBinaryPath = () => {
@@ -24,23 +30,13 @@ const getBinaryPath = () => {
 /* -------------------------------------------------------------------------- */
 router.post("/lookup", requireAuth, async (req, res) => {
     try {
-        const { url } = req.body;
-        if (!url) return res.status(400).json({ success: false, error: "No URL provided" });
-
-        // 🛠️ Auto-correct threads.com -> threads.net (Common typo)
-        let cleanUrl = url.replace("threads.com", "threads.net");
-
-        // 🧹 Strip query parameters to fix yt-dlp issues
-        if (cleanUrl.includes("?")) {
-            cleanUrl = cleanUrl.split("?")[0];
+        const cleanUrl = normalizeThreadsPostUrl(req.body?.url);
+        if (!cleanUrl) {
+            return res.status(400).json({
+                success: false,
+                error: "Invalid Threads URL. Use an HTTPS threads.net or threads.com post link.",
+            });
         }
-
-        if (!cleanUrl.includes("threads.net")) {
-            return res.status(400).json({ success: false, error: "Invalid Threads URL (must be threads.net)" });
-        }
-
-        // Ensure trailing slash for consistent parsing (optional but good practice)
-        if (!cleanUrl.endsWith("/")) cleanUrl += "/";
 
         console.log(`🧵 Lookup Threads: ${cleanUrl}`);
 
@@ -69,7 +65,11 @@ router.post("/lookup", requireAuth, async (req, res) => {
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                         'Accept-Language': 'en-US,en;q=0.5',
                         'Referer': 'https://www.threads.net/'
-                    }
+                    },
+                    timeout: 15000,
+                    maxRedirects: 0,
+                    maxContentLength: 2 * 1024 * 1024,
+                    maxBodyLength: 2 * 1024 * 1024,
                 });
 
                 console.log(`    🔍 Scraper Status: ${htmlRes.status}, Length: ${htmlRes.data.length}`);
@@ -129,13 +129,13 @@ router.post("/lookup", requireAuth, async (req, res) => {
         // Handle Carousel/Multiple Entries
         if (output.entries) {
             output.entries.forEach(entry => {
-                if (entry.vcodec !== 'none' && entry.url) {
+                if (entry.vcodec !== 'none' && isThreadsMediaUrl(entry.url)) {
                     media.videos.push({
                         url: entry.url,
-                        cover: entry.thumbnail,
+                        cover: isThreadsMediaUrl(entry.thumbnail) ? entry.thumbnail : undefined,
                         type: 'video'
                     });
-                } else if (entry.url) {
+                } else if (isThreadsMediaUrl(entry.url)) {
                     // Filter m3u8 if possible or prefer mp4, but usually direct URL is fine
                     media.images.push(entry.url);
                 }
@@ -143,17 +143,24 @@ router.post("/lookup", requireAuth, async (req, res) => {
             media.type = media.videos.length > 0 ? 'video_collection' : 'image_collection';
         } else {
             // Single Media
-            if (output.vcodec !== 'none' && output.url) {
+            if (output.vcodec !== 'none' && isThreadsMediaUrl(output.url)) {
                 media.videos.push({
                     url: output.url,
-                    cover: output.thumbnail,
+                    cover: isThreadsMediaUrl(output.thumbnail) ? output.thumbnail : undefined,
                     type: 'video'
                 });
                 media.type = 'video';
-            } else if (output.url) {
+            } else if (isThreadsMediaUrl(output.url)) {
                 media.images.push(output.url);
                 media.type = 'image';
             }
+        }
+
+        if (!media.videos.length && !media.images.length) {
+            return res.status(502).json({
+                success: false,
+                error: "No supported public media could be extracted from this Threads post.",
+            });
         }
 
         res.json({ success: true, media });
@@ -168,38 +175,68 @@ router.post("/lookup", requireAuth, async (req, res) => {
 /* -------------------------------------------------------------------------- */
 /* 🌐 GET /proxy — Secure Proxy for Downloads                                 */
 /* -------------------------------------------------------------------------- */
-router.get("/proxy", async (req, res) => {
+router.get("/proxy", requireAuth, async (req, res) => {
     try {
         const { url, filename } = req.query;
         if (!url) return res.status(400).send("Missing URL");
-
-        // Simple Domain Check
-        if (!url.match(/(fbcdn|cdninstagram|threads\.net)/)) {
-            return res.status(403).send("Forbidden Source");
-        }
+        if (!isThreadsMediaUrl(url)) return res.status(403).send("Forbidden Source");
 
         const response = await axios({
             method: 'get',
             url: url,
             responseType: 'stream',
+            timeout: 30000,
+            maxRedirects: 0,
+            maxContentLength: maxThreadsMediaBytes,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             }
         });
 
+        const contentType = response.headers["content-type"] || "";
+        if (!/^(image|video)\//i.test(contentType)) {
+            response.data.destroy();
+            return res.status(415).send("Unsupported media type");
+        }
+        const contentLength = Number(response.headers["content-length"]);
+        if (Number.isFinite(contentLength) && contentLength > maxThreadsMediaBytes) {
+            response.data.destroy();
+            return res.status(413).send("Threads media exceeds the download size limit");
+        }
+
         // ✅ Safe Header Encoding Logic (RFC 5987)
-        const safeFilename = (filename || `threads-${Date.now()}`);
+        const requestedFilename = typeof filename === "string"
+            ? path.basename(filename).slice(0, 120)
+            : "";
+        const safeFilename = requestedFilename || `threads-${Date.now()}`;
         const utf8Filename = encodeURIComponent(safeFilename);
         const asciiFilename = safeFilename.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
 
         res.setHeader('Content-Disposition', `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`);
-        res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
+        res.setHeader('Content-Type', contentType);
 
-        response.data.pipe(res);
+        let bytesSent = 0;
+        const sizeLimit = new Transform({
+            transform(chunk, encoding, callback) {
+                bytesSent += chunk.length;
+                if (bytesSent > maxThreadsMediaBytes) {
+                    callback(new Error("Threads media exceeds the download size limit"));
+                    return;
+                }
+                callback(null, chunk);
+            },
+        });
+        response.data.on("error", (error) => sizeLimit.destroy(error));
+        sizeLimit.on("error", (error) => {
+            if (!res.headersSent) res.status(413);
+            res.destroy(error);
+        });
+        response.data.pipe(sizeLimit).pipe(res);
 
     } catch (err) {
         console.error("Proxy Error:", err.message);
-        res.status(502).send("Proxy Failed");
+        if (!res.headersSent) res.status(502).send("Proxy Failed");
+        else res.destroy(err);
     }
 });
 

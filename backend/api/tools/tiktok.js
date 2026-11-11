@@ -10,11 +10,17 @@ const axios = require("axios");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto"); // 🔐 Added for Cache Hashing
+const ytdlp = require("../../utils/ytdlp");
 const { PassThrough } = require("stream");
 const { requireAuth } = require("../../utils/auth");
 const cheerio = require("cheerio"); // ✅ Required for fallback scraper
 const { createSlideshow } = require("../../services/videoGenerator");
-const { execSync, exec } = require("child_process");
+const { execFile, execSync } = require("child_process");
+const {
+    isTikTokMediaUrl,
+    isTikTokPageUrl,
+    resolveLocalVideoPath,
+} = require("../../utils/tiktokSource");
 
 // 🗂️ Temp directory
 const tempDir = path.join(__dirname, "../../temp/videos");
@@ -22,33 +28,32 @@ const slideDir = path.join(__dirname, "../../temp/slideshows");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 if (!fs.existsSync(slideDir)) fs.mkdirSync(slideDir, { recursive: true });
 
-// ⚙️ Helper: Get Binary Path
-const getBinaryPath = () => {
-    let finalPath = 'yt-dlp';
-    try {
-        const possiblePath = path.join(__dirname, '../../node_modules/youtube-dl-exec/bin/yt-dlp');
-        const winPath = possiblePath + '.exe';
-        
-        if (fs.existsSync(winPath)) {
-            finalPath = winPath;
-        } else if (fs.existsSync(possiblePath)) {
-            finalPath = possiblePath;
-        } else {
-            // Check in different possible locations for node_modules
-            const altPath = path.join(process.cwd(), 'node_modules/youtube-dl-exec/bin/yt-dlp.exe');
-            if (fs.existsSync(altPath)) finalPath = altPath;
-        }
-    } catch (e) {}
-    
-    if (finalPath === 'yt-dlp') {
-        const prodPath = path.join(__dirname, '../../bin/yt-dlp');
-        if (fs.existsSync(prodPath)) finalPath = prodPath;
-        else if (fs.existsSync(prodPath + '.exe')) finalPath = prodPath + '.exe';
-    }
+async function resolveTikTokShortUrl(shortUrl) {
+    let currentUrl = shortUrl;
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const response = await axios.get(currentUrl, {
+            maxRedirects: 0,
+            responseType: "stream",
+            timeout: 5000,
+            validateStatus: (status) => status >= 200 && status < 400,
+            headers: { "User-Agent": "Mozilla/5.0" },
+        });
+        response.data.destroy();
+        if (response.status < 300) return currentUrl;
 
-    console.log(`       🔍 Using yt-dlp binary at: ${finalPath}`);
-    return finalPath;
-};
+        const location = response.headers.location;
+        if (!location) throw new Error("TikTok short link did not provide a redirect.");
+        const nextUrl = new URL(location, currentUrl).toString();
+        if (!isTikTokPageUrl(nextUrl)) {
+            throw new Error("TikTok short link redirected outside TikTok.");
+        }
+        currentUrl = nextUrl;
+    }
+    throw new Error("TikTok short link exceeded the redirect limit.");
+}
+
+// ⚙️ Helper: Get Binary Path
+const getBinaryPath = () => ytdlp.getBinaryPath();
 
 /* -------------------------------------------------------------------------- */
 /* 🛠️ HELPER: Standardize Video Object (More Robust Detection)                */
@@ -57,7 +62,7 @@ const formatTikTokVideo = (v) => {
     // 1. ប្រមូលរូបភាព (Deep Check)
     let rawImages = v.images || v.image_post_info?.images || [];
 
-    // ជួនកាលក្នុង Bulk, TikWM ដាក់រូបក្នុង display_image
+    // Some extractor responses place slideshow images in display_image.
     if (rawImages.length === 0 && v.display_image?.url_list) {
         rawImages = v.display_image.url_list;
     }
@@ -125,6 +130,9 @@ const formatTikTokVideo = (v) => {
 
 const createSlideshowPreview = async ({ images, musicUrl, id, title }) => {
     if (!images || images.length === 0) return null;
+    if (!images.every(isTikTokMediaUrl) || (musicUrl && !isTikTokMediaUrl(musicUrl))) {
+        throw new Error("TikTok returned an unsupported media URL.");
+    }
     const safeId = (id || `slideshow_${Date.now()}`).replace(/[^a-z0-9]/gi, "_");
     const previewKey = `local_slideshow_${crypto.createHash("md5").update(images.join("|") + "|" + (musicUrl || "")).digest("hex").slice(0, 8)}`;
     const urlHash = crypto.createHash("md5").update(previewKey).digest("hex").slice(0, 8);
@@ -209,18 +217,15 @@ router.post("/lookup", requireAuth, async (req, res) => {
         if (!url) return res.status(400).json({ success: false, error: "URL required" });
 
         const youtubedl = require("youtube-dl-exec");
-        let cleanUrl = (url.match(/https?:\/\/[^\s]+/) || [url])[0];
-        
-        // 🔄 Handle Short URLs (vt.tiktok.com) - Resolve redirects manually
-        if (cleanUrl.includes("vt.tiktok.com") || cleanUrl.includes("vm.tiktok.com")) {
+        let cleanUrl = typeof url === "string" ? url.trim() : "";
+        if (!isTikTokPageUrl(cleanUrl)) {
+            return res.status(400).json({ success: false, error: "Enter a valid HTTPS TikTok link." });
+        }
+        if (["vm.tiktok.com", "vt.tiktok.com"].includes(new URL(cleanUrl).hostname)) {
             try {
-                const headRes = await axios.head(cleanUrl, { 
-                    maxRedirects: 5,
-                    headers: { 'User-Agent': 'Mozilla/5.0' }
-                });
-                cleanUrl = headRes.request.res.responseUrl || cleanUrl;
-            } catch (e) {
-                console.warn("    ⚠️ Redirect resolution failed, continuing with original URL");
+                cleanUrl = await resolveTikTokShortUrl(cleanUrl);
+            } catch (error) {
+                return res.status(400).json({ success: false, error: error.message });
             }
         }
 
@@ -429,25 +434,10 @@ router.post("/lookup", requireAuth, async (req, res) => {
             }
         }
 
-        // 4️⃣ TikWM API Fallback (Stage 4)
-        if (!videoData) {
-            try {
-                console.log("    👉 Attempting TikWM API Fallback (Lookup)...");
-                const tikwmRes = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(cleanUrl)}`);
-                const v = tikwmRes.data?.data;
-                if (v) {
-                    videoData = formatTikTokVideo(v);
-                    console.log("    ✅ TikWM API Success!");
-                }
-            } catch (tikwmErr) {
-                console.error("    ❌ TikWM API also failed:", tikwmErr.message);
-            }
-        }
-
         if (!videoData) {
             return res.status(422).json({ 
                 success: false, 
-                error: "Local engines blocked. Please try again later or provide the direct media link if you have it." 
+                error: "The local extractor could not read this video. Try a direct media URL you have permission to download." 
             });
         }
 
@@ -589,25 +579,8 @@ router.post("/compatible", requireAuth, async (req, res) => {
             }
         }
 
-        // 🚀 Stage 3: TikWM API Fallback (Final Absolute Fallback)
         if (!downloadSuccess) {
-            try {
-                console.log("       👉 Stage 3: Attempting TikWM API Fallback...");
-                const tikwmRes = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(downloadUrl)}`);
-                if (tikwmRes.data?.data?.play) {
-                    const playUrl = tikwmRes.data.data.play;
-                    console.log("       ✅ TikWM Link Found, downloading...");
-                    const cmd = `"${ytDlpPath}" -y ${proxyArg} -o "${inputPath}" "${playUrl}" --no-playlist --no-warnings --user-agent "${mobileUA}" --no-check-certificates`;
-                    execSync(cmd, { stdio: 'pipe' });
-                    if (fs.existsSync(inputPath)) downloadSuccess = true;
-                }
-            } catch (e3) {
-                console.error("       ❌ Stage 3 Failed:", e3.message);
-            }
-        }
-
-        if (!downloadSuccess) {
-            throw new Error("All local and API download methods failed. TikTok is heavily blocking this content.");
+            throw new Error("Local download methods failed. Try a direct media URL you have permission to download.");
         }
 
         console.log("       ✅ Download complete.");
@@ -737,38 +710,13 @@ router.post("/profile", requireAuth, async (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* 🎵 POST /trending — Get Trending (Updated Logic)                           */
+/* 🎵 POST /trending — Unavailable without an external trend data provider    */
 /* -------------------------------------------------------------------------- */
 router.post("/trending", requireAuth, async (req, res) => {
-    try {
-        const { region = "US", count = 20, type = 'music' } = req.body;
-        console.log(`🔍 Fetching TikTok Trends for region: ${region} (Count: ${count})`);
-
-        // Use TikWM Feed API to get real trending content
-        // This restores functionality to Viral Finder and TikTok Trends pages
-        const tikwmRes = await axios.get(`https://www.tikwm.com/api/feed/list?region=${region}&count=${count}`, {
-            timeout: 10000,
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-        
-        if (tikwmRes.data && tikwmRes.data.data) {
-            const formattedVideos = tikwmRes.data.data.map(v => formatTikTokVideo(v));
-            console.log(`   ✅ Successfully fetched ${formattedVideos.length} trending items.`);
-            return res.json({ 
-                success: true, 
-                videos: formattedVideos 
-            });
-        }
-
-        res.json({ 
-            success: true, 
-            videos: [], 
-            message: "No trending videos found for this region." 
-        });
-    } catch (err) {
-        console.error("❌ Trending Route Error:", err.message);
-        res.status(500).json({ success: false, error: "Failed to fetch trending feed. Please try again later." });
-    }
+    return res.status(501).json({
+        success: false,
+        error: "TikTok trends are unavailable because this app does not use a third-party trends API.",
+    });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -781,6 +729,13 @@ router.post("/download", requireAuth, async (req, res) => {
 
         // 📸 SLIDESHOW (Images) - Keep existing logic for now (it works well)
         if (type === 'slideshow' && images && images.length > 0) {
+            if (
+                !Array.isArray(images) ||
+                images.length > 20 ||
+                !images.every(isTikTokMediaUrl)
+            ) {
+                return res.status(400).json({ success: false, error: "Invalid slideshow media." });
+            }
             console.log(`📥 Downloading Slideshow (${images.length} images)...`);
             const safeTitle = (title || "slide").replace(/[^a-z0-9]/gi, "_").substring(0, 30);
             const folderName = `${safeTitle}_${Date.now()}`;
@@ -792,7 +747,13 @@ router.post("/download", requireAuth, async (req, res) => {
                 try {
                     const filePath = path.join(targetFolder, `image_${i + 1}.jpg`);
                     const writer = fs.createWriteStream(filePath);
-                    const resp = await axios({ url: images[i], method: 'get', responseType: 'stream' });
+                    const resp = await axios({
+                        url: images[i],
+                        method: 'get',
+                        responseType: 'stream',
+                        timeout: 20000,
+                        maxContentLength: 25 * 1024 * 1024,
+                    });
                     resp.data.pipe(writer);
                     await new Promise((resolve) => writer.on('finish', resolve));
                     downloadedFiles.push({ url: `/uploads/temp/slideshows/${folderName}/image_${i + 1}.jpg`, path: filePath });
@@ -833,8 +794,10 @@ router.post("/download", requireAuth, async (req, res) => {
 router.post("/combine", requireAuth, async (req, res) => {
     try {
         const { images, audio, id, title } = req.body;
-        if (!images || images.length === 0) return res.status(400).json({ error: "No images provided" });
-        if (!audio) return res.status(400).json({ error: "No audio provided" });
+        if (!Array.isArray(images) || images.length === 0) return res.status(400).json({ error: "No images provided" });
+        if (images.length > 20 || !images.every(isTikTokMediaUrl) || !isTikTokMediaUrl(audio)) {
+            return res.status(400).json({ success: false, error: "Invalid slideshow media." });
+        }
 
         console.log(`🎬 [Combine] Starting merger for ${id} (${images.length} images)`);
 
@@ -863,6 +826,7 @@ router.post("/combine", requireAuth, async (req, res) => {
                     method: 'get', 
                     responseType: 'stream', 
                     timeout: 15000,
+                    maxContentLength: 25 * 1024 * 1024,
                     headers: commonHeaders
                 });
                 resp.data.pipe(writer);
@@ -886,6 +850,7 @@ router.post("/combine", requireAuth, async (req, res) => {
             method: 'get', 
             responseType: 'stream', 
             timeout: 20000,
+            maxContentLength: 25 * 1024 * 1024,
             headers: commonHeaders
         });
         audioResp.data.pipe(audioWriter);
@@ -954,12 +919,24 @@ router.post("/combine", requireAuth, async (req, res) => {
 router.get("/stream", async (req, res) => {
     try {
         const { id, url, filename } = req.query;
-        if (!id || id === 'undefined' || !url) return res.status(400).send("Missing parameters: id or url");
+        if (
+            typeof id !== "string" ||
+            !/^[a-z0-9_-]{1,100}$/i.test(id) ||
+            typeof url !== "string"
+        ) {
+            return res.status(400).send("Missing or invalid stream parameters.");
+        }
 
-        // 🔐 Security: Domain Allowlist (Updated to allow local absolute paths from transcoding)
-        const isLocalPath = path.isAbsolute(url) && fs.existsSync(url);
-        if (!isLocalPath && !url.match(/(tiktokcdn|tiktokv|tiktok|bytevc|tikwm|douyin|muscdn|akamaized|v19-webapp|local_|local_merge)/i)) {
-            return res.status(403).send("Forbidden Source: " + url);
+        const localPath = resolveLocalVideoPath(url, tempDir);
+        const isLocalPath = Boolean(localPath);
+        const isCombinedCache = url === "local_merge" && id.startsWith("combined_");
+        if (
+            !isLocalPath &&
+            !isCombinedCache &&
+            !isTikTokPageUrl(url) &&
+            !isTikTokMediaUrl(url)
+        ) {
+            return res.status(403).send("Forbidden source.");
         }
 
         const safeId = id.replace(/[^a-z0-9]/gi, "_");
@@ -971,7 +948,7 @@ router.get("/stream", async (req, res) => {
 
         // 🛡️ Header Setup
         const isDownload = !!filename;
-        const rawName = filename || `tiktok_${safeId}.mp4`;
+        const rawName = typeof filename === "string" ? filename.slice(0, 180) : `tiktok_${safeId}.mp4`;
         const utf8Name = encodeURIComponent(rawName);
         const asciiName = rawName.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
 
@@ -1034,15 +1011,15 @@ router.get("/stream", async (req, res) => {
         
         // Handle local transcoded files immediately
         if (isLocalPath) {
-            console.log(`🎬 [Stream] Serving local transcoded file: ${url}`);
-            const stat = fs.statSync(url);
+            console.log(`🎬 [Stream] Serving local transcoded file: ${path.basename(localPath)}`);
+            const stat = fs.statSync(localPath);
             const range = req.headers.range;
             if (range) {
                 const parts = range.replace(/bytes=/, "").split("-");
                 const start = parseInt(parts[0], 10);
                 const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
                 const chunksize = (end - start) + 1;
-                const file = fs.createReadStream(url, { start, end });
+                const file = fs.createReadStream(localPath, { start, end });
                 res.writeHead(206, {
                     ...getCommonHeaders(),
                     'Content-Range': `bytes ${start}-${end}/${stat.size}`,
@@ -1051,11 +1028,11 @@ router.get("/stream", async (req, res) => {
                 return file.pipe(res);
             } else {
                 res.writeHead(200, getCommonHeaders(stat.size));
-                return fs.createReadStream(url).pipe(res);
+                return fs.createReadStream(localPath).pipe(res);
             }
         }
 
-        const isDirectMedia = url.match(/(tiktokcdn|tiktokv|bytevc|muscdn|akamaized|douyin|v19-webapp-prime\.tiktok\.com|v16-webapp\.tiktok\.com|playAddr)/i);
+        const isDirectMedia = isTikTokMediaUrl(url);
 
         if (isDirectMedia) {
             console.log(`📥 [Stream] Direct media URL detected: ${url}`);
@@ -1092,19 +1069,22 @@ router.get("/stream", async (req, res) => {
         console.log(`📥 [Stream] Downloading via yt-dlp: ${safeId} [${urlHash}]`);
         try {
             const ytDlpPath = getBinaryPath() || 'yt-dlp';
-            const proxy = process.env.TIKTOK_PROXY;
-            const proxyArg = proxy ? `--proxy "${proxy}"` : "";
-            
-            // Start yt-dlp download in background
-            const cmd = `"${ytDlpPath}" -y ${proxyArg} -o "${cachePath}" "${url}" --no-playlist --no-warnings --user-agent "${mobileUA}"`;
-            
             let downloadDone = false;
-            exec(cmd, async (error, stdout, stderr) => {
+            const args = [
+                "-y",
+                "-o", cachePath,
+                url,
+                "--no-playlist",
+                "--no-warnings",
+                "--user-agent", mobileUA,
+            ];
+            if (process.env.TIKTOK_PROXY) args.unshift("--proxy", process.env.TIKTOK_PROXY);
+            execFile(ytDlpPath, args, { timeout: 90_000, windowsHide: true }, async (error) => {
                 if (error) {
                     console.error(`❌ [Stream] yt-dlp failed: ${error.message}`);
                     
                     // 🚀 Fallback to Axios download if it's a direct media link
-                    if (url.match(/(tiktokcdn|tiktokv|bytevc|muscdn|akamaized)/i)) {
+                    if (isTikTokMediaUrl(url)) {
                         console.log("    👉 Attempting Axios Fallback Download...");
                         try {
                             const writer = fs.createWriteStream(cachePath);
@@ -1185,9 +1165,8 @@ router.get("/proxy", async (req, res) => {
         }
 
         const targetUrl = url;
-        // ✅ URL Validation: Allow tiktokcdn (any variation), muscdn, douyin, tikwm, facebook, fbcdn.net, akamaized, bytevc
-        if (!targetUrl || !targetUrl.match(/(tiktokcdn|bytevc1|tikwm|douyin|muscdn|akamaized|facebook\.com|fbcdn\.net)/i)) {
-            console.warn(`⚠️ [Proxy] Forbidden Domain: ${targetUrl}`);
+        if (!isTikTokMediaUrl(targetUrl)) {
+            console.warn("⚠️ [Proxy] Rejected non-TikTok media URL.");
             return res.status(403).send("Forbidden Domain");
         }
 
@@ -1199,6 +1178,8 @@ router.get("/proxy", async (req, res) => {
             method: 'get',
             url: targetUrl,
             responseType: 'stream',
+            timeout: 30000,
+            maxContentLength: 100 * 1024 * 1024,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Referer': 'https://www.tiktok.com/',

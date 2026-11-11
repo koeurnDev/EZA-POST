@@ -13,6 +13,8 @@ const { requireAuth } = require("../../utils/auth");
 const axios = require("axios");
 const ytdlp = require("../../utils/ytdlp");
 const cheerio = require("cheerio"); // ✅ Required for scraper
+const crypto = require("crypto");
+const { isSupportedPublicPostPath, normalizeFacebookUrl } = require("../../utils/facebookUrl");
 
 // 📂 Constants & Paths
 const tempDir = path.join(__dirname, "../../temp/videos");
@@ -25,34 +27,25 @@ const DEFAULT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 /* -------------------------------------------------------------------------- */
 /* 🔍 POST /lookup — Get Video or Image Info                                  */
 /* -------------------------------------------------------------------------- */
-// ⚙️ Helper: Check if Public (Basic)
-const isPublicFacebook = (url) => {
-    return /(facebook\.com|fb\.watch|fb\.me)/.test(url)
-        && !url.includes('/stories/')
-        && !url.includes('/groups/')
-        && !url.includes('pfbid'); // User posts often have this ID but are usually private if not pages
-};
-
 /* -------------------------------------------------------------------------- */
 /* 🔍 POST /lookup — Get Video or Image Info                                  */
 /* -------------------------------------------------------------------------- */
 router.post("/lookup", requireAuth, async (req, res) => {
     try {
-        const { url } = req.body;
+        const url = normalizeFacebookUrl(req.body?.url);
 
         // 🌟 MODE B: Standard URL Lookup
-        const isFb = /(facebook\.com|fb\.watch|fb\.me)/.test(url);
-        if (!url || !isFb) {
+        if (!url) {
             return res.status(400).json({ success: false, error: "Invalid Facebook URL" });
         }
 
         console.log(`📘 Lookup Facebook: ${url}`);
 
         // 🔒 Public-Only Check
-        if (!isPublicFacebook(url)) {
+        if (!isSupportedPublicPostPath(url)) {
             return res.status(400).json({
                 success: false,
-                error: "Private Facebook content is not supported. Only public posts, reels, and images can be downloaded."
+                error: "Facebook Stories are not supported. Only accessible posts, reels, and images can be downloaded."
             });
         }
 
@@ -120,7 +113,10 @@ router.post("/lookup", requireAuth, async (req, res) => {
                         'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
                         'Cookie': cookieHeader
                     },
-                    timeout: 15000
+                    timeout: 15000,
+                    maxRedirects: 0,
+                    maxContentLength: 2 * 1024 * 1024,
+                    maxBodyLength: 2 * 1024 * 1024,
                 });
 
                 const $ = cheerio.load(html.data);
@@ -173,86 +169,53 @@ router.post("/lookup", requireAuth, async (req, res) => {
 /* -------------------------------------------------------------------------- */
 router.post("/download", requireAuth, async (req, res) => {
     try {
-        const { url } = req.body;
-        if (!url) return res.status(400).json({ success: false, error: "No URL provided" });
-
-        const isRawUrl = url.includes("fbcdn.net") || url.includes("googlevideo.com") || url.startsWith("blob:");
-        const safeTitle = `fb-${Date.now()}`;
-        const outputTemplate = path.join(tempDir, `${safeTitle}.mp4`);
-
-        console.log(`📥 Downloading Facebook Video (${isRawUrl ? 'Raw URL' : 'yt-dlp'})...`);
-
-        if (isRawUrl) {
-            // 🌟 Direct Download Stream
-            const writer = fs.createWriteStream(outputTemplate);
-            const response = await axios({
-                url,
-                method: 'GET',
-                responseType: 'stream',
-                headers: { 'User-Agent': DEFAULT_UA }
+        const url = normalizeFacebookUrl(req.body?.url);
+        if (!url) return res.status(400).json({ success: false, error: "Invalid Facebook URL" });
+        if (!isSupportedPublicPostPath(url)) {
+            return res.status(400).json({
+                success: false,
+                error: "Facebook Stories are not supported. Only accessible posts, reels, and images can be downloaded."
             });
-
-            response.data.pipe(writer);
-
-            await new Promise((resolve, reject) => {
-                writer.on('finish', resolve);
-                writer.on('error', reject);
-            });
-
-            // ... (Auto-delete logic) ...
-
-            // 🕒 Auto-Delete after 5 minutes
-            setTimeout(() => {
-                if (fs.existsSync(outputTemplate)) {
-                    fs.unlink(outputTemplate, (err) => {
-                        if (err) console.error(`❌ Failed to auto-delete ${safeTitle}:`, err);
-                    });
-                }
-            }, 5 * 60 * 1000);
-
-            return res.json({ success: true, url: `/uploads/temp/videos/${safeTitle}.mp4` });
-
-        } else {
-            // 🌟 Standard yt-dlp Download
-            const outputTemplateYt = path.join(tempDir, `${safeTitle}.%(ext)s`);
-            const dlFlags = {
-                noWarnings: true,
-                noCheckCertificate: true,
-                output: outputTemplateYt,
-                format: 'bestvideo+bestaudio/best',
-                mergeOutputFormat: 'mp4',
-                userAgent: DEFAULT_UA,
-                playlistItems: '1',
-                ffmpegLocation: require('ffmpeg-static')
-            };
-
-            if (fs.existsSync(cookiesPath)) {
-                dlFlags.cookies = cookiesPath;
-            }
-
-            // ⚙️ Use Helper for Binary Path
-            await ytdlp.download(url, outputTemplateYt, dlFlags);
-
-            // Find file
-            const files = fs.readdirSync(tempDir);
-            const found = files.find(f => f.startsWith(safeTitle));
-
-            if (found) {
-                console.log("✅ Facebook Download Complete:", found);
-
-                // 🕒 Auto-Delete after 5 minutes
-                setTimeout(() => {
-                    const filePath = path.join(tempDir, found);
-                    if (fs.existsSync(filePath)) {
-                        fs.unlink(filePath, (err) => { });
-                    }
-                }, 5 * 60 * 1000);
-
-                res.json({ success: true, url: `/uploads/temp/videos/${found}` });
-            } else {
-                throw new Error("File not found after download");
-            }
         }
+
+        const safeTitle = `fb-${Date.now()}-${crypto.randomUUID()}`;
+        const outputTemplate = path.join(tempDir, `${safeTitle}.%(ext)s`);
+
+        console.log("📥 Downloading Facebook video with local yt-dlp...");
+
+        const dlFlags = {
+            noWarnings: true,
+            noCheckCertificate: true,
+            output: outputTemplate,
+            format: 'bestvideo+bestaudio/best',
+            mergeOutputFormat: 'mp4',
+            userAgent: DEFAULT_UA,
+            playlistItems: '1',
+            ffmpegLocation: require('ffmpeg-static')
+        };
+
+        if (fs.existsSync(cookiesPath)) {
+            dlFlags.cookies = cookiesPath;
+        }
+
+        await ytdlp.download(url, outputTemplate, dlFlags);
+
+        const found = fs.readdirSync(tempDir).find(f =>
+            f.startsWith(safeTitle) && !f.endsWith('.part') && !f.endsWith('.ytdl')
+        );
+        if (!found) throw new Error("File not found after download");
+
+        console.log("✅ Facebook Download Complete:", found);
+        setTimeout(() => {
+            const filePath = path.join(tempDir, found);
+            if (fs.existsSync(filePath)) {
+                fs.unlink(filePath, (err) => {
+                    if (err) console.error(`❌ Failed to auto-delete ${found}:`, err);
+                });
+            }
+        }, 5 * 60 * 1000);
+
+        return res.json({ success: true, url: `/uploads/temp/videos/${found}` });
 
     } catch (err) {
         console.error("❌ FB Download Error:", err.message);

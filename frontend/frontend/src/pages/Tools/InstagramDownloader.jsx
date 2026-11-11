@@ -23,13 +23,28 @@ const itemVariants = {
     visible: { opacity: 1, y: 0 }
 };
 
+const isInstagramPostUrl = (value) => {
+    try {
+        const url = new URL(value.trim());
+        return url.protocol === "https:" &&
+            !url.username &&
+            !url.password &&
+            !url.port &&
+            (url.hostname.toLowerCase() === "instagram.com" ||
+                url.hostname.toLowerCase().endsWith(".instagram.com")) &&
+            /^\/(?:p|reel|reels|tv|share\/reel)\/[A-Za-z0-9_-]+\/?$/i.test(url.pathname);
+    } catch {
+        return false;
+    }
+};
+
 export default function InstagramDownloader() {
     const [url, setUrl] = useState("");
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
 
     const handleDownload = async () => {
-        if (!url.includes("instagram.com")) {
+        if (!isInstagramPostUrl(url)) {
             return toast.error("Invalid Instagram Link");
         }
         setLoading(true);

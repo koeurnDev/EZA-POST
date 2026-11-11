@@ -42,6 +42,8 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     postId: "",
     keyword: "",
     reply: "",
+    dmReply: "",
+    enableDm: false,
     attachmentUrl: null,
   });
   const [editingId, setEditingId] = useState(null);
@@ -169,6 +171,8 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       postId: "",
       keyword: "",
       reply: "",
+      dmReply: "",
+      enableDm: false,
       attachmentUrl: null,
     });
     setEditingId(null);
@@ -181,7 +185,9 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       scope: rule.scope || "ALL",
       postId: rule.postId || "",
       keyword: rule.keyword,
-      reply: rule.reply,
+      reply: rule.reply || "",
+      dmReply: rule.dmReply || "",
+      enableDm: Boolean(rule.enableDm),
       attachmentUrl: rule.attachmentUrl || null,
     });
     setEditingId(rule.id);
@@ -191,10 +197,12 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
 
   // ✅ Save Rule (Create or Update)
   const saveRule = useCallback(async () => {
-    const { ruleType, scope, postId, keyword, reply, attachmentUrl } = formData;
+    const { ruleType, scope, postId, keyword, reply, dmReply, enableDm, attachmentUrl } = formData;
 
     // Validation
-    if (!reply.trim()) return showNotify("Reply Message is required", "error");
+    if (!reply.trim() && !(enableDm && dmReply.trim())) {
+      return showNotify("សូមបញ្ចូលសារឆ្លើយតប Comment ឬ សារផ្ញើចូល Inbox (DM)", "error");
+    }
     if (scope === "SPECIFIC" && !postId.trim()) return showNotify("Post ID is required for Specific Post scope", "error");
 
     // 🎯 Extract numeric ID if postId is a URL
@@ -212,6 +220,8 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       postId: scope === "SPECIFIC" ? cleanPostId : undefined,
       keyword: keyword.trim() || "*",
       reply: reply.trim(),
+      dmReply: enableDm ? dmReply.trim() : null,
+      enableDm: Boolean(enableDm),
       attachmentUrl
     };
 
@@ -853,6 +863,42 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
             </div>
           </div>
 
+          {/* 📬 Private Message / DM (Messenger Inbox) */}
+          <div className="mt-4 p-5 rounded-2xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={formData.enableDm}
+                  onChange={(e) => handleFormChange("enableDm", e.target.checked)}
+                  className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                />
+                <span>📬 ផ្ញើសារឯកជនចូល Inbox ស្វ័យប្រវត្តិ (Private Message / DM)</span>
+              </label>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider ${formData.enableDm ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"}`}>
+                {formData.enableDm ? "បើក DM" : "បិទ DM"}
+              </span>
+            </div>
+
+            {formData.enableDm && (
+              <div className="space-y-2 pt-1">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  សារដែលត្រូវផ្ញើចូល Messenger Inbox របស់ភ្ញៀវ៖
+                </label>
+                <textarea
+                  rows={3}
+                  value={formData.dmReply}
+                  onChange={(e) => handleFormChange("dmReply", e.target.value)}
+                  placeholder="ឧទាហរណ៍៖ សួស្តីបង [[name]]! អរគុណសម្រាប់ការចាប់អារម្មណ៍។ តម្លៃទំនិញនេះគឺ $10 បងចង់កុម្ម៉ង់ប៉ុន្មានដែរ?"
+                  className="w-full px-4 py-3 rounded-xl border border-blue-200 dark:border-blue-800/80 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all resize-none"
+                />
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                  💡 គន្លឹះ៖ ប្រើ <code className="bg-white dark:bg-gray-800 px-1 py-0.5 rounded border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">[[name]]</code> ដើម្បីហៅឈ្មោះភ្ញៀវ និង <code className="bg-white dark:bg-gray-800 px-1 py-0.5 rounded border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">{"{សួស្តី|ជំរាបសួរ}"}</code> ដើម្បីបង្វិលពាក្យ Spintax។
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Image Attachment */}
           <div className="mt-6">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
@@ -981,22 +1027,36 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                       className={`p-4 rounded-xl border transition-all active:scale-[0.98] will-change-transform ${r.enabled ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm" : "bg-gray-50 dark:bg-gray-900/40 border-gray-100 dark:border-gray-800 opacity-70"}`}
                     >
                        <div className="flex justify-between items-start mb-3">
-                         <div className="flex flex-col gap-1">
-                           <span className="font-bold text-gray-900 dark:text-white text-sm">
-                             {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
-                           </span>
-                           <div className="flex gap-2">
-                             <span className="text-[8px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">{r.ruleType || "KEYWORD"}</span>
-                           </div>
-                         </div>
-                         <button 
-                           onClick={() => toggleRule(r.id, r.enabled)}
-                           className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase transition-colors ${r.enabled ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}
-                         >
-                           {r.enabled ? "On" : "Off"}
-                         </button>
-                       </div>
-                       <p className="text-gray-600 dark:text-gray-400 text-xs line-clamp-2 mb-3 bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg">{r.reply}</p>
+                          <div className="flex flex-col gap-1">
+                            <span className="font-bold text-gray-900 dark:text-white text-sm">
+                              {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
+                            </span>
+                            <div className="flex flex-wrap gap-1.5 items-center">
+                              <span className="text-[8px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">{r.ruleType || "KEYWORD"}</span>
+                              {r.enableDm && r.dmReply ? (
+                                <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 px-1.5 py-0.5 rounded">💬 Comment + 📬 DM</span>
+                              ) : (
+                                <span className="text-[9px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">💬 Comment Only</span>
+                              )}
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => toggleRule(r.id, r.enabled)}
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase transition-colors ${r.enabled ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}
+                          >
+                            {r.enabled ? "On" : "Off"}
+                          </button>
+                        </div>
+                        {r.reply && (
+                          <p className="text-gray-600 dark:text-gray-400 text-xs line-clamp-2 mb-2 bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg">
+                            <span className="font-semibold text-gray-500">💬 Comment:</span> {r.reply}
+                          </p>
+                        )}
+                        {r.enableDm && r.dmReply && (
+                          <p className="text-blue-700 dark:text-blue-300 text-xs line-clamp-2 mb-2 bg-blue-50/60 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-100 dark:border-blue-900/40">
+                            <span className="font-semibold text-blue-600 dark:text-blue-400">📬 Inbox DM:</span> {r.dmReply}
+                          </p>
+                        )}
                        <div className="flex justify-end gap-2">
                          <button onClick={() => handleEdit(r)} className="p-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded-lg"><Edit2 size={14} /></button>
                          <button onClick={() => deleteRule(r.id)} className="p-2 text-red-500 bg-red-50 dark:bg-red-500/10 rounded-lg"><Trash2 size={14} /></button>
@@ -1019,14 +1079,28 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
                       {filtered.slice(0, visibleCount).map((r, idx) => (
                         <tr key={r.id || idx} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors group">
                            <td className="px-6 py-4">
-                             <div className="flex flex-col gap-1">
+                             <div className="flex flex-col gap-1.5">
                                <div className="flex items-center gap-2">
                                  <span className="font-bold text-gray-900 dark:text-white">
                                    {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
                                  </span>
                                  <span className="text-[9px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">{r.ruleType || "KEYWORD"}</span>
+                                 {r.enableDm && r.dmReply ? (
+                                   <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded-full">💬 Comment + 📬 DM</span>
+                                 ) : (
+                                   <span className="text-[9px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">💬 Comment Only</span>
+                                 )}
                                </div>
-                               <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-1">{r.reply}</p>
+                               {r.reply && (
+                                 <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-1">
+                                   <span className="font-semibold text-gray-500">💬 Comment:</span> {r.reply}
+                                 </p>
+                               )}
+                               {r.enableDm && r.dmReply && (
+                                 <p className="text-blue-600 dark:text-blue-400 text-xs line-clamp-1 italic">
+                                   <span className="font-semibold">📬 Inbox DM:</span> {r.dmReply}
+                                 </p>
+                               )}
                              </div>
                            </td>
                            <td className="px-6 py-4 text-center">

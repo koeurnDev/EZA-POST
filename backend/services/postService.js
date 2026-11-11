@@ -12,11 +12,12 @@ const { processVideo, extractThumbnail, processImage } = require("./videoProcess
 const tiktokDownloader = require("../utils/tiktokDownloader");
 const { decrypt } = require("../utils/crypto");
 
-// ✅ SSRF Protection: Trusted Domains
+// ✅ SSRF Protection: Trusted Domains (Includes Cloudflare R2 & ImageKit)
 const TRUSTED_DOMAINS = [
     "tiktok.com", "douyin.com", "facebook.com", "fbcdn.net", 
     "instagram.com", "cdninstagram.com", "googleusercontent.com",
-    "cloudinary.com"
+    "cloudinary.com", "r2.dev", "cloudflarestorage.com", "workers.dev",
+    "imagekit.io", "ik.imagekit.io"
 ];
 
 const isTrustedUrl = (url) => {
@@ -37,7 +38,7 @@ const isTrustedUrl = (url) => {
  * @param {Object} data - Contains all necessary data for processing.
  * @param {Function} onProgress - Optional callback to report progress (0-100).
  */
-async function processAndPostCarouselLogic({ userId, accountsArray, caption, scheduleTime, videoUrl, videoFilePath, thumbnailFilePath, rightSideImageFilePath, aiOptions, carouselCards }, onProgress = () => {}) {
+async function processAndPostCarouselLogic({ userId, accountsArray, caption, scheduleTime, staggerDelay, videoUrl, videoFilePath, thumbnailFilePath, rightSideImageFilePath, aiOptions, carouselCards }, onProgress = () => {}) {
     let tempFiles = [];
     const results = { successCount: 0, failedCount: 0, details: [] };
 
@@ -46,6 +47,38 @@ async function processAndPostCarouselLogic({ userId, accountsArray, caption, sch
         // ✅ SSRF Check
         if (videoUrl && !isTrustedUrl(videoUrl)) {
             throw new Error("SSRF Blocked: Untrusted video URL domain.");
+        }
+
+        // 💾 0. Connect Scheduled Post to DB if scheduleTime is provided
+        let scheduledPostRecord = null;
+        if (scheduleTime) {
+            try {
+                scheduledPostRecord = await prisma.scheduledPost.create({
+                    data: {
+                        userId,
+                        caption: caption || "",
+                        postType: "video",
+                        status: "scheduled",
+                        scheduleTime: new Date(scheduleTime),
+                        videoUrl: videoUrl || null,
+                        thumbnailUrl: thumbnailFilePath || null,
+                        accounts: accountsArray,
+                        carouselCards: carouselCards || []
+                    }
+                });
+                for (const accId of accountsArray) {
+                    await prisma.postTarget.create({
+                        data: {
+                            scheduledPostId: scheduledPostRecord.id,
+                            pageId: accId,
+                            status: "scheduled"
+                        }
+                    });
+                }
+                console.log(`📅 Created ScheduledPost ${scheduledPostRecord.id} with ${accountsArray.length} targets`);
+            } catch (schedErr) {
+                console.warn("⚠️ Could not save scheduledPost to DB:", schedErr.message);
+            }
         }
 
         // 1. Prepare Inputs
@@ -131,7 +164,8 @@ async function processAndPostCarouselLogic({ userId, accountsArray, caption, sch
         }
 
         // 2. Process Per Account
-        for (const accountId of accountsArray) {
+        for (let i = 0; i < accountsArray.length; i++) {
+            const accountId = accountsArray[i];
             try {
                 const page = await prisma.facebookPage.findFirst({
                     where: { id: accountId, userId: userId }
@@ -142,7 +176,14 @@ async function processAndPostCarouselLogic({ userId, accountsArray, caption, sch
 
                 if (!pageToken) throw new Error(`Page ${accountId} not found or invalid token`);
 
-                console.log(`🚀 Publishing Carousel for ${pageName}...`);
+                console.log(`🚀 Publishing Carousel for ${pageName} (${i + 1}/${accountsArray.length})...`);
+
+                // 🕒 Calculate Stagger Delay per account
+                let accountScheduleTime = scheduleTime ? new Date(scheduleTime) : null;
+                const delayMinutes = parseInt(staggerDelay || 0);
+                if (accountScheduleTime && delayMinutes > 0 && i > 0) {
+                    accountScheduleTime = new Date(accountScheduleTime.getTime() + (i * delayMinutes * 60 * 1000));
+                }
 
                 const childAttachments = [];
                 const defaultLink = `https://facebook.com/${accountId}`;
@@ -150,22 +191,44 @@ async function processAndPostCarouselLogic({ userId, accountsArray, caption, sch
                 for (const [index, card] of carouselCards.entries()) {
                     let mediaFbid = null;
                     
-                    // Upload Media logic (Simplified for service)
+                    // 🌊 Fresh streams created for EACH page to prevent stream draining!
                     if (card.type === 'video') {
-                        let currentVideo = processedVideoPath ? fs.createReadStream(processedVideoPath) : (videoFilePath ? fs.createReadStream(videoFilePath) : videoUrl);
-                        let currentThumb = thumbnailInput ? (typeof thumbnailInput === 'string' ? thumbnailInput : fs.createReadStream(thumbnailInput.path || thumbnailFilePath)) : null;
+                        let currentVideo = null;
+                        if (processedVideoPath && fs.existsSync(processedVideoPath)) {
+                            currentVideo = fs.createReadStream(processedVideoPath);
+                        } else if (videoFilePath && fs.existsSync(videoFilePath)) {
+                            currentVideo = fs.createReadStream(videoFilePath);
+                        } else {
+                            currentVideo = videoUrl;
+                        }
+
+                        let currentThumb = null;
+                        if (thumbnailFilePath && fs.existsSync(thumbnailFilePath)) {
+                            currentThumb = fs.createReadStream(thumbnailFilePath);
+                        }
                         
                         const vRes = await fb.uploadVideoForCarousel(pageToken, accountId, currentVideo, currentThumb);
                         mediaFbid = vRes.id;
                     } else if (card.isPageCard) {
-                        // Auto Page Pic
-                        const picUrlRes = await axios.get(`https://graph.facebook.com/v21.0/${accountId}/picture`, {
-                            params: { width: 1000, redirect: false, access_token: pageToken }
-                        });
-                        const picUrl = picUrlRes.data?.data?.url;
-                        if (picUrl) {
-                            const picStream = await axios.get(picUrl, { responseType: 'stream' });
-                            const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, picStream.data);
+                        // Auto Page Pic with fallback
+                        try {
+                            const picUrlRes = await axios.get(`https://graph.facebook.com/v21.0/${accountId}/picture`, {
+                                params: { width: 1000, redirect: false, access_token: pageToken }
+                            });
+                            const picUrl = picUrlRes.data?.data?.url;
+                            if (picUrl) {
+                                const picStream = await axios.get(picUrl, { responseType: 'stream' });
+                                const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, picStream.data);
+                                mediaFbid = pRes.id;
+                            }
+                        } catch (picErr) {
+                            console.warn(`⚠️ Page picture upload failed for ${accountId}:`, picErr.message);
+                        }
+
+                        // Fallback to right-side image if page picture failed
+                        if (!mediaFbid && rightSideImageFilePath && fs.existsSync(rightSideImageFilePath)) {
+                            const fallbackImg = fs.createReadStream(processedRightSidePath || rightSideImageFilePath);
+                            const pRes = await fb.uploadPhotoForCarousel(pageToken, accountId, fallbackImg);
                             mediaFbid = pRes.id;
                         }
                     } else if (card.imageUrl) {
@@ -183,8 +246,8 @@ async function processAndPostCarouselLogic({ userId, accountsArray, caption, sch
                 }
 
                 const feedRes = await fb.postCarousel(pageToken, [{ id: accountId, name: pageName, type: 'page' }], caption, childAttachments, {
-                    isScheduled: !!scheduleTime,
-                    scheduleTime: scheduleTime ? Math.floor(new Date(scheduleTime).getTime() / 1000) : null
+                    isScheduled: !!accountScheduleTime,
+                    scheduleTime: accountScheduleTime ? Math.floor(accountScheduleTime.getTime() / 1000) : null
                 });
 
                 if (feedRes.successCount > 0) {
@@ -192,10 +255,25 @@ async function processAndPostCarouselLogic({ userId, accountsArray, caption, sch
                     await prisma.postLog.create({
                         data: {
                             userId, pageId: accountId, fbPostId, type: "carousel",
-                            status: scheduleTime ? "scheduled" : "published",
-                            scheduledTime: scheduleTime ? new Date(scheduleTime) : null
+                            status: accountScheduleTime ? "scheduled" : "published",
+                            scheduledTime: accountScheduleTime || null
                         }
                     });
+
+                    // Update PostTarget status in DB
+                    if (scheduledPostRecord) {
+                        try {
+                            await prisma.postTarget.updateMany({
+                                where: { scheduledPostId: scheduledPostRecord.id, pageId: accountId },
+                                data: {
+                                    status: accountScheduleTime ? "scheduled" : "published",
+                                    facebookPostId: fbPostId,
+                                    postedAt: accountScheduleTime ? null : new Date()
+                                }
+                            });
+                        } catch (tgtErr) {}
+                    }
+
                     results.successCount++;
                     results.details.push({ accountId, status: "success", postId: fbPostId });
                 }
@@ -203,6 +281,25 @@ async function processAndPostCarouselLogic({ userId, accountsArray, caption, sch
                 console.error(`❌ Failed for ${accountId}:`, err.message);
                 results.failedCount++;
                 results.details.push({ accountId, status: "failed", error: err.message });
+            }
+        }
+
+        // 💾 Update scheduledPostRecord with generated publishedIds from Meta
+        if (scheduledPostRecord) {
+            try {
+                const successfulTargets = results.details
+                    .filter(d => d.status === 'success' && d.postId)
+                    .map(d => ({ accountId: d.accountId, postId: d.postId }));
+                await prisma.scheduledPost.update({
+                    where: { id: scheduledPostRecord.id },
+                    data: {
+                        publishedIds: successfulTargets,
+                        status: scheduleTime ? "scheduled" : "published",
+                        postedAt: scheduleTime ? null : new Date()
+                    }
+                });
+            } catch (updErr) {
+                console.warn("Could not update scheduledPost publishedIds:", updErr.message);
             }
         }
 
@@ -228,6 +325,36 @@ async function processSinglePostLogic({ userId, accountsArray, caption, title, s
 
     try {
         if (onProgress) onProgress(10);
+
+        // 💾 Save to scheduledPost & postTarget DB records if scheduleTime is provided
+        let scheduledPostRecord = null;
+        if (scheduleTime) {
+            try {
+                scheduledPostRecord = await prisma.scheduledPost.create({
+                    data: {
+                        userId,
+                        caption: caption || "",
+                        postType: "video",
+                        status: "scheduled",
+                        scheduleTime: new Date(scheduleTime),
+                        videoUrl: videoUrl || null,
+                        thumbnailUrl: thumbnailFilePath || null,
+                        accounts: accountsArray
+                    }
+                });
+                for (const accId of accountsArray) {
+                    await prisma.postTarget.create({
+                        data: {
+                            scheduledPostId: scheduledPostRecord.id,
+                            pageId: accId,
+                            status: "scheduled"
+                        }
+                    });
+                }
+            } catch (dbErr) {
+                console.warn("⚠️ Could not save scheduledPost to DB:", dbErr.message);
+            }
+        }
 
         let finalVideoPath = videoFilePath;
         const outputDir = path.join(__dirname, "../../temp/videos");
@@ -313,6 +440,20 @@ async function processSinglePostLogic({ userId, accountsArray, caption, title, s
                             scheduledTime: finalScheduleTime || null
                         }
                     });
+
+                    // Update PostTarget status in DB
+                    if (scheduledPostRecord) {
+                        try {
+                            await prisma.postTarget.updateMany({
+                                where: { scheduledPostId: scheduledPostRecord.id, pageId: accountId },
+                                data: {
+                                    status: finalScheduleTime ? "scheduled" : "published",
+                                    facebookPostId: fbPostId,
+                                    postedAt: finalScheduleTime ? null : new Date()
+                                }
+                            });
+                        } catch (tgtErr) {}
+                    }
                     results.successCount++;
                     results.details.push({ accountId, status: "success", postId: fbPostId });
                 }
@@ -324,6 +465,26 @@ async function processSinglePostLogic({ userId, accountsArray, caption, title, s
         }
 
         if (onProgress) onProgress(100);
+
+        // 💾 Update scheduledPostRecord with generated publishedIds from Meta
+        if (scheduledPostRecord) {
+            try {
+                const successfulTargets = results.details
+                    .filter(d => d.status === 'success' && d.postId)
+                    .map(d => ({ accountId: d.accountId, postId: d.postId }));
+                await prisma.scheduledPost.update({
+                    where: { id: scheduledPostRecord.id },
+                    data: {
+                        publishedIds: successfulTargets,
+                        status: scheduleTime ? "scheduled" : "published",
+                        postedAt: scheduleTime ? null : new Date()
+                    }
+                });
+            } catch (updErr) {
+                console.warn("Could not update scheduledPost publishedIds:", updErr.message);
+            }
+        }
+
         return results;
     } catch (err) {
         console.error("❌ Single Post Service Error:", err.message);

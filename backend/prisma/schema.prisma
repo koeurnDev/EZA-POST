@@ -96,6 +96,9 @@ model User {
   facebookAccessToken   String?
   facebookTokenExpiresAt DateTime?
 
+  resetPasswordToken    String?             @unique
+  resetPasswordExpires  DateTime?
+
   twoFactorSecret       String?
   twoFactorEnabled      Boolean             @default(false)
   twoFactorVerified     Boolean             @default(false)
@@ -164,6 +167,7 @@ model ScheduledPost {
   scheduleTime DateTime
   postedAt     DateTime?
   attempts     Int            @default(0)
+  lastError    Json?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
@@ -171,6 +175,7 @@ model ScheduledPost {
   videoUrl     String?
   thumbnailUrl String?
   mediaFiles   Json?          @default("[]")
+  carouselCards Json?
   accounts     Json?          @default("[]")
   publishedIds Json?          @default("[]")
 
@@ -272,6 +277,8 @@ model BotRule {
   scheduledTargetId String?
   keyword           String
   reply             String
+  dmReply           String?
+  enableDm          Boolean       @default(false)
   postId            String?
   attachmentUrl     String?
   ruleType          BotRuleType   @default(KEYWORD)
@@ -307,6 +314,8 @@ model BotHistory {
   userId       String
   commentId    String
   replyMessage String
+  dmMessage    String?
+  dmStatus     String?
   pageName     String?
   pageId       String?
   status       String
@@ -328,6 +337,8 @@ model PendingReply {
   commentId     String      @unique @map("facebook_comment_id")
   postId        String      @map("facebook_post_id")
   replyMessage  String
+  dmMessage     String?
+  sendDm        Boolean     @default(false)
   attachmentUrl String?
   accessToken   String
   sendAt        DateTime

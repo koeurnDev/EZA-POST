@@ -14,6 +14,7 @@ const ScheduledPosts = lazy(() => import("../pages/ScheduledPosts"));
 const BotSettingsPage = lazy(() => import("../pages/BotSettingsPage"));
 const Settings = lazy(() => import("../pages/Settings"));
 const Post = lazy(() => import("../pages/Post"));
+const SubtitleStudio = lazy(() => import("../pages/SubtitleStudio")); // 🎬 Khmer AI Subtitle Studio
 
 const TikTokDownloader = lazy(() => import("../pages/Tools/TikTokDownloader"));
 const PinterestDownloader = lazy(() => import("../pages/Tools/PinterestDownloader"));
@@ -25,6 +26,8 @@ const CapCutDownloader = lazy(() => import("../pages/Tools/CapCutDownloader")); 
 const DocumentConverter = lazy(() => import("../pages/Tools/DocumentConverter")); // ✅ New
 const TikTokTrends = lazy(() => import("../pages/Tools/TikTokTrends")); // ✅ New
 const ViralFinder = lazy(() => import("../pages/Tools/ViralFinder")); // ✅ New
+const PageCleaner = lazy(() => import("../pages/Tools/PageCleaner")); // 🧹 1-Click Facebook Bulk Delete
+const LiveStreamer = lazy(() => import("../pages/Tools/LiveStreamer")); // 🔴 Multi-Page Live Streamer
 const Connections = lazy(() => import("../pages/Connections"));
 
 const ViralPosts = lazy(() => import("../pages/ViralPosts")); // ✅ Boost Feature
@@ -66,6 +69,16 @@ export default function AppRouter() {
             element={
               <ProtectedRoute redirectPath="/welcome">
                 <Post />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 🎬 Khmer AI Subtitle Studio */}
+          <Route
+            path="/subtitles"
+            element={
+              <ProtectedRoute redirectPath="/welcome">
+                <SubtitleStudio />
               </ProtectedRoute>
             }
           />
@@ -174,6 +187,26 @@ export default function AppRouter() {
             element={
               <ProtectedRoute>
                 <DocumentConverter />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 🧹 Facebook Page Cleaner (Bulk Post Wiper) */}
+          <Route
+            path="/tools/page-cleaner"
+            element={
+              <ProtectedRoute>
+                <PageCleaner />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 🔴 Multi-Page Live Streamer (Fake Live) */}
+          <Route
+            path="/tools/live-stream"
+            element={
+              <ProtectedRoute>
+                <LiveStreamer />
               </ProtectedRoute>
             }
           />

@@ -11,27 +11,28 @@ const router = express.Router();
 const axios = require("axios");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
+const { Transform } = require("stream");
 const { requireAuth } = require("../../utils/auth");
 const cheerio = require("cheerio"); // ⚠️ Ensure this is installed: npm install cheerio
+const ytdlp = require("../../utils/ytdlp");
+const {
+    isPinterestMediaUrl,
+    maxPinterestDownloadBytes,
+    normalizePinterestUrl,
+} = require("../../utils/pinterestUrl");
 
 // 🗂️ Temp directory
 const tempDir = path.join(__dirname, "../../temp/downloads");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-
-// ⚙️ Helper: Get Binary Path
-const getBinaryPath = () => {
-    return process.env.NODE_ENV === 'production'
-        ? path.join(__dirname, '../../bin/yt-dlp')
-        : undefined; // Local uses default PATH
-};
 
 /* -------------------------------------------------------------------------- */
 /* 🔍 POST /lookup — Get Image/Video Info                                     */
 /* -------------------------------------------------------------------------- */
 router.post("/lookup", requireAuth, async (req, res) => {
     try {
-        const { url } = req.body;
-        if (!url || !url.includes("pinterest")) return res.status(400).json({ success: false, error: "Invalid Pinterest URL" });
+        const url = normalizePinterestUrl(req.body?.url);
+        if (!url) return res.status(400).json({ success: false, error: "Invalid Pinterest URL" });
 
         console.log(`📌 Lookup Pinterest: ${url}`);
         let output;
@@ -39,8 +40,6 @@ router.post("/lookup", requireAuth, async (req, res) => {
         // 1. Try yt-dlp first (Best for HD Videos)
         try {
             console.log("    👉 Attempting yt-dlp for Video...");
-            const ytdlp = require("../../utils/ytdlp");
-
             output = await ytdlp.lookup(url, {
                 userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             });
@@ -81,7 +80,11 @@ router.post("/lookup", requireAuth, async (req, res) => {
         // 2. Fallback to Cheerio Scraper (Best for Images)
         console.log("    👉 Attempting Cheerio Scraper for Image...");
         const response = await axios.get(url, {
-            headers: { 'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)' }
+            headers: { 'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)' },
+            timeout: 15000,
+            maxRedirects: 0,
+            maxContentLength: 2 * 1024 * 1024,
+            maxBodyLength: 2 * 1024 * 1024,
         });
 
         const $ = cheerio.load(response.data);
@@ -137,55 +140,60 @@ router.post("/lookup", requireAuth, async (req, res) => {
 /* 📥 POST /download — Save to Server (Standardized for EZA_POST)             */
 /* -------------------------------------------------------------------------- */
 router.post("/download", requireAuth, async (req, res) => {
+    const url = normalizePinterestUrl(req.body?.url);
+    if (!url) return res.status(400).json({ success: false, error: "Invalid Pinterest URL" });
+    const safeId = `pin-${Date.now()}-${crypto.randomUUID()}`;
+
     try {
-        const { url } = req.body;
-        if (!url) return res.status(400).json({ success: false, error: "No URL provided" });
+        const outputTemplate = path.join(tempDir, `${safeId}.%(ext)s`);
+        console.log(`📥 Downloading Pinterest Pin with local yt-dlp: ${url}`);
 
-        const safeId = `pin-${Date.now()}`;
-        // Guess extension based on URL or default to jpg
-        const ext = url.includes('.mp4') ? '.mp4' : (url.includes('.png') ? '.png' : '.jpg');
-        const filename = `${safeId}${ext}`;
-        const outputPath = path.join(tempDir, filename);
-
-        console.log(`📥 Downloading Pinterest Media to Server: ${filename}`);
-
-        const writer = fs.createWriteStream(outputPath);
-        const response = await axios({
-            url,
-            method: 'GET',
-            responseType: 'stream'
-            // headers: {} // Removed strict headers
+        await ytdlp.download(url, outputTemplate, {
+            format: "bestvideo+bestaudio/best",
+            userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            noPlaylist: true,
         });
 
-        // 🛡️ Content-Type Check: Prevent saving HTML/Error pages as images
-        const contentType = response.headers['content-type'];
-        if (contentType && (contentType.includes('text/html') || contentType.includes('application/json'))) {
-            throw new Error(`Invalid Content-Type received: ${contentType}. Likely an error page.`);
+        const filename = fs.readdirSync(tempDir).find((file) =>
+            file.startsWith(`${safeId}.`) && !file.endsWith(".part") && !file.endsWith(".ytdl")
+        );
+        if (!filename) throw new Error("No completed Pinterest media file was produced.");
+
+        const outputPath = path.join(tempDir, filename);
+        const stats = await fs.promises.stat(outputPath);
+        if (stats.size > maxPinterestDownloadBytes) {
+            await fs.promises.unlink(outputPath);
+            return res.status(413).json({
+                success: false,
+                error: "Pinterest media exceeds the 50 MiB download limit.",
+            });
         }
 
-        response.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-        });
-
-        console.log("✅ Download Complete:", filename);
-
-        // 🕒 Auto-delete after 10 mins
+        const isVideo = /\.(?:mp4|mov|m4v|webm)$/i.test(filename);
         setTimeout(() => {
-            if (fs.existsSync(outputPath)) fs.unlink(outputPath, () => console.log(`🗑️ Auto-deleted ${filename}`));
-        }, 600 * 1000);
+            fs.promises.unlink(outputPath).catch((err) => {
+                if (err.code !== "ENOENT") console.error(`Failed to remove ${filename}:`, err);
+            });
+        }, 10 * 60 * 1000);
 
-        // Return the path for the bot to use
-        res.json({
+        return res.json({
             success: true,
             url: `/uploads/temp/downloads/${filename}`,
-            meta: { filename, type: ext === '.mp4' ? 'video' : 'image' }
+            meta: { filename, type: isVideo ? "video" : "image" },
         });
 
     } catch (err) {
         console.error("❌ Download Error:", err.message);
+        const partialFiles = fs.readdirSync(tempDir).filter((file) => file.startsWith(`${safeId}.`));
+        await Promise.all(partialFiles.map(async (file) => {
+            try {
+                await fs.promises.unlink(path.join(tempDir, file));
+            } catch (cleanupError) {
+                if (cleanupError.code !== "ENOENT") {
+                    console.error(`Failed to remove partial Pinterest download ${file}:`, cleanupError);
+                }
+            }
+        }));
         res.status(500).json({ success: false, error: "Download failed. Ensure content is Public." });
     }
 });
@@ -193,26 +201,59 @@ router.post("/download", requireAuth, async (req, res) => {
 /* -------------------------------------------------------------------------- */
 /* 🌐 GET /proxy — For Frontend Preview (Hotlink Fix)                         */
 /* -------------------------------------------------------------------------- */
-router.get("/proxy", async (req, res) => {
+router.get("/proxy", requireAuth, async (req, res) => {
     try {
         const { url } = req.query;
         if (!url) return res.status(400).send("Missing URL");
+        if (!isPinterestMediaUrl(url)) return res.status(403).send("Forbidden Source");
 
         const response = await axios({
             method: 'get',
             url: url,
-            responseType: 'stream'
-            // headers: {} // Removed strict headers
+            responseType: 'stream',
+            timeout: 30000,
+            maxRedirects: 0,
+            maxContentLength: maxPinterestDownloadBytes,
         });
 
-        const safeFilename = (req.query.filename || `pinterest-${Date.now()}`);
+        const contentType = response.headers["content-type"] || "";
+        if (!/^(image|video)\//i.test(contentType)) {
+            response.data.destroy();
+            return res.status(415).send("Unsupported media type");
+        }
+        const contentLength = Number(response.headers["content-length"]);
+        if (Number.isFinite(contentLength) && contentLength > maxPinterestDownloadBytes) {
+            response.data.destroy();
+            return res.status(413).send("Pinterest media exceeds the download size limit");
+        }
+
+        const requestedFilename = typeof req.query.filename === "string"
+            ? path.basename(req.query.filename).slice(0, 120)
+            : "";
+        const safeFilename = requestedFilename || `pinterest-${Date.now()}`;
         const utf8Filename = encodeURIComponent(safeFilename);
         const asciiFilename = safeFilename.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
 
         res.setHeader('Content-Disposition', `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`);
-        res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
+        res.setHeader('Content-Type', contentType);
 
-        response.data.pipe(res);
+        let bytesSent = 0;
+        const sizeLimit = new Transform({
+            transform(chunk, encoding, callback) {
+                bytesSent += chunk.length;
+                if (bytesSent > maxPinterestDownloadBytes) {
+                    callback(new Error("Pinterest media exceeds the download size limit"));
+                    return;
+                }
+                callback(null, chunk);
+            },
+        });
+        response.data.on("error", (error) => sizeLimit.destroy(error));
+        sizeLimit.on("error", (error) => {
+            if (!res.headersSent) res.status(413);
+            res.destroy(error);
+        });
+        response.data.pipe(sizeLimit).pipe(res);
     } catch (err) {
         res.status(500).send("Proxy Failed");
     }

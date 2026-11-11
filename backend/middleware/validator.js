@@ -10,19 +10,17 @@ const validate = (req, res, next) => {
     next();
 };
 
-// ✅ Validation Rules for Single Post
+// ✅ Validation Rules for Single Post (Preserve raw text/emojis without HTML escaping)
 exports.validatePost = [
     body('caption')
         .optional()
         .trim()
-        .isLength({ max: 2200 }).withMessage('Caption cannot exceed 2200 characters')
-        .escape(), // Sanitize input
+        .isLength({ max: 2200 }).withMessage('Caption cannot exceed 2200 characters'),
 
     body('title')
         .optional()
         .trim()
-        .isLength({ max: 100 }).withMessage('Title cannot exceed 100 characters')
-        .escape(),
+        .isLength({ max: 100 }).withMessage('Title cannot exceed 100 characters'),
 
     body('accounts')
         .notEmpty().withMessage('At least one account is required')
@@ -44,8 +42,7 @@ exports.validateCarousel = [
     body('caption')
         .optional()
         .trim()
-        .isLength({ max: 2200 }).withMessage('Caption cannot exceed 2200 characters')
-        .escape(),
+        .isLength({ max: 2200 }).withMessage('Caption cannot exceed 2200 characters'),
 
     body('accounts')
         .notEmpty().withMessage('At least one account is required')
