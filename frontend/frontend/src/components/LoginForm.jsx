@@ -1,6 +1,7 @@
 import React, { useState, useId } from "react";
 import { authAPI } from "../utils/api";
 import Button from "./ui/Button";
+import SocialAuthButtons from "./SocialAuthButtons";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -78,7 +79,10 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
   };
 
   return (
-    <div className="relative">
+    <div className="relative space-y-6">
+      {!show2FA && (
+        <SocialAuthButtons mode="login" onSuccess={onSuccess} />
+      )}
       <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         <MotionAnimatePresence mode="wait">
           {show2FA ? (

@@ -96,6 +96,12 @@ model User {
   facebookAccessToken   String?
   facebookTokenExpiresAt DateTime?
 
+  googleId              String?             @unique
+  googleEmail           String?
+
+  telegramId            String?             @unique
+  telegramUsername      String?
+
   resetPasswordToken    String?             @unique
   resetPasswordExpires  DateTime?
 

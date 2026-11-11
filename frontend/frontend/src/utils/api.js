@@ -307,6 +307,10 @@ const authAPI = {
     }
   },
   facebookLogin: () => (window.location.href = `${API_CONFIG.BASE_URL}/auth/facebook`),
+  googleLogin: () => (window.location.href = `${API_CONFIG.BASE_URL}/auth/google`),
+  googleCredentialLogin: async (credential) => (await api.post("/auth/google", { credential })).data,
+  telegramLogin: async (data) => (await api.post("/auth/telegram", data)).data,
+  getTelegramConfig: async () => (await api.get("/auth/telegram/config")).data,
   mockLogin: () => (window.location.href = "/auth/facebook/mock"),
   register: async (data) =>
     (await api.post(API_ENDPOINTS.AUTH.REGISTER, data)).data,

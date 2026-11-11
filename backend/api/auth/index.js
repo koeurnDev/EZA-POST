@@ -20,6 +20,8 @@ router.use("/status", status);
 router.use("/logout", logout);
 
 router.use("/facebook", require("./facebook")); // ✅ Restored for "Connect Account"
+router.use("/google", require("./google")); // 🔴 Google OAuth & One Tap
+router.use("/telegram", require("./telegram")); // 🔷 Telegram Login Widget
 
 router.use("/forgot-password", require("./forgot-password"));
 router.use("/reset-password", require("./reset-password"));

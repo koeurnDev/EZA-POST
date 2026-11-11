@@ -167,9 +167,46 @@ router.get("/callback", async (req, res) => {
         }
 
         if (!userId) {
-            console.error("❌ CRITICAL: No authenticated user found (Session, Cookie, and State failed)");
-            console.log("   👉 State received:", state);
-            return res.redirect(`${process.env.FRONTEND_URL}/settings?error=session_expired&msg=Authentication+lost+during+redirect`);
+            console.log("ℹ️ No existing user session. Looking up or registering user via Facebook OAuth...");
+            let existingUser = await prisma.user.findFirst({
+                where: {
+                    OR: [
+                        { facebookId: String(fbUser.id) },
+                        ...(fbUser.email ? [{ email: fbUser.email.toLowerCase() }] : [])
+                    ]
+                }
+            });
+
+            if (!existingUser) {
+                const crypto = require("crypto");
+                const bcrypt = require("bcryptjs");
+                const randomPassword = crypto.randomBytes(16).toString("hex");
+                const hashedPassword = await bcrypt.hash(randomPassword, 10);
+                const userEmail = fbUser.email ? fbUser.email.toLowerCase() : `fb_${fbUser.id}@ezapost.com`;
+
+                existingUser = await prisma.user.create({
+                    data: {
+                        email: userEmail,
+                        name: fbUser.name || "Facebook User",
+                        password: hashedPassword,
+                        facebookId: String(fbUser.id),
+                        facebookName: fbUser.name,
+                        avatar: fbUser.picture?.data?.url || null
+                    }
+                });
+                console.log(`🎉 New user registered via Facebook OAuth: ${existingUser.id} (${existingUser.email})`);
+            } else if (!existingUser.facebookId) {
+                existingUser = await prisma.user.update({
+                    where: { id: existingUser.id },
+                    data: {
+                        facebookId: String(fbUser.id),
+                        facebookName: fbUser.name
+                    }
+                });
+            }
+
+            userId = existingUser.id;
+            setAuthCookie(res, existingUser);
         }
         
         console.log(`✅ Final User ID for DB Update: ${userId}`);

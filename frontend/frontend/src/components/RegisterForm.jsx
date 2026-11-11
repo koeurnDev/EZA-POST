@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import toast from "react-hot-toast";
 import { authAPI } from "../utils/api";
 import Button from "./ui/Button";
+import SocialAuthButtons from "./SocialAuthButtons";
 import { User, Mail, Lock, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 
 const RegisterForm = ({ onSuccess }) => {
@@ -55,7 +56,11 @@ const RegisterForm = ({ onSuccess }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-6">
+      {/* 🚀 Social Sign Up (Google, Facebook, Telegram) */}
+      <SocialAuthButtons mode="signup" onSuccess={onSuccess} />
+
+      <form onSubmit={handleSubmit} className="space-y-6">
       {/* Full Name */}
       <div className="space-y-2">
         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">ឈ្មោះរបស់អ្នក</label>
@@ -153,6 +158,7 @@ const RegisterForm = ({ onSuccess }) => {
         </div>
       )}
     </form>
+    </div>
   );
 };
 

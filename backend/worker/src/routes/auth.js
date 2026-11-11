@@ -370,6 +370,211 @@ auth.post("/logout", async (c) => {
   return c.json({ success: true, message: "Logged out successfully" });
 });
 
+auth.get("/telegram/config", (c) => {
+  return c.json({
+    botUsername: c.env.TELEGRAM_BOT_USERNAME || "eza_ocr_bot",
+  });
+});
+
+auth.post("/telegram", async (c) => {
+  let data;
+  try {
+    data = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON payload" }, 400);
+  }
+
+  const { id, first_name, last_name, username, photo_url, hash, auth_date } = data ?? {};
+  if (!id || !hash) {
+    return c.json({ error: "Telegram User ID and hash are required." }, 400);
+  }
+
+  const botToken = c.env.TELEGRAM_BOT_TOKEN || "8289587681:AAFLIUkaDdTN6yub83ezSctYpVNOR7ZCpyU";
+
+  // Verify HMAC using SubtleCrypto
+  try {
+    const { hash: _h, ...dataToCheck } = data;
+    const dataCheckString = Object.keys(dataToCheck)
+      .sort()
+      .map((k) => `${k}=${dataToCheck[k]}`)
+      .join("\n");
+
+    const encoder = new TextEncoder();
+    const secretKey = await crypto.subtle.digest("SHA-256", encoder.encode(botToken));
+    const key = await crypto.subtle.importKey(
+      "raw",
+      secretKey,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(dataCheckString));
+    const hexSignature = Array.from(new Uint8Array(signature), (b) => b.toString(16).padStart(2, "0")).join("");
+
+    if (hexSignature !== hash) {
+      return c.json({ error: "Invalid Telegram authentication payload." }, 401);
+    }
+
+    const authDateNum = Number(auth_date);
+    if (isNaN(authDateNum) || Date.now() / 1000 - authDateNum > 86400) {
+      return c.json({ error: "Telegram authentication has expired." }, 401);
+    }
+  } catch (err) {
+    console.error("Telegram signature verification error:", err);
+    return c.json({ error: "Telegram signature verification error." }, 500);
+  }
+
+  try {
+    const prisma = getPrisma(c.env);
+    const secret = requiredAuthSecret(c.env);
+    const telegramIdStr = String(id);
+    const fullName = [first_name, last_name].filter(Boolean).join(" ") || `Telegram User #${id}`;
+    const syntheticEmail = username ? `${username.toLowerCase()}@telegram.org` : `tg_${id}@ezapost.com`;
+
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [{ telegramId: telegramIdStr }, { email: syntheticEmail }],
+      },
+    });
+
+    if (!user) {
+      const randomPassword = crypto.randomUUID();
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+      user = await prisma.user.create({
+        data: {
+          email: syntheticEmail,
+          name: fullName,
+          password: hashedPassword,
+          telegramId: telegramIdStr,
+          telegramUsername: username || null,
+          avatar: photo_url || null,
+        },
+      });
+      console.log(`🎉 New user registered via Telegram Worker: ${user.id} (@${username || id})`);
+    } else if (!user.telegramId) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          telegramId: telegramIdStr,
+          telegramUsername: username || user.telegramUsername,
+          avatar: user.avatar || photo_url,
+        },
+      });
+    }
+
+    const token = await createAuthToken({ id: user.id, email: user.email }, secret);
+    const secure = new URL(c.req.url).protocol === "https:";
+    setCookie(c, "token", token, {
+      httpOnly: true,
+      secure,
+      sameSite: secure ? "None" : "Lax",
+      path: "/",
+      maxAge: oneDayInSeconds,
+    });
+
+    return c.json({
+      success: true,
+      message: "ចូលគណនីជាមួយ Telegram បានជោគជ័យ!",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        plan: user.plan,
+        avatar: user.avatar,
+      },
+      token,
+    });
+  } catch (err) {
+    console.error("Telegram login worker error:", err);
+    return c.json({ error: "Telegram login failed. Please try again." }, 500);
+  }
+});
+
+auth.post("/google", async (c) => {
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON payload" }, 400);
+  }
+
+  const { credential } = body ?? {};
+  if (!credential) {
+    return c.json({ error: "Google credential ID token is required." }, 400);
+  }
+
+  try {
+    const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+    if (!tokenInfoRes.ok) {
+      return c.json({ error: "Invalid or expired Google credential." }, 401);
+    }
+
+    const payload = await tokenInfoRes.json();
+    const { sub: googleId, email, name, picture } = payload;
+    if (!email) {
+      return c.json({ error: "Google account did not provide an email." }, 400);
+    }
+
+    const prisma = getPrisma(c.env);
+    const secret = requiredAuthSecret(c.env);
+
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [{ googleId }, { email: email.toLowerCase() }],
+      },
+    });
+
+    if (!user) {
+      const randomPassword = crypto.randomUUID();
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+      user = await prisma.user.create({
+        data: {
+          email: email.toLowerCase(),
+          name: name || "Google User",
+          password: hashedPassword,
+          googleId,
+          googleEmail: email.toLowerCase(),
+          avatar: picture || null,
+        },
+      });
+      console.log(`🎉 New user registered via Google Worker: ${user.id} (${user.email})`);
+    } else if (!user.googleId) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { googleId, googleEmail: email.toLowerCase(), avatar: user.avatar || picture },
+      });
+    }
+
+    const token = await createAuthToken({ id: user.id, email: user.email }, secret);
+    const secure = new URL(c.req.url).protocol === "https:";
+    setCookie(c, "token", token, {
+      httpOnly: true,
+      secure,
+      sameSite: secure ? "None" : "Lax",
+      path: "/",
+      maxAge: oneDayInSeconds,
+    });
+
+    return c.json({
+      success: true,
+      message: "ចូលគណនីជាមួយ Google បានជោគជ័យ!",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        plan: user.plan,
+        avatar: user.avatar,
+      },
+      token,
+    });
+  } catch (err) {
+    console.error("Google login worker error:", err);
+    return c.json({ error: "Google login failed. Please try again." }, 500);
+  }
+});
+
 auth.get("/facebook", requireAuth, async (c) => {
   try {
     const appId = requiredFacebookEnv(c.env, "FB_APP_ID");
