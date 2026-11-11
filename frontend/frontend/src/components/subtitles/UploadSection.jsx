@@ -135,7 +135,7 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
             setProgressStatus(`កំពុង Upload: ${percent}% (${loadedMB}MB / ${totalMB}MB)...`);
           } else {
             setCurrentStep(2);
-            setProgressStatus('⚡ AI Gemini 2.5 Flash កំពុងស្តាប់ និងបម្លែងសំឡេងខ្មែរ...');
+            setProgressStatus('⚡ AI Gemini 3 Flash កំពុងស្តាប់ និងបម្លែងសំឡេងខ្មែរ...');
           }
         }
       };
@@ -149,7 +149,7 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
             // Generate instant local blob URL for 0ms video preview loading
             const localMediaUrl = URL.createObjectURL(selectedFile);
 
-            // If Gemini Flash Lite already completed inline during upload, finish immediately!
+            // If Gemini Flash completed inline during upload, finish immediately!
             if (jobData.status === 'COMPLETED' && Array.isArray(jobData.segments)) {
               setCurrentStep(3);
               setIsProcessing(false);
@@ -191,7 +191,7 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
                   setProgressStatus('កំពុងសម្រួលសំឡេង...');
                 } else if (job.status === 'TRANSCRIBING') {
                   setCurrentStep(2);
-                  setProgressStatus('⚡ AI Gemini 2.5 Flash កំពុងស្តាប់សំឡេងខ្មែរ...');
+                  setProgressStatus('⚡ AI Gemini 3 Flash កំពុងស្តាប់សំឡេងខ្មែរ...');
                 } else if (job.status === 'COMPLETED') {
                   clearInterval(interval);
                   setCurrentStep(3);
@@ -245,7 +245,7 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
   };
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 sm:p-6 shadow-xl">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm">
       {/* Drag & Drop Zone */}
       <div
         onDragEnter={handleDrag}
@@ -257,8 +257,8 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
           dragActive
             ? 'border-indigo-500 bg-indigo-500/10'
             : selectedFile
-            ? 'border-emerald-500/50 bg-emerald-500/5'
-            : 'border-slate-700/80 hover:border-slate-600 bg-slate-950/40 hover:bg-slate-800/20'
+            ? 'border-emerald-500/60 bg-emerald-500/5'
+            : 'border-slate-300 dark:border-slate-700/80 hover:border-indigo-400 dark:hover:border-slate-600 bg-slate-50/70 dark:bg-slate-950/40 hover:bg-indigo-50/40 dark:hover:bg-slate-800/20'
         }`}
       >
         <input
@@ -272,24 +272,24 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
 
         {selectedFile ? (
           <div className="flex flex-col items-center gap-2">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
               {selectedFile.type.includes('video') ? <FileVideo className="w-6 h-6" /> : <FileAudio className="w-6 h-6" />}
             </div>
-            <p className="font-semibold text-slate-200">{selectedFile.name}</p>
-            <p className="text-xs text-slate-400">
-              {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB • ចុចដើម្បីប្តូរ
+            <p className="font-semibold text-slate-900 dark:text-slate-100 break-all max-w-lg">{selectedFile.name}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer">
+              {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB • ចុចដើម្បីប្តូរឯកសារ
             </p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2.5">
-            <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+            <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
               <UploadCloud className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-200 font-khmer">
-                អូសទម្លាក់ឯកសារ ឬ <span className="text-indigo-400 underline font-semibold">ចុចជ្រើសរើស</span>
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-200 font-khmer">
+                អូសទម្លាក់ឯកសារវីដេអូ/សំឡេង ឬ <span className="text-indigo-600 dark:text-indigo-400 underline font-semibold">ចុចជ្រើសរើស</span>
               </p>
-              <p className="text-xs text-slate-400 mt-1 font-mono">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">
                 MP3, WAV, M4A, MP4 (max 150MB)
               </p>
             </div>
@@ -302,20 +302,20 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
         <button
           type="button"
           onClick={() => setShowGlossary(!showGlossary)}
-          className="text-[11px] text-slate-400 hover:text-indigo-300 font-khmer transition-colors focus:outline-none"
+          className="text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 font-khmer transition-colors focus:outline-none"
         >
           <span>{showGlossary ? '− បិទប្រអប់ពាក្យពិសេស' : '+ បន្ថែមពាក្យពិសេស (Custom Glossary)'}</span>
         </button>
 
         {showGlossary && (
-          <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-1.5">
+          <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
             <input
               type="text"
               value={customGlossary}
               onChange={(e) => setCustomGlossary(e.target.value)}
               disabled={isProcessing}
               placeholder="ឧទាហរណ៍៖ EZA Post, Seab Koeurn, ABA, Claude, ChatGPT..."
-              className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-khmer"
+              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-khmer"
             />
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               {['ChatGPT', 'Claude', 'Gemini', 'AI Agent', 'EZA Post'].map((tag) => (
@@ -328,7 +328,7 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
                       setCustomGlossary([...current, tag].join(', '));
                     }
                   }}
-                  className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 hover:text-indigo-300 border border-slate-700 text-[10px] text-slate-300 rounded-md transition-colors font-mono cursor-pointer"
+                  className="px-2 py-1 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-300 rounded-md transition-colors font-mono cursor-pointer"
                 >
                   + {tag}
                 </button>
@@ -339,7 +339,7 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
       </div>
 
       {errorMsg && (
-        <div className="mt-3 p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2 text-rose-400 text-xs font-khmer">
+        <div className="mt-3 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2 text-rose-600 dark:text-rose-400 text-xs font-khmer">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>{errorMsg}</span>
         </div>
@@ -348,28 +348,28 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
       {/* Action / Progress Buttons */}
       <div className="mt-4 flex flex-col gap-3">
         {isProcessing && (
-          <div className="w-full bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3 animate-in fade-in">
+          <div className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 space-y-3 animate-in fade-in">
             {/* 3 Steps indicator */}
             <div className="grid grid-cols-3 gap-2 text-center text-xs font-khmer">
               <div className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl transition-all ${
-                uploadProgress >= 100 ? 'bg-emerald-500/15 text-emerald-400 font-semibold' : 'bg-indigo-500/20 text-indigo-300 font-semibold animate-pulse'
+                uploadProgress >= 100 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold' : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 font-semibold animate-pulse'
               }`}>
                 <span>{uploadProgress >= 100 ? '✓' : '1.'}</span>
                 <span className="truncate">Upload {uploadProgress > 0 && uploadProgress < 100 ? `(${uploadProgress}%)` : 'រួចរាល់'}</span>
               </div>
 
               <div className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl transition-all ${
-                currentStep === 2 ? 'bg-indigo-500/25 text-indigo-300 font-semibold ring-1 ring-indigo-500/40 animate-pulse' :
-                currentStep > 2 ? 'bg-emerald-500/15 text-emerald-400 font-semibold' :
-                'bg-slate-900/60 text-slate-500'
+                currentStep === 2 ? 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-semibold ring-1 ring-indigo-500/40 animate-pulse' :
+                currentStep > 2 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold' :
+                'bg-slate-200/70 dark:bg-slate-900/60 text-slate-500'
               }`}>
                 <span>{currentStep > 2 ? '✓' : '2.'}</span>
                 <span className="truncate">AI ស្តាប់សំឡេង</span>
               </div>
 
               <div className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl transition-all ${
-                currentStep === 3 ? 'bg-indigo-500/25 text-indigo-300 font-semibold ring-1 ring-indigo-500/40 animate-pulse' :
-                'bg-slate-900/60 text-slate-500'
+                currentStep === 3 ? 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-semibold ring-1 ring-indigo-500/40 animate-pulse' :
+                'bg-slate-200/70 dark:bg-slate-900/60 text-slate-500'
               }`}>
                 <span>3.</span>
                 <span className="truncate">តម្រឹម Subtitle</span>
@@ -378,20 +378,20 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
 
             {/* Live Status text & Elapsed Time */}
             <div className="flex items-center justify-between text-xs font-khmer pt-0.5">
-              <span className="flex items-center gap-2 text-slate-200 font-medium truncate">
-                <Loader2 className="w-4 h-4 animate-spin text-indigo-400 shrink-0" />
+              <span className="flex items-center gap-2 text-slate-800 dark:text-slate-200 font-medium truncate">
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-600 dark:text-indigo-400 shrink-0" />
                 <span className="truncate">{progressStatus || 'AI កំពុងដំណើរការ...'}</span>
               </span>
-              <span className="font-mono text-indigo-400 font-bold bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800 text-[11px] shrink-0">
+              <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold bg-white dark:bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-800 text-[11px] shrink-0">
                 {elapsedSec < 10 ? `00:0${elapsedSec}` : `00:${elapsedSec}`}s
               </span>
             </div>
 
             {/* Visual Animated Progress Bar */}
-            <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+            <div className="w-full bg-slate-200 dark:bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-200 dark:border-slate-800">
               {uploadProgress < 100 ? (
                 <div
-                  className="bg-indigo-500 h-full rounded-full transition-all duration-200"
+                  className="bg-indigo-600 h-full rounded-full transition-all duration-200"
                   style={{ width: `${uploadProgress}%` }}
                 />
               ) : (
@@ -399,8 +399,8 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
               )}
             </div>
 
-            <p className="text-[11px] text-slate-400 text-center font-khmer pt-0.5">
-              ⚡ បច្ចេកវិទ្យា Gemini 2.5 Flash ដំណើរការលឿនខ្ពស់ រង់ចាំប្រហែល 5-15 វិនាទី
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center font-khmer pt-0.5">
+              ⚡ បច្ចេកវិទ្យា Gemini 3 Flash ដំណើរការលឿនខ្ពស់ រង់ចាំប្រហែល 4-8 វិនាទី
             </p>
           </div>
         )}
@@ -410,7 +410,7 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
             type="button"
             onClick={loadDemoSample}
             disabled={isProcessing}
-            className="flex-1 sm:flex-initial px-4 py-2 rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-medium transition-all font-khmer whitespace-nowrap shadow-sm"
+            className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all font-khmer whitespace-nowrap shadow-sm"
           >
             <span>សាកល្បង (Demo)</span>
           </button>
@@ -420,8 +420,8 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
             disabled={!selectedFile || isProcessing}
             className={`flex-1 sm:flex-initial px-6 py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all flex items-center justify-center gap-2 font-khmer whitespace-nowrap ${
               !selectedFile || isProcessing
-                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 active:scale-95 font-semibold'
+                ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 active:scale-95 font-semibold'
             }`}
           >
             {isProcessing ? (

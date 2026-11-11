@@ -1,22 +1,54 @@
 /* ============================================================
-   🌐 EZA_POST - Final Global Stylesheet (v1.0)
-   Author: EZA_POST Team
-   Description: Clean, fast, and theme-aware CSS foundation.
-   Supports light/dark mode, responsive design, and accessibility.
+   🌐 EZA_POST - Global Stylesheet (Clean Typography & Theme System)
    ============================================================ */
-
-/* -------------------- FONT IMPORT -------------------- */
-@import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,100..700;1,100..700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* -------------------- CUSTOM BASE STYLES -------------------- */
+/* -------------------- THEME VARIABLES -------------------- */
+:root {
+  color-scheme: light;
+  --bg: #f8fafc;
+  --text: #0f172a;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --secondary: #475569;
+  --secondary-hover: #334155;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --muted: #64748b;
+  --scrollbar: #cbd5e1;
+  --scrollbar-hover: #94a3b8;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: #0b0f19;
+  --text: #f1f5f9;
+  --card-bg: #111827;
+  --card-border: #1e293b;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --secondary: #94a3b8;
+  --secondary-hover: #cbd5e1;
+  --success: #22c55e;
+  --warning: #facc15;
+  --error: #f87171;
+  --muted: #94a3b8;
+  --scrollbar: #334155;
+  --scrollbar-hover: #475569;
+}
+
+/* -------------------- BASE TYPOGRAPHY & KHMER RULES -------------------- */
 @layer base {
   html {
-    font-family: 'Kantumruy Pro', sans-serif;
-    scroll-behavior: smooth;
+    font-family: 'Inter', 'Kantumruy Pro', 'Noto Sans Khmer', sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
     overflow-x: hidden;
     width: 100%;
   }
@@ -27,186 +59,70 @@
     overflow-x: hidden;
     width: 100%;
     position: relative;
-    @apply transition-colors duration-300;
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
-}
 
-/* -------------------- THEME VARIABLES -------------------- */
-:root {
-  --bg: #f8fafc;
-  --text: #1e293b;
-  --card-bg: #ffffff;
-  --card-border: #e2e8f0;
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --secondary: #6b7280;
-  --secondary-hover: #4b5563;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --muted: #64748b;
-  --scrollbar: #cbd5e1;
-  --scrollbar-hover: #94a3b8;
-}
+  /* Prevent extreme letter-spacing or tight line-height from breaking Khmer script */
+  h1, h2, h3, h4, h5, h6, p, span, button, label, input, textarea, a {
+    letter-spacing: normal !important;
+  }
 
-/* -------------------- DARK THEME -------------------- */
-.dark {
-  --bg: #000000;
-  --text: #f1f5f9;
-  --card-bg: #0a0a0a;
-  --card-border: #1a1a1a;
-  --primary: #60a5fa;
-  --primary-hover: #3b82f6;
-  --secondary: #94a3b8;
-  --secondary-hover: #cbd5e1;
-  --success: #22c55e;
-  --warning: #facc15;
-  --error: #f87171;
-  --muted: #94a3b8;
-  --scrollbar: #1a1a1a;
-  --scrollbar-hover: #2a2a2a;
-}
-
-/* Respect system preference */
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    color-scheme: dark;
-    --bg: #000000;
-    --text: #f1f5f9;
-    --card-bg: #0a0a0a;
-    --card-border: #1a1a1a;
+  h1, h2, h3, h4 {
+    line-height: 1.38 !important;
   }
 }
 
 /* -------------------- SCROLLBAR -------------------- */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--card-border);
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar);
-  border-radius: 4px;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-hover);
 }
 
-/* -------------------- SELECTION -------------------- */
-::selection,
-::-moz-selection {
-  background-color: var(--primary);
-  color: white;
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
-/* -------------------- FOCUS -------------------- */
+.no-scrollbar,
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* -------------------- SELECTION & FOCUS -------------------- */
+::selection {
+  background-color: var(--primary);
+  color: #ffffff;
+}
+
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: 4px;
-}
-
-/* -------------------- ANIMATIONS -------------------- */
-@keyframes slideInDown {
-  from {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInUp {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes bounce {
-
-  0%,
-  20%,
-  53%,
-  80%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-
-  40%,
-  43% {
-    transform: translate3d(0, -8px, 0);
-  }
-
-  70% {
-    transform: translate3d(0, -4px, 0);
-  }
-
-  90% {
-    transform: translate3d(0, -2px, 0);
-  }
+  border-radius: 6px;
 }
 
 /* -------------------- COMPONENT BASICS -------------------- */
 .card {
   background-color: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease;
-}
-
-.card:hover {
-  transform: translateY(-3px);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .btn {
@@ -215,22 +131,16 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.6rem 1.2rem;
-  font-weight: 500;
-  border-radius: 0.5rem;
+  font-weight: 600;
+  border-radius: 0.75rem;
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
-}
-
-.btn:active {
-  transform: scale(0.96);
-  opacity: 0.9;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
-  transform: none !important;
 }
 
 .btn-primary {
@@ -240,7 +150,6 @@
 
 .btn-primary:hover:not(:disabled) {
   background-color: var(--primary-hover);
-  transform: translateY(-1px);
 }
 
 .btn-outline {
@@ -249,106 +158,10 @@
   color: var(--text);
 }
 
-.btn-outline:hover {
-  background: var(--card-border);
-}
-
-/* -------------------- UTILITIES -------------------- */
-.text-center {
-  text-align: center;
-}
-
-.mt-4 {
-  margin-top: 1rem;
-}
-
-.mb-4 {
-  margin-bottom: 1rem;
-}
-
-.flex {
-  display: flex;
-}
-
-.justify-between {
-  justify-content: space-between;
-}
-
-.items-center {
-  align-items: center;
-}
-
-/* -------------------- CUSTOM UTILITIES -------------------- */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.no-scrollbar {
-  -ms-overflow-style: none;
-  /* IE and Edge */
-  scrollbar-width: none;
-  /* Firefox */
-}
-
-/* -------------------- RESPONSIVE -------------------- */
-@media (max-width: 640px) {
-  html {
-    font-size: 14px;
-  }
-
-  .btn {
-    width: 100%;
-    justify-content: center;
-  }
-}
-
-@media (min-width: 1536px) {
-  html {
-    font-size: 18px;
-  }
-}
-
-/* -------------------- REDUCED MOTION -------------------- */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* -------------------- PRINT -------------------- */
-@media print {
-  * {
-    background: transparent !important;
-    color: black !important;
-    box-shadow: none !important;
-    text-shadow: none !important;
-  }
-
-  body {
-    font-size: 12pt;
-    line-height: 1.4;
-  }
-
-  a,
-  a:visited {
-    text-decoration: underline;
-  }
-
-  .no-print {
-    display: none !important;
-  }
-}
-
-/* -------------------- ACCESSIBILITY -------------------- */
-.js-focus-visible :focus:not(.focus-visible) {
-  outline: none;
-}
-
 /* -------------------- KHMER SUBTITLE STUDIO STYLES -------------------- */
-.khmer-font {
-  font-family: 'Noto Sans Khmer', 'Kantumruy Pro', 'Battambang', sans-serif;
+.khmer-font,
+.font-khmer {
+  font-family: 'Kantumruy Pro', 'Noto Sans Khmer', 'Inter', sans-serif;
 }
 
 .khmer-subtitle {
@@ -363,7 +176,7 @@
 }
 
 .font-noto {
-  font-family: 'Noto Sans Khmer', sans-serif;
+  font-family: 'Noto Sans Khmer', 'Kantumruy Pro', sans-serif;
 }
 
 .font-kantumruy {
@@ -371,20 +184,20 @@
 }
 
 .font-battambang {
-  font-family: 'Battambang', sans-serif;
+  font-family: 'Battambang', 'Kantumruy Pro', sans-serif;
 }
 
 .font-moul {
-  font-family: 'Moul', serif;
+  font-family: 'Moul', 'Kantumruy Pro', serif;
 }
 
 @keyframes word-pop {
   0% {
-    transform: scale(0.82);
+    transform: scale(0.86);
     opacity: 0.85;
   }
   60% {
-    transform: scale(1.15);
+    transform: scale(1.12);
     opacity: 1;
   }
   100% {
@@ -395,7 +208,6 @@
 
 .animate-word-pop {
   display: inline-block;
-  animation: word-pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  animation: word-pop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
   transform-origin: center bottom;
-  will-change: transform, opacity;
 }

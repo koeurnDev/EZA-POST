@@ -156,201 +156,173 @@ export default function Connections() {
 
     return (
         <DashboardLayout>
-            {/* Mesh Gradient Background - Optimized for low-end devices */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20 dark:opacity-40 hidden md:block">
-                <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500 blur-[120px] rounded-full animate-pulse" />
-                <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-teal-600 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
-            </div>
-
-            <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-12 relative z-10">
+            <div className="max-w-5xl mx-auto py-2 sm:py-4 relative z-10 space-y-6">
                 {/* Header Section */}
-                <div className="mb-10 md:mb-16">
-                    <div className="flex items-center gap-2 mb-3 md:mb-4">
-                        <div className="px-2.5 py-0.5 md:px-3 md:py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[11px] md:text-xs font-black text-emerald-500 uppercase tracking-[0.2em]">
-                            Sync Now
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs">
+                    <div>
+                        <div className="inline-flex items-center gap-2 px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-2 font-khmer">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>ការភ្ជាប់គណនី (Account Sync)</span>
                         </div>
-                        <div className="h-px w-8 md:w-12 bg-emerald-500/20" />
+                        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-khmer">
+                            ភ្ជាប់គណនី និងគ្រប់គ្រងផេក <span className="text-blue-600 dark:text-blue-400">Facebook</span>
+                        </h1>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1 font-khmer">
+                            ភ្ជាប់គណនី Facebook របស់អ្នក ដើម្បីផុសវីដេអូ រូបភាព និងឆ្លើយតប Comment ស្វ័យប្រវត្តិទៅកាន់គ្រប់ផេកក្នុងពេលតែមួយ។
+                        </p>
                     </div>
-                    <h1 className="text-4xl md:text-6xl font-black text-gray-900 dark:text-white tracking-tighter mb-3 md:mb-4 leading-none">
-                        Sync <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-600">Accounts.</span>
-                    </h1>
-                    <p className="text-gray-500 dark:text-gray-400 font-medium text-base md:text-lg max-w-2xl leading-relaxed">
-                        Connect your social accounts to auto post across all platforms.
-                    </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-8">
+                <div className="grid grid-cols-1 gap-4">
                     {[
-                        { id: 'facebook', name: 'Facebook Network', icon: Facebook, color: 'from-blue-600 to-indigo-700', isConnected: (!!user?.facebookId || pages.length > 0), desc: 'Connect to auto post and manage Facebook Pages.' }
-                    ].map((platform, idx) => (
-                        <MotionDiv
+                        { id: 'facebook', name: 'បណ្តាញ Facebook Pages', icon: Facebook, color: 'from-blue-600 to-indigo-600', isConnected: (!!user?.facebookId || pages.length > 0), desc: 'ភ្ជាប់តាមរយៈ Cookie / Token (MMO) ឬ OAuth ដើម្បីគ្រប់គ្រងផេកទាំងអស់។' }
+                    ].map((platform) => (
+                        <div
                             key={platform.id}
-                            initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.1, duration: window.innerWidth < 768 ? 0.3 : 0.8 }}
-                            className="group relative overflow-hidden bg-white dark:bg-black/40 md:backdrop-blur-2xl border border-gray-100 dark:border-white/5 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-xl md:shadow-2xl transition-all duration-700"
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs transition-all"
                         >
-                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 md:gap-8 relative z-10">
-                                <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6 md:gap-8">
-                                    <div className={`w-16 h-16 md:w-24 md:h-24 shrink-0 rounded-2xl md:rounded-[2rem] flex items-center justify-center bg-gradient-to-br ${platform.color} text-white shadow-2xl transition-transform duration-700 group-hover:rotate-[5deg] group-hover:scale-110`}>
-                                        <platform.icon size={platform.id === 'facebook' ? 32 : 48}  strokeWidth={1.5} />
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
+                                <div className="flex items-start sm:items-center gap-4">
+                                    <div className={`w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-2xl flex items-center justify-center bg-gradient-to-br ${platform.color} text-white shadow-md`}>
+                                        <platform.icon size={26} strokeWidth={1.8} />
                                     </div>
-                                    <div className="max-w-md">
-                                        <div className="flex flex-col sm:flex-row items-center gap-2 md:gap-4 mb-2">
-                                            <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tight">{platform.name}</h3>
-                                            <div className={`px-2.5 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-black uppercase tracking-widest border transition-colors duration-500 ${platform.isConnected ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-white/5 dark:border-white/10'}`}>
-                                                {platform.isConnected ? 'Connected' : 'Offline'}
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                                            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-khmer">{platform.name}</h3>
+                                            <div className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${platform.isConnected ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400'}`}>
+                                                {platform.isConnected ? 'បានភ្ជាប់ (Connected)' : 'មិនទាន់ភ្ជាប់'}
                                             </div>
                                         </div>
-                                        <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 font-medium leading-relaxed">{platform.desc}</p>
+                                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-khmer">{platform.desc}</p>
                                     </div>
                                 </div>
-                                <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-3">
-                                    <MotionAnimatePresence mode="wait">
-                                        {platform.isConnected ? (
-                                            <MotionDiv
-                                                initial={{ opacity: 0, scale: 0.9 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.9 }}
-                                                key="connected"
-                                                className="flex flex-wrap items-center gap-3 w-full sm:w-auto"
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                    {platform.isConnected ? (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowCookieModal(true)}
+                                                className="h-10 sm:h-11 px-4 sm:px-5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all flex items-center justify-center gap-2 font-khmer"
                                             >
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowCookieModal(true)}
-                                                    className="h-12 md:h-14 px-5 md:px-7 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-wider bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-xl shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <Sparkles size={16} className="text-yellow-300" />
-                                                    + បន្ថែម Pages តាម Cookie
-                                                </button>
-                                                <Button 
-                                                    variant="secondary"
-                                                    className="h-12 md:h-14 px-5 md:px-7 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-widest border-rose-500/20 text-rose-500 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all shadow-xl hover:shadow-rose-600/20 group/btn"
-                                                    onClick={() => handleConnect(platform.id)}
-                                                >
-                                                    <X size={14} className="mr-2 group-hover/btn:rotate-90 transition-transform" />
-                                                    Disconnect
-                                                </Button>
-                                            </MotionDiv>
-                                        ) : (
-                                            <MotionDiv
-                                                initial={{ opacity: 0, scale: 0.9 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.9 }}
-                                                key="disconnected"
-                                                className="flex flex-wrap items-center gap-3 w-full sm:w-auto"
+                                                <Sparkles size={15} className="text-yellow-300" />
+                                                <span>+ បន្ថែមផេកតាម Cookie</span>
+                                            </button>
+                                            <Button 
+                                                variant="secondary"
+                                                className="h-10 sm:h-11 px-4 rounded-xl text-xs font-bold border border-rose-500/20 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all font-khmer"
+                                                onClick={() => handleConnect(platform.id)}
                                             >
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowCookieModal(true)}
-                                                    className="w-full sm:w-auto h-12 md:h-14 px-6 md:px-8 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-wider bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-2xl shadow-blue-600/30 transition-all flex items-center justify-center gap-2 transform active:scale-95 group/btn"
-                                                >
-                                                    <Sparkles size={16} className="text-yellow-300 group-hover/btn:rotate-12 transition-transform" />
-                                                    ភ្ជាប់តាម Cookie / Token (MMO)
-                                                </button>
-                                                <Button 
-                                                    variant="secondary"
-                                                    className="w-full sm:w-auto h-12 md:h-14 px-5 md:px-6 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-bold border border-white/10 hover:bg-white/5 opacity-70 hover:opacity-100 transition-all"
-                                                    onClick={() => handleConnect(platform.id)}
-                                                >
-                                                    <Zap size={14} className="mr-1.5" />
-                                                    OAuth Login
-                                                </Button>
-                                            </MotionDiv>
-                                        )}
-                                    </MotionAnimatePresence>
+                                                <X size={14} className="mr-1.5" />
+                                                <span>ផ្តាច់គណនី</span>
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowCookieModal(true)}
+                                                className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-2 font-khmer"
+                                            >
+                                                <Sparkles size={15} className="text-yellow-300" />
+                                                <span>ភ្ជាប់តាម Cookie / Token (MMO)</span>
+                                            </button>
+                                            <Button 
+                                                variant="secondary"
+                                                className="w-full sm:w-auto h-11 px-4 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                                                onClick={() => handleConnect(platform.id)}
+                                            >
+                                                <Zap size={14} className="mr-1.5" />
+                                                OAuth Login
+                                            </Button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
-                            
-                            {/* Animated background decoration */}
-                            <div className={`absolute top-0 right-0 w-64 h-64 bg-gradient-to-br ${platform.color} opacity-[0.03] blur-[60px] rounded-full -translate-y-1/2 translate-x-1/2 group-hover:opacity-[0.07] transition-opacity duration-700`} />
-                        </MotionDiv>
+                        </div>
                     ))}
                 </div>
 
 
                 {(user?.facebookId || pages.length > 0) && (
-                    <MotionDiv 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-12 bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 dark:border-white/5 overflow-hidden shadow-xl"
+                    <div 
+                        className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs"
                     >
-                        <div className="p-5 md:p-8 border-b border-white/10 dark:border-white/5 flex flex-wrap items-center justify-between gap-4">
+                        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2 md:gap-3">
-                                    Your Facebook Pages
-                                    <span className="px-2 py-0.5 md:px-3 md:py-1 bg-emerald-500/10 text-emerald-500 text-[10px] md:text-xs rounded-full font-black tracking-widest uppercase">
-                                        {pages.length} Online
+                                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2.5 font-khmer">
+                                    <span>បញ្ជីផេក Facebook របស់អ្នក</span>
+                                    <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs rounded-full font-bold">
+                                        {pages.length} ផេក
                                     </span>
                                 </h3>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => setShowCookieModal(true)}
-                                    className="h-9 md:h-10 px-3 md:px-4 rounded-lg md:rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition"
+                                    className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition font-khmer"
                                 >
                                     <Key size={14} />
-                                    + បញ្ចូល Cookie/Token
+                                    <span>+ បញ្ចូល Cookie/Token</span>
                                 </button>
                                 <button 
                                     onClick={() => fetchPages(true)} 
-                                    className="w-9 h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-emerald-500 transition-all border border-white/10 shadow-inner"
+                                    className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-all border border-slate-200 dark:border-slate-700"
                                     title="Refresh Pages"
                                 >
-                                    <RefreshCw size={16} className={isLoadingPages ? "animate-spin text-emerald-500" : ""} />
+                                    <RefreshCw size={15} className={isLoadingPages ? "animate-spin text-emerald-500" : ""} />
                                 </button>
                             </div>
                         </div>
 
-                        <div className="p-8 space-y-6">
+                        <div className="p-4 sm:p-6 space-y-3">
                             {isLoadingPages ? (
-                                [1, 2].map(i => <div key={i} className="h-28 bg-white/5 dark:bg-white/5 rounded-[2rem] animate-pulse" />)
+                                [1, 2].map(i => <div key={i} className="h-20 bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse" />)
                             ) : pages.length === 0 ? (
-                                <EmptyState title="No Pages Found" description="We couldn't find any Facebook Pages connected to your account." actionLabel="Refresh" onAction={fetchPages} />
+                                <EmptyState title="មិនទាន់មានផេក Facebook" description="សូមភ្ជាប់តាមរយៈ Cookie ឬចុច Refresh ដើម្បីទាញយកផេករបស់អ្នក។" actionLabel="Refresh" onAction={fetchPages} />
                             ) : (
                                 pages.map((page, idx) => (
                                     <MotionDiv 
                                         key={page.id}
-                                        initial={{ opacity: 0, y: 10 }}
+                                        initial={{ opacity: 0, y: 6 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: idx * 0.05 }}
-                                        className={`group rounded-[2rem] border transition-all duration-500 ${page.isSelected ? "bg-emerald-600/5 border-emerald-500/20 shadow-lg shadow-emerald-500/5" : "bg-white/40 dark:bg-white/5 border-white/10 hover:border-white/20 dark:hover:border-white/10"}`}
+                                        transition={{ delay: idx * 0.03 }}
+                                        className={`group rounded-2xl border transition-all ${page.isSelected ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.06] border-emerald-500/30" : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800"}`}
                                     >
-                                        <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-                                            <div className="flex items-center gap-5 w-full sm:w-auto">
-                                                <div className="relative">
+                                        <div className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3.5 w-full sm:w-auto min-w-0">
+                                                <div className="relative shrink-0">
                                                     <img
                                                         src={page.picture || "https://via.placeholder.com/50"}
                                                         alt={page.name}
-                                                        className="w-16 h-16 rounded-[1.2rem] object-cover border-2 border-white dark:border-white/10 shadow-2xl group-hover:scale-105 transition-transform duration-500"
+                                                        className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700"
                                                         referrerPolicy="no-referrer"
                                                     />
-                                                    <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-black ${page.isSelected ? "bg-emerald-500 animate-pulse" : "bg-gray-400"}`} />
+                                                    <div className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-900 ${page.isSelected ? "bg-emerald-500" : "bg-slate-400"}`} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <h4 className={`font-black text-lg tracking-tight truncate ${page.isSelected ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}>
+                                                    <h4 className={`font-bold text-sm sm:text-base truncate font-khmer ${page.isSelected ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-slate-400"}`}>
                                                         {page.name}
                                                     </h4>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs font-black uppercase tracking-widest text-gray-400 font-mono">ID: {page.id}</span>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className="text-[11px] font-medium text-slate-400 font-mono">ID: {page.id}</span>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-4 w-full sm:w-auto justify-end">
+                                            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                                                 <button
                                                     onClick={() => setExpandedPageId(expandedPageId === page.id ? null : page.id)}
-                                                    className={`w-12 h-12 rounded-[1rem] transition-all flex items-center justify-center border ${expandedPageId === page.id ? "bg-emerald-600 text-white border-emerald-600 shadow-xl" : "bg-white/10 text-gray-400 border-white/10 hover:border-emerald-500/50 hover:text-emerald-500"}`}
+                                                    className={`w-10 h-10 rounded-xl transition-all flex items-center justify-center border ${expandedPageId === page.id ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-500/50 hover:text-emerald-500"}`}
                                                 >
-                                                    <SettingsIcon size={20} strokeWidth={expandedPageId === page.id ? 2.5 : 2} />
+                                                    <SettingsIcon size={18} strokeWidth={2} />
                                                 </button>
                                                 
                                                 <button 
                                                     onClick={() => handleTogglePage(page.id, page.isSelected)}
-                                                    className={`relative h-12 px-6 rounded-[1rem] flex items-center gap-3 transition-all font-black text-xs uppercase tracking-widest border ${page.isSelected ? "bg-emerald-600 border-emerald-600 text-white shadow-xl shadow-emerald-600/20" : "bg-white/5 border-white/10 text-gray-400"}`}
+                                                    className={`h-10 px-4 rounded-xl flex items-center gap-2 transition-all font-bold text-xs border font-khmer ${page.isSelected ? "bg-emerald-600 border-emerald-600 text-white shadow-xs" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"}`}
                                                 >
-                                                    <Radio size={14} className={page.isSelected ? "animate-pulse" : ""} />
-                                                    {page.isSelected ? "Connected" : "Off"}
+                                                    <Radio size={14} />
+                                                    <span>{page.isSelected ? "កំពុងប្រើ (Active)" : "បិទ (Off)"}</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -361,30 +333,30 @@ export default function Connections() {
                                                     initial={{ height: 0, opacity: 0 }}
                                                     animate={{ height: "auto", opacity: 1 }}
                                                     exit={{ height: 0, opacity: 0 }}
-                                                    className="border-t border-white/10 dark:border-white/5 bg-black/5 dark:bg-black/20 p-5 md:p-8"
+                                                    className="border-t border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60 p-4"
                                                 >
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                         {[
-                                                            { key: "enableBot", label: "Auto Reply", icon: MessageSquare, color: "blue", desc: "Auto reply to comments" },
-                                                            { key: "enableSchedule", label: "Auto Time", icon: Calendar, color: "indigo", desc: "Best time to post" },
-                                                            { key: "enableInbox", label: "Chat Sync", icon: Radio, color: "emerald", desc: "Sync messages and chat" }
+                                                            { key: "enableBot", label: "Auto Reply Comment", icon: MessageSquare, color: "blue", desc: "ឆ្លើយតប Comment ស្វ័យប្រវត្តិ" },
+                                                            { key: "enableSchedule", label: "Auto Schedule", icon: Calendar, color: "indigo", desc: "កំណត់ម៉ោងផុសស្វ័យប្រវត្តិ" },
+                                                            { key: "enableInbox", label: "Chat Sync", icon: Radio, color: "emerald", desc: "ភ្ជាប់ប្រអប់សារផេក" }
                                                         ].map((setting) => (
-                                                            <div key={setting.key} className="bg-white/40 dark:bg-white/5 p-5 md:p-6 rounded-2xl md:rounded-[1.8rem] border border-white/10 dark:border-white/5 shadow-sm flex flex-col justify-between gap-4 md:gap-6 hover:border-emerald-500/30 transition-all group/setting">
-                                                                <div>
-                                                                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-[1rem] flex items-center justify-center mb-3 md:mb-4 transition-all group-hover/setting:scale-110 ${setting.key === "enableBot" ? "bg-blue-500/10 text-blue-500" : setting.key === "enableSchedule" ? "bg-indigo-500/10 text-indigo-500" : "bg-emerald-500/10 text-emerald-500"}`}>
-                                                                        <setting.icon size={18}  />
+                                                            <div key={setting.key} className="bg-white dark:bg-slate-800/90 p-4 rounded-xl border border-slate-200 dark:border-slate-700/80 flex items-center justify-between gap-3">
+                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${setting.key === "enableBot" ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" : setting.key === "enableSchedule" ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"}`}>
+                                                                        <setting.icon size={17} />
                                                                     </div>
-                                                                    <span className="font-black text-gray-900 dark:text-white text-xs md:text-sm uppercase tracking-widest">{setting.label}</span>
-                                                                    <p className="text-[11px] md:text-xs text-gray-500 mt-1 font-medium">{setting.desc}</p>
+                                                                    <div className="min-w-0">
+                                                                        <span className="font-bold text-slate-900 dark:text-white text-xs block truncate">{setting.label}</span>
+                                                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-khmer truncate">{setting.desc}</p>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="flex justify-end">
-                                                                    <button 
-                                                                        onClick={() => handleUpdateSetting(page.id, setting.key, setting.key === "enableSchedule" ? page.settings?.enableSchedule === false : !page.settings?.[setting.key])}
-                                                                        className={`w-12 h-7 md:w-14 md:h-8 rounded-full transition-all relative ${((setting.key === "enableSchedule" ? page.settings?.enableSchedule !== false : page.settings?.[setting.key])) ? "bg-emerald-500 shadow-lg shadow-emerald-500/20" : "bg-gray-200 dark:bg-white/10"}`}
-                                                                    >
-                                                                        <div className={`absolute top-0.5 md:top-1 w-6 h-6 rounded-full bg-white transition-all shadow-md ${((setting.key === "enableSchedule" ? page.settings?.enableSchedule !== false : page.settings?.[setting.key])) ? "left-5.5 md:left-7" : "left-0.5 md:left-1"}`} />
-                                                                    </button>
-                                                                </div>
+                                                                <button 
+                                                                    onClick={() => handleUpdateSetting(page.id, setting.key, setting.key === "enableSchedule" ? page.settings?.enableSchedule === false : !page.settings?.[setting.key])}
+                                                                    className={`w-11 h-6 rounded-full transition-all relative shrink-0 ${((setting.key === "enableSchedule" ? page.settings?.enableSchedule !== false : page.settings?.[setting.key])) ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"}`}
+                                                                >
+                                                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all shadow-xs ${((setting.key === "enableSchedule" ? page.settings?.enableSchedule !== false : page.settings?.[setting.key])) ? "left-5.5" : "left-0.5"}`} />
+                                                                </button>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -395,7 +367,7 @@ export default function Connections() {
                                 ))
                             )}
                         </div>
-                    </MotionDiv>
+                    </div>
                 )}
 
                 {/* 🛡️ Secure Connection Status Card */}
