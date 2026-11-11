@@ -38,6 +38,7 @@ const Profile = lazy(() => import("../pages/Profile"));
 const Welcome = lazy(() => import("../pages/Welcome"));
 const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("../pages/ResetPassword"));
+const AuthCallback = lazy(() => import("../pages/AuthCallback"));
 
 // --- Loading Component ---
 const PageLoader = () => (
@@ -56,6 +57,7 @@ export default function AppRouter() {
           <Route path="/welcome" element={<Welcome />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 

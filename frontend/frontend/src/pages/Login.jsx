@@ -1,21 +1,47 @@
 import React, { useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import LoginForm from "../components/LoginForm";
 import { saveUserData } from "../utils/apiUtils";
+import { authAPI } from "../utils/api";
+import toast from "react-hot-toast";
 import { motion } from "framer-motion";
 import { Zap, Sparkles, ShieldCheck, Lock, ArrowLeft } from "lucide-react";
 
 export default function Login() {
   const MotionDiv = motion.div;
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading: authLoading, setAuthUser } = useAuth();
 
   useEffect(() => {
+    const token = searchParams.get("token");
+    const error = searchParams.get("error");
+    if (error) {
+      toast.error(error === "google_auth_failed" ? "ការចូលដោយ Google មិនបានសម្រេច។" : `កំហុស៖ ${error}`);
+      return;
+    }
+    if (token) {
+      toast.loading("កំពុងផ្ទៀងផ្ទាត់គណនី...", { id: "sso-login" });
+      authAPI.getStatus()
+        .then((res) => {
+          const userData = res?.user || res?.data?.user || { email: "", name: "User" };
+          saveUserData(userData, token);
+          setAuthUser(userData);
+          toast.success("ចូលគណនីបានជោគជ័យ!", { id: "sso-login" });
+          navigate("/post", { replace: true });
+        })
+        .catch(() => {
+          saveUserData({ email: "", name: "User" }, token);
+          navigate("/post", { replace: true });
+        });
+      return;
+    }
+
     if (!authLoading && user) {
       navigate("/post", { replace: true });
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, searchParams, setAuthUser]);
 
   const handleLoginSuccess = (user) => {
     saveUserData(user);

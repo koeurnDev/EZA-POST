@@ -1,3 +1,2 @@
-/api/v1/*  https://eza-post-api.koeurnseab630.workers.dev/api/v1/:splat  200
-/*         /index.html                                                   200
-
+/api/*   https://eza-post-api.koeurnseab630.workers.dev/api/:splat  200
+/*       /index.html                                                200

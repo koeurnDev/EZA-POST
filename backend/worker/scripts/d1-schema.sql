@@ -75,3 +75,4 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
   description TEXT,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
+

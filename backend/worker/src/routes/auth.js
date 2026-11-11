@@ -491,22 +491,25 @@ auth.post("/telegram", async (c) => {
   }
 });
 
-auth.get("/google", (c) => {
+const handleGoogleAuthStart = (c) => {
   const clientId = c.env.GOOGLE_CLIENT_ID;
   const frontendUrl = c.env.FRONTEND_URL || "https://eza-post-3kv.pages.dev";
   if (!clientId) {
     return c.redirect(`${frontendUrl}/login?error=google_not_configured`);
   }
   const origin = new URL(c.req.url).origin;
-  const redirectUri = `${origin}/api/auth/google/callback`;
+  const currentPath = new URL(c.req.url).pathname;
+  const redirectUri = currentPath.includes("/sso/")
+    ? `${origin}/api/auth/sso/callback`
+    : `${origin}/api/auth/google/callback`;
   const state = crypto.randomUUID();
   const secure = new URL(c.req.url).protocol === "https:";
 
-  setCookie(c, "google_oauth_state", state, {
+  setCookie(c, "google_oauth_state", JSON.stringify({ state, redirectUri }), {
     httpOnly: true,
     secure,
     sameSite: "Lax",
-    path: "/api/auth/google",
+    path: "/api/auth",
     maxAge: 600,
   });
 
@@ -514,33 +517,54 @@ auth.get("/google", (c) => {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "openid email profile",
+    scope: "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
+    access_type: "offline",
     prompt: "select_account",
     state,
   });
 
   return c.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
-});
+};
 
-auth.get("/google/callback", async (c) => {
+const handleGoogleAuthCallback = async (c) => {
   const { code, state, error } = c.req.query();
   const frontendUrl = c.env.FRONTEND_URL || "https://eza-post-3kv.pages.dev";
   const secure = new URL(c.req.url).protocol === "https:";
+  const cookieData = getCookie(c, "google_oauth_state");
 
   deleteCookie(c, "google_oauth_state", {
     httpOnly: true,
     secure,
     sameSite: "Lax",
-    path: "/api/auth/google",
+    path: "/api/auth",
   });
 
   if (error || !code) {
     return c.redirect(`${frontendUrl}/login?error=google_auth_failed`);
   }
 
+  let savedState, savedRedirectUri;
+  try {
+    const parsed = JSON.parse(cookieData);
+    savedState = parsed.state;
+    savedRedirectUri = parsed.redirectUri;
+  } catch {
+    savedState = cookieData;
+  }
+
+  if (savedState && state && savedState !== state) {
+    console.error("Google OAuth state mismatch");
+    return c.redirect(`${frontendUrl}/login?error=sso_state_invalid`);
+  }
+
   try {
     const origin = new URL(c.req.url).origin;
-    const redirectUri = `${origin}/api/auth/google/callback`;
+    const currentPath = new URL(c.req.url).pathname;
+    const defaultUri = currentPath.includes("/sso/")
+      ? `${origin}/api/auth/sso/callback`
+      : `${origin}/api/auth/google/callback`;
+    const redirectUri = savedRedirectUri || defaultUri;
+
     const clientId = c.env.GOOGLE_CLIENT_ID;
     const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
     if (!clientId || !clientSecret) {
@@ -560,6 +584,8 @@ auth.get("/google/callback", async (c) => {
     });
 
     if (!tokenRes.ok) {
+      const errBody = await tokenRes.text();
+      console.error("Google token exchange failed:", tokenRes.status, errBody);
       throw new Error(`Google token exchange failed with status ${tokenRes.status}`);
     }
 
@@ -599,6 +625,8 @@ auth.get("/google/callback", async (c) => {
           googleId,
           googleEmail: email.toLowerCase(),
           avatar: picture || null,
+          role: "user",
+          plan: "free",
         },
       });
     } else if (!user.googleId) {
@@ -617,12 +645,17 @@ auth.get("/google/callback", async (c) => {
       maxAge: oneDayInSeconds,
     });
 
-    return c.redirect(`${frontendUrl}/login?token=${token}&provider=google`);
+    return c.redirect(`${frontendUrl}/auth/callback?token=${token}&provider=Google`);
   } catch (err) {
     console.error("Google OAuth callback error:", err);
     return c.redirect(`${frontendUrl}/login?error=google_auth_failed`);
   }
-});
+};
+
+auth.get("/google", handleGoogleAuthStart);
+auth.get("/google/callback", handleGoogleAuthCallback);
+auth.get("/sso/google", handleGoogleAuthStart);
+auth.get("/sso/callback", handleGoogleAuthCallback);
 
 auth.post("/google", async (c) => {
   let body;
