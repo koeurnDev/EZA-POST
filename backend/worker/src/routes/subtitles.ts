@@ -403,12 +403,17 @@ async function runGeminiEdgeTranscription(
     }
 
     const systemPrompt = `You are an elite native Khmer speech-to-text and video subtitle synchronization engine.
-Transcribe the spoken Khmer speech in this audio/video into 100% accurate, natural Khmer subtitle segments (2.0 to 4.5 seconds per segment).
+Transcribe the spoken Khmer speech in this audio/video into 100% accurate, natural Khmer subtitle segments (1.5 to 3.5 seconds per segment).
 If this is a video and there is burned-in Khmer or English text visible on screen, use it to cross-check and guarantee 100% spelling accuracy of every word!
-Strict Rules:
-1. Write standard Khmer script naturally WITHOUT spaces between every syllable/word (only use spaces between clauses or around English words).
-2. Keep English tech/loanwords in English script (e.g., IT, AI, Code, Coding, Project, Logic, Fundamental, Copy-Paste, Developer, Website, Network, Server, Database, Application, Email, Internet, ChatGPT, Claude, Gemini).
-3. Pay careful attention to colloquial Khmer words and grammar (e.g., "អីក៏ IT ដែរ", "ម៉ាស៊ីនកាហ្វេក៏ខូចដែរ", "មិនស៊ីជម្រៅ", "ធាតុពិត"). Never repeat words unnaturally.
+
+Strict Rules for Perfect Audio-to-Subtitle Synchronization:
+1. PRECISION TIMINGS (CRITICAL):
+   - "start" must be the EXACT millisecond when the speaker begins vocalizing the first syllable of the phrase. Never set start time after speech has already begun!
+   - "end" must be the exact millisecond when the phrase vocalization concludes.
+   - Break segments naturally at speech breath/pauses (1.5s to 3.5s per segment). NEVER merge multiple clauses across silent pauses!
+2. Write standard Khmer script naturally WITHOUT spaces between every syllable/word (only use spaces between clauses or around English words).
+3. Keep English tech/loanwords in English script (e.g., IT, AI, Code, Coding, Project, Logic, Fundamental, Copy-Paste, Developer, Website, Network, Server, Database, Application, Email, Internet, ChatGPT, Claude, Gemini).
+4. Pay careful attention to colloquial Khmer words and grammar (e.g., "អីក៏ IT ដែរ", "ម៉ាស៊ីនកាហ្វេក៏ខូចដែរ", "មិនស៊ីជម្រៅ", "ធាតុពិត"). Never repeat words unnaturally.
 ${customPrompt ? `Special terminology / context: ${customPrompt}` : ''}
 Output ONLY a valid JSON array of subtitle segments.`;
 

@@ -74,7 +74,7 @@ export default function MediaPreviewPlayer({
 
   const [localAspectRatio, setLocalAspectRatio] = useState('16:9');
   const [localBounce, setLocalBounce] = useState(true);
-  const [syncOffset, setSyncOffset] = useState(0.18); // Default 180ms audio-lead: text appears right on speech onset, never lags behind voice
+  const [syncOffset, setSyncOffset] = useState(0.20); // Default 200ms audio-lead: text appears right on speech onset, never lags behind voice
 
   const currentAspectRatio = aspectRatio || localAspectRatio;
   const currentBounce = isBounceEnabled !== undefined ? isBounceEnabled : localBounce;
@@ -90,8 +90,11 @@ export default function MediaPreviewPlayer({
     if (onBounceToggle) onBounceToggle(next);
   };
 
-  // Ultra-responsive 60FPS sync loop using requestAnimationFrame while playing
+  // Ultra-responsive 60FPS local sync loop with throttled parent propagation
   const animFrameRef = useRef(null);
+  const lastParentUpdateTimeRef = useRef(0);
+  const currentLocalTimeRef = useRef(currentTime);
+
   useEffect(() => {
     if (!isPlaying) {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -100,7 +103,24 @@ export default function MediaPreviewPlayer({
 
     const tick = () => {
       if (mediaRef.current && !mediaRef.current.paused) {
-        onTimeUpdate(mediaRef.current.currentTime);
+        const rawTime = mediaRef.current.currentTime;
+        currentLocalTimeRef.current = rawTime;
+        const effTime = Math.max(0, rawTime + syncOffset);
+
+        // 1. Instantly match segment directly from hardware video clock
+        const current = segments.find(
+          (s) => effTime >= s.start && effTime <= (s.end + 0.12)
+        ) || null;
+
+        setCurrentSegment(current);
+        setCurrentText(current ? current.text : '');
+
+        // 2. Throttle parent state update to ~10 FPS to keep editor & timeline butter-smooth without stutter
+        const now = performance.now();
+        if (now - lastParentUpdateTimeRef.current >= 100) {
+          lastParentUpdateTimeRef.current = now;
+          onTimeUpdate(rawTime);
+        }
       }
       animFrameRef.current = requestAnimationFrame(tick);
     };
@@ -109,18 +129,20 @@ export default function MediaPreviewPlayer({
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isPlaying]);
+  }, [isPlaying, syncOffset, segments]);
 
-  // Update current subtitle text and active segment based on playback time + sync offset
-  const effectiveTime = Math.max(0, currentTime + syncOffset);
-
+  // When paused or seeking, sync immediately from currentTime prop
   useEffect(() => {
-    const current = segments.find(
-      (s) => effectiveTime >= s.start && effectiveTime <= s.end
-    );
-    setCurrentSegment(current || null);
-    setCurrentText(current ? current.text : '');
-  }, [effectiveTime, segments]);
+    if (!isPlaying) {
+      currentLocalTimeRef.current = currentTime;
+      const effTime = Math.max(0, currentTime + syncOffset);
+      const current = segments.find(
+        (s) => effTime >= s.start && effTime <= (s.end + 0.12)
+      ) || null;
+      setCurrentSegment(current);
+      setCurrentText(current ? current.text : '');
+    }
+  }, [currentTime, isPlaying, syncOffset, segments]);
 
   // Compute Word-Level Active Kinetic Highlight with Natural Khmer Word Spacing
   const renderKineticWords = () => {
@@ -132,8 +154,8 @@ export default function MediaPreviewPlayer({
       return <span>{text}</span>;
     }
 
-    const segments = tokenizeKhmerSegments(text);
-    const wordSegments = segments.filter((s) => s.isWordLike);
+    const segmentsList = tokenizeKhmerSegments(text);
+    const wordSegments = segmentsList.filter((s) => s.isWordLike);
     if (wordSegments.length <= 1) {
       return (
         <span className={currentBounce ? 'animate-word-pop inline-block' : 'inline'}>
@@ -142,8 +164,10 @@ export default function MediaPreviewPlayer({
       );
     }
 
+    const activePlaybackTime = mediaRef.current ? mediaRef.current.currentTime : currentLocalTimeRef.current;
+    const effTime = Math.max(0, activePlaybackTime + syncOffset);
     const segDuration = Math.max(0.1, currentSegment.end - currentSegment.start);
-    const elapsed = Math.max(0, Math.min(segDuration, effectiveTime - currentSegment.start));
+    const elapsed = Math.max(0, Math.min(segDuration, effTime - currentSegment.start));
     const progress = Math.max(0, Math.min(1, elapsed / segDuration));
     const activeWordIndex = Math.min(
       Math.floor(progress * wordSegments.length),
@@ -151,7 +175,7 @@ export default function MediaPreviewPlayer({
     );
 
     let wordIdxCounter = 0;
-    return segments.map((item, idx) => {
+    return segmentsList.map((item, idx) => {
       if (!item.isWordLike) {
         return <span key={idx}>{item.segment}</span>;
       }

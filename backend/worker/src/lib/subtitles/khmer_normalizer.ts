@@ -136,9 +136,9 @@ export function normalizeKhmerText(text: string, addSyllableBreaks: boolean = fa
 
 export function mergeShortSubtitleSegments(
   segments: SubtitleSegment[],
-  minDuration: number = 1.0,
-  maxDuration: number = 4.5,
-  maxGap: number = 0.5
+  minDuration: number = 0.5,
+  maxDuration: number = 3.5,
+  maxGap: number = 0.2
 ): SubtitleSegment[] {
   if (!segments || segments.length === 0) return [];
 
