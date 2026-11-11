@@ -343,12 +343,25 @@ const VERIFIED_1109_SEGMENTS: SubtitleSegment[] = [
 
 function isCorruptedKhmerOutput(text: string): boolean {
   if (!text || text.trim().length === 0) return true;
-  // Reject foreign script hallucinations (Georgian, Armenian, Cyrillic)
+  // 1. Reject foreign script hallucinations (Georgian, Armenian, Cyrillic)
   if (/[\u10A0-\u10FF\u0530-\u058F\u0400-\u04FF]/.test(text)) return true;
-  // Reject broken Unicode glyphs (dotted circles \u25CC, female/male \u2640|\u2642, tofu \uFFFD)
+  // 2. Reject broken Unicode glyphs (dotted circles \u25CC, female/male \u2640|\u2642, tofu \uFFFD)
   if (/[\u25CC\u2640\u2642\uFFFD]/.test(text)) return true;
-  // Reject extreme single character repetition (e.g. 7+ identical chars in a row)
-  if (/(.)\1{6,}/.test(text)) return true;
+  // 3. Reject extreme single character repetition (e.g. 5+ identical chars in a row)
+  if (/(.)\1{4,}/.test(text)) return true;
+  // 4. Reject illegal Khmer Coeng (ជើងអក្សរ \u17D2) orthography violations:
+  // - Coeng must be preceded by a Khmer consonant (\u1780-\u17A2)
+  // - Coeng must be followed by a Khmer consonant (\u1780-\u17A2)
+  // - Double Coengs (\u17D2\u17D2) are invalid
+  // - Coeng cannot be at start or end
+  if (/[^\u1780-\u17A2]\u17D2/.test(text)) return true;
+  if (/\u17D2[^\u1780-\u17A2]/.test(text)) return true;
+  if (/^\u17D2|\u17D2$/.test(text)) return true;
+  if (/\u17D2{2,}/.test(text)) return true;
+  // 5. Reject independent vowel + dependent vowel combinations (e.g. ឦា)
+  if (/[\u17A3-\u17B3][\u17B6-\u17C5]/.test(text)) return true;
+  // 6. Reject hallucinated repetitive syllable loops (e.g. ានានា, កាកាកា)
+  if (/(.{2,6})\1{3,}/.test(text)) return true;
   return false;
 }
 
@@ -514,7 +527,9 @@ async function runEdgeWhisperTranscription(
 
     const isAuto = !language || language === 'auto';
     const targetLang = isAuto ? 'km' : language;
-    const khmerPrompt = customPrompt && customPrompt.trim() ? customPrompt.trim() : 'ភាសាខ្មែរ';
+    const khmerPrompt = customPrompt && customPrompt.trim()
+      ? customPrompt.trim()
+      : 'សួស្តីបងប្អូនទាំងអស់គ្នា ថ្ងៃនេះយើងនឹងនិយាយអំពីការងារ អាជីវកម្ម និងព័ត៌មានទូទៅ។';
     let aiResponse: any;
     try {
       const runParams: any = {
