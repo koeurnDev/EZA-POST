@@ -37,7 +37,7 @@
     "btch-downloader": "^6.0.25",
     "bullmq": "^5.76.6",
     "cheerio": "^1.1.2",
-    "cloudinary": "^2.8.0",
+    "cloudinary": "^2.11.0",
     "connect-mongo": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
