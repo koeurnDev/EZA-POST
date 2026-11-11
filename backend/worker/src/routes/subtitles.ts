@@ -98,22 +98,6 @@ async function getJob(env: Env, jobId: string): Promise<any> {
   return JOBS_CACHE.get(jobId) || null;
 }
 
-// Push job to Upstash Redis queue for high-accuracy Faster-Whisper worker
-async function pushJobToQueue(env: Env, jobData: any) {
-  if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
-    try {
-      await fetch(`${env.UPSTASH_REDIS_REST_URL}/lpush/khmersub:jobs`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${env.UPSTASH_REDIS_REST_TOKEN}` },
-        body: JSON.stringify(jobData)
-      });
-      console.log(`Job ${jobData.job_id} pushed to Upstash Redis queue`);
-    } catch (e) {
-      console.warn('Failed to push to Redis queue:', e);
-    }
-  }
-}
-
 // 0. Health check
 app.get('/health', (c) => {
   return c.json({
@@ -267,18 +251,7 @@ async function handleUploadAndTranscribe(c: any) {
 
   await saveJob(c.env, jobId, jobRecord);
 
-  // 1. Push to Upstash Redis queue for High-Accuracy Faster-Whisper Worker
-  await pushJobToQueue(c.env, {
-    job_id: jobId,
-    filename: file.name,
-    r2_key: r2Key,
-    media_url: `/api/v1/media/${encodeURIComponent(r2Key)}`,
-    language: language,
-    model_size: modelSize,
-    initial_prompt: initialPrompt
-  });
-
-  // 2. Schedule Edge AI Whisper Transcription in background as fallback
+  // Direct Edge AI Transcription (Gemini Flash Cloud + Whisper Fallback)
   c.executionCtx.waitUntil(
     runEdgeWhisperTranscription(c.env, jobId, r2Key, audioBuffer, language, initialPrompt)
   );
