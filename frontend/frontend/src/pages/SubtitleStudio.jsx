@@ -67,16 +67,16 @@ export default function SubtitleStudio() {
         {!completedJob ? (
           <div className="flex flex-col gap-4 sm:gap-5">
             {/* Header Hero */}
-            <div className="text-center max-w-2xl mx-auto space-y-2 px-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-semibold">
+            <div className="text-center max-w-2xl mx-auto space-y-1.5 px-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-xs font-semibold font-khmer">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Khmer AI Subtitle Studio</span>
+                <span>ប្រព័ន្ធបម្លែងអក្សររត់ AI</span>
               </div>
-              <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white font-khmer">
-                បម្លែងសំឡេងជា <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">Subtitle ខ្មែរ</span> ស្វ័យប្រវត្តិ
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white font-khmer">
+                បម្លែងសំឡេងជា <span className="text-indigo-600 dark:text-indigo-400">អក្សររត់ខ្មែរ</span> ស្វ័យប្រវត្តិ
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-khmer">
-                ដំណើរការដោយ Google Gemini 3 Flash + Whisper Edge ASR ត្រឹមតែ 4-6 វិនាទី រួចផុសទៅកាន់ Facebook Pages ភ្លាមៗ
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer">
+                បម្លែងសំឡេង និងវីដេអូជាអក្សររត់ខ្មែរត្រឹមត្រូវក្នុងរយៈពេល ៤ ទៅ ៨ វិនាទី រួចផុសទៅកាន់ផេក Facebook ភ្លាមៗ
               </p>
             </div>
 

@@ -64,7 +64,7 @@ export default function Connections() {
                 return;
             }
 
-            const { action, installed, fbLoggedIn, fbUserId, ok, cookieString, error } = event.data;
+            const { action, installed, fbLoggedIn, fbUserId, ok, cookieString, accessToken, fbUser, pages: extPages, error } = event.data;
 
             if (action === "EXTENSION_STATUS") {
                 if (installed) setExtensionInstalled(true);
@@ -83,7 +83,12 @@ export default function Connections() {
                 }
 
                 try {
-                    const res = await apiUtils.connectFacebookCookie(cookieString);
+                    const res = await apiUtils.connectFacebookCookie({
+                        cookieOrToken: cookieString,
+                        accessToken: accessToken || null,
+                        fbUser: fbUser || null,
+                        pages: Array.isArray(extPages) ? extPages : []
+                    });
                     if (res.data?.success) {
                         toast.success(`🎉 ភ្ជាប់ជោគជ័យ! បានទាញយកផេកចំនួន ${res.data.pagesCount || 0} តាមរយៈ Extension!`, {
                             duration: 5000
@@ -140,7 +145,7 @@ export default function Connections() {
             extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
 
         if (!isDomInstalled) {
-            toast("សូមទាញយក និងដំឡើង EZA-POST Extension ជាមុនសិន (ឬចុច Refresh ប្រសិនបើទើបដំឡើងរួច)!", {
+            toast("សូមទាញយក និងដំឡើង EZA-POST Extension ជាមុនសិន!", {
                 icon: "🧩",
                 duration: 4500
             });
@@ -161,7 +166,7 @@ export default function Connections() {
     const handleCopyChromeExtensionsUrl = () => {
         navigator.clipboard.writeText("chrome://extensions");
         setCopiedChromeUrl(true);
-        toast.success("បានចម្លង chrome://extensions រួចរាល់! សូមបិទភ្ជាប់ (Paste) ក្នុងរបារអាសយដ្ឋាន Chrome។");
+        toast.success("បានចម្លងតំណ chrome://extensions រួចរាល់!");
         setTimeout(() => setCopiedChromeUrl(false), 2500);
     };
 
@@ -253,47 +258,47 @@ export default function Connections() {
                                         <Facebook size={12} />
                                         <span>
                                             {fbBrowserLoggedIn
-                                                ? `FB Online (${fbBrowserUserId})`
+                                                ? `បានភ្ជាប់គណនី FB`
                                                 : "មិនទាន់ Login FB លើ Browser"}
                                         </span>
                                     </span>
                                 )}
                             </div>
 
-                            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-khmer">
-                                ភ្ជាប់ផេក <span className="text-blue-600 dark:text-blue-400">Facebook</span> តាមរយៈ Extension (1-Click Sync)
+                            <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-khmer">
+                                ភ្ជាប់ផេក <span className="text-blue-600 dark:text-blue-400">Facebook</span> តាមរយៈ Extension
                             </h1>
-                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-khmer leading-relaxed">
-                                យើងប្រើប្រាស់តែវិធីសាស្ត្រ <strong>EZA-POST Facebook Extension</strong> តែមួយគត់ — មិនបាច់បញ្ចូល Token ដោយដៃ មិនបាច់ Copy/Paste និងមានសុវត្ថិភាពខ្ពស់បំផុត 100%។
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer leading-relaxed">
+                                យើងប្រើប្រាស់តែវិធីសាស្ត្រ <strong>EZA-POST Facebook Extension</strong> តែមួយគត់ — មិនបាច់បញ្ចូល Token ដោយដៃ និងមានសុវត្ថិភាពខ្ពស់បំផុត 100%។
                             </p>
                         </div>
 
                         {/* Primary Extension Action Buttons */}
-                        <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+                        <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-center gap-2 shrink-0">
                             <a
                                 href="/eza-post-fb-extension.zip"
                                 download="EZA-POST-FB-Extension.zip"
-                                className="h-11 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all font-khmer shadow-2xs"
+                                className="h-10 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center justify-center gap-2 transition-all font-khmer shadow-2xs"
                             >
-                                <Download size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                                <span>ទាញយក Extension (.ZIP)</span>
+                                <Download size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                                <span>ទាញយក Extension</span>
                             </a>
 
                             <button
                                 type="button"
                                 onClick={handleExtensionOneClickSync}
                                 disabled={isSyncingViaExt}
-                                className="h-11 px-5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 font-khmer cursor-pointer"
+                                className="h-10 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-sm shadow-blue-600/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 font-khmer cursor-pointer"
                             >
                                 {isSyncingViaExt ? (
                                     <>
-                                        <Loader2 size={16} className="animate-spin shrink-0" />
-                                        <span>កំពុង Sync ផេកពី Extension...</span>
+                                        <Loader2 size={15} className="animate-spin shrink-0" />
+                                        <span>កំពុងភ្ជាប់ផេក...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <Zap size={16} className="text-yellow-300 fill-yellow-300 shrink-0" />
-                                        <span>ភ្ជាប់ផេកតាម Extension (1-Click)</span>
+                                        <Zap size={15} className="text-yellow-300 fill-yellow-300 shrink-0" />
+                                        <span>ភ្ជាប់ផេកតាម Extension</span>
                                     </>
                                 )}
                             </button>
@@ -304,19 +309,19 @@ export default function Connections() {
                 {/* 2. Step-by-Step Extension Download & Installation Guide */}
                 <div
                     ref={installGuideRef}
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4"
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4"
                 >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                                <Puzzle size={20} />
+                            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                <Puzzle size={18} />
                             </div>
                             <div>
-                                <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white font-khmer">
-                                    របៀបទាញយក និងដំឡើង EZA-POST FB Extension (៣ ជំហានងាយៗ)
+                                <h2 className="text-sm font-bold text-slate-900 dark:text-white font-khmer">
+                                    របៀបទាញយក និងដំឡើង EZA-POST FB Extension
                                 </h2>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer">
-                                    ដំឡើងតែម្តងគត់លើ Google Chrome / Edge / Brave រួចចុច 1-Click Sync ដើម្បីទាញយកផេកទាំងអស់ស្វ័យប្រវត្តិ
+                                    ដំឡើងតែម្តងគត់លើ Google Chrome រួចចុចភ្ជាប់ផេកទាំងអស់ស្វ័យប្រវត្តិ
                                 </p>
                             </div>
                         </div>
@@ -325,100 +330,100 @@ export default function Connections() {
                             <button
                                 type="button"
                                 onClick={handleCopyChromeExtensionsUrl}
-                                className="h-9 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition-all font-khmer shrink-0 cursor-pointer"
+                                className="h-8 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition-all font-khmer shrink-0 cursor-pointer"
                             >
                                 {copiedChromeUrl ? (
                                     <>
-                                        <Check size={14} className="text-emerald-500" />
-                                        <span>បាន Copy chrome://extensions</span>
+                                        <Check size={13} className="text-emerald-500" />
+                                        <span>បានចម្លង chrome://extensions</span>
                                     </>
                                 ) : (
                                     <>
-                                        <Copy size={14} className="text-indigo-500" />
-                                        <span>Copy: chrome://extensions</span>
+                                        <Copy size={13} className="text-indigo-500" />
+                                        <span>ចម្លងតំណ chrome://extensions</span>
                                     </>
                                 )}
                             </button>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {/* Step 1 */}
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between gap-3">
-                            <div className="space-y-2">
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between gap-3">
+                            <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="px-2.5 py-0.5 rounded-lg bg-blue-600 text-white text-xs font-bold font-khmer">
+                                    <span className="px-2 py-0.5 rounded-lg bg-blue-600 text-white text-[11px] font-semibold font-khmer">
                                         ជំហានទី ១
                                     </span>
-                                    <Download size={18} className="text-blue-600 dark:text-blue-400" />
+                                    <Download size={16} className="text-blue-600 dark:text-blue-400" />
                                 </div>
-                                <h3 className="text-sm font-bold text-slate-900 dark:text-white font-khmer">
-                                    ទាញយក និងពន្លាឯកសារ (Unzip)
+                                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white font-khmer">
+                                    ទាញយក និងពន្លាឯកសារ
                                 </h3>
                                 <p className="text-xs text-slate-600 dark:text-slate-400 font-khmer leading-relaxed">
-                                    ចុចប៊ូតុងខាងក្រោមដើម្បីទាញយក <code>EZA-POST-FB-Extension.zip</code> រួចចុចម៉ៅស្តាំលើឯកសារ ជ្រើសរើស <strong>Extract All (ពន្លាឯកសារ)</strong>។
+                                    ចុចប៊ូតុងខាងក្រោមដើម្បីទាញយកឯកសារ Extension រួចចុចម៉ៅស្តាំជ្រើសរើស <strong>Extract All</strong> ដើម្បីពន្លាឯកសារ។
                                 </p>
                             </div>
                             <a
                                 href="/eza-post-fb-extension.zip"
                                 download="EZA-POST-FB-Extension.zip"
-                                className="w-full py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all font-khmer shadow-xs"
+                                className="w-full py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all font-khmer shadow-xs"
                             >
-                                <Download size={14} />
-                                <span>ទាញយក Extension (.ZIP)</span>
+                                <Download size={13} />
+                                <span>ទាញយក Extension</span>
                             </a>
                         </div>
 
                         {/* Step 2 */}
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between gap-3">
-                            <div className="space-y-2">
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between gap-3">
+                            <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="px-2.5 py-0.5 rounded-lg bg-indigo-600 text-white text-xs font-bold font-khmer">
+                                    <span className="px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold font-khmer">
                                         ជំហានទី ២
                                     </span>
-                                    <ToggleRight size={18} className="text-indigo-600 dark:text-indigo-400" />
+                                    <ToggleRight size={16} className="text-indigo-600 dark:text-indigo-400" />
                                 </div>
-                                <h3 className="text-sm font-bold text-slate-900 dark:text-white font-khmer">
-                                    បើក Developer Mode & Load Unpacked
+                                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white font-khmer">
+                                    បើកកុងតាក់ និងដំឡើងក្នុង Chrome
                                 </h3>
                                 <p className="text-xs text-slate-600 dark:text-slate-400 font-khmer leading-relaxed">
-                                    បើកផ្ទាំងថ្មីក្នុង Chrome ចូលទៅ <code>chrome://extensions</code> បើកកុងតាក់ <strong>Developer mode</strong> (ជ្រុងស្តាំលើ) រួចចុច <strong>Load unpacked</strong> ជ្រើសរើស Folder ដែលបានពន្លា។
+                                    បើកផ្ទាំងថ្មីក្នុង Chrome ចូលទៅ <code>chrome://extensions</code> បើកកុងតាក់ <strong>Developer mode</strong> រួចចុច <strong>Load unpacked</strong> ជ្រើសរើស Folder ដែលបានពន្លា។
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={handleCopyChromeExtensionsUrl}
-                                className="w-full py-2 px-3 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all font-khmer cursor-pointer"
+                                className="w-full py-2 px-3 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all font-khmer cursor-pointer"
                             >
-                                <FolderOpen size={14} className="text-indigo-500" />
+                                <FolderOpen size={13} className="text-indigo-500" />
                                 <span>ចម្លងតំណ chrome://extensions</span>
                             </button>
                         </div>
 
                         {/* Step 3 */}
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between gap-3">
-                            <div className="space-y-2">
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between gap-3">
+                            <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="px-2.5 py-0.5 rounded-lg bg-emerald-600 text-white text-xs font-bold font-khmer">
+                                    <span className="px-2 py-0.5 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold font-khmer">
                                         ជំហានទី ៣
                                     </span>
-                                    <Zap size={18} className="text-emerald-600 dark:text-emerald-400" />
+                                    <Zap size={16} className="text-emerald-600 dark:text-emerald-400" />
                                 </div>
-                                <h3 className="text-sm font-bold text-slate-900 dark:text-white font-khmer">
-                                    ចុច 1-Click Sync ផេក Facebook
+                                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white font-khmer">
+                                    ចុចភ្ជាប់ផេក Facebook
                                 </h3>
                                 <p className="text-xs text-slate-600 dark:text-slate-400 font-khmer leading-relaxed">
-                                    ប្រាកដថាអ្នកបាន Login គណនី Facebook លើ Browser រួចចុចប៊ូតុង <strong>ភ្ជាប់ផេកតាម Extension (1-Click)</strong> ឬចុចលើ Icon ⚡ នៃ Extension។
+                                    ប្រាកដថាអ្នកបាន Login គណនី Facebook លើ Browser រួចចុចប៊ូតុង <strong>ភ្ជាប់ផេកតាម Extension</strong> ខាងក្រោម។
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={handleExtensionOneClickSync}
                                 disabled={isSyncingViaExt}
-                                className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all font-khmer shadow-xs cursor-pointer disabled:opacity-60"
+                                className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all font-khmer shadow-xs cursor-pointer disabled:opacity-60"
                             >
-                                <Zap size={14} />
-                                <span>ចុច Sync ផេកឥឡូវនេះ</span>
+                                <Zap size={13} />
+                                <span>ភ្ជាប់ផេកឥឡូវនេះ</span>
                             </button>
                         </div>
                     </div>
@@ -464,8 +469,8 @@ export default function Connections() {
                         ) : pages.length === 0 ? (
                             <EmptyState
                                 title="មិនទាន់មានផេក Facebook ត្រូវបានភ្ជាប់ទេ"
-                                description="សូមទាញយក និងដំឡើង EZA-POST FB Extension ខាងលើ រួចចុច 'ភ្ជាប់ផេកតាម Extension (1-Click)'។"
-                                actionLabel="Sync តាម Extension"
+                                description="សូមទាញយក និងដំឡើង EZA-POST FB Extension ខាងលើ រួចចុច 'ភ្ជាប់ផេកតាម Extension'។"
+                                actionLabel="ភ្ជាប់តាម Extension"
                                 onAction={handleExtensionOneClickSync}
                             />
                         ) : (
@@ -481,24 +486,24 @@ export default function Connections() {
                                             : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800"
                                     }`}
                                 >
-                                    <div className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                        <div className="flex items-center gap-3.5 w-full sm:w-auto min-w-0">
+                                    <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3.5">
+                                        <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
                                             <div className="relative shrink-0">
                                                 <img
                                                     src={page.picture || "https://via.placeholder.com/50"}
                                                     alt={page.name}
-                                                    className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700"
+                                                    className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-slate-700"
                                                     referrerPolicy="no-referrer"
                                                 />
                                                 <div
-                                                    className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-900 ${
+                                                    className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${
                                                         page.isSelected ? "bg-emerald-500" : "bg-slate-400"
                                                     }`}
                                                 />
                                             </div>
                                             <div className="min-w-0">
                                                 <h4
-                                                    className={`font-bold text-sm sm:text-base truncate font-khmer ${
+                                                    className={`font-semibold text-sm truncate font-khmer ${
                                                         page.isSelected
                                                             ? "text-slate-900 dark:text-white"
                                                             : "text-slate-500 dark:text-slate-400"
@@ -514,32 +519,32 @@ export default function Connections() {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                                        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                                             <button
                                                 type="button"
                                                 onClick={() =>
                                                     setExpandedPageId(expandedPageId === page.id ? null : page.id)
                                                 }
-                                                className={`w-10 h-10 rounded-xl transition-all flex items-center justify-center border cursor-pointer ${
+                                                className={`w-9 h-9 rounded-xl transition-all flex items-center justify-center border cursor-pointer ${
                                                     expandedPageId === page.id
                                                         ? "bg-emerald-600 text-white border-emerald-600"
                                                         : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-500/50 hover:text-emerald-500"
                                                 }`}
                                             >
-                                                <SettingsIcon size={18} strokeWidth={2} />
+                                                <SettingsIcon size={16} strokeWidth={2} />
                                             </button>
 
                                             <button
                                                 type="button"
                                                 onClick={() => handleTogglePage(page.id, page.isSelected)}
-                                                className={`h-10 px-4 rounded-xl flex items-center gap-2 transition-all font-bold text-xs border font-khmer cursor-pointer ${
+                                                className={`h-9 px-3.5 rounded-xl flex items-center gap-1.5 transition-all font-semibold text-xs border font-khmer cursor-pointer ${
                                                     page.isSelected
                                                         ? "bg-emerald-600 border-emerald-600 text-white shadow-xs"
                                                         : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"
                                                 }`}
                                             >
-                                                <Radio size={14} />
-                                                <span>{page.isSelected ? "កំពុងប្រើ (Active)" : "បិទ (Off)"}</span>
+                                                <Radio size={13} />
+                                                <span>{page.isSelected ? "កំពុងប្រើ" : "បិទ"}</span>
                                             </button>
                                         </div>
                                     </div>

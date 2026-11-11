@@ -12,38 +12,38 @@ import { toast } from "react-hot-toast";
 
 const SIDEBAR_SECTIONS = [
   {
-    title: "មុខងារចម្បង (Main Studio)",
+    title: "មុខងារចម្បង",
     items: [
       { label: "បង្កើតផុសថ្មី", shortLabel: "ផុស", icon: Send, path: "/post" },
-      { label: "អក្សររត់ AI (KhmerSub)", shortLabel: "KhmerSub", icon: Languages, path: "/subtitles", badge: "AI" },
+      { label: "អក្សររត់ AI", shortLabel: "អក្សររត់", icon: Languages, path: "/subtitles", badge: "AI" },
       { label: "កាលវិភាគផុស", shortLabel: "កាលវិភាគ", icon: Clock, path: "/posts" },
-      { label: "ឆ្លើយតបស្វ័យប្រវត្តិ (Bot)", shortLabel: "Bot ឆ្លើយ", icon: MessageSquare, path: "/bot" },
-      { label: "ភ្ជាប់ផេក Facebook", shortLabel: "ផេក", icon: LinkIcon, path: "/connections", badge: "Ext" },
-      { label: "កាតអាជីវកម្ម (Bio QR)", shortLabel: "កាត Bio", icon: QrCode, path: "/bio" },
+      { label: "ឆ្លើយតបស្វ័យប្រវត្តិ", shortLabel: "ឆ្លើយតប", icon: MessageSquare, path: "/bot" },
+      { label: "ភ្ជាប់ផេក Facebook", shortLabel: "ផេក", icon: LinkIcon, path: "/connections" },
+      { label: "កាតអាជីវកម្មឌីជីថល", shortLabel: "កាត Bio", icon: QrCode, path: "/bio" },
     ],
   },
   {
-    title: "ទាញយកវីដេអូ (Downloaders)",
+    title: "ទាញយកវីដេអូ",
     items: [
-      { label: "TikTok Downloader", icon: Download, path: "/tools/tiktok" },
-      { label: "YouTube Downloader", icon: Video, path: "/tools/youtube" },
-      { label: "Facebook Downloader", icon: Facebook, path: "/tools/facebook" },
-      { label: "Instagram Downloader", icon: Instagram, path: "/tools/instagram" },
-      { label: "CapCut Template", icon: Scissors, path: "/tools/capcut" },
-      { label: "Threads Downloader", icon: AtSign, path: "/tools/threads" },
-      { label: "Pinterest Downloader", icon: Images, path: "/tools/pinterest" },
+      { label: "ទាញយកវីដេអូ TikTok", icon: Download, path: "/tools/tiktok" },
+      { label: "ទាញយកវីដេអូ YouTube", icon: Video, path: "/tools/youtube" },
+      { label: "ទាញយកវីដេអូ Facebook", icon: Facebook, path: "/tools/facebook" },
+      { label: "ទាញយកវីដេអូ Instagram", icon: Instagram, path: "/tools/instagram" },
+      { label: "ទាញយក CapCut", icon: Scissors, path: "/tools/capcut" },
+      { label: "ទាញយកវីដេអូ Threads", icon: AtSign, path: "/tools/threads" },
+      { label: "ទាញយកវីដេអូ Pinterest", icon: Images, path: "/tools/pinterest" },
     ],
   },
   {
-    title: "ឧបករណ៍ផេក & គណនី",
+    title: "ឧបករណ៍ផេក និងគណនី",
     items: [
-      { label: "Live Stream ច្រើនផេក", icon: Radio, path: "/tools/live-stream" },
-      { label: "សម្អាតផុស (Page Cleaner)", icon: Trash2, path: "/tools/page-cleaner" },
-      { label: "បម្លែងឯកសារ (Converter)", icon: FileText, path: "/tools/document-converter" },
-      { label: "ស្វែងរកវីដេអូល្បី (Viral)", icon: TrendingUp, path: "/tools/viral-finder" },
-      { label: "TikTok Trends", icon: Music, path: "/tools/tiktok/trends" },
-      { label: "ការកំណត់ (Settings)", icon: Settings, path: "/settings" },
-      { label: "របៀបប្រើប្រាស់ (Guide)", icon: HelpCircle, path: "/guide" },
+      { label: "ផ្សាយផ្ទាល់ច្រើនផេក", icon: Radio, path: "/tools/live-stream" },
+      { label: "សម្អាតផុសក្នុងផេក", icon: Trash2, path: "/tools/page-cleaner" },
+      { label: "បម្លែងឯកសារ", icon: FileText, path: "/tools/document-converter" },
+      { label: "ស្វែងរកវីដេអូល្បី", icon: TrendingUp, path: "/tools/viral-finder" },
+      { label: "ចម្រៀងកំពុងល្បី TikTok", icon: Music, path: "/tools/tiktok/trends" },
+      { label: "ការកំណត់គណនី", icon: Settings, path: "/settings" },
+      { label: "របៀបប្រើប្រាស់", icon: HelpCircle, path: "/guide" },
     ],
   },
 ];
@@ -125,9 +125,9 @@ const DashboardLayout = ({ children }) => {
                   key={item.path}
                   to={item.path}
                   onClick={onItemClick}
-                  className={`flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl text-[13px] font-semibold transition-colors ${
+                  className={`flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
                     isActive
-                      ? "bg-blue-600 text-white shadow-xs"
+                      ? "bg-blue-600 text-white shadow-xs font-semibold"
                       : isDarkMode
                       ? "text-slate-300 hover:bg-slate-800/80 hover:text-white"
                       : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
@@ -135,7 +135,7 @@ const DashboardLayout = ({ children }) => {
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Icon
-                      size={17}
+                      size={16}
                       className={
                         isActive
                           ? "text-white shrink-0"
@@ -172,20 +172,20 @@ const DashboardLayout = ({ children }) => {
             : "bg-blue-50/80 border-blue-200 text-slate-800"
         }`}
       >
-        <p className="text-xs font-bold font-khmer mb-1 flex items-center gap-1.5">
+        <p className="text-xs font-semibold font-khmer mb-1 flex items-center gap-1.5">
           <Zap size={13} className="text-blue-500 fill-blue-500 shrink-0" />
-          <span>FB Sync Extension</span>
+          <span>ផ្នែកបន្ថែមភ្ជាប់ Facebook</span>
         </p>
         <p className="text-[11px] opacity-75 font-khmer mb-2">
-          ភ្ជាប់ផេក Facebook 1-Click ដោយមិនប្រើ Token ដោយដៃ
+          ភ្ជាប់ផេកស្វ័យប្រវត្តិដោយមិនប្រើ Token ដោយដៃ
         </p>
         <a
           href="/eza-post-fb-extension.zip"
           download="EZA-POST-FB-Extension.zip"
-          className="w-full py-1.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all font-khmer shadow-2xs"
+          className="w-full py-1.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all font-khmer shadow-2xs"
         >
           <Download size={13} />
-          <span>ទាញយក Extension (.ZIP)</span>
+          <span>ទាញយក Extension</span>
         </a>
       </div>
     </div>
@@ -372,8 +372,8 @@ const DashboardLayout = ({ children }) => {
             <button
               type="button"
               onClick={toggleTheme}
-              title={isDarkMode ? "ប្ដូរទៅ Light Mode (ភ្លឺ)" : "ប្ដូរទៅ Dark Mode (ងងឹត)"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+              title={isDarkMode ? "ប្ដូរទៅផ្ទៃភ្លឺ" : "ប្ដូរទៅផ្ទៃងងឹត"}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors ${
                 isDarkMode
                   ? "bg-slate-800 border-slate-700 hover:bg-slate-750 text-amber-400"
                   : "bg-slate-100 border-slate-200 hover:bg-slate-200/70 text-slate-700"
@@ -382,12 +382,12 @@ const DashboardLayout = ({ children }) => {
               {isDarkMode ? (
                 <>
                   <Sun size={14} className="text-amber-400" />
-                  <span className="hidden sm:inline text-slate-200">ភ្លឺ (Light)</span>
+                  <span className="hidden sm:inline text-slate-200">ផ្ទៃភ្លឺ</span>
                 </>
               ) : (
                 <>
                   <Moon size={14} className="text-indigo-600" />
-                  <span className="hidden sm:inline text-slate-700">ងងឹត (Dark)</span>
+                  <span className="hidden sm:inline text-slate-700">ផ្ទៃងងឹត</span>
                 </>
               )}
             </button>

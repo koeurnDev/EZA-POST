@@ -237,7 +237,12 @@ const apiUtils = {
   handleApiError,
   // Facebook Pages
   getUserPages: () => axios.get(getFullUrl("/user/pages"), { withCredentials: true }),
-  connectFacebookCookie: (cookieOrToken) => axios.post(getFullUrl("/user/pages/connect-cookie"), { cookieOrToken }, { withCredentials: true }),
+  connectFacebookCookie: (payload) => {
+    const body = typeof payload === "object" && payload !== null
+      ? payload
+      : { cookieOrToken: payload };
+    return axios.post(getFullUrl("/user/pages/connect-cookie"), body, { withCredentials: true });
+  },
   getUserConnections: () => axios.get(getFullUrl("/user/connections"), { withCredentials: true }), // ✅ Get Connections
   toggleUserPage: (pageId, isSelected) => axios.post(getFullUrl("/user/pages/toggle"), { pageId, isSelected }, { withCredentials: true }),
   updatePageSettings: (pageId, settings) => axios.post(getFullUrl("/user/pages/settings"), { pageId, settings }, { withCredentials: true }),

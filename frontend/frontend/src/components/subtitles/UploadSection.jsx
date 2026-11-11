@@ -304,7 +304,7 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
           onClick={() => setShowGlossary(!showGlossary)}
           className="text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 font-khmer transition-colors focus:outline-none"
         >
-          <span>{showGlossary ? '− បិទប្រអប់ពាក្យពិសេស' : '+ បន្ថែមពាក្យពិសេស (Custom Glossary)'}</span>
+          <span>{showGlossary ? '− បិទប្រអប់ពាក្យពិសេស' : '+ បន្ថែមពាក្យពិសេស'}</span>
         </button>
 
         {showGlossary && (
@@ -410,15 +410,15 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
             type="button"
             onClick={loadDemoSample}
             disabled={isProcessing}
-            className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all font-khmer whitespace-nowrap shadow-sm"
+            className="flex-1 sm:flex-initial px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all font-khmer whitespace-nowrap shadow-sm"
           >
-            <span>សាកល្បង (Demo)</span>
+            <span>សាកល្បងគំរូ</span>
           </button>
 
           <button
             onClick={startTranscription}
             disabled={!selectedFile || isProcessing}
-            className={`flex-1 sm:flex-initial px-6 py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all flex items-center justify-center gap-2 font-khmer whitespace-nowrap ${
+            className={`flex-1 sm:flex-initial px-5 py-2 rounded-xl font-medium text-xs transition-all flex items-center justify-center gap-2 font-khmer whitespace-nowrap ${
               !selectedFile || isProcessing
                 ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
                 : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 active:scale-95 font-semibold'
@@ -430,7 +430,7 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
                 <span>កំពុងបម្លែង... ({elapsedSec}s)</span>
               </>
             ) : (
-              <span>បម្លែងជា Subtitle</span>
+              <span>បម្លែងជាអក្សររត់</span>
             )}
           </button>
         </div>

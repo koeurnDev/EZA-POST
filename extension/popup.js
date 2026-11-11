@@ -93,6 +93,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     btnSyncText.textContent = "កំពុង Sync ផេកទៅកាន់ EZA-POST...";
 
     try {
+      const payload = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: "GET_FB_SYNC_PAYLOAD" }, (resp) => {
+          resolve(resp || { cookieString: currentCookieString });
+        });
+      });
+
       const headers = {
         "Content-Type": "application/json"
       };
@@ -105,7 +111,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         headers,
         credentials: "include",
         body: JSON.stringify({
-          cookieOrToken: currentCookieString
+          cookieOrToken: payload.cookieString || currentCookieString,
+          accessToken: payload.accessToken || null,
+          fbUser: payload.fbUser || null,
+          pages: Array.isArray(payload.pages) ? payload.pages : []
         })
       });
 

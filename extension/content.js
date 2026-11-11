@@ -80,6 +80,9 @@
             ok: Boolean(response.ok),
             fbUserId: response.fbUserId || null,
             cookieString: response.cookieString || "",
+            accessToken: response.accessToken || null,
+            fbUser: response.fbUser || null,
+            pages: Array.isArray(response.pages) ? response.pages : [],
             error: response.error || null
           },
           "*"
@@ -88,3 +91,4 @@
     }
   });
 })();
+

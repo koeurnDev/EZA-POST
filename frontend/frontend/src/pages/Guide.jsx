@@ -76,53 +76,53 @@ const Guide = () => {
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto py-12 px-6">
+            <div className="max-w-5xl mx-auto py-4 px-4">
                 {/* Header */}
-                <div className="mb-16 text-center">
+                <div className="mb-8 text-center">
                     <MotionDiv 
-                        initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : -20 }}
+                        initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-600 rounded-full text-xs font-black uppercase tracking-widest mb-6"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 text-blue-600 rounded-full text-xs font-semibold mb-3"
                     >
-                        <HelpCircle size={14} /> មគ្គុទ្ទេសក៍ការប្រើប្រាស់
+                        <HelpCircle size={13} /> មគ្គុទ្ទេសក៍ការប្រើប្រាស់
                     </MotionDiv>
-                    <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter mb-4">
-                        ស្ទាត់ជំនាញលើ <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">ឧបករណ៍ផុស។</span>
+                    <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-1.5">
+                        របៀបប្រើប្រាស់ <span className="text-blue-600 dark:text-blue-400">ឧបករណ៍ផុសមាតិកា</span>
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-[10px]">អនុវត្តតាមជំហានទាំងនេះ ដើម្បីផុស និងពង្រីកផេករបស់អ្នក។</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs">អនុវត្តតាមជំហានទាំងនេះ ដើម្បីផុស និងពង្រីកផេករបស់អ្នក</p>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     {/* Main Content */}
-                    <div className="lg:col-span-8 space-y-16">
+                    <div className="lg:col-span-8 space-y-10">
                         {/* Setup Section */}
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight px-2 flex items-center gap-3">
-                                <UserPlus className="text-blue-600" /> ជំហានទី ១: ការរៀបចំ
+                        <div className="space-y-4">
+                            <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white px-1 flex items-center gap-2">
+                                <UserPlus size={18} className="text-blue-600" /> ជំហានទី ១: ការរៀបចំ
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="p-8 bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] shadow-xl shadow-black/5">
-                                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center mb-6 text-blue-600">
-                                        <Mail size={20} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl shadow-xs">
+                                    <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center mb-3 text-blue-600">
+                                        <Mail size={18} />
                                     </div>
-                                    <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight mb-2">ការចុះឈ្មោះ</h4>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-relaxed">បង្កើតគណនីរបស់អ្នកដើម្បីចាប់ផ្តើមប្រើប្រាស់ឧបករណ៍។</p>
+                                    <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-1">ការចុះឈ្មោះ</h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">បង្កើតគណនីរបស់អ្នកដើម្បីចាប់ផ្តើមប្រើប្រាស់ឧបករណ៍។</p>
                                 </div>
-                                <div className="p-8 bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-[2.5rem] shadow-xl shadow-black/5">
-                                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center mb-6 text-blue-600">
-                                        <Facebook size={20} />
+                                <div className="p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl shadow-xs">
+                                    <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center mb-3 text-blue-600">
+                                        <Facebook size={18} />
                                     </div>
-                                    <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight mb-2">ភ្ជាប់ផេកតាម EZA-POST FB Extension</h4>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-relaxed mb-3">
-                                        ចូលទៅកាន់ទំព័រ 'ភ្ជាប់ផេក Facebook' ដើម្បីទាញយក Extension (.ZIP) ដំឡើងលើ Chrome រួចចុច 1-Click Sync ដោយមិនបាច់ប្រើ Token ដោយដៃ។
+                                    <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-1">ភ្ជាប់ផេកតាម EZA-POST FB Extension</h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-2.5">
+                                        ចូលទៅកាន់ទំព័រ 'ភ្ជាប់ផេក Facebook' ដើម្បីទាញយក Extension ដំឡើងលើ Chrome រួចចុចភ្ជាប់ដោយមិនបាច់ប្រើ Token ដោយដៃ។
                                     </p>
                                     <a
                                         href="/eza-post-fb-extension.zip"
                                         download="EZA-POST-FB-Extension.zip"
-                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
                                     >
-                                        <Download size={14} />
-                                        <span>ទាញយក Extension (.ZIP)</span>
+                                        <Download size={13} />
+                                        <span>ទាញយក Extension</span>
                                     </a>
                                 </div>
                             </div>

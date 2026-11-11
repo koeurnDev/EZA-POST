@@ -119,46 +119,39 @@ export default function ScheduledPosts() {
         <DashboardLayout>
             <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
                 {/* Header Section */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 md:mb-12 gap-6">
-                    <MotionDiv 
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                    >
-                        <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-                            <div className="p-2 md:p-2.5 bg-blue-600 text-white rounded-xl md:rounded-2xl shadow-xl shadow-blue-500/30">
-                                <Clock size={24}  />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                    <div>
+                        <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
+                            <div className="p-2 bg-blue-600 text-white rounded-xl shadow-xs">
+                                <Clock size={18} />
                             </div>
-                            Queue
+                            <span>កាលវិភាគផុស</span>
                         </h1>
-                        <p className="text-base text-gray-500 dark:text-gray-400 mt-2 font-medium leading-relaxed">Manage and optimize your upcoming content schedule.</p>
-                    </MotionDiv>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">គ្រប់គ្រង និងតាមដានមាតិកាដែលបានកំណត់ម៉ោងផុស</p>
+                    </div>
 
-                    <MotionDiv 
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center gap-3"
-                    >
-                        <div className="bg-gray-100 dark:bg-gray-800 p-1 rounded-xl md:rounded-2xl border border-gray-200 dark:border-gray-700 hidden md:flex">
+                    <div className="flex items-center gap-2.5">
+                        <div className="bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700 hidden md:flex">
                             <button 
                                 onClick={() => setViewMode("grid")}
-                                className={`p-2 rounded-lg md:rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm' : 'text-gray-400'}`}
+                                className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-400'}`}
                             >
-                                <LayoutGrid size={18} />
+                                <LayoutGrid size={16} />
                             </button>
                             <button 
                                 onClick={() => setViewMode("list")}
-                                className={`p-2 rounded-lg md:rounded-xl transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm' : 'text-gray-400'}`}
+                                className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-400'}`}
                             >
-                                <ListIcon size={18} />
+                                <ListIcon size={16} />
                             </button>
                         </div>
                         <Button
-                            onClick={() => window.location.href = "/dashboard"}
-                            className="w-full md:w-auto rounded-xl md:rounded-2xl px-6 h-12 md:h-14 shadow-xl text-sm md:text-base font-black uppercase tracking-widest"
+                            onClick={() => window.location.href = "/post"}
+                            className="w-full sm:w-auto rounded-xl px-4 h-10 shadow-sm text-xs font-semibold"
                         >
-                            <Plus size={18}  className="mr-2" /> បង្កើតថ្មី
+                            <Plus size={15} className="mr-1.5" /> បង្កើតផុសថ្មី
                         </Button>
-                    </MotionDiv>
+                    </div>
                 </div>
 
                 {/* Queue Content */}

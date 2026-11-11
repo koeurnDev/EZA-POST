@@ -649,12 +649,12 @@ export default function Post() {
         <DashboardLayout>
             <div className="max-w-5xl mx-auto px-1 sm:px-4 md:px-6 py-2 md:py-4 pb-16 flex flex-col items-center">
                 {/* 🚀 Header + View Switcher in a Single Clean Row on Desktop */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-5 md:mb-6 w-full">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 w-full">
                     <div>
-                        <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-                            បង្កើត និងកំណត់ពេល <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">ផុសមាតិកា</span>
+                        <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                            បង្កើត និងកំណត់ពេល <span className="text-blue-600 dark:text-blue-400">ផុសមាតិកា</span>
                         </h1>
-                        <p className="text-xs md:text-sm text-gray-500 font-medium mt-0.5">ផុសវីដេអូ និងរូបភាពទៅកាន់ Facebook Pages ច្រើនក្នុងពេលតែមួយ</p>
+                        <p className="text-xs text-gray-500 mt-0.5">ផុសវីដេអូ និងរូបភាពទៅកាន់ផេក Facebook ច្រើនក្នុងពេលតែមួយ</p>
                     </div>
 
                     {/* 🚀 Dynamic View Orchestrator */}
@@ -666,12 +666,12 @@ export default function Post() {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveView(tab.id)}
-                                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${activeView === tab.id
-                                    ? "bg-white dark:bg-gray-900 text-blue-600 shadow-sm border border-gray-200/80 dark:border-white/10"
+                                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeView === tab.id
+                                    ? "bg-white dark:bg-gray-900 text-blue-600 shadow-xs border border-gray-200/80 dark:border-white/10"
                                     : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
                                     }`}
                             >
-                                <tab.icon size={14} />
+                                <tab.icon size={13} />
                                 <span>{tab.label}</span>
                             </button>
                         ))}
@@ -686,49 +686,49 @@ export default function Post() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.15 }}
-                            className="space-y-4 md:space-y-6 w-full"
+                            className="space-y-4 w-full"
                         >
                             {/* 🎛️ Post Format Selector (Carousel vs Single Video) */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-1.5 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 w-full sm:w-fit">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-1 bg-gray-100 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 w-full sm:w-fit">
                                 <button
                                     type="button"
                                     onClick={() => setPostFormat("carousel")}
-                                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                                    className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
                                         postFormat === "carousel"
-                                            ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                                            ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xs"
                                             : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
                                     }`}
                                 >
-                                    <span>🎠 Mixed Carousel (វីដេអូ + កាតផេក)</span>
+                                    <span>🎠 វីដេអូ និងកាតផេក</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setPostFormat("single")}
-                                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                                    className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
                                         postFormat === "single"
-                                            ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                                            ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xs"
                                             : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
                                     }`}
                                 >
-                                    <span>🎥 Single Video / Reel (វីដេអូទោល)</span>
+                                    <span>🎥 វីដេអូទោល</span>
                                 </button>
                             </div>
 
                             {/* 🎯 Destination: Multi-Select Dropdown */}
-                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-2xl md:rounded-[2.5rem] p-5 md:p-10 shadow-xl relative">
-                                <div className="flex items-center justify-between mb-6">
-                                    <div className="space-y-1">
-                                        <h3 className="text-base md:text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">ជ្រើសរើសផេកផុស</h3>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">រើសបានច្រើនក្នុងពេលតែមួយ</p>
+                            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs relative">
+                                <div className="flex items-center justify-between mb-3.5">
+                                    <div className="space-y-0.5">
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">ជ្រើសរើសផេកផុស</h3>
+                                        <p className="text-xs text-gray-500">អាចជ្រើសរើសបានច្រើនផេកក្នុងពេលតែមួយ</p>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[10px] md:text-sm font-black text-gray-400 uppercase">កាតផេក</span>
+                                            <span className="text-xs font-semibold text-gray-500">កាតផេក</span>
                                             <button
                                                 onClick={() => setPageCardSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
-                                                className={`w-8 md:w-10 h-4 md:h-5 rounded-full transition-all relative ${pageCardSettings.enabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-white/10'}`}
+                                                className={`w-9 h-5 rounded-full transition-all relative ${pageCardSettings.enabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-white/10'}`}
                                             >
-                                                <div className={`absolute top-0.5 md:top-1 w-3 h-3 rounded-full bg-white transition-all ${pageCardSettings.enabled ? 'left-[18px] md:left-6' : 'left-0.5 md:left-1'}`} />
+                                                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${pageCardSettings.enabled ? 'left-[18px]' : 'left-0.5'}`} />
                                             </button>
                                         </div>
                                     </div>
@@ -835,23 +835,23 @@ export default function Post() {
                             </div>
 
                             {/* 🔗 TikTok Link Field */}
-                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-2xl md:rounded-[2.5rem] p-4 md:p-8 shadow-xl md:shadow-2xl shadow-black/5 w-full">
-                                <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
+                            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs w-full">
+                                <div className="flex flex-col md:flex-row items-center gap-4">
                                     <div className="flex-1 w-full">
-                                        <div className="flex items-center gap-2 mb-2 md:mb-3 px-1">
+                                        <div className="flex items-center gap-2 mb-2 px-1">
                                             <LinkIcon size={14} className="text-pink-500" />
-                                            <label className="text-[12px] md:text-sm font-black text-gray-400 uppercase tracking-widest">ដាក់ Link វីដេអូ TikTok</label>
+                                            <label className="text-xs font-bold text-gray-700 dark:text-gray-300">ដាក់តំណភ្ជាប់វីដេអូ TikTok</label>
                                         </div>
-                                        <div className="flex flex-col sm:flex-row gap-2.5 md:gap-4">
+                                        <div className="flex flex-col sm:flex-row gap-2.5">
                                             <input
                                                 type="text"
                                                 value={tiktokUrl || ""}
                                                 onChange={(e) => setTiktokUrl(e.target.value)}
-                                                placeholder="Paste TikTok Link..."
-                                                className="w-full bg-gray-100/50 dark:bg-white/5 rounded-xl md:rounded-2xl px-4 md:px-6 py-4 md:py-5 font-bold outline-none transition-all text-base text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 border-2 border-transparent focus:border-pink-500/30"
+                                                placeholder="បិទភ្ជាប់តំណវីដេអូ TikTok ទីនេះ..."
+                                                className="w-full bg-gray-100/70 dark:bg-white/5 rounded-xl px-4 py-2.5 font-medium outline-none transition-all text-xs sm:text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 border border-gray-200 dark:border-white/10 focus:border-pink-500"
                                             />
-                                            <Button onClick={handleLoadTiktok} isLoading={isLoadingVideo} className="h-14 md:h-16 px-6 md:px-10 rounded-xl md:rounded-2xl bg-pink-600 text-white shadow-lg shadow-pink-500/20 active:scale-95 transition-all text-sm md:text-base font-bold w-full sm:w-auto">
-                                                Fetch
+                                            <Button onClick={handleLoadTiktok} isLoading={isLoadingVideo} className="h-10 px-5 rounded-xl bg-pink-600 text-white shadow-sm active:scale-95 transition-all text-xs font-semibold w-full sm:w-auto shrink-0">
+                                                ទាញយកវីដេអូ
                                             </Button>
                                         </div>
                                     </div>
@@ -859,13 +859,13 @@ export default function Post() {
                             </div>
 
                             {/* 📱 Universal Visualizer (Preview) */}
-                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-2xl md:rounded-[2.5rem] p-4 md:p-8 shadow-xl w-full">
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 md:mb-6 pb-4 border-b border-gray-100 dark:border-white/5 gap-4">
-                                        <div className="flex items-center gap-3 select-none">
-                                            <div className="w-8 h-8 bg-blue-500/10 text-blue-600 rounded-lg flex items-center justify-center">
-                                                <Layers size={16}  />
+                            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs w-full">
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-white/5 gap-3">
+                                        <div className="flex items-center gap-2.5 select-none">
+                                            <div className="w-7 h-7 bg-blue-500/10 text-blue-600 rounded-lg flex items-center justify-center">
+                                                <Layers size={15} />
                                             </div>
-                                            <h3 className="text-[12px] md:text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">ការបង្ហាញសាកល្បង (PREVIEW)</h3>
+                                            <h3 className="text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-200">ការបង្ហាញសាកល្បង</h3>
                                         </div>
                                         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                                             <div className="flex items-center gap-2 mr-2 bg-purple-500/10 px-2.5 py-1.5 rounded-xl border border-purple-500/20">
