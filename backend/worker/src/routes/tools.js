@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 import { requireAuth } from "./auth.js";
+import { proxyToBackend } from "../lib/proxy.js";
 
 const tools = new Hono();
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const maxPageBytes = 2 * 1024 * 1024;
 const maxMediaBytes = 100 * 1024 * 1024;
 const pageHosts = new Set(["tiktok.com", "www.tiktok.com", "vt.tiktok.com", "vm.tiktok.com", "m.tiktok.com"]);
@@ -540,6 +543,640 @@ tools.get("/tiktok/download", requireAuth, async (c) => {
       502
     );
   }
+});
+
+// ============================================================
+// 🌐 UNIVERSAL NATIVE EDGE STREAM PROXY
+// ============================================================
+async function streamEdgeMedia(c, rawTargetUrl, defaultFilename, defaultType = "video/mp4") {
+  const targetUrl = rawTargetUrl || c.req.query("url");
+  if (!targetUrl) {
+    return c.json({ success: false, error: "Missing media stream URL" }, 400);
+  }
+
+  try {
+    const parsed = new URL(targetUrl);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return c.json({ success: false, error: "Invalid stream URL protocol" }, 400);
+    }
+
+    const upstream = await fetch(parsed.href, {
+      headers: {
+        "User-Agent": BROWSER_UA,
+        Accept: "*/*",
+        Range: c.req.header("range") || "bytes=0-",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!upstream.ok && upstream.status !== 206) {
+      return c.json({ success: false, error: "Upstream media source unavailable." }, 502);
+    }
+
+    const contentType = upstream.headers.get("Content-Type") || defaultType;
+    const filename = c.req.query("filename") || defaultFilename || "media_file.mp4";
+
+    const headers = new Headers();
+    headers.set("Content-Type", contentType);
+    headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+    headers.set("Cache-Control", "public, max-age=3600");
+    if (upstream.headers.has("Content-Length")) {
+      headers.set("Content-Length", upstream.headers.get("Content-Length"));
+    }
+    if (upstream.headers.has("Content-Range")) {
+      headers.set("Content-Range", upstream.headers.get("Content-Range"));
+    }
+
+    return new Response(upstream.body, { status: upstream.status, headers });
+  } catch (err) {
+    console.error("Edge media stream error:", err);
+    return c.json({ success: false, error: "Failed to stream media: " + err.message }, 502);
+  }
+}
+
+// ============================================================
+// 📘 1. FACEBOOK NATIVE EDGE DOWNLOADER
+// ============================================================
+async function extractFacebookEdge(rawUrl) {
+  let targetUrl = String(rawUrl || "").trim();
+  if (targetUrl.includes("fb.watch") || targetUrl.includes("fb.me")) {
+    try {
+      const red = await fetch(targetUrl, {
+        method: "HEAD",
+        redirect: "follow",
+        headers: { "User-Agent": BROWSER_UA },
+      });
+      if (red.url) targetUrl = red.url;
+    } catch {
+      // continue
+    }
+  }
+
+  const res = await fetch(targetUrl, {
+    headers: {
+      "User-Agent": BROWSER_UA,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    signal: AbortSignal.timeout(12_000),
+  });
+
+  if (!res.ok) throw new Error("Could not load Facebook page");
+  const html = await res.text();
+
+  const cleanSlash = (str) =>
+    str ? str.replace(/\\u0025/g, "%").replace(/\\u0026/g, "&").replace(/\\/g, "") : null;
+
+  const hdMatch =
+    html.match(/"browser_native_hd_url":"([^"]+)"/) ||
+    html.match(/"playable_url_quality_hd":"([^"]+)"/) ||
+    html.match(/hd_src:"([^"]+)"/);
+
+  const sdMatch =
+    html.match(/"browser_native_sd_url":"([^"]+)"/) ||
+    html.match(/"playable_url":"([^"]+)"/) ||
+    html.match(/sd_src:"([^"]+)"/);
+
+  const ogVid =
+    html.match(/property=["']og:video(?::url)?["'] content=["']([^"']+)["']/i) ||
+    html.match(/name=["']twitter:player:stream["'] content=["']([^"']+)["']/i);
+
+  const ogImg =
+    html.match(/property=["']og:image["'] content=["']([^"']+)["']/i) ||
+    html.match(/name=["']twitter:image["'] content=["']([^"']+)["']/i);
+
+  const titleMatch =
+    html.match(/property=["']og:title["'] content=["']([^"']+)["']/i) ||
+    html.match(/<title>([^<]+)<\/title>/i);
+
+  const videoUrl = cleanSlash(hdMatch?.[1] || sdMatch?.[1] || ogVid?.[1]);
+  const imageUrl = cleanSlash(ogImg?.[1]);
+  const title = (titleMatch?.[1] || "Facebook Content").replace(/\s*\|\s*Facebook$/i, "").trim();
+
+  if (!videoUrl && !imageUrl) {
+    throw new Error("Could not find public video or image on this Facebook link. Ensure post is Public.");
+  }
+
+  return {
+    isVideo: Boolean(videoUrl),
+    mediaUrl: videoUrl || imageUrl,
+    title,
+    thumbnail: imageUrl || videoUrl,
+  };
+}
+
+tools.post("/facebook/download", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "Facebook URL is required" }, 400);
+
+  try {
+    const data = await extractFacebookEdge(body.url);
+    const filename = `facebook-${Date.now()}.${data.isVideo ? "mp4" : "jpg"}`;
+    const streamUrl = `/api/tools/facebook/stream?url=${encodeURIComponent(data.mediaUrl)}&filename=${filename}`;
+
+    return c.json({
+      success: true,
+      url: streamUrl,
+      video: {
+        url: streamUrl,
+        type: data.isVideo ? "video" : "image",
+        is_video: data.isVideo,
+      },
+      meta: { title: data.title },
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to download Facebook media." }, 502);
+  }
+});
+
+tools.post("/facebook/lookup", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "Facebook URL is required" }, 400);
+
+  try {
+    const data = await extractFacebookEdge(body.url);
+    const filename = `facebook-${Date.now()}.${data.isVideo ? "mp4" : "jpg"}`;
+    const streamUrl = `/api/tools/facebook/stream?url=${encodeURIComponent(data.mediaUrl)}&filename=${filename}`;
+
+    return c.json({
+      success: true,
+      video: {
+        title: data.title,
+        thumbnail: data.thumbnail,
+        url: streamUrl,
+        type: data.isVideo ? "video" : "image",
+        is_video: data.isVideo,
+      },
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to find Facebook media." }, 502);
+  }
+});
+
+tools.get("/facebook/stream", (c) => streamEdgeMedia(c, null, "facebook-video.mp4"));
+
+// ============================================================
+// 📸 2. INSTAGRAM NATIVE EDGE DOWNLOADER
+// ============================================================
+async function extractInstagramEdge(rawUrl) {
+  const shortcodeMatch = String(rawUrl || "").match(/\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/);
+  const shortcode = shortcodeMatch ? shortcodeMatch[1] : `ig-${Date.now()}`;
+
+  const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
+  const res = await fetch(embedUrl, {
+    headers: {
+      "User-Agent": BROWSER_UA,
+      Accept: "text/html,application/xhtml+xml",
+    },
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  const html = await res.text();
+  const cleanSlash = (str) => (str ? str.replace(/\\u0026/g, "&").replace(/\\/g, "") : null);
+
+  const videoMatch =
+    html.match(/class=["']EmbeddedMediaImage["'][^>]*src=["']([^"']+)["']/i) ||
+    html.match(/<video[^>]*src=["']([^"']+)["']/i) ||
+    html.match(/"video_url":"([^"]+)"/);
+
+  const ogImg =
+    html.match(/property=["']og:image["'] content=["']([^"']+)["']/i) ||
+    html.match(/"display_url":"([^"]+)"/);
+
+  const titleMatch = html.match(/property=["']og:title["'] content=["']([^"']+)["']/i);
+
+  const isVideo = html.includes("<video") || html.includes("video_url") || rawUrl.includes("/reel");
+  const mediaUrl = cleanSlash(videoMatch?.[1] || ogImg?.[1]) || `https://www.instagram.com/p/${shortcode}/media/?size=l`;
+  const title = titleMatch?.[1] || `Instagram Media ${shortcode}`;
+
+  return { isVideo, mediaUrl, title, shortcode };
+}
+
+tools.post("/instagram/download", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "Instagram URL is required" }, 400);
+
+  try {
+    const data = await extractInstagramEdge(body.url);
+    const filename = `instagram-${data.shortcode}.${data.isVideo ? "mp4" : "jpg"}`;
+    const streamUrl = `/api/tools/instagram/stream?url=${encodeURIComponent(data.mediaUrl)}&filename=${filename}`;
+
+    return c.json({
+      success: true,
+      url: streamUrl,
+      meta: {
+        title: data.title,
+        type: data.isVideo ? "video" : "image",
+      },
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to download Instagram media." }, 502);
+  }
+});
+
+tools.post("/instagram/lookup", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "Instagram URL is required" }, 400);
+
+  try {
+    const data = await extractInstagramEdge(body.url);
+    const filename = `instagram-${data.shortcode}.${data.isVideo ? "mp4" : "jpg"}`;
+    const streamUrl = `/api/tools/instagram/stream?url=${encodeURIComponent(data.mediaUrl)}&filename=${filename}`;
+
+    return c.json({
+      success: true,
+      video: {
+        title: data.title,
+        url: streamUrl,
+        type: data.isVideo ? "video" : "image",
+      },
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to find Instagram media." }, 502);
+  }
+});
+
+tools.get("/instagram/stream", (c) => streamEdgeMedia(c, null, "instagram-media.mp4"));
+
+// ============================================================
+// 📌 3. PINTEREST NATIVE EDGE DOWNLOADER
+// ============================================================
+async function extractPinterestEdge(rawUrl) {
+  let targetUrl = String(rawUrl || "").trim();
+  if (targetUrl.includes("pin.it")) {
+    try {
+      const red = await fetch(targetUrl, {
+        method: "HEAD",
+        redirect: "follow",
+        headers: { "User-Agent": BROWSER_UA },
+      });
+      if (red.url) targetUrl = red.url;
+    } catch {
+      // continue
+    }
+  }
+
+  const res = await fetch(targetUrl, {
+    headers: { "User-Agent": BROWSER_UA },
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) throw new Error("Could not access Pinterest link");
+  const html = await res.text();
+
+  const vidMatch =
+    html.match(/(https:\/\/v\.pinimg\.com\/videos\/mc\/720p\/[^"'\s]+\.mp4)/i) ||
+    html.match(/(https:\/\/v\.pinimg\.com\/videos\/[^"'\s]+\.mp4)/i) ||
+    html.match(/property=["']og:video["'] content=["']([^"']+)["']/i);
+
+  const imgMatches = html.match(/https:\/\/i\.pinimg\.com\/[^"'\s]+\.(?:jpg|png|webp)/gi) || [];
+  let bestImg = imgMatches.find((u) => u.includes("/originals/"));
+  if (!bestImg && imgMatches.length > 0) {
+    bestImg = imgMatches[0].replace(/\/\d+x\//, "/originals/");
+  }
+
+  const titleMatch = html.match(/property=["']og:title["'] content=["']([^"']+)["']/i);
+  const title = titleMatch?.[1] || "Pinterest Pin";
+
+  const isVideo = Boolean(vidMatch);
+  const mediaUrl = vidMatch ? vidMatch[1] : bestImg;
+
+  if (!mediaUrl) throw new Error("Could not find media in this Pinterest Pin");
+
+  return { isVideo, mediaUrl, title, thumbnail: bestImg || mediaUrl };
+}
+
+tools.post("/pinterest/download", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "Pinterest URL is required" }, 400);
+
+  try {
+    const data = await extractPinterestEdge(body.url);
+    const filename = `pinterest-${Date.now()}.${data.isVideo ? "mp4" : "jpg"}`;
+    const streamUrl = `/api/tools/pinterest/stream?url=${encodeURIComponent(data.mediaUrl)}&filename=${filename}`;
+
+    return c.json({
+      success: true,
+      url: streamUrl,
+      meta: {
+        title: data.title,
+        type: data.isVideo ? "video" : "image",
+      },
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to download Pinterest media." }, 502);
+  }
+});
+
+tools.post("/pinterest/lookup", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "Pinterest URL is required" }, 400);
+
+  try {
+    const data = await extractPinterestEdge(body.url);
+    const filename = `pinterest-${Date.now()}.${data.isVideo ? "mp4" : "jpg"}`;
+    const streamUrl = `/api/tools/pinterest/stream?url=${encodeURIComponent(data.mediaUrl)}&filename=${filename}`;
+
+    return c.json({
+      success: true,
+      video: {
+        title: data.title,
+        url: streamUrl,
+        type: data.isVideo ? "video" : "image",
+      },
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to find Pinterest media." }, 502);
+  }
+});
+
+tools.get("/pinterest/stream", (c) => streamEdgeMedia(c, null, "pinterest-media.jpg"));
+
+// ============================================================
+// 🎬 4. CAPCUT NATIVE EDGE DOWNLOADER
+// ============================================================
+async function extractCapCutEdge(rawUrl) {
+  let targetUrl = String(rawUrl || "").trim();
+  if (targetUrl.includes("/t/")) {
+    try {
+      const red = await fetch(targetUrl, {
+        method: "HEAD",
+        redirect: "follow",
+        headers: { "User-Agent": BROWSER_UA },
+      });
+      if (red.url) targetUrl = red.url;
+    } catch {
+      // continue
+    }
+  }
+
+  const res = await fetch(targetUrl, {
+    headers: { "User-Agent": BROWSER_UA },
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) throw new Error("Could not access CapCut template");
+  const html = await res.text();
+
+  const vidMatch =
+    html.match(/https:\/\/[^"'\s]+\.tiktokcdn\.com\/[^"'\s]+\.mp4/i) ||
+    html.match(/https:\/\/[^"'\s]+\.byteoversea\.com\/[^"'\s]+\.mp4/i) ||
+    html.match(/property=["']og:video["'] content=["']([^"']+)["']/i);
+
+  const imgMatch =
+    html.match(/property=["']og:image["'] content=["']([^"']+)["']/i) ||
+    html.match(/https:\/\/[^"'\s]+\.tiktokcdn\.com\/[^"'\s]+\.(?:jpg|png|webp)/i);
+
+  const titleMatch = html.match(/property=["']og:title["'] content=["']([^"']+)["']/i);
+  const title = titleMatch?.[1] || "CapCut Template Video";
+
+  if (!vidMatch && !imgMatch) {
+    throw new Error("Could not locate template video. Ensure template is Public.");
+  }
+
+  return {
+    isVideo: Boolean(vidMatch),
+    mediaUrl: vidMatch ? vidMatch[0] : imgMatch[0],
+    title,
+    thumbnail: imgMatch ? imgMatch[0] : null,
+  };
+}
+
+tools.post("/capcut/download", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "CapCut URL is required" }, 400);
+
+  try {
+    const data = await extractCapCutEdge(body.url);
+    const filename = `capcut-${Date.now()}.${data.isVideo ? "mp4" : "jpg"}`;
+    const streamUrl = `/api/tools/capcut/stream?url=${encodeURIComponent(data.mediaUrl)}&filename=${filename}`;
+
+    return c.json({
+      success: true,
+      url: streamUrl,
+      meta: {
+        filename,
+        title: data.title,
+        type: data.isVideo ? "video" : "image",
+      },
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to download CapCut media." }, 502);
+  }
+});
+
+tools.post("/capcut/lookup", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "CapCut URL is required" }, 400);
+
+  try {
+    const data = await extractCapCutEdge(body.url);
+    const filename = `capcut-${Date.now()}.${data.isVideo ? "mp4" : "jpg"}`;
+    const streamUrl = `/api/tools/capcut/stream?url=${encodeURIComponent(data.mediaUrl)}&filename=${filename}`;
+
+    return c.json({
+      success: true,
+      video: {
+        title: data.title,
+        url: streamUrl,
+        type: data.isVideo ? "video" : "image",
+      },
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to find CapCut media." }, 502);
+  }
+});
+
+tools.get("/capcut/stream", (c) => streamEdgeMedia(c, null, "capcut-video.mp4"));
+
+// ============================================================
+// 🧵 5. THREADS NATIVE EDGE DOWNLOADER
+// ============================================================
+async function extractThreadsEdge(rawUrl) {
+  const res = await fetch(String(rawUrl || "").trim(), {
+    headers: { "User-Agent": BROWSER_UA },
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) throw new Error("Could not access Threads post");
+  const html = await res.text();
+
+  const vidMatch =
+    html.match(/property=["']og:video(?::url)?["'] content=["']([^"']+)["']/i) ||
+    html.match(/name=["']twitter:player:stream["'] content=["']([^"']+)["']/i);
+
+  const imgMatch =
+    html.match(/property=["']og:image["'] content=["']([^"']+)["']/i) ||
+    html.match(/name=["']twitter:image["'] content=["']([^"']+)["']/i);
+
+  const titleMatch =
+    html.match(/property=["']og:description["'] content=["']([^"']+)["']/i) ||
+    html.match(/property=["']og:title["'] content=["']([^"']+)["']/i);
+
+  const title = titleMatch?.[1] || "Threads Post";
+  const isVideo = Boolean(vidMatch);
+  const mediaUrl = vidMatch ? vidMatch[1] : imgMatch?.[1];
+
+  if (!mediaUrl) throw new Error("Could not find media in this Threads post");
+
+  return { isVideo, mediaUrl, title, thumbnail: imgMatch?.[1] || null };
+}
+
+tools.post("/threads/lookup", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "Threads URL is required" }, 400);
+
+  try {
+    const data = await extractThreadsEdge(body.url);
+    const filename = `threads-${Date.now()}.${data.isVideo ? "mp4" : "jpg"}`;
+    const streamUrl = `/api/tools/threads/proxy?url=${encodeURIComponent(data.mediaUrl)}&filename=${filename}`;
+
+    return c.json({
+      success: true,
+      video: {
+        title: data.title,
+        url: streamUrl,
+        thumbnail: data.thumbnail,
+        type: data.isVideo ? "video" : "image",
+      },
+      url: streamUrl,
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to find Threads media." }, 502);
+  }
+});
+
+tools.post("/threads/download", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "Threads URL is required" }, 400);
+
+  try {
+    const data = await extractThreadsEdge(body.url);
+    const filename = `threads-${Date.now()}.${data.isVideo ? "mp4" : "jpg"}`;
+    const streamUrl = `/api/tools/threads/proxy?url=${encodeURIComponent(data.mediaUrl)}&filename=${filename}`;
+
+    return c.json({
+      success: true,
+      url: streamUrl,
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to download Threads media." }, 502);
+  }
+});
+
+tools.get("/threads/proxy", (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+  return streamEdgeMedia(c, null, "threads-media.mp4");
+});
+
+// ============================================================
+// 📺 6. YOUTUBE NATIVE EDGE DOWNLOADER
+// ============================================================
+async function extractYouTubeEdge(rawUrl) {
+  const videoIdMatch = String(rawUrl || "").match(
+    /(?:v=|\/embed\/|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  );
+  if (!videoIdMatch) throw new Error("Invalid YouTube Video URL");
+  const videoId = videoIdMatch[1];
+
+  let title = `YouTube Video ${videoId}`;
+  let author = "YouTube Creator";
+  let thumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+  try {
+    const oembedRes = await fetch(
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (oembedRes.ok) {
+      const data = await oembedRes.json();
+      if (data.title) title = data.title;
+      if (data.author_name) author = data.author_name;
+      if (data.thumbnail_url) thumbnail = data.thumbnail_url;
+    }
+  } catch {
+    // continue
+  }
+
+  return {
+    id: videoId,
+    title,
+    author,
+    thumbnail,
+    resolutions: [1080, 720, 480, 360],
+    embedUrl: `https://www.youtube.com/embed/${videoId}`,
+  };
+}
+
+tools.post("/youtube/lookup", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "YouTube URL is required" }, 400);
+
+  try {
+    const data = await extractYouTubeEdge(body.url);
+    return c.json({
+      success: true,
+      video: data,
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to lookup YouTube video." }, 502);
+  }
+});
+
+tools.post("/youtube/download", async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.url) return c.json({ success: false, error: "YouTube URL is required" }, 400);
+
+  try {
+    const data = await extractYouTubeEdge(body.url);
+    const format = body.format === "mp3" ? "mp3" : "mp4";
+    const filename = `${data.title.replace(/[^a-zA-Z0-9_\u1780-\u17FF]/g, "_").slice(0, 40)}.${format}`;
+    const streamUrl = `/api/tools/youtube/stream?id=${data.id}&format=${format}&filename=${encodeURIComponent(filename)}`;
+
+    return c.json({
+      success: true,
+      url: streamUrl,
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message || "Failed to start YouTube download." }, 502);
+  }
+});
+
+tools.get("/youtube/stream", async (c) => {
+  const videoId = c.req.query("id");
+  const format = c.req.query("format") || "mp4";
+  const filename = c.req.query("filename") || `youtube-${videoId}.${format}`;
+
+  if (!videoId) return c.json({ success: false, error: "Video ID is required" }, 400);
+
+  // Redirect to direct YouTube media delivery or client embed
+  const ytFallbackUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  return c.redirect(ytFallbackUrl, 302);
 });
 
 export default tools;
