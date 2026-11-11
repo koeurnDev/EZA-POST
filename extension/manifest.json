@@ -1,16 +1,17 @@
 {
   "manifest_version": 3,
   "name": "EZA-POST Facebook Sync Extension",
-  "version": "2.0.0",
-  "description": "1-Click Facebook Page Sync Extension for EZA-POST. No manual token required — safe, instant, and automated.",
+  "version": "2.0.1",
+  "description": "1-Click Facebook Page Sync Extension for EZA-POST. Safe, instant, and automated.",
   "permissions": [
     "cookies",
     "storage",
-    "activeTab",
-    "tabs"
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
     "*://*.facebook.com/*",
+    "*://facebook.com/*",
     "*://*.messenger.com/*",
     "https://*.pages.dev/*",
     "https://*.workers.dev/*",

@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Facebook Sync Extension — Background Service Worker
+ * ⚡ EZA-POST Facebook Sync Extension — Background Service Worker (v2.0.1)
  * ============================================================
  */
 
@@ -66,37 +66,113 @@ function parsePagesFromFacebookHtml(html, cUserId) {
   return Array.from(pagesMap.values());
 }
 
+async function getAllFacebookCookies() {
+  const cookieMap = new Map();
+
+  // 1. Gather cookies from all active Facebook tabs (e.g. web.facebook.com)
+  try {
+    const tabs = await chrome.tabs.query({
+      url: ["*://*.facebook.com/*", "*://facebook.com/*"]
+    });
+    for (const tab of tabs) {
+      if (tab.url) {
+        try {
+          const list = await chrome.cookies.getAll({ url: tab.url });
+          if (Array.isArray(list)) {
+            for (const c of list) {
+              if (c?.name && c?.value) {
+                cookieMap.set(c.name, c.value);
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }
+  } catch (e) {}
+
+  // 2. Query specific Facebook URLs
+  const targetUrls = [
+    "https://web.facebook.com",
+    "https://www.facebook.com",
+    "https://facebook.com",
+    "https://m.facebook.com",
+    "https://business.facebook.com"
+  ];
+  for (const url of targetUrls) {
+    try {
+      const list = await chrome.cookies.getAll({ url });
+      if (Array.isArray(list)) {
+        for (const c of list) {
+          if (c?.name && c?.value && !cookieMap.has(c.name)) {
+            cookieMap.set(c.name, c.value);
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Query domains (WITHOUT leading dot)
+  const targetDomains = [
+    "facebook.com",
+    "web.facebook.com",
+    "www.facebook.com",
+    "business.facebook.com",
+    "m.facebook.com"
+  ];
+  for (const domain of targetDomains) {
+    try {
+      const list = await chrome.cookies.getAll({ domain });
+      if (Array.isArray(list)) {
+        for (const c of list) {
+          if (c?.name && c?.value && !cookieMap.has(c.name)) {
+            cookieMap.set(c.name, c.value);
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 4. Fallback search across all accessible cookies for any facebook cookie
+  try {
+    const all = await chrome.cookies.getAll({});
+    if (Array.isArray(all)) {
+      for (const c of all) {
+        if (c?.name && c?.value && typeof c.domain === "string" && c.domain.includes("facebook.com")) {
+          if (!cookieMap.has(c.name)) {
+            cookieMap.set(c.name, c.value);
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
+  return cookieMap;
+}
+
 async function getFacebookSessionData() {
   try {
-    const cookies = await chrome.cookies.getAll({ domain: ".facebook.com" });
-    if (!cookies || cookies.length === 0) {
+    const cookieMap = await getAllFacebookCookies();
+    const cUserId = cookieMap.get("c_user");
+    const xs = cookieMap.get("xs");
+
+    if (!cUserId) {
       return {
         ok: false,
         fbLoggedIn: false,
         fbUserId: null,
         cookieString: "",
-        error: "សូមបើក facebook.com ហើយ Login គណនី Facebook លើ Browser ជាមុនសិន!"
+        error: "រកមិនឃើញគណនី Facebook ដែលបាន Login លើ Browser ទេ។ សូម Login គណនី Facebook ជាមុនសិន!"
       };
     }
 
-    const cUser = cookies.find((c) => c.name === "c_user");
-    const xs = cookies.find((c) => c.name === "xs");
+    const cookieString = Array.from(cookieMap.entries())
+      .map(([k, v]) => `${k}=${v}`)
+      .join("; ");
 
-    if (!cUser || !xs) {
-      return {
-        ok: false,
-        fbLoggedIn: false,
-        fbUserId: null,
-        cookieString: "",
-        error: "រកមិនឃើញគណនី Facebook ដែលបាន Login លើ Browser ទេ។ សូម Login facebook.com ជាមុនសិន!"
-      };
-    }
-
-    const cookieString = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
     return {
       ok: true,
       fbLoggedIn: true,
-      fbUserId: cUser.value,
+      fbUserId: cUserId,
       cookieString
     };
   } catch (err) {
@@ -111,82 +187,132 @@ async function getFacebookSessionData() {
 }
 
 async function getFullFacebookSyncPayload() {
-  const session = await getFacebookSessionData();
-  if (!session.ok) return session;
+  try {
+    const session = await getFacebookSessionData();
+    if (!session.ok || !session.fbUserId) return session;
 
-  let accessToken = null;
-  let fbUser = {
-    id: session.fbUserId,
-    name: "Facebook User",
-    picture: `https://graph.facebook.com/${session.fbUserId}/picture?type=large`
-  };
-  let pages = [];
+    let accessToken = null;
+    let fbUserName = "Facebook User";
+    let pages = [];
 
-  const endpoints = [
-    "https://business.facebook.com/business_locations",
-    "https://adsmanager.facebook.com/adsmanager/manage/campaigns",
-    "https://www.facebook.com/pages/?category=your_pages"
-  ];
-
-  for (const url of endpoints) {
+    // Attempt to extract name directly from an open Facebook tab if available
     try {
-      const res = await fetch(url, { credentials: "include", redirect: "follow" });
-      const html = await res.text();
-      if (!html) continue;
+      const tabs = await chrome.tabs.query({
+        url: ["*://*.facebook.com/*", "*://facebook.com/*"]
+      });
+      if (tabs.length > 0 && tabs[0]?.id && chrome.scripting) {
+        const injected = await chrome.scripting.executeScript({
+          target: { tabId: tabs[0].id },
+          func: () => {
+            let name = null;
+            try {
+              const html = document.documentElement.innerHTML || "";
+              const match =
+                html.match(/"CURRENT_USER_INITIAL_DATA"\s*,\s*\[\]\s*,\s*\{[^}]*"NAME"\s*:\s*"([^"]+)"/) ||
+                html.match(/"NAME"\s*:\s*"([^"]+)"/);
+              if (match && match[1]) {
+                name = JSON.parse(`"${match[1].replace(/"/g, '\\"')}"`);
+              }
+            } catch (e) {}
+            return { name };
+          }
+        }).catch(() => null);
 
-      const tok = extractTokenFromText(html);
-      if (tok) {
-        accessToken = tok;
-        break;
-      }
-
-      const nameMatch =
-        html.match(/"CURRENT_USER_INITIAL_DATA"\s*,\s*\[\]\s*,\s*\{[^}]*"NAME"\s*:\s*"([^"]+)"/) ||
-        html.match(/"NAME"\s*:\s*"([^"]+)"/);
-      if (nameMatch && nameMatch[1]) {
-        try {
-          fbUser.name = JSON.parse(`"${nameMatch[1].replace(/"/g, '\\"')}"`);
-        } catch {
-          fbUser.name = nameMatch[1];
+        if (injected?.[0]?.result?.name) {
+          fbUserName = injected[0].result.name;
         }
       }
+    } catch (e) {}
 
-      const extractedPages = parsePagesFromFacebookHtml(html, session.fbUserId);
-      for (const p of extractedPages) {
-        if (!pages.some((x) => x.id === p.id)) {
-          pages.push(p);
+    // Check endpoints from the browser to obtain access token or pages
+    const endpoints = [
+      "https://business.facebook.com/business_locations",
+      "https://adsmanager.facebook.com/adsmanager/manage/campaigns",
+      "https://web.facebook.com/pages/?category=your_pages",
+      "https://www.facebook.com/pages/?category=your_pages"
+    ];
+
+    for (const url of endpoints) {
+      try {
+        const res = await fetch(url, { credentials: "include", redirect: "follow" }).catch(() => null);
+        if (!res) continue;
+        const html = await res.text().catch(() => "");
+        if (!html) continue;
+
+        const tok = extractTokenFromText(html);
+        if (tok && !accessToken) {
+          accessToken = tok;
         }
-      }
-    } catch {}
+
+        if (fbUserName === "Facebook User") {
+          const nameMatch =
+            html.match(/"CURRENT_USER_INITIAL_DATA"\s*,\s*\[\]\s*,\s*\{[^}]*"NAME"\s*:\s*"([^"]+)"/) ||
+            html.match(/"NAME"\s*:\s*"([^"]+)"/);
+          if (nameMatch && nameMatch[1]) {
+            try {
+              fbUserName = JSON.parse(`"${nameMatch[1].replace(/"/g, '\\"')}"`);
+            } catch {
+              fbUserName = nameMatch[1];
+            }
+          }
+        }
+
+        const extractedPages = parsePagesFromFacebookHtml(html, session.fbUserId);
+        for (const p of extractedPages) {
+          if (!pages.some((x) => x.id === p.id)) {
+            pages.push(p);
+          }
+        }
+      } catch (e) {}
+    }
+
+    const fbUser = {
+      id: String(session.fbUserId),
+      name: fbUserName,
+      picture: `https://graph.facebook.com/${session.fbUserId}/picture?type=large`
+    };
+
+    return {
+      ...session,
+      accessToken,
+      fbUser,
+      pages
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.message || "កំហុសក្នុងការទាញយកទិន្នន័យ Facebook"
+    };
   }
-
-  return {
-    ...session,
-    accessToken,
-    fbUser,
-    pages
-  };
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.action) return false;
 
   if (message.action === "CHECK_FB_STATUS") {
-    getFacebookSessionData().then((data) => {
-      sendResponse({
-        installed: true,
-        version: "2.0.0",
-        fbLoggedIn: data.fbLoggedIn,
-        fbUserId: data.fbUserId
+    getFacebookSessionData()
+      .then((data) => {
+        sendResponse({
+          installed: true,
+          version: "2.0.1",
+          fbLoggedIn: Boolean(data?.fbLoggedIn),
+          fbUserId: data?.fbUserId || null
+        });
+      })
+      .catch(() => {
+        sendResponse({ installed: true, version: "2.0.1", fbLoggedIn: false, fbUserId: null });
       });
-    });
     return true;
   }
 
   if (message.action === "GET_FB_SYNC_PAYLOAD") {
-    getFullFacebookSyncPayload().then((data) => {
-      sendResponse(data);
-    });
+    getFullFacebookSyncPayload()
+      .then((data) => {
+        sendResponse(data);
+      })
+      .catch((err) => {
+        sendResponse({ ok: false, error: err?.message || "Sync error" });
+      });
     return true;
   }
 

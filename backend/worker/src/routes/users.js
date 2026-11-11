@@ -221,9 +221,9 @@ function parsePagesFromFacebookHtml(html, cUserId) {
   return Array.from(pagesMap.values());
 }
 
-async function extractTokenAndPagesFromCookie(cleanCookie) {
-  const cUserMatch = cleanCookie.match(/(?:^|;\s*)c_user=(\d+)/);
-  const cUserId = cUserMatch ? cUserMatch[1] : null;
+async function extractTokenAndPagesFromCookie(cleanCookie, fallbackUserId = null) {
+  const cUserMatch = cleanCookie.match(/(?:^|[;\s])c_user=["']?(\d+)["']?/i);
+  const cUserId = cUserMatch ? cUserMatch[1] : fallbackUserId;
 
   const browserHeaders = {
     "User-Agent":
@@ -284,6 +284,7 @@ async function extractTokenAndPagesFromCookie(cleanCookie) {
   const htmlPages = [];
 
   for (const pageUrl of [
+    "https://web.facebook.com/pages/?category=your_pages",
     "https://www.facebook.com/pages/?category=your_pages",
     "https://www.facebook.com/bookmarks",
   ]) {
@@ -364,7 +365,7 @@ async function extractTokenAndPagesFromCookie(cleanCookie) {
     token: null,
     fallbackUser: cUserId
       ? {
-          id: cUserId,
+          id: String(cUserId),
           name: fbUserName,
           picture: `https://graph.facebook.com/${cUserId}/picture?type=large`,
         }
@@ -400,14 +401,11 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
     let fbUser = extUser;
     let rawPages = extPages || [];
 
+    const cUserMatch = cleanCookie.match(/(?:^|[;\s])c_user=["']?(\d+)["']?/i);
+    const resolvedFbUserId = cUserMatch ? cUserMatch[1] : (extUser?.id || null);
+
     if (!userToken && cleanCookie) {
-      if (!cleanCookie.includes("c_user") && !cleanCookie.includes("xs")) {
-        return c.json({
-          success: false,
-          error: "សូម Login គណនី Facebook លើ Browser ជាមុនសិន មុននឹងចុចភ្ជាប់តាម Extension!",
-        }, 400);
-      }
-      const extracted = await extractTokenAndPagesFromCookie(cleanCookie);
+      const extracted = await extractTokenAndPagesFromCookie(cleanCookie, resolvedFbUserId);
       if (extracted.token) {
         userToken = extracted.token;
       } else if (extracted.fallbackUser) {
@@ -416,6 +414,14 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
           rawPages = extracted.fallbackPages;
         }
       }
+    }
+
+    if (!fbUser && resolvedFbUserId) {
+      fbUser = {
+        id: String(resolvedFbUserId),
+        name: "Facebook User",
+        picture: `https://graph.facebook.com/${resolvedFbUserId}/picture?type=large`,
+      };
     }
 
     // If we have an EAA token, fetch profile and pages via Graph API
