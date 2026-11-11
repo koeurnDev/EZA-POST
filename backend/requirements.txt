@@ -1,5 +1,5 @@
 opencv-python-headless
 numpy
 pillow
-yt-dlp==2026.8.19
+yt-dlp==2026.10.26
 pdf2docx
