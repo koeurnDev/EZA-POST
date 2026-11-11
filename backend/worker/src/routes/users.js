@@ -51,7 +51,7 @@ users.get("/pages", requireAuth, async (c) => {
             name: profileName,
             picture: profilePic,
             category: "គណនីផ្ទាល់ខ្លួន",
-            accessToken: user.facebookAccessToken || null,
+            accessToken: user.facebookAccessToken || "active_extension_session",
             isConnected: true,
             isSelected: true,
             enableSchedule: true,
@@ -565,7 +565,7 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
       if (!p || !p.id || !p.name) continue;
       try {
         const encryptedPageToken = await encryptFacebookToken(
-          p.access_token || userToken || cleanCookie,
+          p.access_token || userToken || cleanCookie || "active_extension_session",
           c.env
         );
         const pictureUrl = p.picture || `https://graph.facebook.com/${p.id}/picture?type=large`;

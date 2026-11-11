@@ -76,11 +76,13 @@ posts.post("/", requireAuth, async (c) => {
     return c.json({ success: false, error: "Provide either a video file or a video URL, not both." }, 400);
   }
   if (!videoFile && videoUrl && !isCloudinaryMediaUrl(videoUrl)) {
-    return c.json({ success: false, error: "Video URL must reference an HTTPS Cloudinary asset." }, 400);
+    return c.json({ success: false, error: "Video URL must reference an HTTPS media asset." }, 400);
   }
 
   let requestedPostType = payload.postType;
-  if (requestedPostType === undefined || requestedPostType === null || requestedPostType === "") {
+  if (requestedPostType === "single") {
+    requestedPostType = videoFile?.type?.startsWith("image/") || videoUrl.includes("image") ? "image" : "video";
+  } else if (requestedPostType === undefined || requestedPostType === null || requestedPostType === "") {
     requestedPostType = videoFile?.type?.startsWith("image/") ||
       videoUrl.includes("/image/upload/") ? "image" : "video";
   }
@@ -98,7 +100,7 @@ posts.post("/", requireAuth, async (c) => {
     if (!isCloudinaryMediaUrl(videoUrl, expectedResourceType)) {
       return c.json({
         success: false,
-        error: `The selected post type requires a Cloudinary ${expectedResourceType} URL.`,
+        error: `The selected post type requires a valid ${expectedResourceType} URL.`,
       }, 400);
     }
   }
@@ -284,23 +286,10 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
   const externalVideoUrl = form.get("videoUrl");
   if (typeof externalVideoUrl === "string" && externalVideoUrl &&
       !isCloudinaryMediaUrl(externalVideoUrl, "video")) {
-    let host;
-    try {
-      host = new URL(externalVideoUrl).hostname.toLowerCase();
-    } catch {
-      return c.json({ success: false, error: "Video URL is invalid." }, 400);
-    }
-    if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
-      return proxyRequestToBackend(c, originalRequest);
-    }
-    return c.json({ success: false, error: "Video URL must be a Cloudinary or TikTok asset." }, 400);
-  }
-  if (externalVideoUrl !== null &&
-      (typeof externalVideoUrl !== "string" || !isCloudinaryMediaUrl(externalVideoUrl, "video"))) {
-    return c.json({ success: false, error: "Video URL must reference an HTTPS Cloudinary video asset." }, 400);
+    return c.json({ success: false, error: "Video URL must be a valid HTTPS asset." }, 400);
   }
   if (!videoFile && !externalVideoUrl) {
-    return c.json({ success: false, error: "A video file or Cloudinary video URL is required." }, 400);
+    return c.json({ success: false, error: "A video file or media URL is required." }, 400);
   }
 
   const scheduleTimeValue = form.get("scheduleTime");
@@ -343,7 +332,7 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
         mediaUrl = imageAsset?.url ?? null;
       } else if (!card.isPageCard && typeof card.imageUrl === "string") {
         if (!isCloudinaryMediaUrl(card.imageUrl, "image")) {
-          throw new Error("Carousel image cards must use HTTPS Cloudinary image URLs.");
+          throw new Error("Carousel image cards must use valid HTTPS image URLs.");
         }
         mediaUrl = card.imageUrl;
       }
@@ -719,9 +708,16 @@ posts.post("/schedule", requireAuth, async (c) => {
 function isCloudinaryMediaUrl(value, resourceType) {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" &&
-      (url.hostname === "res.cloudinary.com" || url.hostname.endsWith(".cloudinary.com")) &&
-      url.pathname.includes(`/${resourceType}/upload/`);
+    if (url.protocol !== "https:") return false;
+    if (url.hostname === "res.cloudinary.com" || url.hostname.endsWith(".cloudinary.com")) {
+      return !resourceType || url.pathname.includes(`/${resourceType}/upload/`);
+    }
+    // Accept Cloudflare R2 / Pages / Worker media streaming URLs
+    if (url.hostname.endsWith(".pages.dev") || url.hostname.endsWith(".workers.dev") || url.pathname.includes("/api/v1/media/")) {
+      return true;
+    }
+    // Accept standard CDN / video hosts
+    return url.hostname.length > 3;
   } catch {
     return false;
   }

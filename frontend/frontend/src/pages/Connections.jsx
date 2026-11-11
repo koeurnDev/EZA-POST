@@ -159,11 +159,11 @@ export default function Connections() {
         setIsSyncingViaExt(true);
         window.postMessage({ source: "EZA_WEB_APP", action: "SYNC_FB_PAGES" }, "*");
 
-        // Safety timeout if extension does not respond
+        // Safety timeout if extension does not respond (allow 25s for full sync)
         syncTimeoutRef.current = setTimeout(() => {
             setIsSyncingViaExt(false);
             toast.error("មិនអាចភ្ជាប់ទៅ Extension បានទេ។ សូមចុច Refresh ទំព័រ ឬចុចលើ Icon Extension ⚡ នៅលើ Browser!");
-        }, 8000);
+        }, 25000);
     };
 
     const handleCopyChromeExtensionsUrl = () => {

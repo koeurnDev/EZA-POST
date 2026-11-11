@@ -197,7 +197,11 @@ async function extractDataInsideFacebookTab() {
       html.match(/"CURRENT_USER_INITIAL_DATA"\s*,\s*\[\]\s*,\s*\{[^}]*"NAME"\s*:\s*"([^"]+)"/) ||
       html.match(/"NAME"\s*:\s*"([^"]+)"/);
     if (nameMatch && nameMatch[1]) {
-      result.userName = JSON.parse(`"${nameMatch[1].replace(/"/g, '\\"')}"`);
+      try {
+        result.userName = JSON.parse(`"${nameMatch[1].replace(/\\"/g, '"').replace(/"/g, '\\"')}"`);
+      } catch {
+        result.userName = nameMatch[1];
+      }
     }
   } catch (e) {}
 
@@ -284,9 +288,14 @@ async function extractDataInsideFacebookTab() {
           const gqlText = await gqlRes.text();
           if (gqlText) {
             // Remove for (;;); security prefix if present
-            const cleanGql = gqlText.replace(/^for\s*\(\s*;\s*;\s*\)\s*;\s*/, "");
-            const gqlData = JSON.parse(cleanGql);
-            findProfilesInObject(gqlData, cUserId, pagesMap);
+            const cleanGql = gqlText.replace(/^for\s*\(\s*;\s*;\s*\)\s*;\s*/, "").trim();
+            const lines = cleanGql.split(/\r?\n/).filter(Boolean);
+            for (const line of lines) {
+              try {
+                const gqlData = JSON.parse(line);
+                findProfilesInObject(gqlData, cUserId, pagesMap);
+              } catch (e) {}
+            }
             if (pagesMap.size > 0) break;
           }
         } catch (e) {}
@@ -313,8 +322,10 @@ async function extractDataInsideFacebookTab() {
           if (id && rawName) {
             let name = rawName;
             try {
-              name = JSON.parse(`"${rawName.replace(/"/g, '\\"')}"`);
-            } catch (e) {}
+              name = JSON.parse(`"${rawName.replace(/\\"/g, '"').replace(/"/g, '\\"')}"`);
+            } catch (e) {
+              name = rawName;
+            }
             if (!pagesMap.has(id)) {
               pagesMap.set(id, {
                 id,

@@ -110,11 +110,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (data?.success) {
           const count = data.pagesCount ?? (data.pages ? data.pages.length : 0);
+          const userName = payload.fbUser?.name || "គណនី Facebook";
+          const countText = count > 0
+            ? `បានភ្ជាប់ ${count} គោលដៅ (គណនី និងផេក)`
+            : `បានភ្ជាប់គណនី ${userName}`;
           showMessage(
-            `🎉 ជោគជ័យ! បានភ្ជាប់ផេកចំនួន ${count} ទៅកាន់ EZA-POST រួចរាល់!`,
+            `🎉 ជោគជ័យ! ${countText} ទៅកាន់ EZA-POST រួចរាល់!`,
             "success"
           );
-          btnSyncText.textContent = "✅ Sync ផេកជោគជ័យ!";
+          btnSyncText.textContent = "✅ Sync ជោគជ័យ!";
 
           setTimeout(() => {
             chrome.tabs.create({ url: `${serverUrl}/connections` });

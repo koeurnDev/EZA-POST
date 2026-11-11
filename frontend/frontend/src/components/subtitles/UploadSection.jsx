@@ -122,6 +122,7 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
 
       // Use XMLHttpRequest for real-time upload progress tracking
       const xhr = new XMLHttpRequest();
+      xhr.timeout = 70000; // 70s safety timeout to prevent hanging
       xhr.open('POST', '/api/v1/transcribe');
 
       xhr.upload.onprogress = (event) => {
@@ -252,6 +253,11 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
       xhr.onerror = () => {
         setIsProcessing(false);
         setErrorMsg('បាត់បង់ការតភ្ជាប់ទៅកាន់ Server សូមពិនិត្យមើល Internet របស់អ្នក!');
+      };
+
+      xhr.ontimeout = () => {
+        setIsProcessing(false);
+        setErrorMsg('ការ Upload ឬ AI ឆ្លើយតបយូរខុសធម្មតា (Timeout)។ សូមសាកល្បងម្ដងទៀត!');
       };
 
       xhr.send(formData);

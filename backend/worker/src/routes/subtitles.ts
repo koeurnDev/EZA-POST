@@ -286,11 +286,11 @@ async function handleUploadAndTranscribe(c: any) {
     c.executionCtx.waitUntil(transcribePromise);
   }
 
-  // For audio/video under 18MB, wait up to 20s inline so Gemini 3 Flash (4-8s) completes within active request!
+  // For audio/video under 18MB, wait up to 14s inline so Gemini Flash (3-6s) completes within active request!
   if (geminiBuffer.byteLength <= 18 * 1024 * 1024) {
     await Promise.race([
       transcribePromise,
-      new Promise((resolve) => setTimeout(resolve, 20000))
+      new Promise((resolve) => setTimeout(resolve, 14000))
     ]);
   }
 
@@ -417,11 +417,9 @@ Output ONLY a valid JSON array of subtitle segments.`;
 
     const isVideoFile = validMime.startsWith('video/');
     const modelConfigs: Array<{ model: string; thinkingBudget: number | null; timeoutMs: number }> = [
-      { model: 'gemini-3-flash-preview', thinkingBudget: 0, timeoutMs: isVideoFile ? 26000 : 18000 },
-      { model: 'gemini-2.5-flash', thinkingBudget: 0, timeoutMs: isVideoFile ? 26000 : 18000 },
-      { model: 'gemini-flash-latest', thinkingBudget: 0, timeoutMs: 16000 },
-      { model: 'gemini-2.0-flash', thinkingBudget: null, timeoutMs: 16000 },
-      { model: 'gemini-3.1-flash-lite-preview', thinkingBudget: 0, timeoutMs: 14000 }
+      { model: 'gemini-2.0-flash', thinkingBudget: null, timeoutMs: 14000 },
+      { model: 'gemini-1.5-flash', thinkingBudget: null, timeoutMs: 14000 },
+      { model: 'gemini-2.0-flash-lite-preview-02-05', thinkingBudget: null, timeoutMs: 10000 }
     ];
 
     for (const cfg of modelConfigs) {
@@ -972,7 +970,10 @@ app.get('/api/v1/media/:key{.*}', async (c) => {
   if (!c.env.MEDIA_BUCKET) {
     return c.text('R2 storage not configured. Please enable R2 in Cloudflare dashboard.', 503);
   }
-  const key = c.req.param('key');
+  let key = c.req.param('key');
+  try {
+    key = decodeURIComponent(key);
+  } catch {}
   const rangeHeader = c.req.header('range');
 
   const object = await c.env.MEDIA_BUCKET.get(key, {

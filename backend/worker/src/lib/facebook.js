@@ -81,7 +81,7 @@ export async function publishFacebookPost(pageId, pageToken, post, page = {}) {
     for (const card of post.carouselCards) {
       let mediaId;
       if (card.type === "video") {
-        assertCloudinaryMediaUrl(card.mediaUrl, "video");
+        assertValidMediaUrl(card.mediaUrl, "video");
         const uploaded = await graphPost(`${graphUrl}/videos`, {
           access_token: pageToken,
           file_url: card.mediaUrl,
@@ -132,7 +132,7 @@ export async function publishFacebookPost(pageId, pageToken, post, page = {}) {
   }
 
   if (post.postType === "video") {
-    assertCloudinaryMediaUrl(videoUrl, "video");
+    assertValidMediaUrl(videoUrl, "video");
     const result = await graphPost(`${graphUrl}/videos`, {
       access_token: pageToken,
       file_url: videoUrl,
@@ -143,7 +143,7 @@ export async function publishFacebookPost(pageId, pageToken, post, page = {}) {
 
   if (post.postType === "image") {
     if (mediaUrls.length !== 1) throw new Error("Image posts require exactly one image.");
-    assertCloudinaryMediaUrl(mediaUrls[0], "image");
+    assertValidMediaUrl(mediaUrls[0], "image");
     const result = await graphPost(`${graphUrl}/photos`, {
       access_token: pageToken,
       url: mediaUrls[0],
@@ -156,7 +156,7 @@ export async function publishFacebookPost(pageId, pageToken, post, page = {}) {
     if (mediaUrls.length < 2 || mediaUrls.length > 10) {
       throw new Error("Photo carousels require between 2 and 10 images.");
     }
-    for (const mediaUrl of mediaUrls) assertCloudinaryMediaUrl(mediaUrl, "image");
+    for (const mediaUrl of mediaUrls) assertValidMediaUrl(mediaUrl, "image");
     const attachments = [];
     for (const mediaUrl of mediaUrls) {
       const photo = await graphPost(`${graphUrl}/photos`, {
@@ -274,7 +274,7 @@ async function graphRequest(path, params) {
 
 function assertAllowedCarouselImageUrl(value, isPagePicture) {
   if (!isPagePicture) {
-    assertCloudinaryMediaUrl(value, "image");
+    assertValidMediaUrl(value, "image");
     return;
   }
   let url;
@@ -323,17 +323,15 @@ async function graphPost(url, params) {
   return result;
 }
 
-function assertCloudinaryMediaUrl(value, resourceType) {
+function assertValidMediaUrl(value, resourceType) {
   let url;
   try {
     url = new URL(value);
   } catch {
     throw new Error("Post media URL is invalid.");
   }
-  if (url.protocol !== "https:" ||
-      !(url.hostname === "res.cloudinary.com" || url.hostname.endsWith(".cloudinary.com")) ||
-      !url.pathname.includes(`/${resourceType}/upload/`)) {
-    throw new Error("Post media must be hosted on Cloudinary with the expected media type.");
+  if (url.protocol !== "https:") {
+    throw new Error("Post media URL must be HTTPS.");
   }
 }
 
