@@ -71,15 +71,51 @@ export function createD1Client(db) {
       const clauses = [];
       const values = [];
 
+      const processCondition = (targetClauses, k, v) => {
+        if (v === undefined) return;
+        if (v !== null && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date)) {
+          if ("not" in v) {
+            if (v.not === null) {
+              targetClauses.push(`${k} IS NOT NULL`);
+            } else {
+              targetClauses.push(`${k} != ?`);
+              values.push(serializeValue(k, v.not));
+            }
+          } else if ("in" in v && Array.isArray(v.in)) {
+            if (v.in.length === 0) {
+              targetClauses.push("1 = 0");
+            } else {
+              const placeholders = v.in.map(() => "?").join(", ");
+              targetClauses.push(`${k} IN (${placeholders})`);
+              v.in.forEach((item) => values.push(serializeValue(k, item)));
+            }
+          } else if ("gte" in v) {
+            targetClauses.push(`${k} >= ?`);
+            values.push(serializeValue(k, v.gte));
+          } else if ("lte" in v) {
+            targetClauses.push(`${k} <= ?`);
+            values.push(serializeValue(k, v.lte));
+          } else if ("gt" in v) {
+            targetClauses.push(`${k} > ?`);
+            values.push(serializeValue(k, v.gt));
+          } else if ("lt" in v) {
+            targetClauses.push(`${k} < ?`);
+            values.push(serializeValue(k, v.lt));
+          }
+        } else if (v === null) {
+          targetClauses.push(`${k} IS NULL`);
+        } else {
+          targetClauses.push(`${k} = ?`);
+          values.push(serializeValue(k, v));
+        }
+      };
+
       if (Array.isArray(where.OR) && where.OR.length > 0) {
         const orClauses = [];
         for (const condition of where.OR) {
           const subClauses = [];
           for (const [k, v] of Object.entries(condition)) {
-            if (v !== undefined) {
-              subClauses.push(`${k} = ?`);
-              values.push(serializeValue(k, v));
-            }
+            processCondition(subClauses, k, v);
           }
           if (subClauses.length > 0) {
             orClauses.push(`(${subClauses.join(" AND ")})`);
@@ -92,37 +128,7 @@ export function createD1Client(db) {
 
       for (const [k, v] of Object.entries(where)) {
         if (k === "OR") continue;
-        if (v === undefined) continue;
-
-        if (v !== null && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date)) {
-          if ("not" in v) {
-            if (v.not === null) {
-              clauses.push(`${k} IS NOT NULL`);
-            } else {
-              clauses.push(`${k} != ?`);
-              values.push(serializeValue(k, v.not));
-            }
-          } else if ("in" in v && Array.isArray(v.in)) {
-            if (v.in.length === 0) {
-              clauses.push("1 = 0");
-            } else {
-              const placeholders = v.in.map(() => "?").join(", ");
-              clauses.push(`${k} IN (${placeholders})`);
-              v.in.forEach((item) => values.push(serializeValue(k, item)));
-            }
-          } else if ("gte" in v) {
-            clauses.push(`${k} >= ?`);
-            values.push(serializeValue(k, v.gte));
-          } else if ("lte" in v) {
-            clauses.push(`${k} <= ?`);
-            values.push(serializeValue(k, v.lte));
-          }
-        } else if (v === null) {
-          clauses.push(`${k} IS NULL`);
-        } else {
-          clauses.push(`${k} = ?`);
-          values.push(serializeValue(k, v));
-        }
+        processCondition(clauses, k, v);
       }
 
       const sql = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";

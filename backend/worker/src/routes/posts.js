@@ -155,10 +155,33 @@ posts.post("/", requireAuth, async (c) => {
       },
     });
 
+    if (scheduleTime.getTime() <= Date.now() + 5000) {
+      if (c.executionCtx && typeof c.executionCtx.waitUntil === "function") {
+        c.executionCtx.waitUntil(processScheduledPosts(c.env));
+      }
+      try {
+        await processScheduledPosts(c.env);
+        const refreshed = await prisma.scheduledPost.findUnique({
+          where: { id: scheduledPost.id },
+          select: { status: true, lastError: true, publishedIds: true },
+        });
+        if (Array.isArray(refreshed?.lastError) && refreshed.lastError.length > 0) {
+          const firstErr = refreshed.lastError[0]?.error || "Facebook rejected publishing.";
+          return c.json({
+            success: false,
+            error: `Facebook បដិសេធការបង្ហោះ: ${firstErr}`,
+            jobId: scheduledPost.id,
+          }, 400);
+        }
+      } catch (err) {
+        console.error("Immediate post processing error:", err);
+      }
+    }
+
     return c.json({
       success: true,
       message: scheduleTime.getTime() <= Date.now() + 5000
-        ? "Post added to the publishing queue."
+        ? "បានបង្ហោះទៅកាន់ Facebook រួចរាល់!"
         : "Post scheduled successfully!",
       jobId: scheduledPost.id,
       data: {
@@ -377,14 +400,33 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
       },
     });
 
-    if (scheduleTime.getTime() <= Date.now() + 5000 && c.executionCtx && typeof c.executionCtx.waitUntil === "function") {
-      c.executionCtx.waitUntil(processScheduledPosts(c.env));
+    if (scheduleTime.getTime() <= Date.now() + 5000) {
+      if (c.executionCtx && typeof c.executionCtx.waitUntil === "function") {
+        c.executionCtx.waitUntil(processScheduledPosts(c.env));
+      }
+      try {
+        await processScheduledPosts(c.env);
+        const refreshed = await prisma.scheduledPost.findUnique({
+          where: { id: scheduledPost.id },
+          select: { status: true, lastError: true, publishedIds: true },
+        });
+        if (Array.isArray(refreshed?.lastError) && refreshed.lastError.length > 0) {
+          const firstErr = refreshed.lastError[0]?.error || "Facebook rejected publishing.";
+          return c.json({
+            success: false,
+            error: `Facebook បដិសេធការបង្ហោះ: ${firstErr}`,
+            jobId: scheduledPost.id,
+          }, 400);
+        }
+      } catch (err) {
+        console.error("Immediate mixed-carousel processing error:", err);
+      }
     }
 
     return c.json({
       success: true,
       message: scheduleTime.getTime() <= Date.now() + 5000
-        ? "Post added to queue for processing."
+        ? "បានបង្ហោះទៅកាន់ Facebook រួចរាល់!"
         : "Post scheduled successfully!",
       jobId: scheduledPost.id,
     }, 202);

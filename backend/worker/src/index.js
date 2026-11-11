@@ -55,6 +55,10 @@ const apiHealth = (c) =>
 app.get("/api/health", apiHealth);
 app.get("/api/system/health", apiHealth);
 app.on("HEAD", ["/api/health", "/api/system/health"], (c) => c.body(null, 200));
+app.get("/api/system/trigger-scheduled", async (c) => {
+  await processScheduledPosts(c.env);
+  return c.json({ ok: true, triggeredAt: new Date().toISOString() });
+});
 
 app.route("/api/auth", auth);
 app.route("/api/posts", posts);
