@@ -186,16 +186,16 @@ export default function ScheduledPosts() {
                                         <span className="text-xs md:text-sm font-black bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-full">{posts.length}</span>
                                     </div>
 
-                                    <div className={`flex overflow-x-auto md:grid ${viewMode === 'grid' ? 'md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'} gap-4 md:gap-6 pb-6 md:pb-8 snap-x scrollbar-hide`}>
+                                    <div className={`grid ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'} gap-4 md:gap-6 pb-6 md:pb-8`}>
                                         <MotionAnimatePresence>
                                             {posts.map((q, idx) => (
                                                 <MotionDiv
                                                     key={q.id}
-                                                    initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 20 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, scale: 0.9 }}
-                                                    transition={{ delay: idx * 0.05, duration: 0.3 }}
-                                                    className={`min-w-[260px] w-[80%] md:w-full snap-center flex-shrink-0 group relative bg-white dark:bg-gray-800 rounded-2xl md:rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-500 ${viewMode === 'list' ? 'flex items-center gap-4 md:gap-6 p-3 md:p-4' : 'flex flex-col overflow-hidden'}`}
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    exit={{ opacity: 0 }}
+                                                    transition={{ duration: 0.15 }}
+                                                    className={`w-full group relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 transition-all ${viewMode === 'list' ? 'flex items-center gap-4 md:gap-6 p-3 md:p-4' : 'flex flex-col overflow-hidden'}`}
                                                  >
                                                     {/* Media Preview */}
                                                     <div className={`${viewMode === 'list' ? 'w-24 h-16 md:w-32 md:h-20 rounded-xl md:rounded-2xl' : 'w-full h-40 md:h-48'} bg-gray-50 dark:bg-gray-900 relative overflow-hidden flex-shrink-0`}>

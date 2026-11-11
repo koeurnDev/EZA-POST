@@ -63,20 +63,20 @@ export default function SubtitleStudio() {
 
   return (
     <DashboardLayout>
-      <div className={completedJob ? "h-[calc(100dvh-5rem)] flex flex-col overflow-hidden -mx-4 -my-4 p-2 sm:p-3" : "max-w-4xl mx-auto py-2 sm:py-6"}>
+      <div className={completedJob ? "w-full flex flex-col gap-2.5 lg:h-[calc(100dvh-5.5rem)] lg:min-h-[600px]" : "max-w-4xl mx-auto py-2 sm:py-4"}>
         {!completedJob ? (
-          <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
+          <div className="flex flex-col gap-4 sm:gap-5">
             {/* Header Hero */}
-            <div className="text-center max-w-2xl mx-auto space-y-2">
+            <div className="text-center max-w-2xl mx-auto space-y-2 px-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-semibold">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Khmer AI Subtitle Studio</span>
               </div>
-              <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white font-khmer">
+              <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white font-khmer">
                 បម្លែងសំឡេងជា <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">Subtitle ខ្មែរ</span> ស្វ័យប្រវត្តិ
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-khmer">
-                ដំណើរការដោយ Google Gemini 2.5 Flash + Whisper Edge ASR ត្រឹមតែ 5-8 វិនាទី រួចផុសទៅកាន់ Facebook Pages ភ្លាមៗ
+                ដំណើរការដោយ Google Gemini 3 Flash + Whisper Edge ASR ត្រឹមតែ 4-6 វិនាទី រួចផុសទៅកាន់ Facebook Pages ភ្លាមៗ
               </p>
             </div>
 
@@ -91,32 +91,33 @@ export default function SubtitleStudio() {
             />
           </div>
         ) : (
-          /* Studio Workspace: 100% Full-Screen Studio */
-          <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden animate-in fade-in duration-200">
+          /* Studio Workspace: Responsive on Phone, Laptop & Large Desktop */
+          <div className="flex-1 min-h-0 flex flex-col gap-2.5 overflow-hidden">
             {/* Top Workspace Navigation Bar */}
-            <div className="flex items-center justify-between pb-1 shrink-0 bg-slate-900/60 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-xl">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2 shrink-0 bg-slate-900/80 border border-slate-800 px-2.5 sm:px-3 py-1.5 rounded-xl">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <button
                   onClick={() => setCompletedJob(null)}
-                  className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 px-2.5 py-1 rounded-lg transition-all font-khmer shadow-sm group"
+                  className="flex items-center gap-1 text-xs text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1.5 rounded-lg transition-colors font-khmer shrink-0"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5 text-indigo-400 group-hover:-translate-x-0.5 transition-transform" />
+                  <ArrowLeft className="w-3.5 h-3.5 text-indigo-400" />
                   <span>Upload ថ្មី</span>
                 </button>
 
-                <div className="flex items-center gap-1.5 text-xs text-slate-300 font-khmer bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="font-medium truncate max-w-[140px] sm:max-w-xs">{completedJob.filename}</span>
+                <div className="flex items-center gap-1.5 text-xs text-slate-300 font-khmer bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700/60 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                  <span className="font-medium truncate max-w-[110px] sm:max-w-xs">{completedJob.filename}</span>
                 </div>
               </div>
 
               {/* Action Button: Send to Facebook Post Composer */}
               <button
                 onClick={handleSendToPost}
-                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-3 py-1.5 rounded-lg transition-all shadow-md active:scale-95 font-khmer"
+                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all shadow-sm font-khmer shrink-0"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>បង្កើតផុស Facebook 🚀</span>
+                <span className="hidden xs:inline">បង្កើតផុស Facebook 🚀</span>
+                <span className="xs:hidden">ផុស FB 🚀</span>
               </button>
             </div>
 
@@ -144,7 +145,11 @@ export default function SubtitleStudio() {
 
             {/* Split Grid: Video Preview on Left, Editor on Right */}
             <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-hidden">
-              <div className={`lg:col-span-5 h-full overflow-hidden ${mobileTab === "preview" ? "block" : "hidden lg:block"}`}>
+              <div
+                className={`lg:col-span-5 h-[56dvh] min-h-[340px] lg:h-full overflow-hidden ${
+                  mobileTab === "preview" ? "block" : "hidden lg:block"
+                }`}
+              >
                 <MediaPreviewPlayer
                   mediaUrl={completedJob.media_url}
                   mediaType={completedJob.media_type || "video"}
@@ -162,7 +167,11 @@ export default function SubtitleStudio() {
                 />
               </div>
 
-              <div className={`lg:col-span-7 h-full overflow-hidden ${mobileTab === "editor" ? "block" : "hidden lg:block"}`}>
+              <div
+                className={`lg:col-span-7 h-[calc(100dvh-15.5rem)] min-h-[380px] lg:h-full overflow-hidden ${
+                  mobileTab === "editor" ? "block" : "hidden lg:block"
+                }`}
+              >
                 <SubtitleEditor
                   job={completedJob}
                   currentTime={currentTime}

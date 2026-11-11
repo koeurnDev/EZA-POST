@@ -647,58 +647,53 @@ export default function Post() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-5xl mx-auto px-3 sm:px-6 md:px-8 py-6 md:py-16 pb-32 flex flex-col items-center">
-                {/* 🚀 Header Section */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-8 mb-8 md:mb-12 w-full">
-                    <div className="space-y-1 md:space-y-2">
-                        <div className="flex items-center gap-2 mb-1 md:mb-3">
-                            <div className="px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded text-[9px] md:text-[10px] font-black text-blue-500 uppercase tracking-widest">
-                                Social Manager
-                            </div>
-                        </div>
-                        <h1 className="text-2xl sm:text-3xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter">
-                            Main <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Home.</span>
+            <div className="max-w-5xl mx-auto px-1 sm:px-4 md:px-6 py-2 md:py-4 pb-16 flex flex-col items-center">
+                {/* 🚀 Header + View Switcher in a Single Clean Row on Desktop */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-5 md:mb-6 w-full">
+                    <div>
+                        <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                            បង្កើត និងកំណត់ពេល <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">ផុសមាតិកា</span>
                         </h1>
-                        <p className="text-xs md:text-base text-gray-500 font-medium max-w-lg leading-relaxed">គ្រប់គ្រង និងកំណត់ពេលផុសមាតិការបស់អ្នកដោយងាយស្រួល។</p>
+                        <p className="text-xs md:text-sm text-gray-500 font-medium mt-0.5">ផុសវីដេអូ និងរូបភាពទៅកាន់ Facebook Pages ច្រើនក្នុងពេលតែមួយ</p>
                     </div>
-                </div>
 
-                {/* 🚀 Dynamic View Orchestrator */}
-                <div className="flex items-center gap-1 md:gap-2 mb-8 md:mb-16 bg-gray-50/50 dark:bg-white/5 p-1.5 md:p-2 rounded-2xl md:rounded-[2rem] border border-gray-100 dark:border-white/5 w-fit">
-                    {[
-                        { id: 'create', label: 'បង្កើតមាតិកា', icon: Plus },
-                        { id: 'queue', label: 'បញ្ជីកំពុងដំណើរការ', icon: Layers }
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveView(tab.id)}
-                            className={`flex items-center gap-2 md:gap-3 px-4 md:px-8 py-2 md:py-3.5 rounded-xl md:rounded-[1.5rem] text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${activeView === tab.id
-                                ? "bg-white dark:bg-gray-900 text-blue-600 shadow-xl shadow-black/5 border border-gray-100 dark:border-white/10"
-                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                                }`}
-                        >
-                            <tab.icon size={14} className="md:w-[16px] md:h-[16px]" />
-                            {tab.label}
-                        </button>
-                    ))}
+                    {/* 🚀 Dynamic View Orchestrator */}
+                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10 w-full sm:w-fit shrink-0">
+                        {[
+                            { id: 'create', label: 'បង្កើតមាតិកា', icon: Plus },
+                            { id: 'queue', label: 'បញ្ជីកំពុងដំណើរការ', icon: Layers }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveView(tab.id)}
+                                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${activeView === tab.id
+                                    ? "bg-white dark:bg-gray-900 text-blue-600 shadow-sm border border-gray-200/80 dark:border-white/10"
+                                    : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                                    }`}
+                            >
+                                <tab.icon size={14} />
+                                <span>{tab.label}</span>
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 <AnimatePresence mode="wait">
                     {activeView === 'create' ? (
                         <motion.div
                             key="create"
-                            initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: window.innerWidth < 768 ? 0 : -20 }}
-                            transition={{ duration: window.innerWidth < 768 ? 0.3 : 0.5, ease: "linear" }}
-                            className="space-y-4 md:space-y-10 w-full"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="space-y-4 md:space-y-6 w-full"
                         >
                             {/* 🎛️ Post Format Selector (Carousel vs Single Video) */}
-                            <div className="flex items-center gap-2 p-1.5 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 w-fit">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-1.5 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 w-full sm:w-fit">
                                 <button
                                     type="button"
                                     onClick={() => setPostFormat("carousel")}
-                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                                         postFormat === "carousel"
                                             ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm"
                                             : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
@@ -709,7 +704,7 @@ export default function Post() {
                                 <button
                                     type="button"
                                     onClick={() => setPostFormat("single")}
-                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                                         postFormat === "single"
                                             ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm"
                                             : "text-gray-500 hover:text-gray-900 dark:hover:text-white"

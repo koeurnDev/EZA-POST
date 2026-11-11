@@ -143,8 +143,8 @@ const DashboardLayout = ({ children }) => {
             </div>
           </Link>
 
-          {/* Center: Desktop Primary Navigation Tabs (Always Visible & Instant) */}
-          <nav className="hidden lg:flex items-center gap-1 p-1 rounded-xl border bg-slate-500/5 border-slate-500/10">
+          {/* Center: Desktop/Laptop Primary Navigation Tabs (Scroll-safe on smaller laptops) */}
+          <nav className="hidden md:flex items-center gap-1 p-1 rounded-xl border bg-slate-500/5 border-slate-500/10 overflow-x-auto no-scrollbar min-w-0 max-w-full">
             {PRIMARY_TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = location.pathname === tab.path;
@@ -152,7 +152,7 @@ const DashboardLayout = ({ children }) => {
                 <Link
                   key={tab.path}
                   to={tab.path}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-3.5 py-1.5 rounded-lg text-[11px] xl:text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
                     isActive
                       ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
                       : isDarkMode
@@ -160,7 +160,7 @@ const DashboardLayout = ({ children }) => {
                       : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
                   }`}
                 >
-                  <Icon size={15} />
+                  <Icon size={14} className="shrink-0" />
                   <span>{tab.label}</span>
                 </Link>
               );
@@ -170,7 +170,7 @@ const DashboardLayout = ({ children }) => {
             <button
               type="button"
               onClick={() => setIsToolsOpen(!isToolsOpen)}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-2.5 xl:px-3.5 py-1.5 rounded-lg text-[11px] xl:text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
                 isToolsOpen || isToolRoute
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/25"
                   : isDarkMode
@@ -178,18 +178,32 @@ const DashboardLayout = ({ children }) => {
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
               }`}
             >
-              <Grid size={15} />
-              <span>ឧបករណ៍ទាំងអស់</span>
+              <Grid size={14} className="shrink-0" />
+              <span>ឧបករណ៍</span>
               <ChevronDown
-                size={13}
+                size={12}
                 className={`transition-transform duration-150 ${isToolsOpen ? "rotate-180" : ""}`}
               />
             </button>
           </nav>
 
-          {/* Right: Quick Status, Theme Toggle & User Profile */}
+          {/* Right: Quick Status, Mobile Page Link, Theme Toggle & User Profile */}
           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-            <div className="hidden sm:block">
+            <Link
+              to="/connections"
+              className={`md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-colors ${
+                location.pathname === "/connections"
+                  ? "bg-blue-600 text-white border-blue-500"
+                  : isDarkMode
+                  ? "bg-slate-800/70 border-slate-700/80 text-slate-200"
+                  : "bg-slate-100 border-slate-200 text-slate-700"
+              }`}
+            >
+              <LinkIcon size={13} />
+              <span>ផេក</span>
+            </Link>
+
+            <div className="hidden xl:block">
               <NetworkStatus />
             </div>
 
@@ -307,26 +321,26 @@ const DashboardLayout = ({ children }) => {
       )}
 
       {/* 3. MAIN PAGE CONTENT (Instant 0ms Render, Clean Spacing) */}
-      <main className="flex-1 pt-4 md:pt-6 pb-20 lg:pb-8 px-3 md:px-6 max-w-[1440px] mx-auto w-full min-w-0">
+      <main className="flex-1 pt-3 md:pt-5 pb-20 md:pb-8 px-3 md:px-6 max-w-[1440px] mx-auto w-full min-w-0">
         {children}
       </main>
 
-      {/* 4. MOBILE BOTTOM TAB BAR (Visible on Mobile/Tablet < lg, Clear Icon + Khmer Label) */}
+      {/* 4. MOBILE BOTTOM TAB BAR (Visible on Phone < md, 5 Equal Grid Columns with Khmer Labels) */}
       <nav
-        className={`lg:hidden fixed bottom-0 left-0 right-0 h-16 z-40 border-t px-1 flex items-center justify-around ${
+        className={`md:hidden fixed bottom-0 left-0 right-0 h-16 z-40 border-t px-1 grid grid-cols-5 items-center ${
           isDarkMode
             ? "bg-[#0d1321]/98 border-slate-800 text-slate-300"
             : "bg-white/98 border-slate-200 text-slate-600 shadow-lg"
         }`}
       >
-        {PRIMARY_TABS.slice(0, 5).map((tab) => {
+        {PRIMARY_TABS.slice(0, 4).map((tab) => {
           const Icon = tab.icon;
           const isActive = location.pathname === tab.path;
           return (
             <Link
               key={tab.path}
               to={tab.path}
-              className={`flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl min-w-[54px] transition-colors ${
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-colors min-w-0 ${
                 isActive
                   ? "text-blue-500 font-bold"
                   : "opacity-75 hover:opacity-100"
@@ -339,7 +353,7 @@ const DashboardLayout = ({ children }) => {
               >
                 <Icon size={18} />
               </div>
-              <span className="text-[10px] leading-none truncate">{tab.shortLabel}</span>
+              <span className="text-[10px] leading-none truncate max-w-full">{tab.shortLabel}</span>
             </Link>
           );
         })}
@@ -347,7 +361,7 @@ const DashboardLayout = ({ children }) => {
         <button
           type="button"
           onClick={() => setIsToolsOpen(!isToolsOpen)}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl min-w-[54px] transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-colors min-w-0 ${
             isToolsOpen || isToolRoute
               ? "text-indigo-500 font-bold"
               : "opacity-75 hover:opacity-100"
@@ -360,7 +374,7 @@ const DashboardLayout = ({ children }) => {
           >
             <Grid size={18} />
           </div>
-          <span className="text-[10px] leading-none">ឧបករណ៍</span>
+          <span className="text-[10px] leading-none truncate max-w-full">ឧបករណ៍</span>
         </button>
       </nav>
     </div>
