@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import auth from "./routes/auth.js";
 import posts from "./routes/posts.js";
 import users from "./routes/users.js";
@@ -12,6 +13,18 @@ import { proxyToBackend } from "./lib/proxy.js";
 import { processScheduledPosts } from "./lib/scheduled-posts.js";
 
 const app = new Hono();
+
+app.use(
+  "*",
+  cors({
+    origin: (origin) => origin || "*",
+    credentials: true,
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
+    allowHeaders: ["Content-Type", "Authorization", "Range", "X-CSRF-Token", "Cookie"],
+    exposeHeaders: ["Content-Length", "Content-Range", "Set-Cookie"],
+    maxAge: 86400,
+  })
+);
 
 app.get("/healthz", (c) =>
   c.json({

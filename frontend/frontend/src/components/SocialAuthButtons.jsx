@@ -141,3 +141,4 @@ export default function SocialAuthButtons({ mode = "signup", onSuccess }) {
     </div>
   );
 }
+

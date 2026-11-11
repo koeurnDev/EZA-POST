@@ -36,6 +36,13 @@
 	],
 	"vars": {
 		"ENVIRONMENT": "production",
+		"JWT_SECRET": "97b4f3e2d8c1a5b6e0d9c0f8a7e2b1d3c4b5a6f2e8d3c5b9a7f1e2d8c3b5a79f",
+		"ENCRYPTION_KEY": "24d2713bad9e902a64c48970868f0a07",
+		"SECURITY_PEPPER": "ezapost-security-pepper-2026",
+		"FRONTEND_URL": "https://eza-post-3kv.pages.dev",
+		"DATABASE_URL": "postgresql://neondb_owner:npg_P9irZ3EpVncx@ep-bold-king-ah26thpo-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require",
+		"TELEGRAM_BOT_TOKEN": "8289587681:AAFLIUkaDdTN6yub83ezSctYpVNOR7ZCpyU",
+		"TELEGRAM_BOT_USERNAME": "eza_ocr_bot",
 		"BAKONG_ACCOUNT_ID": "seab_koeurn@bkrt",
 		"BAKONG_MERCHANT_NAME": "EZA POST",
 		"WHISPER_EDGE_MODEL": "@cf/openai/whisper-large-v3-turbo",

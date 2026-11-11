@@ -179,7 +179,7 @@ auth.post("/register", async (c) => {
   if (
     typeof c.env.JWT_SECRET !== "string" ||
     !c.env.JWT_SECRET ||
-    (!c.env.HYPERDRIVE?.connectionString && !c.env.DATABASE_URL)
+    (!c.env.HYPERDRIVE?.connectionString && !c.env.DATABASE_URL && !c.env.DB)
   ) {
     return c.json({
       success: false,
@@ -426,7 +426,7 @@ auth.post("/telegram", async (c) => {
 
   try {
     const prisma = getPrisma(c.env);
-    const secret = requiredAuthSecret(c.env);
+    const secret = getJwtSecret(c.env);
     const telegramIdStr = String(id);
     const fullName = [first_name, last_name].filter(Boolean).join(" ") || `Telegram User #${id}`;
     const syntheticEmail = username ? `${username.toLowerCase()}@telegram.org` : `tg_${id}@ezapost.com`;
@@ -491,6 +491,139 @@ auth.post("/telegram", async (c) => {
   }
 });
 
+auth.get("/google", (c) => {
+  const clientId = c.env.GOOGLE_CLIENT_ID;
+  const frontendUrl = c.env.FRONTEND_URL || "https://eza-post-3kv.pages.dev";
+  if (!clientId) {
+    return c.redirect(`${frontendUrl}/login?error=google_not_configured`);
+  }
+  const origin = new URL(c.req.url).origin;
+  const redirectUri = `${origin}/api/auth/google/callback`;
+  const state = crypto.randomUUID();
+  const secure = new URL(c.req.url).protocol === "https:";
+
+  setCookie(c, "google_oauth_state", state, {
+    httpOnly: true,
+    secure,
+    sameSite: "Lax",
+    path: "/api/auth/google",
+    maxAge: 600,
+  });
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    prompt: "select_account",
+    state,
+  });
+
+  return c.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+});
+
+auth.get("/google/callback", async (c) => {
+  const { code, state, error } = c.req.query();
+  const frontendUrl = c.env.FRONTEND_URL || "https://eza-post-3kv.pages.dev";
+  const secure = new URL(c.req.url).protocol === "https:";
+
+  deleteCookie(c, "google_oauth_state", {
+    httpOnly: true,
+    secure,
+    sameSite: "Lax",
+    path: "/api/auth/google",
+  });
+
+  if (error || !code) {
+    return c.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+  }
+
+  try {
+    const origin = new URL(c.req.url).origin;
+    const redirectUri = `${origin}/api/auth/google/callback`;
+    const clientId = c.env.GOOGLE_CLIENT_ID;
+    const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      throw new Error("Google OAuth credentials are not configured in Worker.");
+    }
+
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+      }).toString(),
+    });
+
+    if (!tokenRes.ok) {
+      throw new Error(`Google token exchange failed with status ${tokenRes.status}`);
+    }
+
+    const { access_token } = await tokenRes.json();
+    const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+
+    if (!userRes.ok) {
+      throw new Error("Failed to fetch Google user profile");
+    }
+
+    const profile = await userRes.json();
+    const { sub: googleId, email, name, picture } = profile;
+
+    if (!email) {
+      return c.redirect(`${frontendUrl}/login?error=google_missing_email`);
+    }
+
+    const prisma = getPrisma(c.env);
+    const secret = getJwtSecret(c.env);
+
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [{ googleId }, { email: email.toLowerCase() }],
+      },
+    });
+
+    if (!user) {
+      const randomPassword = crypto.randomUUID();
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+      user = await prisma.user.create({
+        data: {
+          email: email.toLowerCase(),
+          name: name || "Google User",
+          password: hashedPassword,
+          googleId,
+          googleEmail: email.toLowerCase(),
+          avatar: picture || null,
+        },
+      });
+    } else if (!user.googleId) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { googleId, googleEmail: email.toLowerCase(), avatar: user.avatar || picture },
+      });
+    }
+
+    const token = await createAuthToken({ id: user.id, email: user.email }, secret);
+    setCookie(c, "token", token, {
+      httpOnly: true,
+      secure,
+      sameSite: secure ? "None" : "Lax",
+      path: "/",
+      maxAge: oneDayInSeconds,
+    });
+
+    return c.redirect(`${frontendUrl}/login?token=${token}&provider=google`);
+  } catch (err) {
+    console.error("Google OAuth callback error:", err);
+    return c.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+  }
+});
+
 auth.post("/google", async (c) => {
   let body;
   try {
@@ -517,7 +650,7 @@ auth.post("/google", async (c) => {
     }
 
     const prisma = getPrisma(c.env);
-    const secret = requiredAuthSecret(c.env);
+    const secret = getJwtSecret(c.env);
 
     let user = await prisma.user.findFirst({
       where: {
