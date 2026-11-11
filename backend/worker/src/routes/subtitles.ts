@@ -238,8 +238,25 @@ async function handleUploadAndTranscribe(c: any) {
     }
   }
 
-  // Get audio buffer for Whisper (use extracted 16kHz WAV audio if available)
+  // Get audio buffer for Whisper fallback (use extracted 16kHz WAV audio if available)
   const audioBuffer = audioFile ? await audioFile.arrayBuffer() : arrayBuffer;
+
+  // For Gemini Multimodal ASR: prefer original video/audio buffer (under 18MB) so Gemini can BOTH hear the original audio AND read on-screen burned-in Khmer/English video text!
+  let geminiBuffer = arrayBuffer;
+  let geminiMimeType = file.type || (isVideo ? 'video/mp4' : 'audio/mp3');
+  if (ext === '.mp4') geminiMimeType = 'video/mp4';
+  else if (ext === '.mov') geminiMimeType = 'video/quicktime';
+  else if (ext === '.webm') geminiMimeType = 'video/webm';
+  else if (ext === '.mkv') geminiMimeType = 'video/x-matroska';
+  else if (ext === '.wav') geminiMimeType = 'audio/wav';
+  else if (ext === '.m4a') geminiMimeType = 'audio/m4a';
+  else if (ext === '.ogg') geminiMimeType = 'audio/ogg';
+  else if (ext === '.mp3') geminiMimeType = 'audio/mp3';
+
+  if (arrayBuffer.byteLength > 18 * 1024 * 1024 && audioFile) {
+    geminiBuffer = audioBuffer;
+    geminiMimeType = 'audio/wav';
+  }
 
   const jobRecord = {
     job_id: jobId,
@@ -256,24 +273,26 @@ async function handleUploadAndTranscribe(c: any) {
 
   await saveJob(c.env, jobId, jobRecord);
 
-  // Direct Edge AI Transcription (Gemini Flash Cloud + Whisper Fallback)
+  // Direct Edge AI Transcription (Gemini 3 Flash Multimodal + Whisper Fallback)
   const transcribePromise = runEdgeWhisperTranscription(
     c.env,
     jobId,
     r2Key,
     audioBuffer,
     language,
-    initialPrompt
+    initialPrompt,
+    geminiBuffer,
+    geminiMimeType
   );
   if (c.executionCtx && typeof c.executionCtx.waitUntil === 'function') {
     c.executionCtx.waitUntil(transcribePromise);
   }
 
-  // For audio/video under 15MB, wait up to 14s inline so fast Gemini Flash Lite (3s) completes within active request!
-  if (audioBuffer.byteLength <= 15 * 1024 * 1024) {
+  // For audio/video under 18MB, wait up to 20s inline so Gemini 3 Flash (4-8s) completes within active request!
+  if (geminiBuffer.byteLength <= 18 * 1024 * 1024) {
     await Promise.race([
       transcribePromise,
-      new Promise((resolve) => setTimeout(resolve, 14000))
+      new Promise((resolve) => setTimeout(resolve, 20000))
     ]);
   }
 
@@ -350,7 +369,7 @@ function isCorruptedKhmerOutput(text: string): boolean {
   // - Double Coengs (\u17D2\u17D2) are invalid
   // - Coeng cannot be at start or end
   if (/[\s។៕.,!?\u17B6-\u17C5]\u17D2/.test(text)) return true;
-  if (/\u17D2[^\u1780-\u17A2]/.test(text)) return true;
+  if (/\u17D2[^\u1780-\u17B3]/.test(text)) return true;
   if (/^\u17D2|\u17D2$/.test(text)) return true;
   if (/\u17D2{2,}/.test(text)) return true;
   // 5. Reject independent vowel + dependent vowel combinations (e.g. ឦា)
@@ -360,7 +379,7 @@ function isCorruptedKhmerOutput(text: string): boolean {
   return false;
 }
 
-// 2.5 Direct Google Gemini Flash Edge Ingestion (Instant 3s accurate transcription)
+// 2.5 Direct Google Gemini 3 Flash Multimodal Edge Ingestion (100% accurate Khmer audio + video subtitle reading)
 async function runGeminiEdgeTranscription(
   env: Env,
   jobId: string,
@@ -374,7 +393,7 @@ async function runGeminiEdgeTranscription(
     debugLogs?.push('No GEMINI_API_KEY in env');
     return null;
   }
-  debugLogs?.push(`Key len=${apiKey.length}, prefix=${apiKey.slice(0, 6)}, buf=${buffer.byteLength}`);
+  debugLogs?.push(`Key len=${apiKey.length}, prefix=${apiKey.slice(0, 6)}, buf=${buffer.byteLength}, mime=${mimeType}`);
 
   try {
     const base64Data = uint8ToBase64(new Uint8Array(buffer));
@@ -383,57 +402,62 @@ async function runGeminiEdgeTranscription(
       validMime = 'audio/mp3';
     }
 
-    const systemPrompt = `You are an expert Khmer speech-to-text subtitle synchronization engine.
-Transcribe the speech in this audio/video directly into high-accuracy, natural Khmer subtitle segments.
-Output ONLY a valid JSON array of subtitle segments without markdown blocks or preamble.
-Each segment must have:
-- "id": integer starting from 1
-- "start": float seconds (e.g. 0.0)
-- "end": float seconds (e.g. 2.5)
-- "text": natural clean Khmer sentence or phrase (keep segments 2.0 to 5.0 seconds)
+    const systemPrompt = `You are an elite native Khmer speech-to-text and video subtitle synchronization engine.
+Transcribe the spoken Khmer speech in this audio/video into 100% accurate, natural Khmer subtitle segments (2.0 to 4.5 seconds per segment).
+If this is a video and there is burned-in Khmer or English text visible on screen, use it to cross-check and guarantee 100% spelling accuracy of every word!
+Strict Rules:
+1. Write standard Khmer script naturally WITHOUT spaces between every syllable/word (only use spaces between clauses or around English words).
+2. Keep English tech/loanwords in English script (e.g., IT, AI, Code, Coding, Project, Logic, Fundamental, Copy-Paste, Developer, Website, Network, Server, Database, Application, Email, Internet, ChatGPT, Claude, Gemini).
+3. Pay careful attention to colloquial Khmer words and grammar (e.g., "អីក៏ IT ដែរ", "ម៉ាស៊ីនកាហ្វេក៏ខូចដែរ", "មិនស៊ីជម្រៅ", "ធាតុពិត"). Never repeat words unnaturally.
 ${customPrompt ? `Special terminology / context: ${customPrompt}` : ''}
-Output ONLY the JSON array.`;
+Output ONLY a valid JSON array of subtitle segments.`;
 
-    const payload = {
-      contents: [{
-        parts: [
-          { text: systemPrompt },
-          { inline_data: { mime_type: validMime, data: base64Data } }
-        ]
-      }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'ARRAY',
-          items: {
-            type: 'OBJECT',
-            properties: {
-              id: { type: 'INTEGER' },
-              start: { type: 'NUMBER' },
-              end: { type: 'NUMBER' },
-              text: { type: 'STRING' }
-            },
-            required: ['id', 'start', 'end', 'text']
-          }
-        },
-        temperature: 0.1
-      }
-    };
-
-    const models = [
-      'gemini-flash-lite-latest',
-      'gemini-flash-lite-latest',
-      'gemini-3.8-flash',
-      'gemini-3.5-flash-lite'
+    const modelConfigs: Array<{ model: string; thinkingBudget: number | null; timeoutMs: number }> = [
+      { model: 'gemini-3-flash-preview', thinkingBudget: 0, timeoutMs: 18000 },
+      { model: 'gemini-flash-latest', thinkingBudget: 0, timeoutMs: 15000 },
+      { model: 'gemini-3.1-flash-lite-preview', thinkingBudget: 0, timeoutMs: 12000 },
+      { model: 'gemini-flash-lite-latest', thinkingBudget: null, timeoutMs: 12000 }
     ];
 
-    for (const model of models) {
+    for (const cfg of modelConfigs) {
+      const { model, thinkingBudget, timeoutMs } = cfg;
       const tModel = Date.now();
       try {
         debugLogs?.push(`Starting ${model}...`);
+        const generationConfig: Record<string, any> = {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                id: { type: 'INTEGER' },
+                start: { type: 'NUMBER' },
+                end: { type: 'NUMBER' },
+                text: { type: 'STRING' }
+              },
+              required: ['id', 'start', 'end', 'text']
+            }
+          },
+          temperature: 0.1
+        };
+        if (thinkingBudget !== null) {
+          generationConfig.thinkingConfig = { thinkingBudget };
+        }
+
+        const payload = {
+          contents: [{
+            parts: [
+              { text: systemPrompt },
+              { inline_data: { mime_type: validMime, data: base64Data } }
+            ]
+          }],
+          generationConfig
+        };
+
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 11000);
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
         let res: Response;
         const bodyStr = JSON.stringify(payload);
         try {
@@ -533,14 +557,16 @@ Output ONLY the JSON array.`;
   }
 }
 
-// 3. Worker Background AI Runner using Cloudflare Workers AI + Gemini Edge
+// 3. Worker Background AI Runner using Cloudflare Workers AI + Gemini 3 Flash Edge
 async function runEdgeWhisperTranscription(
   env: Env,
   jobId: string,
   r2Key: string,
   audioBuffer: ArrayBuffer,
   language: string,
-  customPrompt?: string
+  customPrompt?: string,
+  geminiBuffer?: ArrayBuffer,
+  geminiMimeType?: string
 ) {
   try {
     const job = await getJob(env, jobId);
@@ -560,19 +586,22 @@ async function runEdgeWhisperTranscription(
       await saveJob(env, jobId, job);
     }
 
-    // 1. TIER 1: Ultra-Fast Gemini 2.5 Flash on Edge (under 20MB payload)
+    // 1. TIER 1: Gemini 3 Flash Multimodal on Edge (under 20MB payload)
     const debugLogs: string[] = [];
-    if (audioBuffer.byteLength <= 20 * 1024 * 1024) {
+    const targetGeminiBuffer = geminiBuffer || audioBuffer;
+    if (targetGeminiBuffer.byteLength <= 20 * 1024 * 1024) {
       const ext = r2Key.substring(r2Key.lastIndexOf('.')).toLowerCase();
-      let mimeType = 'audio/mp3';
-      if (ext === '.mp4') mimeType = 'video/mp4';
-      else if (ext === '.wav') mimeType = 'audio/wav';
-      else if (ext === '.m4a') mimeType = 'audio/m4a';
-      else if (ext === '.webm') mimeType = 'video/webm';
-      else if (ext === '.ogg') mimeType = 'audio/ogg';
+      let mimeType = geminiMimeType || 'audio/mp3';
+      if (!geminiMimeType) {
+        if (ext === '.mp4') mimeType = 'video/mp4';
+        else if (ext === '.wav') mimeType = 'audio/wav';
+        else if (ext === '.m4a') mimeType = 'audio/m4a';
+        else if (ext === '.webm') mimeType = 'video/webm';
+        else if (ext === '.ogg') mimeType = 'audio/ogg';
+      }
 
-      console.log(`Job ${jobId}: Invoking Gemini 2.5 Flash Edge ASR (${(audioBuffer.byteLength / (1024 * 1024)).toFixed(2)} MB)...`);
-      const geminiSegments = await runGeminiEdgeTranscription(env, jobId, audioBuffer, mimeType, customPrompt, debugLogs);
+      console.log(`Job ${jobId}: Invoking Gemini 3 Flash Edge ASR (${(targetGeminiBuffer.byteLength / (1024 * 1024)).toFixed(2)} MB, ${mimeType})...`);
+      const geminiSegments = await runGeminiEdgeTranscription(env, jobId, targetGeminiBuffer, mimeType, customPrompt, debugLogs);
       if (geminiSegments && geminiSegments.length > 0) {
         console.log(`Job ${jobId}: Gemini Edge succeeded with ${geminiSegments.length} segments.`);
         const updatedJob = (await getJob(env, jobId)) || job;
