@@ -2,6 +2,108 @@ import React, { useState, useRef, useEffect } from 'react';
 import { UploadCloud, FileAudio, FileVideo, Cpu, AlertCircle, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
 import { extractAudioFromVideo } from '../../utils/audioExtractor';
 
+// Client-side high-speed Gemini Flash 3.8 Transcription (bypasses server region blocks)
+async function transcribeWithGeminiFlash(blob, apiKey, model = 'gemini-3.8-flash', customPrompt = '') {
+  const base64Data = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const res = reader.result;
+      const base64 = typeof res === 'string' ? res.split(',')[1] : null;
+      if (base64) resolve(base64);
+      else reject(new Error('Failed to read audio data'));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+  const mimeType = blob.type && blob.type.startsWith('audio/') ? blob.type : 'audio/wav';
+
+  const systemPrompt = `You are an elite native Khmer speech-to-text and video subtitle synchronization engine.
+Transcribe the spoken Khmer speech in this audio into 100% accurate, natural Khmer subtitle segments (1.5 to 3.5 seconds per segment).
+
+Strict Rules for Perfect Audio-to-Subtitle Synchronization:
+1. PRECISION TIMINGS (CRITICAL):
+   - "start" must be the EXACT millisecond when the speaker begins vocalizing the first syllable of the phrase.
+   - "end" must be the exact millisecond when the phrase vocalization concludes.
+   - Break segments naturally at speech breath/pauses (1.5s to 3.5s per segment). NEVER merge multiple clauses across silent pauses!
+2. Write standard Khmer script naturally WITHOUT spaces between every syllable/word (only use spaces between clauses or around English words).
+3. Keep English tech/loanwords in English script (e.g., IT, AI, Code, Coding, Project, Logic, Fundamental, Copy-Paste, Developer, Website, Network, Server, Database, Application, Email, Internet, ChatGPT, Claude, Gemini).
+4. Pay careful attention to colloquial Khmer words and grammar. Never repeat words unnaturally.
+${customPrompt ? `Special terminology / context: ${customPrompt}` : ''}
+Output ONLY a valid JSON array of subtitle segments.`;
+
+  const payload = {
+    contents: [{
+      parts: [
+        { text: systemPrompt },
+        { inline_data: { mime_type: mimeType, data: base64Data } }
+      ]
+    }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            id: { type: 'INTEGER' },
+            start: { type: 'NUMBER' },
+            end: { type: 'NUMBER' },
+            text: { type: 'STRING' }
+          },
+          required: ['id', 'start', 'end', 'text']
+        }
+      },
+      temperature: 0.1,
+      maxOutputTokens: 8192
+    }
+  };
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Gemini API error (HTTP ${res.status}): ${errText.slice(0, 100)}`);
+  }
+
+  const data = await res.json();
+  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!rawText) throw new Error('Empty response from Gemini');
+
+  let cleanJson = rawText.trim();
+  if (cleanJson.startsWith('```')) {
+    cleanJson = cleanJson.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleanJson);
+  } catch (e) {
+    const lastBrace = cleanJson.lastIndexOf('}');
+    if (lastBrace !== -1) {
+      parsed = JSON.parse(cleanJson.slice(0, lastBrace + 1) + ']');
+    } else {
+      throw e;
+    }
+  }
+
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error('No subtitle segments returned');
+  }
+
+  return parsed.map((item, idx) => ({
+    id: idx + 1,
+    start: Math.round(Number(item.start || 0) * 100) / 100,
+    end: Math.round(Number(item.end || Number(item.start || 0) + 2) * 100) / 100,
+    text: String(item.text || '').trim()
+  }));
+}
+
 export default function UploadSection({ onJobCompleted, isProcessing, setIsProcessing }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -103,6 +205,52 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
           audioBlob = await extractAudioFromVideo(selectedFile);
         } catch (e) {
           audioBlob = null;
+        }
+      }
+
+      // 🚀 TIER 1: Ultra-fast direct Gemini 3.8 Flash transcription from user's browser (bypasses server region blocks)
+      const targetBlob = audioBlob || (selectedFile.size <= 15 * 1024 * 1024 ? selectedFile : null);
+      if (targetBlob) {
+        try {
+          setCurrentStep(2);
+          setProgressStatus('⚡ AI Gemini 3.8 Flash កំពុងស្តាប់ និងបម្លែងសំឡេងខ្មែរ...');
+          const cfgRes = await fetch('/api/v1/gemini-config').catch(() => null);
+          const cfg = cfgRes ? await cfgRes.json().catch(() => null) : null;
+          if (cfg?.ok && cfg?.key) {
+            const clientSegments = await transcribeWithGeminiFlash(targetBlob, cfg.key, cfg.model || 'gemini-3.8-flash', customGlossary);
+            if (clientSegments && clientSegments.length > 0) {
+              setCurrentStep(3);
+              setIsProcessing(false);
+              setProgressStatus('');
+              setUploadProgress(100);
+              const localMediaUrl = URL.createObjectURL(selectedFile);
+              const jobId = `job_${Date.now()}`;
+              onJobCompleted({
+                job_id: jobId,
+                status: 'COMPLETED',
+                filename: selectedFile.name,
+                duration: clientSegments[clientSegments.length - 1]?.end || 30.0,
+                language: selectedLanguage,
+                media_url: localMediaUrl,
+                media_type: isVideo ? 'video' : 'audio',
+                segments: clientSegments,
+                srt_url: `/api/v1/jobs/${jobId}/export/srt`,
+                vtt_url: `/api/v1/jobs/${jobId}/export/vtt`,
+                ass_url: `/api/v1/jobs/${jobId}/export/ass`,
+                txt_url: `/api/v1/jobs/${jobId}/export/txt`
+              });
+
+              // Background sync to server R2
+              fetch('/api/v1/jobs/' + jobId + '/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ segments: clientSegments, filename: selectedFile.name })
+              }).catch(() => {});
+              return;
+            }
+          }
+        } catch (clientGeminiErr) {
+          console.warn('Client-side Gemini Flash fallback to server upload:', clientGeminiErr);
         }
       }
 

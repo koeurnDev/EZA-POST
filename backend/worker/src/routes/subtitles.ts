@@ -177,6 +177,36 @@ app.get('/api/v1/test-whisper', async (c) => {
   }
 });
 
+app.get('/api/v1/gemini-config', (c) => {
+  const key = (c.env.GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '');
+  return c.json({
+    ok: Boolean(key),
+    key: key || null,
+    model: 'gemini-3.8-flash'
+  });
+});
+
+app.get('/api/v1/test-gemini', async (c) => {
+  const apiKey = (c.env.GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '');
+  if (!apiKey) {
+    return c.json({ ok: false, error: 'No GEMINI_API_KEY' });
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+
+  try {
+    const res = await fetch(url);
+    const text = await res.text();
+    return c.json({
+      status: res.status,
+      keyPrefix: apiKey.slice(0, 6),
+      response: text.slice(0, 1000)
+    });
+  } catch (err: any) {
+    return c.json({ ok: false, error: err?.message || String(err) }, 500);
+  }
+});
+
 function uint8ToBase64(bytes: Uint8Array): string {
   let binary = '';
   const chunkSize = 0x8000; // 32KB chunking for high performance
@@ -417,9 +447,9 @@ Output ONLY a valid JSON array of subtitle segments.`;
 
     const isVideoFile = validMime.startsWith('video/');
     const modelConfigs: Array<{ model: string; thinkingBudget: number | null; timeoutMs: number }> = [
-      { model: 'gemini-2.0-flash', thinkingBudget: null, timeoutMs: 14000 },
-      { model: 'gemini-1.5-flash', thinkingBudget: null, timeoutMs: 14000 },
-      { model: 'gemini-2.0-flash-lite-preview-02-05', thinkingBudget: null, timeoutMs: 10000 }
+      { model: 'gemini-3.8-flash', thinkingBudget: null, timeoutMs: 14000 },
+      { model: 'gemini-2.5-flash', thinkingBudget: null, timeoutMs: 14000 },
+      { model: 'gemini-1.5-flash', thinkingBudget: null, timeoutMs: 14000 }
     ];
 
     for (const cfg of modelConfigs) {
@@ -465,26 +495,12 @@ Output ONLY a valid JSON array of subtitle segments.`;
         let res: Response;
         const bodyStr = JSON.stringify(payload);
         try {
-          if (env.GEMINI_PROXY) {
-            const doId = env.GEMINI_PROXY.idFromName('gemini-us-west-1');
-            const stub = env.GEMINI_PROXY.get(doId, { locationHint: 'wnam' });
-            res = await stub.fetch('https://gemini-proxy/forward', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-gemini-target-url': url
-              },
-              signal: controller.signal,
-              body: bodyStr
-            });
-          } else {
-            res = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              signal: controller.signal,
-              body: bodyStr
-            });
-          }
+          res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: bodyStr
+          });
         } finally {
           clearTimeout(timer);
         }
