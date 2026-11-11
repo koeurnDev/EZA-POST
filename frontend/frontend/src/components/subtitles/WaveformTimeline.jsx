@@ -373,9 +373,9 @@ export default function WaveformTimeline({
   const playheadPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="bg-[#0e121b] border border-slate-800 rounded-xl shadow-2xl flex flex-col overflow-hidden select-none">
+    <div className="bg-white dark:bg-[#0e121b] border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm dark:shadow-2xl flex flex-col overflow-hidden select-none">
       {/* 1. CapCut Pro Action Toolbar */}
-      <div className="h-8 px-3 bg-[#131722] border-b border-slate-800 flex items-center justify-between text-xs shrink-0">
+      <div className="h-8 px-3 bg-slate-100 dark:bg-[#131722] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs shrink-0">
         {/* Left: Playhead Tools (Split, Delete, Play, Snap) */}
         <div className="flex items-center gap-1 sm:gap-2">
           {/* Play / Pause */}
@@ -393,7 +393,7 @@ export default function WaveformTimeline({
           <button
             onClick={handleSplitAtPlayhead}
             title="Split កាត់ Segment នៅត្រង់ Playhead (Ctrl+B / S)"
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all text-[11px] font-khmer border border-slate-700/80 group"
+            className="flex items-center gap-1 px-2 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all text-[11px] font-khmer border border-slate-200 dark:border-slate-700/80 group"
           >
             <Scissors className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
             <span className="hidden sm:inline">Split</span>
@@ -403,7 +403,7 @@ export default function WaveformTimeline({
           <button
             onClick={handleDeleteSegment}
             title="Delete លុប Segment ដែលជ្រើសរើស"
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 transition-all text-[11px] font-khmer border border-slate-700/80"
+            className="flex items-center gap-1 px-2 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/20 text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 transition-all text-[11px] font-khmer border border-slate-200 dark:border-slate-700/80"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Delete</span>
@@ -422,7 +422,7 @@ export default function WaveformTimeline({
         </div>
 
         {/* Center: Live Timecode Display (HH:MM:SS.ms) */}
-        <div className="font-mono text-slate-200 text-xs tracking-wider font-semibold bg-slate-900/80 px-2.5 py-0.5 rounded border border-slate-800">
+        <div className="font-mono text-slate-800 dark:text-slate-200 text-xs tracking-wider font-semibold bg-white dark:bg-slate-900/80 px-2.5 py-0.5 rounded border border-slate-200 dark:border-slate-800">
           <span className="text-indigo-400">{formatTimeCode(currentTime)}</span>
           <span className="text-slate-500 mx-1">/</span>
           <span className="text-slate-400">{formatTimeCode(duration)}</span>
@@ -446,7 +446,7 @@ export default function WaveformTimeline({
             step="0.5"
             value={zoom}
             onChange={(e) => setZoom(parseFloat(e.target.value))}
-            className="w-16 sm:w-20 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+            className="w-16 sm:w-20 h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             title={`Zoom: ${zoom}x`}
           />
 

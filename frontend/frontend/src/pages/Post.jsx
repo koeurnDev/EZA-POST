@@ -1146,18 +1146,22 @@ export default function Post() {
                                  </div>
 
 
-                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-2xl p-5 md:p-10 shadow-xl">
+                            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-5 md:p-10 shadow-xl">
                                 <h3 className="text-sm md:text-xl font-black text-gray-900 dark:text-white mb-4 md:mb-6 uppercase tracking-tighter">ឧបករណ៍ជំនួយ</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-4">
                                     {[
-                                        { id: 'safeMode', label: 'Safe Mode', color: 'blue' },
-                                        { id: 'pitchShift', label: 'Voice Fix', color: 'indigo' },
-                                        { id: 'flip', label: 'Flip Video', color: 'pink' }
+                                        { id: 'safeMode', label: 'Safe Mode', activeClass: 'bg-blue-500/10 border-blue-500/30 text-blue-600' },
+                                        { id: 'pitchShift', label: 'Voice Fix', activeClass: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-600' },
+                                        { id: 'flip', label: 'Flip Video', activeClass: 'bg-pink-500/10 border-pink-500/30 text-pink-600' }
                                     ].map(opt => (
                                         <button
                                             key={opt.id}
                                             onClick={() => setAiOptions(prev => ({ ...prev, [opt.id]: !prev[opt.id] }))}
-                                            className={`p-3.5 md:p-6 rounded-xl md:rounded-2xl border-2 transition-all font-black uppercase text-[8px] md:text-[10px] tracking-widest active:scale-[0.98] ${aiOptions[opt.id] ? `bg-${opt.color}-500/10 border-${opt.color}-500/20 text-${opt.color}-600` : 'bg-gray-50 dark:bg-black border-transparent text-gray-400'}`}
+                                            className={`p-3.5 md:p-6 rounded-xl md:rounded-2xl border-2 transition-all font-black uppercase text-[10px] md:text-xs tracking-wider active:scale-[0.98] ${
+                                                aiOptions[opt.id]
+                                                    ? opt.activeClass
+                                                    : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700 dark:bg-black dark:border-white/10 dark:text-gray-400 dark:hover:text-white'
+                                            }`}
                                         >
                                             {opt.label}
                                         </button>

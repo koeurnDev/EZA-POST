@@ -71,6 +71,9 @@ export default function MediaPreviewPlayer({
   const [isMuted, setIsMuted] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [currentSegment, setCurrentSegment] = useState(null);
+  const currentSegmentRef = useRef(null);
+  const [activeWordIndex, setActiveWordIndex] = useState(0);
+  const activeWordIndexRef = useRef(0);
 
   const [localAspectRatio, setLocalAspectRatio] = useState('16:9');
   const [localBounce, setLocalBounce] = useState(true);
@@ -112,10 +115,26 @@ export default function MediaPreviewPlayer({
           (s) => effTime >= s.start && effTime <= (s.end + 0.12)
         ) || null;
 
-        setCurrentSegment(current);
-        setCurrentText(current ? current.text : '');
+        if (current !== currentSegmentRef.current) {
+          currentSegmentRef.current = current;
+          setCurrentSegment(current);
+          setCurrentText(current ? current.text : '');
+        }
 
-        // 2. Throttle parent state update to ~10 FPS to keep editor & timeline butter-smooth without stutter
+        // 2. Compute kinetic active word at full 60 FPS for butter-smooth animation
+        if (current && current.text) {
+          const segDuration = Math.max(0.1, current.end - current.start);
+          const elapsed = Math.max(0, Math.min(segDuration, effTime - current.start));
+          const progress = Math.max(0, Math.min(1, elapsed / segDuration));
+          const words = tokenizeKhmerWords(current.text);
+          const wIdx = Math.min(Math.floor(progress * words.length), Math.max(0, words.length - 1));
+          if (wIdx !== activeWordIndexRef.current) {
+            activeWordIndexRef.current = wIdx;
+            setActiveWordIndex(wIdx);
+          }
+        }
+
+        // 3. Throttle parent state update to ~10 FPS to keep editor & timeline butter-smooth without stutter
         const now = performance.now();
         if (now - lastParentUpdateTimeRef.current >= 100) {
           lastParentUpdateTimeRef.current = now;
@@ -139,8 +158,19 @@ export default function MediaPreviewPlayer({
       const current = segments.find(
         (s) => effTime >= s.start && effTime <= (s.end + 0.12)
       ) || null;
+      currentSegmentRef.current = current;
       setCurrentSegment(current);
       setCurrentText(current ? current.text : '');
+
+      if (current && current.text) {
+        const segDuration = Math.max(0.1, current.end - current.start);
+        const elapsed = Math.max(0, Math.min(segDuration, effTime - current.start));
+        const progress = Math.max(0, Math.min(1, elapsed / segDuration));
+        const words = tokenizeKhmerWords(current.text);
+        const wIdx = Math.min(Math.floor(progress * words.length), Math.max(0, words.length - 1));
+        activeWordIndexRef.current = wIdx;
+        setActiveWordIndex(wIdx);
+      }
     }
   }, [currentTime, isPlaying, syncOffset, segments]);
 
@@ -158,21 +188,11 @@ export default function MediaPreviewPlayer({
     const wordSegments = segmentsList.filter((s) => s.isWordLike);
     if (wordSegments.length <= 1) {
       return (
-        <span className={currentBounce ? 'animate-word-pop inline-block' : 'inline'}>
+        <span className={currentBounce ? 'animate-word-pop inline-block align-baseline' : 'inline'}>
           {text}
         </span>
       );
     }
-
-    const activePlaybackTime = mediaRef.current ? mediaRef.current.currentTime : currentLocalTimeRef.current;
-    const effTime = Math.max(0, activePlaybackTime + syncOffset);
-    const segDuration = Math.max(0.1, currentSegment.end - currentSegment.start);
-    const elapsed = Math.max(0, Math.min(segDuration, effTime - currentSegment.start));
-    const progress = Math.max(0, Math.min(1, elapsed / segDuration));
-    const activeWordIndex = Math.min(
-      Math.floor(progress * wordSegments.length),
-      wordSegments.length - 1
-    );
 
     let wordIdxCounter = 0;
     return segmentsList.map((item, idx) => {
@@ -184,13 +204,11 @@ export default function MediaPreviewPlayer({
       const isPast = wordIdxCounter < activeWordIndex;
       wordIdxCounter++;
 
-      // Pure inline styling to never break Khmer syllables, ligatures or subscripts
-      let tokenClass = 'transition-all duration-150 ';
+      // Consistent inline-block align-baseline to eliminate layout reflow jitter
+      let tokenClass = 'inline-block align-baseline transition-all duration-200 ';
       if (isActive) {
         if (currentBounce) {
-          tokenClass += 'animate-word-pop inline-block ';
-        } else {
-          tokenClass += 'inline ';
+          tokenClass += 'animate-word-pop ';
         }
 
         if (stylePreset === 'ocean_blue') {
@@ -220,21 +238,19 @@ export default function MediaPreviewPlayer({
           tokenClass += 'text-cyan-400 font-black drop-shadow-[0_0_12px_rgba(56,189,248,0.9)]';
         }
       } else if (isPast) {
-        tokenClass += 'inline ';
         if (stylePreset === 'ocean_blue' || stylePreset === 'comic_pop') {
-          tokenClass += 'opacity-100 text-slate-900 font-black';
+          tokenClass += 'opacity-100 text-slate-900 font-bold';
         } else {
           tokenClass += 'opacity-100 text-white font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]';
         }
       } else {
-        // Upcoming words: Clean dimmed translucent dark white / soft gray ("សរក្រមៅ សាមញ្ញ ស្អាត")
-        tokenClass += 'inline ';
+        // Upcoming words: Clean dimmed translucent dark white / soft gray
         if (stylePreset === 'ocean_blue') {
           tokenClass += 'opacity-40 text-slate-400 font-bold';
         } else if (stylePreset === 'comic_pop') {
           tokenClass += 'opacity-35 text-slate-900 font-bold';
         } else {
-          tokenClass += 'opacity-35 text-white/50 font-bold';
+          tokenClass += 'opacity-40 text-white/60 font-bold';
         }
       }
 
@@ -369,11 +385,11 @@ export default function MediaPreviewPlayer({
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl flex flex-col h-full">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm dark:shadow-xl flex flex-col h-full">
       {/* Top Reframe & Kinetic Word Animation Toolbar */}
-      <div className="px-3 py-1.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2 text-xs shrink-0">
+      <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2 text-xs shrink-0">
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center bg-slate-800/90 p-0.5 rounded-lg border border-slate-700/80 shadow-inner">
+          <div className="flex items-center bg-slate-200/80 dark:bg-slate-800/90 p-0.5 rounded-lg border border-slate-300 dark:border-slate-700/80 shadow-inner">
             <button
               type="button"
               onClick={() => handleAspectRatioSwitch('16:9')}
@@ -415,7 +431,7 @@ export default function MediaPreviewPlayer({
 
         <div className="flex items-center gap-1.5 flex-wrap">
           {/* Audio-Subtitle Sync Offset Adjuster */}
-          <div className="flex items-center bg-slate-800/90 px-2 py-0.5 rounded-lg border border-slate-700/80 text-[11px] gap-1 font-khmer">
+          <div className="flex items-center bg-slate-200/80 dark:bg-slate-800/90 px-2 py-0.5 rounded-lg border border-slate-300 dark:border-slate-700/80 text-[11px] gap-1 font-khmer text-slate-700 dark:text-slate-300">
             <span className="text-slate-400">Sync សំឡេង៖</span>
             <button
               type="button"
@@ -455,7 +471,7 @@ export default function MediaPreviewPlayer({
             className={`px-2 py-0.5 rounded-lg border text-[11px] font-medium transition-all flex items-center gap-1 ${
               currentBounce
                 ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm'
-                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'
+                : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
             }`}
             title="បើក/បិទចលនាលោតពាក្យ Kinetic Pop (MrBeast / Hormozi Style)"
           >
@@ -471,15 +487,14 @@ export default function MediaPreviewPlayer({
           {/* Keyframe Styles for Spring Pop */}
           <style>{`
             @keyframes wordBounceSpring {
-              0% { transform: scale(0.92) translateY(0); opacity: 0.85; }
-              35% { transform: scale(1.24) translateY(-3px); opacity: 1; }
-              70% { transform: scale(1.08) translateY(-1px); opacity: 1; }
-              100% { transform: scale(1.14) translateY(-1.5px); opacity: 1; }
+              0% { transform: scale(1); }
+              40% { transform: scale(1.10); }
+              100% { transform: scale(1.05); }
             }
             .animate-word-pop {
-              animation: wordBounceSpring 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-              display: inline-block;
-              transform-origin: center bottom;
+              animation: wordBounceSpring 0.20s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+              transform-origin: center baseline;
+              will-change: transform;
             }
           `}</style>
 
@@ -524,8 +539,7 @@ export default function MediaPreviewPlayer({
               className={`absolute left-0 right-0 px-6 flex justify-center pointer-events-none z-20 ${getPositionClass()}`}
             >
               <div
-                key={currentSegment?.id || 'sub'}
-                className={`${getSubtitleStyle()} ${fontClass} animate-in fade-in-0 zoom-in-95 duration-150`}
+                className={`${getSubtitleStyle()} ${fontClass} transition-all duration-150`}
                 style={{
                   textShadow: getSubtitleTextShadow(stylePreset)
                 }}
@@ -548,7 +562,7 @@ export default function MediaPreviewPlayer({
       </div>
 
       {/* Control Bar */}
-      <div className="px-3 py-2 bg-slate-900/90 border-t border-slate-800 space-y-2 shrink-0">
+      <div className="px-3 py-2 bg-slate-50/95 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 space-y-2 shrink-0">
         {/* Progress Scrubber */}
         <div className="flex items-center gap-3">
           <span className="text-xs font-mono text-slate-400 w-12 text-right">
@@ -561,7 +575,7 @@ export default function MediaPreviewPlayer({
             step={0.01}
             value={currentTime || 0}
             onChange={handleSeek}
-            className="flex-1 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
+            className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
           />
           <span className="text-xs font-mono text-slate-400 w-12">
             {formatSeconds(duration)}
@@ -585,7 +599,7 @@ export default function MediaPreviewPlayer({
                 }
               }}
               title="Skip back 3s"
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all text-xs flex items-center gap-1 font-mono"
+              className="p-2 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all text-xs flex items-center gap-1 font-mono"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>3s</span>
@@ -610,7 +624,7 @@ export default function MediaPreviewPlayer({
                   }
                   setIsMuted(false);
                 }}
-                className="w-16 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                className="w-16 h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
               />
             </div>
           </div>
