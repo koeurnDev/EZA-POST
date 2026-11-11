@@ -12,12 +12,13 @@ users.get("/pages", requireAuth, async (c) => {
       include: { facebookPages: true },
     });
 
-    if (!user || (!user.facebookAccessToken && user.facebookPages.length === 0)) {
+    const pages = Array.isArray(user?.facebookPages) ? user.facebookPages : [];
+    if (!user || (!user.facebookAccessToken && pages.length === 0)) {
       return c.json({ success: true, accounts: [] });
     }
 
     const pageSettings = parsePageSettings(user.pageSettings);
-    const accounts = user.facebookPages.map((page) => {
+    const accounts = pages.map((page) => {
       const savedSettings = pageSettings.find((settings) => settings.pageId === page.id) ?? {};
       return {
         id: page.id,
@@ -220,20 +221,40 @@ users.get("/stats", requireAuth, async (c) => {
 
 users.get("/connections", requireAuth, async (c) => {
   try {
-    const configs = await getPrisma(c.env).platformConfig.findMany({
-      where: { userId: c.get("authUser").id },
-      select: { platform: true, isEnabled: true },
+    const userId = c.get("authUser").id;
+    const prisma = getPrisma(c.env);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { facebookPages: true },
     });
+
+    let configs = [];
+    try {
+      configs = await prisma.platformConfig.findMany({
+        where: { userId },
+        select: { platform: true, isEnabled: true },
+      });
+    } catch (cfgErr) {
+      console.warn("Failed to query platformConfig, using empty defaults:", cfgErr);
+    }
+
+    const hasFacebook = Boolean(
+      user?.facebookAccessToken ||
+      (Array.isArray(user?.facebookPages) && user.facebookPages.length > 0)
+    );
+
     const connections = {
       youtube: false,
       tiktok: false,
       instagram: false,
-      facebook: false,
+      facebook: hasFacebook,
     };
 
-    for (const config of configs) {
-      if (config.isEnabled && Object.hasOwn(connections, config.platform)) {
-        connections[config.platform] = true;
+    if (Array.isArray(configs)) {
+      for (const config of configs) {
+        if (config?.isEnabled && Object.hasOwn(connections, config.platform)) {
+          connections[config.platform] = true;
+        }
       }
     }
 

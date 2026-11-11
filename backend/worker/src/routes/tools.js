@@ -8,9 +8,16 @@ const pageHosts = new Set(["tiktok.com", "www.tiktok.com", "vt.tiktok.com", "vm.
 const mediaHostSuffixes = [
   ".tiktok.com",
   ".tiktokcdn.com",
+  ".tiktokcdn-us.com",
+  ".tiktokcdn-eu.com",
   ".tiktokv.com",
   ".byteoversea.com",
+  ".byteoversea.net",
+  ".byteicdn.com",
   ".bytevc.com",
+  ".ibytedtos.com",
+  ".muscdn.com",
+  ".tikwm.com",
 ];
 
 export function validateTikTokUrl(value) {
@@ -188,21 +195,149 @@ async function fetchTikTokPage(pageUrl) {
   throw new Error("TikTok page redirect limit exceeded");
 }
 
-async function extractTikTokVideo(pageUrl) {
+export async function resolveTikTokUrl(input) {
+  if (typeof input !== "string" || input.length > 2048) return null;
+  const trimmed = input.trim();
+
+  // First check if already canonical
+  const canonical = validateTikTokUrl(trimmed);
+  if (canonical) return canonical;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:" || !pageHosts.has(parsed.hostname)) {
+      return null;
+    }
+
+    // Follow redirect for short links (e.g. vt.tiktok.com, vm.tiktok.com)
+    const res = await fetch(parsed.href, {
+      method: "GET",
+      redirect: "follow",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      signal: AbortSignal.timeout(6_000),
+    });
+
+    if (res.url) {
+      const resolved = validateTikTokUrl(res.url);
+      if (resolved) return resolved;
+    }
+  } catch (err) {
+    console.warn("TikTok URL redirect resolution failed:", err.message);
+  }
+
+  return null;
+}
+
+async function extractFromTikWM(url) {
+  try {
+    const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(7_000),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json?.code === 0 && json?.data) {
+      return json.data;
+    }
+  } catch (err) {
+    console.warn("TikWM lookup failed:", err.message);
+  }
+  return null;
+}
+
+async function extractFromOEmbed(url) {
+  try {
+    const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function extractTikTokVideo(pageUrl, originalInputUrl) {
   const match = pageUrl.pathname.match(/^\/@[^/]+\/video\/(\d+)\/?$/);
-  if (!match) throw new TypeError("Expected a canonical TikTok video URL");
-  const html = await fetchTikTokPage(pageUrl);
-  const video = extractTikTokVideoData(html, match[1]);
-  video.web_url = pageUrl.href;
-  video.author = {
-    nickname: pageUrl.pathname.split("/")[1].slice(1),
-    unique_id: pageUrl.pathname.split("/")[1].slice(1),
+  const videoId = match ? match[1] : "";
+  const creator = match ? pageUrl.pathname.split("/")[1].slice(1) : "";
+
+  // 1. Try native public-page extraction
+  try {
+    const html = await fetchTikTokPage(pageUrl);
+    const video = extractTikTokVideoData(html, videoId);
+    video.web_url = pageUrl.href;
+    video.author = {
+      nickname: creator,
+      unique_id: creator,
+    };
+    video.downloadUrl = video.mediaUrl
+      ? `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}`
+      : null;
+    delete video.mediaUrl;
+    return video;
+  } catch (nativeErr) {
+    console.warn("Native TikTok page scraping failed, trying TikWM fallback:", nativeErr?.message);
+  }
+
+  // 2. Fallback to TikWM
+  const targetUrl = originalInputUrl || pageUrl.href;
+  const tikwm = await extractFromTikWM(targetUrl);
+  if (tikwm) {
+    const isSlideshow = Array.isArray(tikwm.images) && tikwm.images.length > 0;
+    const resolvedId = String(tikwm.id || videoId);
+    const authorName = tikwm.author?.nickname || creator || "TikTok User";
+    const authorId = tikwm.author?.unique_id || creator || "user";
+    const playMediaUrl = tikwm.play || tikwm.hdplay || null;
+
+    return {
+      id: resolvedId,
+      title: tikwm.title || `TikTok video by @${authorId}`,
+      cover: tikwm.cover || "",
+      type: isSlideshow ? "slideshow" : "video",
+      embedUrl: `https://www.tiktok.com/player/v1/${resolvedId}`,
+      web_url: pageUrl.href || targetUrl,
+      author: {
+        nickname: authorName,
+        unique_id: authorId,
+      },
+      stats: {
+        plays: Number(tikwm.play_count || 0),
+        likes: Number(tikwm.digg_count || 0),
+      },
+      images: tikwm.images || [],
+      no_watermark_url: playMediaUrl,
+      playUrl: playMediaUrl,
+      downloadUrl: playMediaUrl
+        ? `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}&direct=${encodeURIComponent(playMediaUrl)}`
+        : null,
+    };
+  }
+
+  // 3. Fallback to oEmbed + Preview player
+  const oembed = await extractFromOEmbed(pageUrl.href);
+  const fallbackCreator = oembed?.author_name || creator || "user";
+  return {
+    id: videoId || String(oembed?.embed_product_id || ""),
+    title: oembed?.title || `TikTok video by @${fallbackCreator}`,
+    cover: oembed?.thumbnail_url || "",
+    type: "preview",
+    embedUrl: `https://www.tiktok.com/player/v1/${videoId || oembed?.embed_product_id}`,
+    web_url: pageUrl.href,
+    author: {
+      nickname: fallbackCreator,
+      unique_id: fallbackCreator,
+    },
+    stats: { plays: 0, likes: 0 },
+    downloadUrl: null,
   };
-  video.downloadUrl = video.mediaUrl
-    ? `/tools/tiktok/download?url=${encodeURIComponent(pageUrl.href)}`
-    : null;
-  delete video.mediaUrl;
-  return video;
 }
 
 tools.post("/tiktok/lookup", requireAuth, async (c) => {
@@ -212,36 +347,97 @@ tools.post("/tiktok/lookup", requireAuth, async (c) => {
   } catch {
     return c.json({ success: false, error: "A valid JSON body is required" }, 400);
   }
-  const pageUrl = validateTikTokUrl(body?.url);
+
+  const rawUrl = body?.url;
+  if (typeof rawUrl !== "string" || !rawUrl.trim()) {
+    return c.json({ success: false, error: "A canonical HTTPS TikTok video URL is required" }, 400);
+  }
+
+  let pageUrl = validateTikTokUrl(rawUrl.trim());
+  if (!pageUrl) {
+    pageUrl = await resolveTikTokUrl(rawUrl.trim());
+  }
+
+  if (!pageUrl) {
+    const tikwm = await extractFromTikWM(rawUrl.trim());
+    if (tikwm && tikwm.id) {
+      const authorId = tikwm.author?.unique_id || "tiktok";
+      try {
+        pageUrl = new URL(`https://www.tiktok.com/@${authorId}/video/${tikwm.id}`);
+      } catch {}
+    }
+  }
+
   if (!pageUrl) {
     return c.json({ success: false, error: "A canonical HTTPS TikTok video URL is required" }, 400);
   }
 
   try {
-    return c.json({ success: true, video: await extractTikTokVideo(pageUrl) });
+    const video = await extractTikTokVideo(pageUrl, rawUrl);
+    return c.json({ success: true, video });
   } catch (error) {
     console.error("TikTok public video lookup failed:", {
       error: error instanceof Error ? error.message : "Unknown error",
       status: error?.status,
     });
-    return c.json(
-      { success: false, error: "TikTok's public video page is temporarily unavailable." },
-      502
-    );
+    try {
+      const preview = createTikTokPreview(pageUrl);
+      return c.json({ success: true, video: preview });
+    } catch {
+      return c.json(
+        { success: false, error: "TikTok's public video page is temporarily unavailable." },
+        502
+      );
+    }
   }
 });
 
 tools.get("/tiktok/download", requireAuth, async (c) => {
-  const pageUrl = validateTikTokUrl(c.req.query("url"));
-  if (!pageUrl) {
+  const rawUrl = c.req.query("url");
+  const directUrl = c.req.query("direct");
+
+  let pageUrl = validateTikTokUrl(rawUrl);
+  if (!pageUrl && typeof rawUrl === "string") {
+    pageUrl = await resolveTikTokUrl(rawUrl);
+  }
+
+  if (!pageUrl && !directUrl) {
     return c.json({ success: false, error: "A canonical HTTPS TikTok video URL is required" }, 400);
   }
 
+  const videoId =
+    pageUrl?.pathname?.match(/^\/@[^/]+\/video\/(\d+)\/?$/)?.[1] ||
+    (typeof rawUrl === "string" ? rawUrl.match(/\/video\/(\d+)/)?.[1] : null) ||
+    "video";
+
   try {
-    const html = await fetchTikTokPage(pageUrl);
-    const videoId = pageUrl.pathname.match(/^\/@[^/]+\/video\/(\d+)\/?$/)[1];
-    const extracted = extractTikTokVideoData(html, videoId);
-    const sourceUrl = validateTikTokMediaUrl(extracted.mediaUrl);
+    let sourceUrl = null;
+
+    if (directUrl) {
+      sourceUrl = validateTikTokMediaUrl(directUrl);
+    }
+
+    if (!sourceUrl && pageUrl) {
+      try {
+        const html = await fetchTikTokPage(pageUrl);
+        const match = pageUrl.pathname.match(/^\/@[^/]+\/video\/(\d+)\/?$/);
+        if (match) {
+          const extracted = extractTikTokVideoData(html, match[1]);
+          sourceUrl = validateTikTokMediaUrl(extracted.mediaUrl);
+        }
+      } catch (nativeErr) {
+        console.warn("Native download extraction failed, trying TikWM:", nativeErr?.message);
+      }
+    }
+
+    if (!sourceUrl && (pageUrl || rawUrl)) {
+      const target = pageUrl ? pageUrl.href : rawUrl;
+      const tikwm = await extractFromTikWM(target);
+      if (tikwm) {
+        sourceUrl = validateTikTokMediaUrl(tikwm.play || tikwm.hdplay);
+      }
+    }
+
     if (!sourceUrl) {
       return c.json(
         { success: false, error: "TikTok did not publish a supported media URL for this video." },
@@ -255,7 +451,8 @@ tools.get("/tiktok/download", requireAuth, async (c) => {
       upstream = await fetch(url, {
         headers: {
           Accept: "video/*,application/octet-stream",
-          Referer: pageUrl.href,
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          Referer: pageUrl ? pageUrl.href : "https://www.tiktok.com/",
         },
         redirect: "manual",
         signal: AbortSignal.timeout(20_000),

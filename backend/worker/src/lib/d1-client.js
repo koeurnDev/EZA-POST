@@ -285,6 +285,25 @@ export function createD1Client(db) {
     botRule: botRuleModel,
     creditTransaction: creditTransactionModel,
 
+    platformConfig: {
+      findMany: async () => [],
+      findUnique: async () => null,
+      findFirst: async () => null,
+      create: async ({ data }) => data,
+      update: async ({ data }) => data,
+      upsert: async ({ create }) => create,
+    },
+
+    postLog: {
+      create: async ({ data }) => ({ id: crypto.randomUUID(), ...data }),
+      findMany: async () => [],
+    },
+
+    botHistory: {
+      findMany: async () => [],
+      create: async ({ data }) => data,
+    },
+
     botStatus: {
       findUnique: async () => ({ enabled: true }),
       upsert: async () => ({ enabled: true }),
@@ -292,7 +311,9 @@ export function createD1Client(db) {
 
     botMonitoredPost: {
       findUnique: async () => null,
+      findMany: async () => [],
       upsert: async ({ create }) => create,
+      deleteMany: async () => ({ count: 0 }),
     },
 
     postMetrics: {
