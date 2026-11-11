@@ -74,6 +74,7 @@ export default function MediaPreviewPlayer({
 
   const [localAspectRatio, setLocalAspectRatio] = useState('16:9');
   const [localBounce, setLocalBounce] = useState(true);
+  const [syncOffset, setSyncOffset] = useState(0.18); // Default 180ms audio-lead: text appears right on speech onset, never lags behind voice
 
   const currentAspectRatio = aspectRatio || localAspectRatio;
   const currentBounce = isBounceEnabled !== undefined ? isBounceEnabled : localBounce;
@@ -89,14 +90,37 @@ export default function MediaPreviewPlayer({
     if (onBounceToggle) onBounceToggle(next);
   };
 
-  // Update current subtitle text and active segment based on playback time
+  // Ultra-responsive 60FPS sync loop using requestAnimationFrame while playing
+  const animFrameRef = useRef(null);
+  useEffect(() => {
+    if (!isPlaying) {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      return;
+    }
+
+    const tick = () => {
+      if (mediaRef.current && !mediaRef.current.paused) {
+        onTimeUpdate(mediaRef.current.currentTime);
+      }
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    animFrameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [isPlaying]);
+
+  // Update current subtitle text and active segment based on playback time + sync offset
+  const effectiveTime = Math.max(0, currentTime + syncOffset);
+
   useEffect(() => {
     const current = segments.find(
-      (s) => currentTime >= s.start && currentTime <= s.end
+      (s) => effectiveTime >= s.start && effectiveTime <= s.end
     );
     setCurrentSegment(current || null);
     setCurrentText(current ? current.text : '');
-  }, [currentTime, segments]);
+  }, [effectiveTime, segments]);
 
   // Compute Word-Level Active Kinetic Highlight with Natural Khmer Word Spacing
   const renderKineticWords = () => {
@@ -119,7 +143,7 @@ export default function MediaPreviewPlayer({
     }
 
     const segDuration = Math.max(0.1, currentSegment.end - currentSegment.start);
-    const elapsed = Math.max(0, Math.min(segDuration, currentTime - currentSegment.start));
+    const elapsed = Math.max(0, Math.min(segDuration, effectiveTime - currentSegment.start));
     const progress = Math.max(0, Math.min(1, elapsed / segDuration));
     const activeWordIndex = Math.min(
       Math.floor(progress * wordSegments.length),
@@ -365,20 +389,56 @@ export default function MediaPreviewPlayer({
           </div>
         </div>
 
-        {/* Kinetic Word Pop Animation Toggle (MrBeast / Hormozi Style) */}
-        <button
-          type="button"
-          onClick={handleBounceSwitch}
-          className={`px-2 py-0.5 rounded-lg border text-[11px] font-medium transition-all flex items-center gap-1 ${
-            currentBounce
-              ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm'
-              : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'
-          }`}
-          title="បើក/បិទចលនាលោតពាក្យ Kinetic Pop (MrBeast / Hormozi Style)"
-        >
-          <Sparkles className="w-3 h-3 text-amber-400" />
-          <span>⚡ Word Pop {currentBounce ? '✓' : ''}</span>
-        </button>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Audio-Subtitle Sync Offset Adjuster */}
+          <div className="flex items-center bg-slate-800/90 px-2 py-0.5 rounded-lg border border-slate-700/80 text-[11px] gap-1 font-khmer">
+            <span className="text-slate-400">Sync សំឡេង៖</span>
+            <button
+              type="button"
+              onClick={() => setSyncOffset((prev) => Math.min(0.6, parseFloat((prev + 0.05).toFixed(2))))}
+              className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-emerald-400 font-bold"
+              title="ឱ្យអក្សរចេញមុនសំឡេង 0.05 វិនាទី"
+            >
+              +
+            </button>
+            <span className={`font-mono font-bold ${syncOffset > 0 ? 'text-emerald-400' : syncOffset < 0 ? 'text-amber-400' : 'text-slate-300'}`}>
+              {syncOffset > 0 ? `+${syncOffset}s` : `${syncOffset}s`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSyncOffset((prev) => Math.max(-0.4, parseFloat((prev - 0.05).toFixed(2))))}
+              className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-amber-400 font-bold"
+              title="ឱ្យអក្សរចេញក្រោយ 0.05 វិនាទី"
+            >
+              -
+            </button>
+            {syncOffset !== 0.18 && (
+              <button
+                type="button"
+                onClick={() => setSyncOffset(0.18)}
+                className="text-[10px] text-indigo-400 hover:underline ml-0.5"
+                title="កំណត់លំនាំដើមស្វ័យប្រវត្តិតាមស្តង់ដារ (+0.18s)"
+              >
+                Auto
+              </button>
+            )}
+          </div>
+
+          {/* Kinetic Word Pop Animation Toggle (MrBeast / Hormozi Style) */}
+          <button
+            type="button"
+            onClick={handleBounceSwitch}
+            className={`px-2 py-0.5 rounded-lg border text-[11px] font-medium transition-all flex items-center gap-1 ${
+              currentBounce
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'
+            }`}
+            title="បើក/បិទចលនាលោតពាក្យ Kinetic Pop (MrBeast / Hormozi Style)"
+          >
+            <Sparkles className="w-3 h-3 text-amber-400" />
+            <span>⚡ Word Pop {currentBounce ? '✓' : ''}</span>
+          </button>
+        </div>
       </div>
 
       {/* Player Display Container */}
