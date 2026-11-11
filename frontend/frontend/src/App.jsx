@@ -27,25 +27,24 @@ export default function App() {
       <AuthProvider>
         <AppRouter />
         <Toaster
-          position="top-center"
+          position="top-right"
           reverseOrder={false}
           containerStyle={{
-            top: '50%',
-            transform: 'translateY(-50%)',
+            top: 16,
+            right: 16,
           }}
           toastOptions={{
-            // Default options
-            duration: 4000,
+            duration: 3000,
             style: {
-              background: 'var(--card-bg)',
-              color: 'var(--text)',
-              border: '1px solid var(--card-border)',
+              background: '#1e293b',
+              color: '#f8fafc',
+              border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: '12px',
-              padding: '16px',
-              fontSize: '14px',
-              fontWeight: '500',
-              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06)',
-              maxWidth: '500px',
+              padding: '12px 16px',
+              fontSize: '13px',
+              fontWeight: '600',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+              maxWidth: '420px',
             },
             // Success
             success: {

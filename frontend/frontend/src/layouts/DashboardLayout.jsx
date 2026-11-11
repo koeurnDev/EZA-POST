@@ -1,34 +1,85 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
-import { motion, AnimatePresence } from "framer-motion";
 import NetworkStatus from "../components/NetworkStatus";
 import {
-  LayoutDashboard, Send, Layers, Clock, BarChart2, HelpCircle, Link as LinkIcon, MessageSquare, Zap, Settings, LogOut, Sun, Moon, User, Grid, Search, Bell, MoreHorizontal, X,
-  Download, Video, Instagram, AtSign, Facebook, Images, Scissors, ShoppingBag, Music, TrendingUp, Film, FileText, ImagePlus, Wand2, EyeOff, Repeat, Languages, Users, Cloud, Eraser,
-  Radio, Trash2, QrCode, Store
+  Send, Clock, HelpCircle, Link as LinkIcon, MessageSquare, Zap, Settings, LogOut, Sun, Moon, Grid, X,
+  Download, Video, Instagram, AtSign, Facebook, Images, Scissors, Music, TrendingUp, FileText, Languages,
+  Radio, Trash2, QrCode, ChevronDown
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
+const PRIMARY_TABS = [
+  { label: "បង្កើតផុស", shortLabel: "ផុស", icon: Send, path: "/post" },
+  { label: "អក្សររត់ AI", shortLabel: "KhmerSub", icon: Languages, path: "/subtitles" },
+  { label: "កាលវិភាគ", shortLabel: "កាលវិភាគ", icon: Clock, path: "/posts" },
+  { label: "ឆ្លើយតប Bot", shortLabel: "Bot ឆ្លើយ", icon: MessageSquare, path: "/bot" },
+  { label: "ភ្ជាប់ផេក", shortLabel: "គណនីផេក", icon: LinkIcon, path: "/connections" },
+  { label: "កាត Bio", shortLabel: "កាត Bio", icon: QrCode, path: "/bio" },
+];
+
+const TOOL_GROUPS = [
+  {
+    title: "ទាញយកវីដេអូគ្មាន Watermark (Downloaders)",
+    items: [
+      { label: "TikTok Downloader", desc: "ទាញយកវីដេអូ TikTok HD", icon: Download, path: "/tools/tiktok", color: "text-pink-500 bg-pink-500/10" },
+      { label: "YouTube Downloader", desc: "ទាញយក YouTube & Shorts", icon: Video, path: "/tools/youtube", color: "text-red-500 bg-red-500/10" },
+      { label: "Facebook Downloader", desc: "ទាញយកវីដេអូ & Reels", icon: Facebook, path: "/tools/facebook", color: "text-blue-500 bg-blue-500/10" },
+      { label: "Instagram Downloader", desc: "ទាញយក Reels & រូបភាព", icon: Instagram, path: "/tools/instagram", color: "text-purple-500 bg-purple-500/10" },
+      { label: "Threads Downloader", desc: "ទាញយកវីដេអូពី Threads", icon: AtSign, path: "/tools/threads", color: "text-slate-400 bg-slate-500/10" },
+      { label: "Pinterest Downloader", desc: "ទាញយកវីដេអូ & រូបភាព", icon: Images, path: "/tools/pinterest", color: "text-rose-500 bg-rose-500/10" },
+      { label: "CapCut Template", desc: "ទាញយកវីដេអូពី CapCut", icon: Scissors, path: "/tools/capcut", color: "text-emerald-500 bg-emerald-500/10" },
+    ]
+  },
+  {
+    title: "ឧបករណ៍គ្រប់គ្រងផេក & ច្នៃប្រឌិត (Page & AI Tools)",
+    items: [
+      { label: "Live Stream ច្រើនផេក", desc: "ផ្សាយផ្ទាល់វីដេអូទៅច្រើនផេក", icon: Radio, path: "/tools/live-stream", color: "text-red-500 bg-red-500/10" },
+      { label: "សម្អាតផុស (Page Cleaner)", desc: "លុបផុសចាស់ៗលើផេក دفعةតែមួយ", icon: Trash2, path: "/tools/page-cleaner", color: "text-amber-500 bg-amber-500/10" },
+      { label: "បម្លែងឯកសារ (Converter)", desc: "បម្លែង PDF, Word និងរូបភាព", icon: FileText, path: "/tools/document-converter", color: "text-indigo-500 bg-indigo-500/10" },
+      { label: "ស្វែងរកវីដេអូល្បី (Viral)", desc: "ស្វែងរកវីដេអូកំពុងពេញនិយម", icon: TrendingUp, path: "/tools/viral-finder", color: "text-cyan-500 bg-cyan-500/10" },
+      { label: "TikTok Trends", desc: "ចម្រៀង និងវីដេអូកំពុងផ្ទុះ", icon: Music, path: "/tools/tiktok/trends", color: "text-violet-500 bg-violet-500/10" },
+    ]
+  },
+  {
+    title: "គណនី & ជំនួយ (Account & Help)",
+    items: [
+      { label: "ភ្ជាប់គណនី (Connections)", desc: "គ្រប់គ្រង Facebook Pages", icon: LinkIcon, path: "/connections", color: "text-blue-500 bg-blue-500/10" },
+      { label: "ការកំណត់ (Settings)", desc: "កែប្រែព័ត៌មានគណនី & សុវត្ថិភាព", icon: Settings, path: "/settings", color: "text-slate-400 bg-slate-500/10" },
+      { label: "របៀបប្រើប្រាស់ (Guide)", desc: "ណែនាំពីការប្រើប្រាស់ប្រព័ន្ធ", icon: HelpCircle, path: "/guide", color: "text-emerald-500 bg-emerald-500/10" },
+    ]
+  }
+];
+
 const DashboardLayout = ({ children }) => {
-  const [scrolled, setScrolled] = useState(false);
-  const MotionDiv = motion.div;
-  const MotionAnimatePresence = AnimatePresence;
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isToolsOpen, setIsToolsOpen] = useState(false);
+  const toolsRef = useRef(null);
   const isDarkMode = theme === "dark";
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 10);
-    };
-    window.addEventListener("scroll", handleScroll);
+  const isToolRoute = location.pathname.startsWith("/tools") || location.pathname === "/guide" || location.pathname === "/settings";
 
-    // 🛡️ Global Notification Handler (for OAuth redirects, etc.)
+  useEffect(() => {
+    setIsToolsOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (toolsRef.current && !toolsRef.current.contains(e.target)) {
+        setIsToolsOpen(false);
+      }
+    };
+    if (isToolsOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isToolsOpen]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const success = params.get("success");
     const error = params.get("error");
@@ -39,8 +90,7 @@ const DashboardLayout = ({ children }) => {
       } else {
         toast.success("ប្រតិបត្តិការជោគជ័យ!");
       }
-      // Clean URL
-      const newUrl = window.location.pathname + window.location.search.replace(/[\?&]success=[^&]+/, '').replace(/^&/, '?');
+      const newUrl = window.location.pathname + window.location.search.replace(/[\?&]success=[^&]+/, "").replace(/^&/, "?");
       window.history.replaceState({}, document.title, newUrl);
     }
 
@@ -52,285 +102,267 @@ const DashboardLayout = ({ children }) => {
       } else {
         toast.error("មានបញ្ហាអ្វីមួយ! សូមព្យាយាមម្តងទៀត។");
       }
-      // Clean URL
-      const newUrl = window.location.pathname + window.location.search.replace(/[\?&]error=[^&]+/, '').replace(/^&/, '?');
+      const newUrl = window.location.pathname + window.location.search.replace(/[\?&]error=[^&]+/, "").replace(/^&/, "?");
       window.history.replaceState({}, document.title, newUrl);
     }
-
-    return () => window.removeEventListener("scroll", handleScroll);
   }, [location.search]);
 
   const handleLogout = async () => {
     await logout();
-    toast.success("Signed out successfully");
+    toast.success("បានចាកចេញដោយជោគជ័យ");
     navigate("/login");
   };
 
-  const CORE_NAV = [
-    { label: "បង្កើតផុស", icon: <Send size={22} />, path: "/post" },
-    { label: "អក្សររត់ AI", icon: <Languages size={22} />, path: "/subtitles" },
-    { label: "បញ្ជីពេលវេល", icon: <Clock size={22} />, path: "/posts" },
-    { label: "ឆ្លើយតបស្វ័យប្រវត្តិ", icon: <MessageSquare size={22} />, path: "/bot" },
-    { label: "Bio អាជីវកម្ម", icon: <QrCode size={22} />, path: "/bio" },
-  ];
-
-  const TOOL_CATEGORIES = [
-    {
-      title: "អាជីវកម្ម & កាតឌីជីថល (Noonlai Bio)",
-      items: [
-        { label: "កាតអាជីវកម្ម (Bio Link & QR)", icon: <QrCode size={18} />, path: "/bio" },
-      ]
-    },
-    {
-      title: "ឧបករណ៍សង្គម",
-      items: [
-        { label: "គណនី", icon: <LinkIcon size={18} />, path: "/connections" },
-        { label: "ជំនួយ", icon: <HelpCircle size={18} />, path: "/guide" },
-        { label: "ការកំណត់", icon: <Settings size={18} />, path: "/settings" },
-      ]
-    },
-    {
-      title: "កម្មវិធីទាញយកវីដេអូ",
-      items: [
-        { label: "TikTok", icon: <Download size={18} />, path: "/tools/tiktok" },
-        { label: "YouTube", icon: <Video size={18} />, path: "/tools/youtube" },
-        { label: "Instagram", icon: <Instagram size={18} />, path: "/tools/instagram" },
-        { label: "Threads", icon: <AtSign size={18} />, path: "/tools/threads" },
-        { label: "Facebook", icon: <Facebook size={18} />, path: "/tools/facebook" },
-        { label: "Pinterest", icon: <Images size={18} />, path: "/tools/pinterest" },
-        { label: "CapCut", icon: <Scissors size={18} />, path: "/tools/capcut" },
-      ]
-    },
-    {
-      title: "Facebook MMO & ផ្សាយផ្ទាល់",
-      items: [
-        { label: "Live Stream ច្រើនផេក", icon: <Radio size={18} />, path: "/tools/live-stream" },
-        { label: "សម្អាតផុស (Bulk Delete)", icon: <Trash2 size={18} />, path: "/tools/page-cleaner" },
-      ]
-    },
-    {
-      title: "ឧបករណ៍ច្នៃប្រឌិត",
-      items: [
-        { label: "អក្សររត់ AI (Subtitles)", icon: <Languages size={18} />, path: "/subtitles" },
-        { label: "ឯកសារ", icon: <FileText size={18} />, path: "/tools/document-converter" },
-      ]
-    },
-    {
-      title: "ឧបករណ៍កម្រិតខ្ពស់",
-      items: [
-        { label: "ស្វែងរកវីដេអូ", icon: <TrendingUp size={18} />, path: "/tools/viral-finder" },
-        { label: "វីដេអូល្បីៗ", icon: <Music size={18} />, path: "/tools/tiktok/trends" },
-      ]
-    }
-  ];
-
   return (
-    <div className={`min-h-screen flex flex-col overflow-x-hidden ${isDarkMode ? "bg-[#050505] text-white" : "bg-[#f8f9fa] text-gray-900"} md:transition-colors md:duration-500`}>
+    <div
+      className={`min-h-screen flex flex-col overflow-x-hidden ${
+        isDarkMode ? "bg-[#090d16] text-slate-100" : "bg-[#f8fafc] text-slate-900"
+      }`}
+    >
+      {/* 1. CLEAN STICKY TOP HEADER WITH DIRECT TABS */}
+      <header
+        className={`sticky top-0 left-0 right-0 h-14 md:h-16 z-40 px-3 md:px-6 flex items-center justify-between border-b ${
+          isDarkMode
+            ? "bg-[#0d1321]/95 border-slate-800/80"
+            : "bg-white/95 border-slate-200/80 shadow-xs"
+        }`}
+      >
+        <div className="max-w-[1440px] mx-auto w-full flex items-center justify-between gap-2 md:gap-4">
+          {/* Left: Brand Logo */}
+          <Link to="/post" className="flex items-center gap-2.5 shrink-0 group">
+            <div className="w-8 h-8 md:w-9 md:h-9 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-600/20">
+              <Zap className="text-white fill-white" size={16} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm md:text-base font-extrabold tracking-tight leading-none">
+                EZA_POST
+              </span>
+              <span className="text-[9px] uppercase tracking-wider text-blue-500 font-bold mt-0.5">
+                Social Studio
+              </span>
+            </div>
+          </Link>
 
-      <header className={`fixed top-0 left-0 right-0 h-16 md:h-20 z-40 px-3 md:px-6 flex items-center justify-between gap-2 transition-all duration-300 ${scrolled ? (isDarkMode ? "bg-[#050505] md:backdrop-blur-xl border-b border-white/5" : "bg-white md:backdrop-blur-xl border-b border-gray-100 shadow-sm") : "bg-transparent"}`}>
-        <div className="max-w-[1400px] mx-auto w-full flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 md:gap-6 min-w-0">
-            <Link to="/dashboard" className="flex items-center gap-2 md:gap-3 group">
-              <div className="w-8 h-8 md:w-11 md:h-11 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg md:rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/20 group-hover:rotate-6 transition-transform">
-                <Zap className="text-white fill-white" size={16}  />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm md:text-lg font-bold tracking-tight">EZA_POST</span>
-                <span className="hidden sm:block text-[7px] md:text-[10px] uppercase tracking-widest text-blue-500 font-bold opacity-80">Social Manager</span>
-              </div>
-            </Link>
-          </div>
+          {/* Center: Desktop Primary Navigation Tabs (Always Visible & Instant) */}
+          <nav className="hidden lg:flex items-center gap-1 p-1 rounded-xl border bg-slate-500/5 border-slate-500/10">
+            {PRIMARY_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = location.pathname === tab.path;
+              return (
+                <Link
+                  key={tab.path}
+                  to={tab.path}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                    isActive
+                      ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
+                      : isDarkMode
+                      ? "text-slate-300 hover:text-white hover:bg-white/5"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                  }`}
+                >
+                  <Icon size={15} />
+                  <span>{tab.label}</span>
+                </Link>
+              );
+            })}
 
-          <div className={`flex items-center gap-1 md:gap-2 p-1 md:p-1.5 rounded-lg md:rounded-2xl border ${isDarkMode ? "bg-white/5 border-white/5" : "bg-white border-gray-200 shadow-sm"} md:backdrop-blur-xl min-w-0`}>
-            <div className="hidden sm:block min-w-0">
+            {/* Tools Dropdown Trigger */}
+            <button
+              type="button"
+              onClick={() => setIsToolsOpen(!isToolsOpen)}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                isToolsOpen || isToolRoute
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/25"
+                  : isDarkMode
+                  ? "text-slate-300 hover:text-white hover:bg-white/5"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+              }`}
+            >
+              <Grid size={15} />
+              <span>ឧបករណ៍ទាំងអស់</span>
+              <ChevronDown
+                size={13}
+                className={`transition-transform duration-150 ${isToolsOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          </nav>
+
+          {/* Right: Quick Status, Theme Toggle & User Profile */}
+          <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+            <div className="hidden sm:block">
               <NetworkStatus />
             </div>
-            <button onClick={toggleTheme} className={`p-1.5 md:p-2.5 rounded-md md:rounded-xl transition-all ${isDarkMode ? "hover:bg-white/10 text-yellow-400" : "hover:bg-gray-100 text-gray-600"}`}>
-              {isDarkMode ? <Sun size={16}  /> : <Moon size={16}  />}
+
+            <button
+              onClick={toggleTheme}
+              title={isDarkMode ? "ប្ដូរទៅពន្លឺថ្ងៃ (Light Mode)" : "ប្ដូរទៅងងឹត (Dark Mode)"}
+              className={`p-2 rounded-xl border transition-colors ${
+                isDarkMode
+                  ? "bg-slate-800/70 border-slate-700/80 hover:bg-slate-800 text-amber-400"
+                  : "bg-slate-100 border-slate-200 hover:bg-slate-200/70 text-slate-700"
+              }`}
+            >
+              {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <div className={`w-px h-4 md:h-6 mx-0.5 md:mx-1 ${isDarkMode ? "bg-white/10" : "bg-gray-200"}`}></div>
-            <Link to="/settings" className={`flex items-center gap-1.5 md:gap-3 p-0.5 md:p-1 rounded-md md:rounded-xl transition-all ${isDarkMode ? "hover:bg-white/5" : "hover:bg-gray-50"}`}>
-              <div className="w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-[10px] md:text-sm text-white shadow-lg">
-                {user?.name?.[0] || "U"}
+
+            <Link
+              to="/settings"
+              className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl border transition-colors ${
+                isDarkMode
+                  ? "bg-slate-800/70 border-slate-700/80 hover:bg-slate-800"
+                  : "bg-slate-100 border-slate-200 hover:bg-slate-200/70"
+              }`}
+            >
+              <div className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-xs text-white">
+                {user?.name?.[0]?.toUpperCase() || "U"}
               </div>
-              <div className="hidden sm:flex flex-col pr-1 md:pr-2 text-left">
-                <span className="text-[10px] md:text-xs font-bold leading-tight">{user?.name || "User"}</span>
-                <span className="text-[8px] md:text-[9px] opacity-60">Pro Account</span>
-              </div>
+              <span className="hidden sm:inline text-xs font-bold truncate max-w-[90px]">
+                {user?.name || "គណនី"}
+              </span>
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 pt-20 md:pt-24 pb-32 px-3 md:px-6 max-w-[1400px] mx-auto w-full min-w-0">
-        <MotionDiv 
-          initial={{ opacity: 0, y: window.innerWidth < 768 ? 0 : 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ duration: window.innerWidth < 768 ? 0.3 : 0.6, ease: "easeOut" }} 
-          className="relative z-10 motion-div-container"
-        >
-          {children}
-        </MotionDiv>
-      </main>
-
-      {/* 🚀 FLOATING COMMAND DOCK */}
-      <div className="fixed bottom-4 md:bottom-10 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
-        <div className="relative pointer-events-auto flex justify-center w-full max-w-full">
-
-          {/* More Menu Popover */}
-          <MotionAnimatePresence>
-            {isMoreMenuOpen && (
-              <>
-                <MotionDiv
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setIsMoreMenuOpen(false)}
-                  className="fixed inset-0 bg-black/20 dark:bg-black/60 backdrop-blur-md z-[-1]"
-                />
-                <MotionDiv
-                  initial={{ opacity: 0, y: 30, scale: 0.95, x: "-50%" }}
-                  animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
-                  exit={{ opacity: 0, y: 30, scale: 0.95, x: "-50%" }}
-                  transition={{ duration: window.innerWidth < 768 ? 0.2 : 0.4 }}
-                  className={`
-                    fixed bottom-20 md:bottom-24 left-1/2
-                    w-[calc(100%-2rem)] max-w-[calc(100%-2rem)] md:w-full md:max-w-2xl p-4 md:p-8
-                    rounded-3xl md:rounded-[3rem] border backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.3)]
-                    max-h-[75vh] overflow-y-auto custom-scrollbar 
-                    ${isDarkMode ? "bg-[#0b0b0f]/90 border-white/10 shadow-blue-500/5" : "bg-white/95 border-gray-200 shadow-gray-200/20"}
-                  `}
-                >
-                  <div className="space-y-6 md:space-y-8">
-                    {TOOL_CATEGORIES.map((cat, idx) => (
-                      <div key={idx}>
-                        <div className="flex items-center gap-2 mb-4 px-1">
-                          <div className="w-1 h-3 bg-blue-500 rounded-full"></div>
-                          <p className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] font-black opacity-60">{cat.title}</p>
-                        </div>
-                        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 md:gap-4">
-                          {cat.items.map((item) => {
-                            const isActiveItem = location.pathname === item.path;
-                            return (
-                              <Link
-                                key={item.path}
-                                to={item.path}
-                                onClick={() => setIsMoreMenuOpen(false)}
-                                className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-all duration-300 ${isActiveItem ? (isDarkMode ? "bg-white/10 scale-105" : "bg-blue-50 scale-105") : (isDarkMode ? "hover:bg-white/5" : "hover:bg-gray-100 text-gray-700")}`}
-                              >
-                                <div className={`w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center transition-all ${isActiveItem ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : (isDarkMode ? "bg-white/5 border border-white/10" : "bg-gray-50 border border-black/5")}`}>
-                                  {React.cloneElement(item.icon, { size: isActiveItem ? 22 : 20 })}
-                                </div>
-                                <span className={`text-[8px] md:text-[10px] font-bold text-center leading-tight tracking-tight ${isActiveItem ? "text-blue-500" : "opacity-70"}`}>{item.label}</span>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className={`h-px ${isDarkMode ? "bg-white/5" : "bg-gray-100"} my-5 md:my-8`}></div>
-
-                  <div className="flex justify-between items-center px-1">
-                    <div className="flex flex-col">
-                      <p className="text-[10px] font-black text-blue-500 tracking-wider">EZA_POST PRO</p>
-                      <p className="text-[8px] opacity-40 font-bold">STABLE V2.1.0</p>
-                    </div>
-                    <button onClick={handleLogout} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all text-[11px] font-black uppercase tracking-widest border border-red-500/20 shadow-xl shadow-red-500/10">
-                      <LogOut size={14} /> ចាកចេញ
-                    </button>
-                  </div>
-                </MotionDiv>
-              </>
-            )}
-          </MotionAnimatePresence>
-
-          {/* Main Dock Bar - Scrollable on Mobile */}
-          <nav className={`
-            flex items-center justify-center gap-1 p-1 md:p-1.5 rounded-full border md:backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] transition-all
-            w-full max-w-[95vw] md:max-w-fit mx-auto overflow-x-auto no-scrollbar
-            ${isDarkMode
-              ? "bg-black/60 border-white/10 shadow-blue-500/5"
-              : "bg-white/90 border-gray-200 shadow-gray-200/30"}
-          `}>
-
-            <div className="flex items-center gap-1 shrink-0">
-              {CORE_NAV.map((item) => {
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link key={item.path} to={item.path} className={`relative flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full transition-all duration-300 group ${isActive ? "bg-blue-600 text-white shadow-xl shadow-blue-600/40 scale-105" : (isDarkMode ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-500 hover:bg-black/5 hover:text-black")}`}>
-                    {React.cloneElement(item.icon, { size: 22 })}
-                    <div className="hidden md:block absolute -top-14 px-3 py-1.5 rounded-xl bg-black text-white text-[11px] font-bold opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap shadow-2xl border border-white/10 scale-90 group-hover:scale-100">
-                      {item.label}
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45 border-r border-b border-white/10"></div>
-                    </div>
-                    {isActive && <MotionDiv layoutId="active-nav" className="absolute -bottom-1 w-1 h-1 bg-white rounded-full" />}
-                  </Link>
-                );
-              })}
+      {/* 2. ALL TOOLS DRAWER / MODAL (Fast, Clean, Readable Card Grid) */}
+      {isToolsOpen && (
+        <div className="fixed inset-0 z-50 flex items-start md:items-center justify-center bg-black/50 p-3 md:p-6 overflow-y-auto">
+          <div
+            ref={toolsRef}
+            className={`w-full max-w-3xl rounded-2xl border p-4 md:p-6 shadow-2xl my-auto max-h-[85vh] overflow-y-auto ${
+              isDarkMode
+                ? "bg-[#111827] border-slate-800 text-slate-100"
+                : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-500/15">
+              <div className="flex items-center gap-2">
+                <Grid size={18} className="text-blue-500" />
+                <h2 className="text-sm md:text-base font-bold">
+                  មជ្ឈមណ្ឌលឧបករណ៍ទាំងអស់ (All Tools & Settings)
+                </h2>
+              </div>
+              <button
+                onClick={() => setIsToolsOpen(false)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isDarkMode ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-100 text-slate-500"
+                }`}
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <div className={`shrink-0 w-px h-6 md:h-8 mx-1 md:mx-2 ${isDarkMode ? "bg-white/10" : "bg-gray-200"}`}></div>
+            <div className="space-y-5">
+              {TOOL_GROUPS.map((group, idx) => (
+                <div key={idx}>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-blue-500 mb-2.5">
+                    {group.title}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = location.pathname === item.path;
+                      return (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          onClick={() => setIsToolsOpen(false)}
+                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                            isActive
+                              ? "border-blue-500 bg-blue-500/10"
+                              : isDarkMode
+                              ? "border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 hover:border-slate-700"
+                              : "border-slate-200/80 bg-slate-50/70 hover:bg-slate-100 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${item.color}`}>
+                            <Icon size={20} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold truncate">{item.label}</p>
+                            <p className="text-[11px] opacity-65 truncate mt-0.5">{item.desc}</p>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
 
-            <button onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)} className={`shrink-0 relative flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full transition-all duration-300 ${isMoreMenuOpen ? "bg-indigo-600 text-white shadow-xl shadow-indigo-600/40" : (isDarkMode ? "text-gray-400 hover:bg-white/10" : "text-gray-500 hover:bg-black/5")}`}>
-              {isMoreMenuOpen ? <X size={22} /> : <Grid size={22} />}
-            </button>
-          </nav>
+            <div className="flex items-center justify-between pt-4 mt-5 border-t border-slate-500/15">
+              <span className="text-xs opacity-60 font-medium">
+                EZA_POST Cloud Studio • Fast Edition
+              </span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-colors text-xs font-bold border border-red-500/20"
+              >
+                <LogOut size={14} />
+                <span>ចាកចេញពីគណនី</span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* 🧩 Global Effects & Animations */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,100..700;1,100..700&display=swap');
-        body { font-family: 'Kantumruy Pro', sans-serif; overflow-x: hidden; width: 100%; position: relative; -webkit-tap-highlight-color: transparent; }
-        html { scroll-behavior: smooth; overflow-x: hidden; width: 100%; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(100, 100, 100, 0.2); border-radius: 20px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(100, 100, 100, 0.3); }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      {/* 3. MAIN PAGE CONTENT (Instant 0ms Render, Clean Spacing) */}
+      <main className="flex-1 pt-4 md:pt-6 pb-20 lg:pb-8 px-3 md:px-6 max-w-[1440px] mx-auto w-full min-w-0">
+        {children}
+      </main>
 
-        @media (max-width: 768px) {
-          main { padding-left: 0.5rem; padding-right: 0.5rem; }
-          
-          /* 🚀 Ultra-Performance: Disable blurs and heavy animations on low-end mobile */
-          * {
-            backdrop-filter: none !important;
-            -webkit-backdrop-filter: none !important;
-          }
-          
-          .animate-pulse, .animate-bounce, .animate-spin {
-            animation-duration: 0.8s !important; /* Slow down instead of killing for better feel */
-          }
+      {/* 4. MOBILE BOTTOM TAB BAR (Visible on Mobile/Tablet < lg, Clear Icon + Khmer Label) */}
+      <nav
+        className={`lg:hidden fixed bottom-0 left-0 right-0 h-16 z-40 border-t px-1 flex items-center justify-around ${
+          isDarkMode
+            ? "bg-[#0d1321]/98 border-slate-800 text-slate-300"
+            : "bg-white/98 border-slate-200 text-slate-600 shadow-lg"
+        }`}
+      >
+        {PRIMARY_TABS.slice(0, 5).map((tab) => {
+          const Icon = tab.icon;
+          const isActive = location.pathname === tab.path;
+          return (
+            <Link
+              key={tab.path}
+              to={tab.path}
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl min-w-[54px] transition-colors ${
+                isActive
+                  ? "text-blue-500 font-bold"
+                  : "opacity-75 hover:opacity-100"
+              }`}
+            >
+              <div
+                className={`p-1 rounded-lg ${
+                  isActive ? "bg-blue-500/15 text-blue-500" : ""
+                }`}
+              >
+                <Icon size={18} />
+              </div>
+              <span className="text-[10px] leading-none truncate">{tab.shortLabel}</span>
+            </Link>
+          );
+        })}
 
-          /* Hardware acceleration for mobile */
-          .fixed, .absolute, nav, header, .motion-div-container {
-            will-change: transform;
-            transform: translateZ(0);
-            backface-visibility: hidden;
-            perspective: 1000;
-          }
-          
-          /* Simplify shadows for memory */
-          .shadow-2xl, .shadow-xl, .shadow-lg {
-             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .xs\\:hidden { display: none !important; }
-          .xs\\:block { display: block !important; }
-        }
-
-        .motion-div-container {
-          will-change: transform, opacity;
-          transform: translateZ(0);
-        }
-      `}</style>
+        <button
+          type="button"
+          onClick={() => setIsToolsOpen(!isToolsOpen)}
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl min-w-[54px] transition-colors ${
+            isToolsOpen || isToolRoute
+              ? "text-indigo-500 font-bold"
+              : "opacity-75 hover:opacity-100"
+          }`}
+        >
+          <div
+            className={`p-1 rounded-lg ${
+              isToolsOpen || isToolRoute ? "bg-indigo-500/15 text-indigo-500" : ""
+            }`}
+          >
+            <Grid size={18} />
+          </div>
+          <span className="text-[10px] leading-none">ឧបករណ៍</span>
+        </button>
+      </nav>
     </div>
   );
 };

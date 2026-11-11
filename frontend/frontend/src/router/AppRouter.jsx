@@ -2,12 +2,11 @@
 // 🌐 AppRouter.jsx - Main Router Configuration for EZA_POST
 // ============================================================
 
-import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
 
 // --- Lazy Loaded Pages ---
-// const Dashboard = lazy(() => import("../pages/Dashboard"));
 const Login = lazy(() => import("../pages/Login"));
 const Register = lazy(() => import("../pages/Register"));
 const ScheduledPosts = lazy(() => import("../pages/ScheduledPosts"));
@@ -19,18 +18,18 @@ const SubtitleStudio = lazy(() => import("../pages/SubtitleStudio")); // 🎬 Kh
 const TikTokDownloader = lazy(() => import("../pages/Tools/TikTokDownloader"));
 const PinterestDownloader = lazy(() => import("../pages/Tools/PinterestDownloader"));
 const YoutubeDownloader = lazy(() => import("../pages/Tools/YoutubeDownloader"));
-const FacebookDownloader = lazy(() => import("../pages/Tools/FacebookDownloader")); // ✅ New
-const InstagramDownloader = lazy(() => import("../pages/Tools/InstagramDownloader")); // ✅ New
-const ThreadsDownloader = lazy(() => import("../pages/Tools/ThreadsDownloader")); // ✅ New
-const CapCutDownloader = lazy(() => import("../pages/Tools/CapCutDownloader")); // ✅ New
-const DocumentConverter = lazy(() => import("../pages/Tools/DocumentConverter")); // ✅ New
-const TikTokTrends = lazy(() => import("../pages/Tools/TikTokTrends")); // ✅ New
-const ViralFinder = lazy(() => import("../pages/Tools/ViralFinder")); // ✅ New
-const PageCleaner = lazy(() => import("../pages/Tools/PageCleaner")); // 🧹 1-Click Facebook Bulk Delete
-const LiveStreamer = lazy(() => import("../pages/Tools/LiveStreamer")); // 🔴 Multi-Page Live Streamer
+const FacebookDownloader = lazy(() => import("../pages/Tools/FacebookDownloader"));
+const InstagramDownloader = lazy(() => import("../pages/Tools/InstagramDownloader"));
+const ThreadsDownloader = lazy(() => import("../pages/Tools/ThreadsDownloader"));
+const CapCutDownloader = lazy(() => import("../pages/Tools/CapCutDownloader"));
+const DocumentConverter = lazy(() => import("../pages/Tools/DocumentConverter"));
+const TikTokTrends = lazy(() => import("../pages/Tools/TikTokTrends"));
+const ViralFinder = lazy(() => import("../pages/Tools/ViralFinder"));
+const PageCleaner = lazy(() => import("../pages/Tools/PageCleaner"));
+const LiveStreamer = lazy(() => import("../pages/Tools/LiveStreamer"));
 const Connections = lazy(() => import("../pages/Connections"));
 
-const ViralPosts = lazy(() => import("../pages/ViralPosts")); // ✅ Boost Feature
+const ViralPosts = lazy(() => import("../pages/ViralPosts"));
 const BuyCredits = lazy(() => import("../pages/BuyCredits"));
 const Guide = lazy(() => import("../pages/Guide"));
 
@@ -44,15 +43,33 @@ const AuthCallback = lazy(() => import("../pages/AuthCallback"));
 const BioBuilder = lazy(() => import("../pages/BioBuilder"));
 const PublicBio = lazy(() => import("../pages/PublicBio"));
 
-// --- Loading Component ---
+// --- Smooth Non-Flashing Loading Indicator ---
 const PageLoader = () => (
-  <div className="flex items-center justify-center h-screen bg-gray-50">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+  <div className="flex flex-col items-center justify-center min-h-screen bg-[#090d16] text-slate-300 gap-3">
+    <div className="animate-spin rounded-full h-9 w-9 border-2 border-slate-700 border-t-blue-500"></div>
+    <span className="text-xs font-medium opacity-75">កំពុងផ្ទុកទំព័រ...</span>
   </div>
 );
 
 // --- App Router Component ---
 export default function AppRouter() {
+  // Background preload all primary tabs so switching tabs is 0ms instant!
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      import("../pages/Post");
+      import("../pages/SubtitleStudio");
+      import("../pages/ScheduledPosts");
+      import("../pages/BotSettingsPage");
+      import("../pages/Connections");
+      import("../pages/BioBuilder");
+      import("../pages/Tools/TikTokDownloader");
+      import("../pages/Tools/YoutubeDownloader");
+      import("../pages/Tools/FacebookDownloader");
+      import("../pages/Settings");
+    }, 250);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Suspense fallback={<PageLoader />}>
