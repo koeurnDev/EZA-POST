@@ -7,7 +7,7 @@
 (function () {
   // Mark DOM so the EZA-POST web app immediately knows the extension is installed
   document.documentElement.setAttribute("data-eza-extension", "installed");
-  document.documentElement.setAttribute("data-eza-extension-version", "2.0.1");
+  document.documentElement.setAttribute("data-eza-extension-version", "2.0.2");
 
   function isExtensionValid() {
     return typeof chrome !== "undefined" && Boolean(chrome?.runtime?.id);

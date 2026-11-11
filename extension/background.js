@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Facebook Sync Extension — Background Service Worker (v2.0.1)
+ * ⚡ EZA-POST Facebook Sync Extension — Background Service Worker (v2.0.2)
  * ============================================================
  */
 
@@ -21,49 +21,43 @@ function extractTokenFromText(text) {
   return null;
 }
 
-function parsePagesFromFacebookHtml(html, cUserId) {
-  const pagesMap = new Map();
-  if (!html || typeof html !== "string") return [];
+function findProfilesInObject(obj, cUserId, foundMap) {
+  if (!obj || typeof obj !== "object") return;
+  if (Array.isArray(obj)) {
+    for (const item of obj) findProfilesInObject(item, cUserId, foundMap);
+    return;
+  }
+  if (
+    obj.id &&
+    obj.name &&
+    typeof obj.id === "string" &&
+    typeof obj.name === "string" &&
+    obj.id !== String(cUserId) &&
+    obj.id.length >= 4 &&
+    obj.name.trim().length > 0 &&
+    !obj.name.includes("CURRENT_USER")
+  ) {
+    const pic =
+      obj.profile_picture?.uri ||
+      obj.picture?.data?.url ||
+      (typeof obj.picture === "string" ? obj.picture : null) ||
+      `https://graph.facebook.com/${obj.id}/picture?type=large`;
 
-  const profileRegexes = [
-    /"profile"\s*:\s*\{\s*"__typename"\s*:\s*"User"\s*,\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"(?:\s*,\s*"profile_picture"\s*:\s*\{\s*"uri"\s*:\s*"([^"]+)")?/g,
-    /"node"\s*:\s*\{\s*"__typename"\s*:\s*"(?:Page|User)"\s*,\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"(?:\s*,\s*"profile_picture"\s*:\s*\{\s*"uri"\s*:\s*"([^"]+)")?/g,
-    /"additional_profile"\s*:\s*\{\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"/g,
-    /"page"\s*:\s*\{\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"/g
-  ];
-
-  const decodeUnicode = (s) => {
-    try {
-      return JSON.parse(`"${s.replace(/"/g, '\\"')}"`);
-    } catch {
-      return s;
-    }
-  };
-
-  for (const re of profileRegexes) {
-    let m;
-    while ((m = re.exec(html)) !== null) {
-      const id = m[1];
-      const rawName = m[2];
-      const rawPic = m[3];
-      if (!id || id === String(cUserId)) continue;
-      const name = decodeUnicode(rawName);
-      if (!name || name.length < 1) continue;
-      const picture = rawPic
-        ? decodeUnicode(rawPic).replace(/\\\//g, "/")
-        : `https://graph.facebook.com/${id}/picture?type=large`;
-      if (!pagesMap.has(id)) {
-        pagesMap.set(id, {
-          id,
-          name,
-          picture,
-          category: "Facebook Page"
-        });
-      }
+    if (!foundMap.has(obj.id)) {
+      foundMap.set(obj.id, {
+        id: obj.id,
+        name: obj.name,
+        picture: pic,
+        category: obj.category || obj.category_name || "Facebook Page",
+        access_token: obj.access_token || null
+      });
     }
   }
-
-  return Array.from(pagesMap.values());
+  for (const k of Object.keys(obj)) {
+    if (typeof obj[k] === "object") {
+      findProfilesInObject(obj[k], cUserId, foundMap);
+    }
+  }
 }
 
 async function getAllFacebookCookies() {
@@ -186,6 +180,159 @@ async function getFacebookSessionData() {
   }
 }
 
+// In-tab script that executes directly inside user's active Facebook tab
+async function extractDataInsideFacebookTab() {
+  const result = {
+    userName: null,
+    accessToken: null,
+    pages: []
+  };
+
+  const pagesMap = new Map();
+  const html = document.documentElement?.innerHTML || "";
+
+  // 1. Detect User Name
+  try {
+    const nameMatch =
+      html.match(/"CURRENT_USER_INITIAL_DATA"\s*,\s*\[\]\s*,\s*\{[^}]*"NAME"\s*:\s*"([^"]+)"/) ||
+      html.match(/"NAME"\s*:\s*"([^"]+)"/);
+    if (nameMatch && nameMatch[1]) {
+      result.userName = JSON.parse(`"${nameMatch[1].replace(/"/g, '\\"')}"`);
+    }
+  } catch (e) {}
+
+  // 2. Search for existing EAA Token in the current page
+  const tokenMatch = html.match(/(EAAG[A-Za-z0-9_-]+|EAAB[A-Za-z0-9_-]+|EAAI[A-Za-z0-9_-]+|EAA[A-Za-z0-9_-]{50,})/);
+  if (tokenMatch) {
+    result.accessToken = tokenMatch[1];
+  }
+
+  // 3. If no token found yet, query m.facebook.com or business_locations using browser session
+  if (!result.accessToken) {
+    const probeUrls = [
+      "https://business.facebook.com/business_locations",
+      "https://adsmanager.facebook.com/adsmanager/manage/campaigns",
+      "https://m.facebook.com/composer/ocelot/async_loader/?publisher=feed"
+    ];
+    for (const url of probeUrls) {
+      try {
+        const res = await fetch(url, { credentials: "include" });
+        const text = await res.text();
+        const m = text.match(/(EAAG[A-Za-z0-9_-]+|EAAB[A-Za-z0-9_-]+|EAAI[A-Za-z0-9_-]+|EAA[A-Za-z0-9_-]{50,})/);
+        if (m) {
+          result.accessToken = m[1];
+          break;
+        }
+      } catch (e) {}
+    }
+  }
+
+  // 4. If we have an Access Token, fetch pages from Graph API directly
+  if (result.accessToken) {
+    try {
+      const gRes = await fetch(
+        `https://graph.facebook.com/v21.0/me/accounts?access_token=${result.accessToken}&fields=id,name,access_token,category,picture{url}&limit=100`
+      );
+      const gData = await gRes.json();
+      if (Array.isArray(gData?.data)) {
+        for (const p of gData.data) {
+          if (p?.id && p?.name) {
+            pagesMap.set(p.id, {
+              id: p.id,
+              name: p.name,
+              picture: p.picture?.data?.url || `https://graph.facebook.com/${p.id}/picture?type=large`,
+              category: p.category || "Facebook Page",
+              access_token: p.access_token || result.accessToken
+            });
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 5. Query Facebook Comet Profile Switcher GraphQL (returns ALL pages user can switch to)
+  try {
+    const dtsgMatch =
+      html.match(/"DTSGInitialData"\s*,\s*\[\]\s*,\s*\{\s*"token"\s*:\s*"([^"]+)"/) ||
+      html.match(/name="fb_dtsg"\s+value="([^"]+)"/);
+    const userMatch =
+      html.match(/"USER_ID"\s*:\s*"(\d+)"/) ||
+      html.match(/"ACCOUNT_ID"\s*:\s*"(\d+)"/);
+
+    const fbDtsg = dtsgMatch ? dtsgMatch[1] : null;
+    const cUserId = userMatch ? userMatch[1] : null;
+
+    if (fbDtsg && cUserId) {
+      const docIds = ["6552796808090963", "5430261317056683"];
+      for (const docId of docIds) {
+        try {
+          const body = new URLSearchParams({
+            av: cUserId,
+            __user: cUserId,
+            __a: "1",
+            fb_dtsg: fbDtsg,
+            fb_api_caller_class: "RelayModern",
+            fb_api_req_friendly_name: "CometProfileSwitcherListQuery",
+            variables: JSON.stringify({ scale: 1 }),
+            doc_id: docId
+          });
+          const gqlRes = await fetch("/api/graphql/", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body
+          });
+          const gqlText = await gqlRes.text();
+          if (gqlText) {
+            // Remove for (;;); security prefix if present
+            const cleanGql = gqlText.replace(/^for\s*\(\s*;\s*;\s*\)\s*;\s*/, "");
+            const gqlData = JSON.parse(cleanGql);
+            findProfilesInObject(gqlData, cUserId, pagesMap);
+            if (pagesMap.size > 0) break;
+          }
+        } catch (e) {}
+      }
+    }
+  } catch (e) {}
+
+  // 6. Query /pages/?category=your_pages
+  try {
+    const yourPagesRes = await fetch("/pages/?category=your_pages", { credentials: "include" });
+    const yourPagesHtml = await yourPagesRes.text();
+    if (yourPagesHtml) {
+      // Find embedded JSON objects for pages
+      const pageRegexes = [
+        /"page"\s*:\s*\{\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"/g,
+        /"node"\s*:\s*\{\s*"__typename"\s*:\s*"Page"\s*,\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"/g,
+        /"additional_profile"\s*:\s*\{\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"/g
+      ];
+      for (const re of pageRegexes) {
+        let m;
+        while ((m = re.exec(yourPagesHtml)) !== null) {
+          const id = m[1];
+          const rawName = m[2];
+          if (id && rawName) {
+            let name = rawName;
+            try {
+              name = JSON.parse(`"${rawName.replace(/"/g, '\\"')}"`);
+            } catch (e) {}
+            if (!pagesMap.has(id)) {
+              pagesMap.set(id, {
+                id,
+                name,
+                picture: `https://graph.facebook.com/${id}/picture?type=large`,
+                category: "Facebook Page"
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
+  result.pages = Array.from(pagesMap.values());
+  return result;
+}
+
 async function getFullFacebookSyncPayload() {
   try {
     const session = await getFacebookSessionData();
@@ -193,74 +340,81 @@ async function getFullFacebookSyncPayload() {
 
     let accessToken = null;
     let fbUserName = "Facebook User";
-    let pages = [];
+    const pagesMap = new Map();
 
-    // Attempt to extract name directly from an open Facebook tab if available
+    // 1. Try in-tab extraction on active Facebook tab (e.g. web.facebook.com)
     try {
       const tabs = await chrome.tabs.query({
         url: ["*://*.facebook.com/*", "*://facebook.com/*"]
       });
       if (tabs.length > 0 && tabs[0]?.id && chrome.scripting) {
-        const injected = await chrome.scripting.executeScript({
-          target: { tabId: tabs[0].id },
-          func: () => {
-            let name = null;
-            try {
-              const html = document.documentElement.innerHTML || "";
-              const match =
-                html.match(/"CURRENT_USER_INITIAL_DATA"\s*,\s*\[\]\s*,\s*\{[^}]*"NAME"\s*:\s*"([^"]+)"/) ||
-                html.match(/"NAME"\s*:\s*"([^"]+)"/);
-              if (match && match[1]) {
-                name = JSON.parse(`"${match[1].replace(/"/g, '\\"')}"`);
-              }
-            } catch (e) {}
-            return { name };
-          }
-        }).catch(() => null);
+        const injected = await chrome.scripting
+          .executeScript({
+            target: { tabId: tabs[0].id },
+            func: extractDataInsideFacebookTab
+          })
+          .catch(() => null);
 
-        if (injected?.[0]?.result?.name) {
-          fbUserName = injected[0].result.name;
+        if (injected?.[0]?.result) {
+          const res = injected[0].result;
+          if (res.userName) fbUserName = res.userName;
+          if (res.accessToken) accessToken = res.accessToken;
+          if (Array.isArray(res.pages)) {
+            for (const p of res.pages) {
+              if (p?.id && p?.name && p.id !== session.fbUserId) {
+                pagesMap.set(p.id, p);
+              }
+            }
+          }
         }
       }
     } catch (e) {}
 
-    // Check endpoints from the browser to obtain access token or pages
-    const endpoints = [
-      "https://business.facebook.com/business_locations",
-      "https://adsmanager.facebook.com/adsmanager/manage/campaigns",
-      "https://web.facebook.com/pages/?category=your_pages",
-      "https://www.facebook.com/pages/?category=your_pages"
-    ];
+    // 2. If no tab was open or token still missing, probe from service worker
+    if (!accessToken) {
+      const endpoints = [
+        "https://business.facebook.com/business_locations",
+        "https://adsmanager.facebook.com/adsmanager/manage/campaigns",
+        "https://m.facebook.com/composer/ocelot/async_loader/?publisher=feed"
+      ];
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url, { credentials: "include", redirect: "follow" }).catch(() => null);
+          if (!res) continue;
+          const html = await res.text().catch(() => "");
+          if (!html) continue;
 
-    for (const url of endpoints) {
-      try {
-        const res = await fetch(url, { credentials: "include", redirect: "follow" }).catch(() => null);
-        if (!res) continue;
-        const html = await res.text().catch(() => "");
-        if (!html) continue;
-
-        const tok = extractTokenFromText(html);
-        if (tok && !accessToken) {
-          accessToken = tok;
-        }
-
-        if (fbUserName === "Facebook User") {
-          const nameMatch =
-            html.match(/"CURRENT_USER_INITIAL_DATA"\s*,\s*\[\]\s*,\s*\{[^}]*"NAME"\s*:\s*"([^"]+)"/) ||
-            html.match(/"NAME"\s*:\s*"([^"]+)"/);
-          if (nameMatch && nameMatch[1]) {
-            try {
-              fbUserName = JSON.parse(`"${nameMatch[1].replace(/"/g, '\\"')}"`);
-            } catch {
-              fbUserName = nameMatch[1];
-            }
+          const tok = extractTokenFromText(html);
+          if (tok) {
+            accessToken = tok;
+            break;
           }
-        }
+        } catch (e) {}
+      }
+    }
 
-        const extractedPages = parsePagesFromFacebookHtml(html, session.fbUserId);
-        for (const p of extractedPages) {
-          if (!pages.some((x) => x.id === p.id)) {
-            pages.push(p);
+    // 3. If token is now available, fetch any extra Graph API pages
+    if (accessToken) {
+      try {
+        const pagesUrl = new URL("https://graph.facebook.com/v21.0/me/accounts");
+        pagesUrl.searchParams.set("access_token", accessToken);
+        pagesUrl.searchParams.set("fields", "id,name,access_token,category,picture{url}");
+        pagesUrl.searchParams.set("limit", "100");
+        const pagesRes = await fetch(pagesUrl).catch(() => null);
+        if (pagesRes) {
+          const pagesData = await pagesRes.json().catch(() => ({}));
+          if (Array.isArray(pagesData?.data)) {
+            for (const p of pagesData.data) {
+              if (p?.id && p?.name && p.id !== session.fbUserId) {
+                pagesMap.set(p.id, {
+                  id: p.id,
+                  name: p.name,
+                  picture: p.picture?.data?.url || `https://graph.facebook.com/${p.id}/picture?type=large`,
+                  category: p.category || "Facebook Page",
+                  access_token: p.access_token || accessToken
+                });
+              }
+            }
           }
         }
       } catch (e) {}
@@ -276,7 +430,7 @@ async function getFullFacebookSyncPayload() {
       ...session,
       accessToken,
       fbUser,
-      pages
+      pages: Array.from(pagesMap.values())
     };
   } catch (err) {
     return {
@@ -294,13 +448,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then((data) => {
         sendResponse({
           installed: true,
-          version: "2.0.1",
+          version: "2.0.2",
           fbLoggedIn: Boolean(data?.fbLoggedIn),
           fbUserId: data?.fbUserId || null
         });
       })
       .catch(() => {
-        sendResponse({ installed: true, version: "2.0.1", fbLoggedIn: false, fbUserId: null });
+        sendResponse({ installed: true, version: "2.0.2", fbLoggedIn: false, fbUserId: null });
       });
     return true;
   }
