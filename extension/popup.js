@@ -1,8 +1,10 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Extension Popup Script
+ * ⚡ EZA-POST Extension Popup Script (v2.0.0)
  * ============================================================
  */
+
+const DEFAULT_SERVER_URL = "https://eza-post-3kv.pages.dev";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const fbStatusBadge = document.getElementById("fbStatusBadge");
@@ -10,29 +12,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   const fbUserText = document.getElementById("fbUserText");
   const btnSync = document.getElementById("btnSync");
   const btnSyncText = document.getElementById("btnSyncText");
-  const btnCopyCookie = document.getElementById("btnCopyCookie");
   const btnOpenDashboard = document.getElementById("btnOpenDashboard");
   const messageBox = document.getElementById("messageBox");
   const messageContent = document.getElementById("messageContent");
-  const serverUrlInput = document.getElementById("serverUrl");
-  const btnSaveSettings = document.getElementById("btnSaveSettings");
 
   let currentCookieString = "";
   let fbUserId = null;
 
-  // 1. Load saved settings
-  const storageData = await chrome.storage.local.get(["serverUrl"]);
-  if (storageData.serverUrl) {
-    serverUrlInput.value = storageData.serverUrl;
+  // Detect active EZA-POST server URL & token
+  async function getEzaConnectionConfig() {
+    const storageData = await chrome.storage.local.get(["serverUrl", "ezaAuthToken"]);
+    let serverUrl = storageData.serverUrl || DEFAULT_SERVER_URL;
+    let ezaAuthToken = storageData.ezaAuthToken || "";
+
+    try {
+      const tabs = await chrome.tabs.query({
+        url: ["https://*.pages.dev/*", "http://localhost:*/*", "http://127.0.0.1:*/*"]
+      });
+      if (tabs && tabs.length > 0 && tabs[0].url) {
+        const u = new URL(tabs[0].url);
+        serverUrl = u.origin;
+      }
+    } catch (e) {}
+
+    return { serverUrl: serverUrl.replace(/\/$/, ""), ezaAuthToken };
   }
 
-  btnSaveSettings.addEventListener("click", async () => {
-    const newUrl = serverUrlInput.value.trim().replace(/\/$/, "");
-    await chrome.storage.local.set({ serverUrl: newUrl });
-    showMessage("បានរក្សាទុក Server URL ដោយជោគជ័យ!", "success");
-  });
-
-  // 2. Fetch Facebook Session Cookies
+  // Fetch Facebook Session Cookies
   async function checkFacebookSession() {
     try {
       const cookies = await chrome.cookies.getAll({ domain: ".facebook.com" });
@@ -48,18 +54,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         fbUserId = cUserCookie.value;
         currentCookieString = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
 
-        // Set Online UI
         fbStatusBadge.textContent = "Online";
         fbStatusBadge.className = "badge online";
         statusDot.className = "dot active";
-        fbUserText.textContent = `បានរកឃើញ FB User: ${fbUserId}`;
+        fbUserText.textContent = `បានរកឃើញគណនី FB: ${fbUserId}`;
         btnSync.disabled = false;
       } else {
-        setOfflineState("រកមិនឃើញ c_user ឬ xs cookie ឡើយ");
+        setOfflineState("សូម Login គណនី Facebook លើ Browser ជាមុនសិន");
       }
     } catch (err) {
-      console.error("Error reading cookies:", err);
-      setOfflineState("មានបញ្ហាក្នុងការអាន Cookie");
+      setOfflineState("មានបញ្ហាក្នុងការពិនិត្យសម័យ Facebook");
     }
   }
 
@@ -77,27 +81,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     messageBox.classList.remove("hidden");
   }
 
-  // 3. 1-Click Sync to EZA-POST
+  // 1-Click Sync to EZA-POST
   btnSync.addEventListener("click", async () => {
     if (!currentCookieString) {
-      showMessage("សូមបើក Facebook ហើយ Login លើ Browser ជាមុនសិន!", "error");
+      showMessage("សូមបើក facebook.com ហើយ Login លើ Browser ជាមុនសិន!", "error");
       return;
     }
 
-    const serverUrl = serverUrlInput.value.trim().replace(/\/$/, "");
+    const { serverUrl, ezaAuthToken } = await getEzaConnectionConfig();
     btnSync.disabled = true;
-    btnSyncText.textContent = "កំពុង Sync ទៅកាន់ EZA-POST...";
+    btnSyncText.textContent = "កំពុង Sync ផេកទៅកាន់ EZA-POST...";
 
     try {
+      const headers = {
+        "Content-Type": "application/json"
+      };
+      if (ezaAuthToken) {
+        headers["Authorization"] = `Bearer ${ezaAuthToken}`;
+      }
+
       const res = await fetch(`${serverUrl}/api/user/pages/connect-cookie`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // send existing session cookie if on localhost
+        headers,
+        credentials: "include",
         body: JSON.stringify({
-          cookieOrToken: currentCookieString,
-        }),
+          cookieOrToken: currentCookieString
+        })
       });
 
       const data = await res.json();
@@ -105,24 +114,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (data.success) {
         const count = data.pagesCount ?? (data.pages ? data.pages.length : 0);
         showMessage(
-          `🎉 ជោគជ័យ! បានទាញយក ${count} Pages ទៅកាន់ EZA-POST រួចរាល់!`,
+          `🎉 ជោគជ័យ! បានភ្ជាប់ផេកចំនួន ${count} ទៅកាន់ EZA-POST រួចរាល់!`,
           "success"
         );
-        btnSyncText.textContent = "✅ Sync ជោគជ័យ!";
+        btnSyncText.textContent = "✅ Sync ផេកជោគជ័យ!";
 
-        // Auto open dashboard after 1.5s
         setTimeout(() => {
-          chrome.tabs.create({ url: "http://localhost:5173/connections" });
-        }, 1500);
+          chrome.tabs.create({ url: `${serverUrl}/connections` });
+        }, 1200);
       } else {
-        showMessage(`បរាជ័យ: ${data.error || "មិនអាចទាញយក Pages បានទេ"}`, "error");
+        showMessage(
+          `សូមបើកទំព័រ EZA-POST រួចចុចប៊ូតុង Sync នៅលើវេបសាយផ្ទាល់ (${data.error || "Unauthorized"})`,
+          "error"
+        );
         btnSyncText.textContent = "ព្យាយាមម្តងទៀត";
         btnSync.disabled = false;
       }
     } catch (err) {
-      console.error("Sync API Error:", err);
       showMessage(
-        `មិនអាចទាក់ទងទៅ EZA-POST Server (${serverUrl}) បានទេ! សូមប្រាកដថា Backend កំពុងដំណើរការ។`,
+        "សូមបើកទំព័រភ្ជាប់ផេក EZA-POST រួចចុចប៊ូតុង Sync នៅលើវេបសាយផ្ទាល់!",
         "error"
       );
       btnSyncText.textContent = "ព្យាយាមម្តងទៀត";
@@ -130,24 +140,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // 4. Quick Actions
-  btnCopyCookie.addEventListener("click", () => {
-    if (!currentCookieString) {
-      showMessage("មិនមាន Cookie សម្រាប់ Copy ទេ", "error");
-      return;
-    }
-    navigator.clipboard.writeText(currentCookieString);
-    btnCopyCookie.textContent = "✅ Copied!";
-    setTimeout(() => {
-      btnCopyCookie.innerHTML = "<span>📋</span> Copy Cookie";
-    }, 2000);
+  btnOpenDashboard.addEventListener("click", async () => {
+    const { serverUrl } = await getEzaConnectionConfig();
+    chrome.tabs.create({ url: `${serverUrl}/connections` });
   });
 
-  btnOpenDashboard.addEventListener("click", () => {
-    chrome.tabs.create({ url: "http://localhost:5173/connections" });
-  });
-
-  // Initialize
   checkFacebookSession();
 });
-

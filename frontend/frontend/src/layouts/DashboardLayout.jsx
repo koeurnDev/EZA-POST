@@ -18,7 +18,7 @@ const SIDEBAR_SECTIONS = [
       { label: "អក្សររត់ AI (KhmerSub)", shortLabel: "KhmerSub", icon: Languages, path: "/subtitles", badge: "AI" },
       { label: "កាលវិភាគផុស", shortLabel: "កាលវិភាគ", icon: Clock, path: "/posts" },
       { label: "ឆ្លើយតបស្វ័យប្រវត្តិ (Bot)", shortLabel: "Bot ឆ្លើយ", icon: MessageSquare, path: "/bot" },
-      { label: "ភ្ជាប់ផេក Facebook", shortLabel: "ផេក", icon: LinkIcon, path: "/connections" },
+      { label: "ភ្ជាប់ផេក Facebook", shortLabel: "ផេក", icon: LinkIcon, path: "/connections", badge: "Ext" },
       { label: "កាតអាជីវកម្ម (Bio QR)", shortLabel: "កាត Bio", icon: QrCode, path: "/bio" },
     ],
   },
@@ -163,6 +163,31 @@ const DashboardLayout = ({ children }) => {
           </div>
         </div>
       ))}
+
+      {/* Quick Download EZA-POST FB Extension Box */}
+      <div
+        className={`p-3 rounded-xl border ${
+          isDarkMode
+            ? "bg-blue-500/10 border-blue-500/20 text-slate-200"
+            : "bg-blue-50/80 border-blue-200 text-slate-800"
+        }`}
+      >
+        <p className="text-xs font-bold font-khmer mb-1 flex items-center gap-1.5">
+          <Zap size={13} className="text-blue-500 fill-blue-500 shrink-0" />
+          <span>FB Sync Extension</span>
+        </p>
+        <p className="text-[11px] opacity-75 font-khmer mb-2">
+          ភ្ជាប់ផេក Facebook 1-Click ដោយមិនប្រើ Token ដោយដៃ
+        </p>
+        <a
+          href="/eza-post-fb-extension.zip"
+          download="EZA-POST-FB-Extension.zip"
+          className="w-full py-1.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all font-khmer shadow-2xs"
+        >
+          <Download size={13} />
+          <span>ទាញយក Extension (.ZIP)</span>
+        </a>
+      </div>
     </div>
   );
 

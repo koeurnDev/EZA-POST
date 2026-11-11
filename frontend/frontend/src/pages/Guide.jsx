@@ -112,8 +112,18 @@ const Guide = () => {
                                     <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center mb-6 text-blue-600">
                                         <Facebook size={20} />
                                     </div>
-                                    <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight mb-2">ភ្ជាប់ជាមួយ Facebook</h4>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-relaxed">ចូលទៅកាន់ការកំណត់ ហើយភ្ជាប់គណនី Facebook របស់អ្នក។ ប្រសិនបើវាឈប់ដំណើរការ សូមចុច 'Connect Again'។</p>
+                                    <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight mb-2">ភ្ជាប់ផេកតាម EZA-POST FB Extension</h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-relaxed mb-3">
+                                        ចូលទៅកាន់ទំព័រ 'ភ្ជាប់ផេក Facebook' ដើម្បីទាញយក Extension (.ZIP) ដំឡើងលើ Chrome រួចចុច 1-Click Sync ដោយមិនបាច់ប្រើ Token ដោយដៃ។
+                                    </p>
+                                    <a
+                                        href="/eza-post-fb-extension.zip"
+                                        download="EZA-POST-FB-Extension.zip"
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                                    >
+                                        <Download size={14} />
+                                        <span>ទាញយក Extension (.ZIP)</span>
+                                    </a>
                                 </div>
                             </div>
                         </div>

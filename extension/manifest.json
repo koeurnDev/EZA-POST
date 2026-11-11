@@ -1,25 +1,39 @@
 {
   "manifest_version": 3,
-  "name": "EZA-POST Facebook Sync Helper",
-  "version": "1.0.0",
-  "description": "1-Click Facebook Page Sync Helper for EZA-POST MMO Platform. Safe, instant, and automated.",
+  "name": "EZA-POST Facebook Sync Extension",
+  "version": "2.0.0",
+  "description": "1-Click Facebook Page Sync Extension for EZA-POST. No manual token required — safe, instant, and automated.",
   "permissions": [
     "cookies",
     "storage",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "*://*.facebook.com/*",
     "*://*.messenger.com/*",
-    "http://localhost:5000/*",
-    "http://localhost:5173/*",
-    "http://127.0.0.1:5000/*",
     "https://*.pages.dev/*",
-    "https://*.onrender.com/*"
+    "https://*.workers.dev/*",
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.pages.dev/*",
+        "http://localhost:*/*",
+        "http://127.0.0.1:*/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "EZA-POST Facebook Sync",
+    "default_title": "EZA-POST Facebook 1-Click Sync",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -32,4 +46,3 @@
     "128": "icons/icon128.png"
   }
 }
-
