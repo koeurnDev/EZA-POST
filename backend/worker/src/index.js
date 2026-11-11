@@ -76,3 +76,30 @@ export default app;
 export async function scheduled(_controller, env, context) {
   context.waitUntil(processScheduledPosts(env));
 }
+
+export class GeminiProxyDO {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+
+  async fetch(request) {
+    const targetUrl = request.headers.get("x-gemini-target-url");
+    if (!targetUrl) {
+      return Response.json({ error: "Missing x-gemini-target-url" }, { status: 400 });
+    }
+    const body = await request.text();
+    const res = await fetch(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    const text = await res.text();
+    return new Response(text, {
+      status: res.status,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  }
+}

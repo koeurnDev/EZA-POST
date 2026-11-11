@@ -20,23 +20,41 @@ export async function generateBotSuggestions(env) {
     throw new Error("GEMINI_API_KEY Worker secret is not configured.");
   }
 
-  const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-    {
+  const cleanKey = env.GEMINI_API_KEY.trim().replace(/^["']|["']$/g, "");
+  const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleanKey}`;
+  const bodyStr = JSON.stringify({
+    contents: [{ parts: [{ text: suggestionPrompt }] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: suggestionSchema,
+    },
+  });
+
+  let response;
+  if (env.GEMINI_PROXY) {
+    const doId = env.GEMINI_PROXY.idFromName("gemini-us-west-1");
+    const stub = env.GEMINI_PROXY.get(doId, { locationHint: "wnam" });
+    response = await stub.fetch("https://gemini-proxy/forward", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": env.GEMINI_API_KEY,
+        "x-gemini-target-url": targetUrl,
       },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: suggestionPrompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: suggestionSchema,
+      body: bodyStr,
+    });
+  } else {
+    response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": cleanKey,
         },
-      }),
-    }
-  );
+        body: bodyStr,
+      }
+    );
+  }
 
   let result;
   try {

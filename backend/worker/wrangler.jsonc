@@ -17,6 +17,25 @@
 		}
 	],
 	"workers_dev": true,
+	"placement": {
+		"mode": "smart"
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "GEMINI_PROXY",
+				"class_name": "GeminiProxyDO"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"GeminiProxyDO"
+			]
+		}
+	],
 	"ai": {
 		"binding": "AI"
 	},

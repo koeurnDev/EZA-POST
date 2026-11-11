@@ -16,6 +16,7 @@ export interface Env {
   UPSTASH_REDIS_REST_URL?: string;
   UPSTASH_REDIS_REST_TOKEN?: string;
   GEMINI_API_KEY?: string;
+  GEMINI_PROXY?: any;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -427,17 +428,42 @@ Output ONLY the JSON array.`;
     ];
 
     for (const model of models) {
+      const tModel = Date.now();
       try {
+        debugLogs?.push(`Starting ${model}...`);
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 11000);
+        let res: Response;
+        const bodyStr = JSON.stringify(payload);
+        try {
+          if (env.GEMINI_PROXY) {
+            const doId = env.GEMINI_PROXY.idFromName('gemini-us-west-1');
+            const stub = env.GEMINI_PROXY.get(doId, { locationHint: 'wnam' });
+            res = await stub.fetch('https://gemini-proxy/forward', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-gemini-target-url': url
+              },
+              signal: controller.signal,
+              body: bodyStr
+            });
+          } else {
+            res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: controller.signal,
+              body: bodyStr
+            });
+          }
+        } finally {
+          clearTimeout(timer);
+        }
 
         if (!res.ok) {
           const errText = await res.text();
-          debugLogs?.push(`${model} HTTP ${res.status}: ${errText.slice(0, 180)}`);
+          debugLogs?.push(`${model} HTTP ${res.status} (${Date.now() - tModel}ms): ${errText.slice(0, 180)}`);
           console.warn(`Gemini Edge API (${model}) error:`, res.status, errText.slice(0, 200));
           continue;
         }
@@ -445,11 +471,11 @@ Output ONLY the JSON array.`;
         const data = await res.json() as any;
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
         if (!rawText) {
-          debugLogs?.push(`${model} empty candidates: ${JSON.stringify(data).slice(0, 150)}`);
+          debugLogs?.push(`${model} empty (${Date.now() - tModel}ms): ${JSON.stringify(data).slice(0, 150)}`);
           continue;
         }
 
-        debugLogs?.push(`${model} OK len=${rawText.length}`);
+        debugLogs?.push(`${model} OK (${Date.now() - tModel}ms) len=${rawText.length}`);
         let cleanJson = rawText.trim();
         if (cleanJson.startsWith('```')) {
           cleanJson = cleanJson.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
@@ -554,6 +580,7 @@ async function runEdgeWhisperTranscription(
           updatedJob.status = 'COMPLETED';
           updatedJob.duration = geminiSegments[geminiSegments.length - 1].end;
           updatedJob.segments = geminiSegments;
+          updatedJob.gemini_debug = debugLogs;
           await saveJob(env, jobId, updatedJob);
           return;
         }
@@ -668,6 +695,7 @@ async function runEdgeWhisperTranscription(
 
     const updatedJob = (await getJob(env, jobId)) || job || { job_id: jobId };
     updatedJob.status = 'COMPLETED';
+    updatedJob.gemini_debug = debugLogs;
     if (finalSegments.length > 0) {
       updatedJob.duration = finalSegments[finalSegments.length - 1].end;
       updatedJob.segments = finalSegments;
