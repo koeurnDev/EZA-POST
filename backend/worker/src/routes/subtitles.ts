@@ -790,19 +790,41 @@ app.get('/api/v1/jobs/:id', async (c) => {
   });
 });
 
-// 5. Update Job Segments
+// 5. Update Job Segments (Supports Upsert for client-side Gemini Flash jobs)
 app.post('/api/v1/jobs/:id/update', async (c) => {
   const jobId = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
-  const job = await getJob(c.env, jobId);
-
-  if (job && body.segments) {
-    job.segments = body.segments;
-    await saveJob(c.env, jobId, job);
-    return c.json({ status: 'success', message: 'Segments updated', count: job.segments.length });
+  if (!body.segments || !Array.isArray(body.segments)) {
+    return c.json({ error: 'Invalid payload: segments array required' }, 400);
   }
 
-  return c.json({ error: 'Job not found or invalid payload' }, 404);
+  let job = await getJob(c.env, jobId);
+  if (!job) {
+    // Upsert new completed job from client-side direct transcription
+    job = {
+      job_id: jobId,
+      status: 'COMPLETED',
+      filename: body.filename || 'media',
+      duration: body.segments[body.segments.length - 1]?.end || 30.0,
+      language: body.language || 'km',
+      segments: body.segments,
+      created_at: new Date().toISOString()
+    };
+  } else {
+    job.segments = body.segments;
+    if (body.filename) job.filename = body.filename;
+    if (body.segments.length > 0) {
+      job.duration = body.segments[body.segments.length - 1]?.end || job.duration;
+    }
+  }
+
+  await saveJob(c.env, jobId, job);
+  return c.json({
+    status: 'success',
+    message: 'Segments saved successfully',
+    job_id: jobId,
+    count: job.segments.length
+  });
 });
 
 // Delete Job and associated media file from R2 & Redis
