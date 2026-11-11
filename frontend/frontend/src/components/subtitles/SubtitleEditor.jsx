@@ -62,10 +62,99 @@ export const tokenizeRealWords = (text) => {
 
 export const tokenizeKhmerWords = tokenizeRealWords;
 
+function chunkTextByWords(text, count) {
+  if (!text) return [];
+  const preSpaced = text
+    .replace(/([\u1780-\u17FF])([A-Za-z0-9])/g, '$1 $2')
+    .replace(/([A-Za-z0-9])([\u1780-\u17FF])/g, '$1 $2')
+    .replace(/[\s\u200b]+/g, ' ')
+    .trim();
+
+  try {
+    if (EDITOR_KM_SEGMENTER) {
+      const raw = Array.from(EDITOR_KM_SEGMENTER.segment(preSpaced));
+      const wordIndices = [];
+      raw.forEach((item, idx) => {
+        if (item.isWordLike) wordIndices.push(idx);
+      });
+      if (wordIndices.length <= count) return [preSpaced];
+
+      const chunks = [];
+      for (let i = 0; i < wordIndices.length; i += count) {
+        const firstRawIdx = wordIndices[i];
+        const nextFirstRawIdx = i + count < wordIndices.length ? wordIndices[i + count] : raw.length;
+        const sliceText = raw
+          .slice(firstRawIdx, nextFirstRawIdx)
+          .map((r) => r.segment)
+          .join('')
+          .trim();
+        if (sliceText) chunks.push(sliceText);
+      }
+      if (chunks.length > 0) return chunks;
+    }
+  } catch (e) {}
+
+  const words = tokenizeRealWords(preSpaced);
+  if (words.length <= count) return [preSpaced];
+  const fallbackChunks = [];
+  for (let i = 0; i < words.length; i += count) {
+    fallbackChunks.push(words.slice(i, i + count).join(' '));
+  }
+  return fallbackChunks;
+}
+
+// Reconstruct natural phrase segments if baseSegments were previously overwritten by 1-word/2-word split segments
+function ensurePhraseSegments(segments) {
+  if (!Array.isArray(segments) || segments.length <= 2) return segments || [];
+  const avgWords =
+    segments.reduce((sum, s) => sum + tokenizeRealWords(s.text || '').length, 0) / segments.length;
+  const avgDur =
+    segments.reduce((sum, s) => sum + Math.max(0, (s.end || 0) - (s.start || 0)), 0) / segments.length;
+
+  // If segments are already normal phrases (> 2.5 words on average or > 1.5s average duration), keep as-is
+  if (avgWords > 2.5 && avgDur > 1.3) {
+    return segments;
+  }
+
+  // Otherwise merge tiny split segments back into natural ~2.8s phrases (6-8 words)
+  const merged = [];
+  let current = null;
+  let currentWordCount = 0;
+
+  for (const seg of segments) {
+    const txt = (seg.text || '').trim();
+    if (!txt) continue;
+    const wCount = Math.max(1, tokenizeRealWords(txt).length);
+
+    if (!current) {
+      current = { ...seg, text: txt };
+      currentWordCount = wCount;
+    } else {
+      const gap = (seg.start || 0) - (current.end || 0);
+      const newDur = (seg.end || 0) - (current.start || 0);
+      if (gap <= 0.6 && newDur <= 3.6 && currentWordCount + wCount <= 8) {
+        const needsSpace =
+          /[A-Za-z0-9]$/.test(current.text) || /^[A-Za-z0-9]/.test(txt);
+        current.text = needsSpace ? `${current.text} ${txt}` : `${current.text}${txt}`;
+        current.end = seg.end;
+        currentWordCount += wCount;
+      } else {
+        merged.push({ ...current, id: merged.length + 1 });
+        current = { ...seg, text: txt };
+        currentWordCount = wCount;
+      }
+    }
+  }
+  if (current) {
+    merged.push({ ...current, id: merged.length + 1 });
+  }
+  return merged;
+}
+
 function splitSegmentsByWords(sourceSegments, pacingMode = 'phrase') {
   if (!Array.isArray(sourceSegments)) return [];
   if (!pacingMode || pacingMode === 'phrase' || pacingMode === '0') {
-    return sourceSegments;
+    return sourceSegments.map((s, idx) => ({ ...s, id: idx + 1 }));
   }
 
   const count = parseInt(pacingMode, 10) || 1;
@@ -79,7 +168,7 @@ function splitSegmentsByWords(sourceSegments, pacingMode = 'phrase') {
     // 1. If acoustic word timestamps from Gemini exist, use them directly for 100% precision!
     if (Array.isArray(seg.words) && seg.words.length > 0) {
       const validWords = seg.words.filter(w => w.word && w.word.trim());
-      if (validWords.length > 0) {
+      if (validWords.length > count) {
         for (let i = 0; i < validWords.length; i += count) {
           const slice = validWords.slice(i, i + count);
           const chunkText = slice.map(w => w.word.trim()).join(' ');
@@ -97,26 +186,21 @@ function splitSegmentsByWords(sourceSegments, pacingMode = 'phrase') {
       }
     }
 
-    // 2. Fallback: tokenizeRealWords with character duration ratio
-    const words = tokenizeRealWords(text);
-    if (words.length <= count) {
+    // 2. Natural Khmer Word Chunking using Intl.Segmenter + proportional duration
+    const chunks = chunkTextByWords(text, count);
+    if (chunks.length <= 1) {
       result.push({
         ...seg,
         id: segCounter++,
         start: Math.round(seg.start * 100) / 100,
         end: Math.round(seg.end * 100) / 100,
-        text: text
+        text: chunks[0] || text
       });
       continue;
     }
 
-    const chunks = [];
-    for (let i = 0; i < words.length; i += count) {
-      chunks.push(words.slice(i, i + count).join(' '));
-    }
-
     const totalChars = chunks.reduce((sum, c) => sum + c.length, 0);
-    const duration = Math.max(0.4, seg.end - seg.start);
+    const duration = Math.max(0.3, seg.end - seg.start);
 
     let currentStart = seg.start;
     for (let idx = 0; idx < chunks.length; idx++) {
@@ -322,9 +406,11 @@ export default function SubtitleEditor({
   useEffect(() => {
     if (job?.segments && job.segments.length > 0) {
       if (job.segments !== lastInternalUpdateRef.current) {
+        const cleanPhrases = ensurePhraseSegments(job.segments);
         lastInternalUpdateRef.current = job.segments;
-        setBaseSegments(job.segments);
-        setSegments(job.segments);
+        setBaseSegments(cleanPhrases);
+        const currentView = wordsPerSub === 'phrase' ? cleanPhrases : splitSegmentsByWords(cleanPhrases, wordsPerSub);
+        setSegments(currentView);
       }
     }
   }, [job?.segments]);
@@ -341,37 +427,46 @@ export default function SubtitleEditor({
     setSaveSuccess(false);
   };
 
-  // Auto-Save Draft to LocalStorage so edits are never lost on refresh
+  // Auto-Save Base Phrase Draft to LocalStorage so edits are never lost on refresh
   useEffect(() => {
-    if (job?.job_id && segments?.length > 0) {
+    if (job?.job_id && baseSegments?.length > 0) {
       try {
-        localStorage.setItem(`khmersub_draft_${job.job_id}`, JSON.stringify(segments));
+        localStorage.setItem(`khmersub_base_draft_${job.job_id}`, JSON.stringify(baseSegments));
       } catch (e) {}
     }
-  }, [segments, job?.job_id]);
+  }, [baseSegments, job?.job_id]);
 
-  // Restore saved draft if available
+  // Restore saved base phrase draft if available
   useEffect(() => {
     if (!job?.job_id) return;
     try {
-      const saved = localStorage.getItem(`khmersub_draft_${job.job_id}`);
+      // Remove legacy corrupted split draft key if present
+      localStorage.removeItem(`khmersub_draft_${job.job_id}`);
+      const saved = localStorage.getItem(`khmersub_base_draft_${job.job_id}`);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setBaseSegments(parsed);
-          setSegments(parsed);
+          const cleanPhrases = ensurePhraseSegments(parsed);
+          lastInternalUpdateRef.current = cleanPhrases;
+          setBaseSegments(cleanPhrases);
+          setSegments(cleanPhrases);
           if (onJobUpdated) {
-            onJobUpdated({ ...job, segments: parsed });
+            onJobUpdated({ ...job, segments: cleanPhrases });
           }
         }
       }
     } catch (e) {}
   }, [job?.job_id]);
 
-  // Dynamic Pacing Change (Standard Phrase, Short 2-3s, Medium 3-4s)
+  // Dynamic Pacing Change (Standard Phrase, 1 Word, 2 Words, 3 Words)
   const handlePacingChange = (newPacing) => {
     setWordsPerSub(newPacing);
-    const updated = splitSegmentsByWords(baseSegments, newPacing);
+    const cleanBase = ensurePhraseSegments(baseSegments);
+    if (cleanBase !== baseSegments) {
+      setBaseSegments(cleanBase);
+    }
+    const updated = splitSegmentsByWords(cleanBase, newPacing);
+    lastInternalUpdateRef.current = updated;
     setSegments(updated);
     if (onJobUpdated) {
       onJobUpdated({ ...job, segments: updated });
@@ -1136,6 +1231,16 @@ export default function SubtitleEditor({
             }`}
           >
             2 ពាក្យ
+          </button>
+          <button
+            onClick={() => handlePacingChange('3')}
+            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all font-khmer ${
+              wordsPerSub === '3'
+                ? 'bg-indigo-600 text-white font-semibold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            3 ពាក្យ
           </button>
         </div>
 
