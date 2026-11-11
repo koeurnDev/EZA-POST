@@ -14,7 +14,7 @@ const fb = require("../../utils/fb");
 const FB_APP_ID = process.env.FB_APP_ID;
 const FB_APP_SECRET = process.env.FB_APP_SECRET;
 
-// Determine Base URL (Handle Render, Vercel, or Localhost)
+// Determine Base URL (Handle Render, Cloudflare Pages, or Localhost)
 const BASE_URL =
     process.env.API_BASE_URL ||
     process.env.RENDER_EXTERNAL_URL ||

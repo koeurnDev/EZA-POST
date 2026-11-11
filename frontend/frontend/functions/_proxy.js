@@ -25,13 +25,11 @@ export async function proxyToApi(request, env) {
     }
   }
 
-  if (!env.API_ORIGIN) {
-    return Response.json({ error: "API origin is not configured" }, { status: 503 });
-  }
+  const apiOriginStr = env.API_ORIGIN || "https://eza-post-api.koeurnseab630.workers.dev";
 
   let destination;
   try {
-    const apiOrigin = new URL(env.API_ORIGIN);
+    const apiOrigin = new URL(apiOriginStr);
     if (apiOrigin.protocol !== "https:" && apiOrigin.protocol !== "http:") {
       return Response.json({ error: "API origin must use HTTP or HTTPS" }, { status: 500 });
     }
