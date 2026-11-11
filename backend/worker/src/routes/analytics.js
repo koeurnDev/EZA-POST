@@ -51,7 +51,10 @@ export function buildAnalyticsStats(posts, engagement) {
 
     if (parseJsonArray(post.accounts).length) platformCounts.facebook++;
 
-    const dateKey = post.createdAt.toISOString().split("T")[0];
+    const createdDate = post.createdAt instanceof Date ? post.createdAt : new Date(post.createdAt || Date.now());
+    const dateKey = !Number.isNaN(createdDate.getTime())
+      ? createdDate.toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0];
     dailyActivity.set(dateKey, (dailyActivity.get(dateKey) || 0) + 1);
   }
 

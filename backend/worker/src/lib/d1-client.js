@@ -42,6 +42,28 @@ export function createD1Client(db) {
           }
         }
       }
+
+      // Bi-directional Prisma/D1 column aliases
+      if (tableName === "posts") {
+        if (res.caption && !res.content) res.content = res.caption;
+        if (res.content && !res.caption) res.caption = res.content;
+        if (res.mediaFiles && !res.mediaUrls) res.mediaUrls = res.mediaFiles;
+        if (res.mediaUrls && !res.mediaFiles) res.mediaFiles = res.mediaUrls;
+        if (res.scheduleTime && !res.scheduledFor) res.scheduledFor = res.scheduleTime;
+        if (res.scheduledFor && !res.scheduleTime) res.scheduleTime = res.scheduledFor;
+        if (res.postType && !res.mediaType) res.mediaType = res.postType;
+        if (res.mediaType && !res.postType) res.postType = res.mediaType;
+      } else if (tableName === "bot_rules") {
+        if (res.keyword && !res.trigger) res.trigger = res.keyword;
+        if (res.trigger && !res.keyword) res.keyword = res.trigger;
+        if (res.reply && !res.response) res.response = res.reply;
+        if (res.response && !res.reply) res.reply = res.response;
+        if (res.ruleType && !res.type) res.type = res.ruleType;
+        if (res.type && !res.ruleType) res.ruleType = res.type;
+        if (res.enabled !== undefined && res.isActive === undefined) res.isActive = res.enabled;
+        if (res.isActive !== undefined && res.enabled === undefined) res.enabled = res.isActive;
+      }
+
       return res;
     };
 
@@ -262,15 +284,15 @@ export function createD1Client(db) {
   });
 
   const facebookPageModel = createModel("facebook_pages", {
-    boolFields: ["isConnected", "isSelected"],
+    boolFields: ["isConnected", "isSelected", "enableBot", "enableSchedule", "enableInbox"],
   });
 
   const postModel = createModel("posts", {
-    jsonFields: ["mediaUrls"],
+    jsonFields: ["mediaUrls", "mediaFiles", "carouselCards", "accounts", "publishedIds", "lastError"],
   });
 
   const botRuleModel = createModel("bot_rules", {
-    boolFields: ["isActive"],
+    boolFields: ["isActive", "enabled", "enableDm"],
   });
 
   const creditTransactionModel = createModel("credit_transactions", {

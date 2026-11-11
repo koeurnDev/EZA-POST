@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS users (
   twoFactorEnabled INTEGER DEFAULT 0,
   twoFactorVerified INTEGER DEFAULT 0,
   credits INTEGER DEFAULT 100,
+  totalCreditsSpent INTEGER DEFAULT 0,
+  totalCreditsPurchased INTEGER DEFAULT 0,
+  pageSettings TEXT DEFAULT '[]',
   lastLogin TEXT,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
   updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
@@ -36,6 +39,9 @@ CREATE TABLE IF NOT EXISTS facebook_pages (
   category TEXT,
   isConnected INTEGER DEFAULT 1,
   isSelected INTEGER DEFAULT 1,
+  enableBot INTEGER DEFAULT 0,
+  enableSchedule INTEGER DEFAULT 1,
+  enableInbox INTEGER DEFAULT 0,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
   updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -44,12 +50,24 @@ CREATE TABLE IF NOT EXISTS posts (
   id TEXT PRIMARY KEY,
   userId TEXT NOT NULL,
   content TEXT,
+  caption TEXT,
   mediaUrls TEXT,
-  mediaType TEXT,
+  mediaFiles TEXT DEFAULT '[]',
+  mediaType TEXT DEFAULT 'video',
+  postType TEXT DEFAULT 'video',
+  videoUrl TEXT,
+  thumbnailUrl TEXT,
+  carouselCards TEXT DEFAULT '[]',
+  accounts TEXT DEFAULT '[]',
+  publishedIds TEXT DEFAULT '[]',
   status TEXT DEFAULT 'draft',
   scheduledFor TEXT,
+  scheduleTime TEXT,
   publishedAt TEXT,
+  postedAt TEXT,
+  attempts INTEGER DEFAULT 0,
   error TEXT,
+  lastError TEXT,
   platform TEXT DEFAULT 'facebook',
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
   updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
@@ -58,11 +76,20 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE TABLE IF NOT EXISTS bot_rules (
   id TEXT PRIMARY KEY,
   userId TEXT NOT NULL,
-  trigger TEXT NOT NULL,
-  response TEXT NOT NULL,
+  keyword TEXT,
+  trigger TEXT,
+  reply TEXT,
+  response TEXT,
+  ruleType TEXT DEFAULT 'KEYWORD',
   type TEXT DEFAULT 'KEYWORD',
   scope TEXT DEFAULT 'ALL',
+  enabled INTEGER DEFAULT 1,
   isActive INTEGER DEFAULT 1,
+  postId TEXT,
+  attachmentUrl TEXT,
+  dmReply TEXT,
+  enableDm INTEGER DEFAULT 0,
+  pageId TEXT,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
   updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -75,4 +102,3 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
   description TEXT,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
-
