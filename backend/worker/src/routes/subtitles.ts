@@ -444,7 +444,8 @@ Output ONLY a valid JSON array of subtitle segments.`;
               required: ['id', 'start', 'end', 'text']
             }
           },
-          temperature: 0.1
+          temperature: 0.1,
+          maxOutputTokens: 8192
         };
         if (thinkingBudget !== null) {
           generationConfig.thinkingConfig = { thinkingBudget };
@@ -510,7 +511,24 @@ Output ONLY a valid JSON array of subtitle segments.`;
           cleanJson = cleanJson.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
         }
 
-        let parsed = JSON.parse(cleanJson);
+        let parsed: any;
+        try {
+          parsed = JSON.parse(cleanJson);
+        } catch (jsonErr) {
+          // If Gemini output was truncated mid-JSON, repair unclosed array
+          const lastBrace = cleanJson.lastIndexOf('}');
+          if (lastBrace !== -1) {
+            try {
+              parsed = JSON.parse(cleanJson.slice(0, lastBrace + 1) + ']');
+            } catch (repairErr) {
+              debugLogs?.push(`JSON parse & repair failed: ${jsonErr}`);
+              continue;
+            }
+          } else {
+            debugLogs?.push(`JSON parse failed: ${jsonErr}`);
+            continue;
+          }
+        }
         if (!Array.isArray(parsed)) {
           if (parsed && Array.isArray(parsed.subtitles)) parsed = parsed.subtitles;
           else if (parsed && Array.isArray(parsed.segments)) parsed = parsed.segments;
