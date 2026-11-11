@@ -13,9 +13,56 @@ users.get("/pages", requireAuth, async (c) => {
       include: { facebookPages: true },
     });
 
-    const pages = Array.isArray(user?.facebookPages) ? user.facebookPages : [];
-    if (!user || (!user.facebookAccessToken && pages.length === 0)) {
-      return c.json({ success: true, accounts: [] });
+    const rawPages = Array.isArray(user?.facebookPages) ? user.facebookPages : [];
+    if (!user || (!user.facebookAccessToken && rawPages.length === 0 && !user.facebookId)) {
+      return c.json({ success: true, accounts: [], user: null });
+    }
+
+    const pages = [...rawPages];
+    // If the user's personal profile is not in the pages list, include it so the user can post to both personal profile and pages
+    if (user.facebookId && !pages.some((p) => String(p.id) === String(user.facebookId))) {
+      const profileName = `${user.facebookName || "Facebook User"} (គណនីផ្ទាល់ខ្លួន)`;
+      const profilePic = `https://graph.facebook.com/${user.facebookId}/picture?type=large`;
+      const profileDest = {
+        id: String(user.facebookId),
+        userId: String(userId),
+        name: profileName,
+        picture: profilePic,
+        category: "គណនីផ្ទាល់ខ្លួន",
+        isSelected: true,
+        enableBot: false,
+        enableSchedule: true,
+        enableInbox: false
+      };
+      try {
+        await getPrisma(c.env).facebookPage.upsert({
+          where: { id: String(user.facebookId) },
+          update: {
+            userId: String(userId),
+            name: profileName,
+            picture: profilePic,
+            category: "គណនីផ្ទាល់ខ្លួន",
+            isConnected: true,
+            isSelected: true
+          },
+          create: {
+            id: String(user.facebookId),
+            userId: String(userId),
+            name: profileName,
+            picture: profilePic,
+            category: "គណនីផ្ទាល់ខ្លួន",
+            accessToken: user.facebookAccessToken || null,
+            isConnected: true,
+            isSelected: true,
+            enableSchedule: true,
+            enableBot: false,
+            enableInbox: false
+          }
+        });
+      } catch (err) {
+        console.warn("Could not upsert profile destination to facebookPage:", err);
+      }
+      pages.unshift(profileDest);
     }
 
     const pageSettings = parsePageSettings(user.pageSettings);
@@ -25,7 +72,9 @@ users.get("/pages", requireAuth, async (c) => {
         id: page.id,
         name: page.name,
         picture: page.picture,
-        isSelected: page.isSelected,
+        category: page.category || "Facebook Page",
+        isProfile: page.category === "គណនីផ្ទាល់ខ្លួន" || String(page.id) === String(user.facebookId),
+        isSelected: page.isSelected !== false,
         settings: {
           enableBot: page.enableBot || savedSettings.enableBot || false,
           enableSchedule: page.enableSchedule !== false,
@@ -34,7 +83,11 @@ users.get("/pages", requireAuth, async (c) => {
       };
     });
 
-    return c.json({ success: true, accounts });
+    return c.json({
+      success: true,
+      accounts,
+      user: user.facebookId ? { id: user.facebookId, name: user.facebookName } : null
+    });
   } catch (error) {
     const diagnosticId = c.req.header("cf-ray");
     const errorCode = typeof error?.code === "string" ? error.code : "UNKNOWN";
@@ -478,18 +531,44 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
       },
     });
 
-    const savedPages = [];
+    const destinationsToSave = [];
+
+    // 1. Always include User's Personal Profile / Account so user can post to both personal profile & pages
+    if (fbUser && fbUser.id) {
+      destinationsToSave.push({
+        id: String(fbUser.id),
+        name: `${fbUser.name} (គណនីផ្ទាល់ខ្លួន)`,
+        picture: fbUser.picture || `https://graph.facebook.com/${fbUser.id}/picture?type=large`,
+        category: "គណនីផ្ទាល់ខ្លួន",
+        access_token: userToken || cleanCookie
+      });
+    }
+
+    // 2. Add all Facebook Pages
     for (const p of rawPages) {
+      if (p && p.id && String(p.id) !== String(fbUser?.id)) {
+        destinationsToSave.push({
+          id: String(p.id),
+          name: String(p.name),
+          picture:
+            p.picture?.data?.url ||
+            (typeof p.picture === "string" ? p.picture : null) ||
+            `https://graph.facebook.com/${p.id}/picture?type=large`,
+          category: p.category || "Facebook Page",
+          access_token: p.access_token || p.accessToken || userToken || cleanCookie
+        });
+      }
+    }
+
+    const savedPages = [];
+    for (const p of destinationsToSave) {
       if (!p || !p.id || !p.name) continue;
       try {
         const encryptedPageToken = await encryptFacebookToken(
-          p.access_token || p.accessToken || userToken || cleanCookie,
+          p.access_token || userToken || cleanCookie,
           c.env
         );
-        const pictureUrl =
-          p.picture?.data?.url ||
-          (typeof p.picture === "string" ? p.picture : null) ||
-          `https://graph.facebook.com/${p.id}/picture?type=large`;
+        const pictureUrl = p.picture || `https://graph.facebook.com/${p.id}/picture?type=large`;
         const category = p.category || "Facebook Page";
 
         const saved = await prisma.facebookPage.upsert({
@@ -520,10 +599,11 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
           name: saved.name,
           picture: saved.picture,
           category: saved.category,
+          isProfile: category === "គណនីផ្ទាល់ខ្លួន",
           isSelected: true,
         });
       } catch (pageErr) {
-        console.warn("Failed to upsert Facebook page:", p.id, pageErr);
+        console.warn("Failed to upsert Facebook page/profile:", p.id, pageErr);
       }
     }
 

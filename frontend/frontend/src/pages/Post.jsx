@@ -803,7 +803,12 @@ export default function Post() {
                                                                     >
                                                                         <div className="flex items-center gap-3">
                                                                             <img src={page.picture} className="w-9 h-9 rounded-full border border-white/10" />
-                                                                            <p className={`text-[13px] font-bold ${isSelected ? 'text-blue-600' : 'text-gray-900 dark:text-white'}`}>{page.name}</p>
+                                                                            <div className="flex flex-col">
+                                                                                <p className={`text-[13px] font-bold ${isSelected ? 'text-blue-600' : 'text-gray-900 dark:text-white'}`}>{page.name}</p>
+                                                                                <span className={`text-[10px] font-bold ${page.isProfile || page.category === "គណនីផ្ទាល់ខ្លួន" ? 'text-purple-500' : 'text-slate-400'}`}>
+                                                                                    {page.isProfile || page.category === "គណនីផ្ទាល់ខ្លួន" ? "គណនីផ្ទាល់ខ្លួន" : "ផេក Facebook"}
+                                                                                </span>
+                                                                            </div>
                                                                         </div>
                                                                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-200 dark:border-white/10'}`}>
                                                                             {isSelected && <Zap size={10} className="text-white fill-white" />}

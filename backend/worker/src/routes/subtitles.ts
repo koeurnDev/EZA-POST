@@ -238,24 +238,22 @@ async function handleUploadAndTranscribe(c: any) {
     }
   }
 
-  // Get audio buffer for Whisper fallback (use extracted 16kHz WAV audio if available)
+  // Get clean audio buffer (use client-extracted 16kHz WAV audio if available)
   const audioBuffer = audioFile ? await audioFile.arrayBuffer() : arrayBuffer;
 
-  // For Gemini Multimodal ASR: prefer original video/audio buffer (under 18MB) so Gemini can BOTH hear the original audio AND read on-screen burned-in Khmer/English video text!
-  let geminiBuffer = arrayBuffer;
-  let geminiMimeType = file.type || (isVideo ? 'video/mp4' : 'audio/mp3');
-  if (ext === '.mp4') geminiMimeType = 'video/mp4';
-  else if (ext === '.mov') geminiMimeType = 'video/quicktime';
-  else if (ext === '.webm') geminiMimeType = 'video/webm';
-  else if (ext === '.mkv') geminiMimeType = 'video/x-matroska';
-  else if (ext === '.wav') geminiMimeType = 'audio/wav';
-  else if (ext === '.m4a') geminiMimeType = 'audio/m4a';
-  else if (ext === '.ogg') geminiMimeType = 'audio/ogg';
-  else if (ext === '.mp3') geminiMimeType = 'audio/mp3';
-
-  if (arrayBuffer.byteLength > 18 * 1024 * 1024 && audioFile) {
-    geminiBuffer = audioBuffer;
-    geminiMimeType = 'audio/wav';
+  // For Gemini Multimodal ASR:
+  // If clean extracted audio is provided, prioritize it for ultra-fast 2-4s speech recognition!
+  let geminiBuffer = audioFile ? audioBuffer : arrayBuffer;
+  let geminiMimeType = audioFile ? 'audio/wav' : (file.type || (isVideo ? 'video/mp4' : 'audio/mp3'));
+  if (!audioFile) {
+    if (ext === '.mp4') geminiMimeType = 'video/mp4';
+    else if (ext === '.mov') geminiMimeType = 'video/quicktime';
+    else if (ext === '.webm') geminiMimeType = 'video/webm';
+    else if (ext === '.mkv') geminiMimeType = 'video/x-matroska';
+    else if (ext === '.wav') geminiMimeType = 'audio/wav';
+    else if (ext === '.m4a') geminiMimeType = 'audio/m4a';
+    else if (ext === '.ogg') geminiMimeType = 'audio/ogg';
+    else if (ext === '.mp3') geminiMimeType = 'audio/mp3';
   }
 
   const jobRecord = {
@@ -417,11 +415,13 @@ Strict Rules for Perfect Audio-to-Subtitle Synchronization:
 ${customPrompt ? `Special terminology / context: ${customPrompt}` : ''}
 Output ONLY a valid JSON array of subtitle segments.`;
 
+    const isVideoFile = validMime.startsWith('video/');
     const modelConfigs: Array<{ model: string; thinkingBudget: number | null; timeoutMs: number }> = [
-      { model: 'gemini-3-flash-preview', thinkingBudget: 0, timeoutMs: 18000 },
-      { model: 'gemini-flash-latest', thinkingBudget: 0, timeoutMs: 15000 },
-      { model: 'gemini-3.1-flash-lite-preview', thinkingBudget: 0, timeoutMs: 12000 },
-      { model: 'gemini-flash-lite-latest', thinkingBudget: null, timeoutMs: 12000 }
+      { model: 'gemini-3-flash-preview', thinkingBudget: 0, timeoutMs: isVideoFile ? 26000 : 18000 },
+      { model: 'gemini-2.5-flash', thinkingBudget: 0, timeoutMs: isVideoFile ? 26000 : 18000 },
+      { model: 'gemini-flash-latest', thinkingBudget: 0, timeoutMs: 16000 },
+      { model: 'gemini-2.0-flash', thinkingBudget: null, timeoutMs: 16000 },
+      { model: 'gemini-3.1-flash-lite-preview', thinkingBudget: 0, timeoutMs: 14000 }
     ];
 
     for (const cfg of modelConfigs) {

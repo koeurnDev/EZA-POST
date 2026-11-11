@@ -171,17 +171,35 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
             let pollAttempts = 0;
             const interval = setInterval(async () => {
               pollAttempts++;
-              if (pollAttempts > 120) {
+              if (pollAttempts > 45) {
                 clearInterval(interval);
                 setIsProcessing(false);
-                setErrorMsg('ការបម្លែងសំឡេងយូរខុសធម្មតា (Timeout)។ សូមសាកល្បងម្ដងទៀត!');
+                setErrorMsg('ការបម្លែងសំឡេងយូរខុសធម្មតា (Timeout)។ សូមចុចសាកល្បងម្ដងទៀត!');
                 return;
               }
 
               try {
                 const res = await fetch(`/api/v1/jobs/${jobId}`);
-                if (!res.ok) throw new Error('Failed to query job status');
-                const job = await res.json();
+                if (!res.ok) {
+                  if (pollAttempts > 25) {
+                    clearInterval(interval);
+                    setIsProcessing(false);
+                    setErrorMsg(`មិនអាចទាញយកទិន្នន័យពី Server បានទេ (HTTP ${res.status})`);
+                  }
+                  return;
+                }
+
+                const resText = await res.text();
+                if (!resText || !resText.trim()) return;
+
+                let job = null;
+                try {
+                  job = JSON.parse(resText);
+                } catch {
+                  return; // Don't crash on partial/in-transit responses
+                }
+
+                if (!job || typeof job !== 'object') return;
 
                 if (job.status === 'QUEUED') {
                   setCurrentStep(2);
@@ -209,10 +227,10 @@ export default function UploadSection({ onJobCompleted, isProcessing, setIsProce
                   setErrorMsg(job.error || 'ការបម្លែងសំឡេងបានបរាជ័យ');
                 }
               } catch (err) {
-                if (pollAttempts > 30) {
+                if (pollAttempts > 25) {
                   clearInterval(interval);
                   setIsProcessing(false);
-                  setErrorMsg(err.message || 'Error checking job status');
+                  setErrorMsg(err.message || 'កំហុសក្នុងការពិនិត្យស្ថានភាពការងារ');
                 }
               }
             }, 1000);
