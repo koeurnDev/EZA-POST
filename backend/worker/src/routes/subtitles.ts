@@ -401,18 +401,31 @@ Output ONLY the JSON array.`;
         ]
       }],
       generationConfig: {
-        response_mime_type: 'application/json',
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              id: { type: 'INTEGER' },
+              start: { type: 'NUMBER' },
+              end: { type: 'NUMBER' },
+              text: { type: 'STRING' }
+            },
+            required: ['id', 'start', 'end', 'text']
+          }
+        },
         temperature: 0.1
       }
     };
 
     const models = [
       'gemini-flash-lite-latest',
+      'gemini-flash-lite-latest',
       'gemini-3.8-flash',
       'gemini-3.5-flash-lite'
     ];
 
-    let rawText: string | null = null;
     for (const model of models) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -430,13 +443,55 @@ Output ONLY the JSON array.`;
         }
 
         const data = await res.json() as any;
-        rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-        if (rawText) {
-          debugLogs?.push(`${model} OK len=${rawText.length}`);
-          console.log(`Job ${jobId}: Gemini (${model}) responded successfully.`);
-          break;
-        } else {
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+        if (!rawText) {
           debugLogs?.push(`${model} empty candidates: ${JSON.stringify(data).slice(0, 150)}`);
+          continue;
+        }
+
+        debugLogs?.push(`${model} OK len=${rawText.length}`);
+        let cleanJson = rawText.trim();
+        if (cleanJson.startsWith('```')) {
+          cleanJson = cleanJson.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+        }
+
+        let parsed = JSON.parse(cleanJson);
+        if (!Array.isArray(parsed)) {
+          if (parsed && Array.isArray(parsed.subtitles)) parsed = parsed.subtitles;
+          else if (parsed && Array.isArray(parsed.segments)) parsed = parsed.segments;
+          else continue;
+        }
+
+        const segments: SubtitleSegment[] = [];
+        for (let i = 0; i < parsed.length; i++) {
+          const item = parsed[i];
+          const txt = normalizeKhmerText(String(item.text || '').trim());
+          if (txt && !isCorruptedKhmerOutput(txt)) {
+            const seg: SubtitleSegment = {
+              id: segments.length + 1,
+              start: Math.round(Number(item.start || 0) * 100) / 100,
+              end: Math.round(Number(item.end || Number(item.start || 0) + 2) * 100) / 100,
+              text: txt
+            };
+            if (Array.isArray(item.words) && item.words.length > 0) {
+              seg.words = item.words
+                .filter((w: any) => w && w.word)
+                .map((w: any) => ({
+                  word: normalizeKhmerText(String(w.word).trim()),
+                  start: Math.round(Number(w.start || seg.start) * 100) / 100,
+                  end: Math.round(Number(w.end || seg.end) * 100) / 100
+                }));
+            }
+            segments.push(seg);
+          } else {
+            debugLogs?.push(`Rejected segment: ${txt.slice(0, 60)}`);
+          }
+        }
+
+        debugLogs?.push(`Parsed=${parsed.length}, Kept=${segments.length}`);
+        if (segments.length > 0) {
+          console.log(`Job ${jobId}: Gemini (${model}) succeeded with ${segments.length} segments.`);
+          return segments;
         }
       } catch (modelErr: any) {
         debugLogs?.push(`${model} exception: ${modelErr?.message || String(modelErr)}`);
@@ -444,48 +499,7 @@ Output ONLY the JSON array.`;
       }
     }
 
-    if (!rawText) return null;
-
-    let cleanJson = rawText.trim();
-    if (cleanJson.startsWith('```')) {
-      cleanJson = cleanJson.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-    }
-
-    let parsed = JSON.parse(cleanJson);
-    if (!Array.isArray(parsed)) {
-      if (parsed && Array.isArray(parsed.subtitles)) parsed = parsed.subtitles;
-      else if (parsed && Array.isArray(parsed.segments)) parsed = parsed.segments;
-      else return null;
-    }
-
-    const segments: SubtitleSegment[] = [];
-    for (let i = 0; i < parsed.length; i++) {
-      const item = parsed[i];
-      const txt = normalizeKhmerText(String(item.text || '').trim());
-      if (txt && !isCorruptedKhmerOutput(txt)) {
-        const seg: SubtitleSegment = {
-          id: segments.length + 1,
-          start: Math.round(Number(item.start || 0) * 100) / 100,
-          end: Math.round(Number(item.end || Number(item.start || 0) + 2) * 100) / 100,
-          text: txt
-        };
-        if (Array.isArray(item.words) && item.words.length > 0) {
-          seg.words = item.words
-            .filter((w: any) => w && w.word)
-            .map((w: any) => ({
-              word: normalizeKhmerText(String(w.word).trim()),
-              start: Math.round(Number(w.start || seg.start) * 100) / 100,
-              end: Math.round(Number(w.end || seg.end) * 100) / 100
-            }));
-        }
-        segments.push(seg);
-      } else {
-        debugLogs?.push(`Rejected segment: ${txt.slice(0, 60)}`);
-      }
-    }
-
-    debugLogs?.push(`Parsed=${parsed.length}, Kept=${segments.length}`);
-    return segments.length > 0 ? segments : null;
+    return null;
   } catch (err: any) {
     debugLogs?.push(`Outer catch: ${err?.message || String(err)}`);
     console.warn('Gemini Edge Transcription exception:', err);

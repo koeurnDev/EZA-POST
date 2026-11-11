@@ -91,6 +91,7 @@ export function phoneticKhmerToUnicode(text: string): string {
   processed = processed.replace(/ប៊ុតតុន/g, 'ប៊ូតុង');
   processed = processed.replace(/(ហ្វុន|ហ្វុង)/g, 'Font');
   processed = processed.replace(/អេអាយ/g, 'AI');
+  processed = processed.replace(/អាយធី/g, 'IT');
   processed = processed.replace(/(អាក្សេស|អាក់សេស|សេស(?=ចូល)|(?<=អោយវា)សេស)/g, 'Access');
   processed = processed.replace(/(ប្រើសរណ៍|ប្រោស័រ|ប្រាវស័រ|ប្រូស័រ|ប្រើសិល)/g, 'Browser');
   processed = processed.replace(/(រីពរ\s*គីតហាប់|គីតហាប់)/g, 'GitHub');
