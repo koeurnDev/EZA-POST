@@ -20,6 +20,7 @@ import {
     FolderOpen,
     ToggleRight
 } from "lucide-react";
+import axios from "axios";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import EmptyState from "../components/ui/EmptyState";
@@ -46,9 +47,14 @@ export default function Connections() {
     const installGuideRef = useRef(null);
     const syncTimeoutRef = useRef(null);
     const [isGuideOpen, setIsGuideOpen] = useState(false);
+    const [fbOauthConfigured, setFbOauthConfigured] = useState(false);
 
     useEffect(() => {
         fetchPages().finally(() => setLoading(false));
+        axios
+            .get(apiUtils.getFullUrl("/auth/facebook/status"), { withCredentials: true })
+            .then((res) => setFbOauthConfigured(Boolean(res.data?.configured)))
+            .catch(() => setFbOauthConfigured(false));
     }, [user?.facebookId]);
 
     // Check & listen for EZA-POST Chrome Extension
@@ -77,25 +83,39 @@ export default function Connections() {
                     syncTimeoutRef.current = null;
                 }
 
-                if (!ok || !cookieString) {
+                if (!ok || (!accessToken && !fbUser?.id && (!Array.isArray(extPages) || extPages.length === 0))) {
                     setIsSyncingViaExt(false);
                     toast.error(error || "សូមបើក facebook.com និង Login គណនី Facebook លើ Browser ជាមុនសិន!");
                     return;
                 }
 
                 try {
+                    // Anti-ban protection: never send raw browser c_user/xs cookies off-device to server
                     const res = await apiUtils.connectFacebookCookie({
-                        cookieOrToken: cookieString,
+                        cookieOrToken: accessToken || "active_extension_session",
                         accessToken: accessToken || null,
+                        fbUserId: fbUserId || fbUser?.id || null,
                         fbUser: fbUser || null,
                         pages: Array.isArray(extPages) ? extPages : []
                     });
                     if (res.data?.success) {
                         const total = res.data.pagesCount ?? (res.data.pages?.length || 0);
                         const countText = total > 0 ? `${total} គោលដៅ (គណនី និងផេក)` : "គណនី Facebook";
-                        toast.success(`🎉 ភ្ជាប់ជោគជ័យ! បានធ្វើបច្ចុប្បន្នភាព ${countText} រួចរាល់!`, {
-                            duration: 5000
-                        });
+                        if (res.data.hasPublishToken === false) {
+                            toast(res.data.message || "ទាញបញ្ជីផេកបាន តែខ្វះ Access Token (EAA...) សម្រាប់ផុស!", {
+                                icon: "⚠️",
+                                duration: 7000
+                            });
+                        } else if (res.data.hasPublishPermissions === false) {
+                            toast(res.data.message || "Token ពី Extension អាចខ្វះសិទ្ធិផុសវីដេអូ — សូមផ្ទុក Extension ថ្មីឡើងវិញ!", {
+                                icon: "⚠️",
+                                duration: 8000
+                            });
+                        } else {
+                            toast.success(`🎉 ភ្ជាប់ជោគជ័យ! បានធ្វើបច្ចុប្បន្នភាព ${countText} រួចរាល់!`, {
+                                duration: 5000
+                            });
+                        }
                         await fetchPages(true);
                     } else {
                         toast.error(res.data?.error || "មិនអាចទាញយកផេកពី Facebook បានទេ");
@@ -246,6 +266,16 @@ export default function Connections() {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2">
+                                {fbOauthConfigured && (
+                                    <a
+                                        href={apiUtils.getFullUrl("/auth/facebook")}
+                                        className="h-9 px-3.5 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition font-khmer"
+                                    >
+                                        <Facebook size={14} />
+                                        <span>Facebook Login</span>
+                                    </a>
+                                )}
+
                                 <button
                                     type="button"
                                     onClick={() => setIsGuideOpen((prev) => !prev)}
@@ -359,7 +389,31 @@ export default function Connections() {
                                         </>
                                     )}
                                 </button>
+
+                                {fbOauthConfigured && (
+                                    <a
+                                        href={apiUtils.getFullUrl("/auth/facebook")}
+                                        className="h-10 px-4 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white text-xs font-semibold shadow-sm flex items-center justify-center gap-2 transition-all font-khmer"
+                                    >
+                                        <Facebook size={15} />
+                                        <span>ភ្ជាប់តាម Facebook Login</span>
+                                    </a>
+                                )}
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Meta OAuth capability notice when Facebook Login App is not configured on Worker */}
+                {pages.length > 0 && !fbOauthConfigured && (
+                    <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1">
+                            <p className="text-xs sm:text-sm font-bold text-amber-700 dark:text-amber-300 font-khmer">
+                                ⚠️ សម្រាប់ការផុសវីដេអូ / Mixed Carousel តាម Graph API ត្រូវការ Facebook Login OAuth
+                            </p>
+                            <p className="text-xs text-amber-800/80 dark:text-amber-200/80 font-khmer leading-relaxed">
+                                Token ដែលទាញពី Browser Extension (`EAAG`) អាចទាញបញ្ជីផេក និងផុសរូបភាព/អត្ថបទខ្លះបាន ប៉ុន្តែ Meta បដិសេធការផុសវីដេអូ (`FB #1 Invalid request`) បើគ្មាន Facebook App OAuth (សិទ្ធិផ្លូវការ `publish_video`) កំណត់នៅលើ Server។
+                            </p>
                         </div>
                     </div>
                 )}
@@ -589,6 +643,11 @@ export default function Connections() {
                                                     <span className="text-[11px] font-medium text-slate-400 font-mono">
                                                         ID: {page.id}
                                                     </span>
+                                                    {page.hasAccessToken === false && !page.isProfile && (
+                                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-khmer">
+                                                            ⚠️ ខ្វះ Access Token (សូម Sync ឡើងវិញ)
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -732,7 +791,10 @@ export default function Connections() {
                             ប្រព័ន្ធតភ្ជាប់តាម Extension ប្រកបដោយសុវត្ថិភាពខ្ពស់បំផុត
                         </h4>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer mt-0.5">
-                            មិនមានការបញ្ចូល Token ដោយដៃ ឬរក្សាទុកពាក្យសម្ងាត់ឡើយ។ រាល់ការភ្ជាប់ផេកទាំងអស់ធ្វើឡើងដោយស្វ័យប្រវត្តិតាមរយៈ EZA-POST FB Extension ផ្លូវការ។
+                            មិនមានការបញ្ចូល Token ដោយដៃ ឬរក្សាទុកពាក្យសម្ងាត់ឡើយ។{" "}
+                            <a href="/privacy" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold">Privacy Policy</a>
+                            {" • "}
+                            <a href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold">Terms of Service</a>
                         </p>
                     </div>
                 </div>

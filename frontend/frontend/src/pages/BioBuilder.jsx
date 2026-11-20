@@ -93,6 +93,8 @@ export default function BioBuilder() {
         const res = await api.get("/bio/me");
         if (res.data.success && res.data.bioPage) {
           const page = res.data.bioPage;
+          const loadedContacts = typeof page.contacts === "object" && page.contacts ? page.contacts : {};
+          const loadedHours = typeof page.businessHours === "object" && page.businessHours ? page.businessHours : {};
           setFormData({
             slug: page.slug || "",
             businessName: page.businessName || "",
@@ -101,12 +103,21 @@ export default function BioBuilder() {
             avatarUrl: page.avatarUrl || "",
             coverUrl: page.coverUrl || "",
             theme: page.theme || "dark",
-            contacts: page.contacts || {},
-            businessHours: page.businessHours || {
+            contacts: {
+              phone: "",
+              telegram: "",
+              whatsapp: "",
+              facebook: "",
+              tiktok: "",
+              website: "",
+              ...loadedContacts,
+            },
+            businessHours: {
               alwaysOpen: false,
               openTime: "07:00",
               closeTime: "21:00",
               days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+              ...loadedHours,
             },
             address: page.address || "",
             googleMapsUrl: page.googleMapsUrl || "",
@@ -131,7 +142,10 @@ export default function BioBuilder() {
 
   // Generate QR Code for downloading
   useEffect(() => {
-    if (!formData.slug) return;
+    if (!formData.slug) {
+      setQrDownloadUrl("");
+      return;
+    }
     const fullUrl = `${window.location.origin}/b/${formData.slug}`;
     QRCodeLib.toDataURL(fullUrl, {
       width: 600,
@@ -152,6 +166,7 @@ export default function BioBuilder() {
       .replace(/[^a-z0-9_-]/g, "-")
       .replace(/-+/g, "-");
     setFormData((prev) => ({ ...prev, slug: clean }));
+    setSlugStatus({ checking: false, available: true, error: null });
   };
 
   // Check Slug Availability
@@ -269,7 +284,7 @@ export default function BioBuilder() {
                   កាតអាជីវកម្មឌីជីថល (Digital Business Card)
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Noonlai Pro
+                  Moneaa Pro
                 </span>
               </div>
               <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1025,14 +1040,25 @@ export default function BioBuilder() {
                 </div>
 
                 <div className="max-w-xs mx-auto space-y-2">
-                  <a
-                    href={qrDownloadUrl}
-                    download={`${formData.slug || "store"}-qr.png`}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 transition-all"
-                  >
-                    <Download size={15} />
-                    <span>ទាញយករូបភាព QR Code (PNG)</span>
-                  </a>
+                  {qrDownloadUrl ? (
+                    <a
+                      href={qrDownloadUrl}
+                      download={`${formData.slug || "store"}-qr.png`}
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 transition-all"
+                    >
+                      <Download size={15} />
+                      <span>ទាញយករូបភាព QR Code (PNG)</span>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full py-3 bg-blue-600/50 text-white/70 font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-not-allowed"
+                    >
+                      <Download size={15} />
+                      <span>បញ្ចូល Handle ដើម្បីទាញយក QR Code</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {

@@ -1,4 +1,21 @@
 const graphApiVersion = "v21.0";
+const paceDelay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isFacebookHardStopError(fbErrOrMsg) {
+  if (!fbErrOrMsg) return false;
+  if (typeof fbErrOrMsg === "object" && !(fbErrOrMsg instanceof Error)) {
+    const code = Number(fbErrOrMsg.code);
+    if ([1, 4, 10, 17, 32, 190, 200, 368, 459].includes(code)) {
+      return true;
+    }
+    if (code === 100) return false;
+    return isFacebookHardStopError(fbErrOrMsg.message || "");
+  }
+  const msg = fbErrOrMsg instanceof Error ? fbErrOrMsg.message : String(fbErrOrMsg);
+  return /FB #(1|4|10|17|32|190|200|368|459)\b|Error validating access token|session has been invalidated|checkpoint|temporarily blocked|action blocked|spam/i.test(
+    msg
+  );
+}
 
 export async function exchangeFacebookCode(code, env) {
   const appId = requiredEnv(env, "FB_APP_ID");
@@ -69,58 +86,114 @@ export async function fetchFacebookPages(accessToken) {
   });
 }
 
-export async function publishFacebookPost(pageId, pageToken, post, page = {}) {
+export async function publishFacebookPost(pageId, pageToken, post, page = {}, env = null) {
+  if (
+    typeof pageToken !== "string" ||
+    !pageToken.trim() ||
+    pageToken === "active_extension_session" ||
+    /c_user=|xs=|;\s*[a-z_]+=/i.test(pageToken)
+  ) {
+    throw new Error(
+      "ផេកនេះមិនទាន់មាន Facebook Access Token (EAA...) ត្រឹមត្រូវសម្រាប់បង្ហោះទេ។ សូម Sync ឡើងវិញតាម Extension ឬភ្ជាប់តាម Facebook Login។"
+    );
+  }
   const graphUrl = `https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(pageId)}`;
+  const graphVideoUrl = `https://graph-video.facebook.com/${graphApiVersion}/${encodeURIComponent(pageId)}`;
   const mediaUrls = Array.isArray(post.mediaFiles)
     ? post.mediaFiles.filter((url) => typeof url === "string" && url)
     : [];
   const videoUrl = post.videoUrl || mediaUrls[0];
   if (post.postType === "carousel" && Array.isArray(post.carouselCards) &&
       post.carouselCards.length) {
-    const childAttachments = [];
-    for (const card of post.carouselCards) {
-      let mediaId;
-      if (card.type === "video") {
-        assertValidMediaUrl(card.mediaUrl, "video");
-        const uploaded = await graphPost(`${graphUrl}/videos`, {
-          access_token: pageToken,
-          file_url: card.mediaUrl,
-          description: card.description || "",
-          published: "false",
-        });
-        mediaId = uploaded.id;
-      } else if (card.type === "image") {
-        const pictureUrl = card.isPageCard ? page.picture : card.mediaUrl;
-        assertAllowedCarouselImageUrl(pictureUrl, card.isPageCard === true);
-        const uploaded = await graphPost(`${graphUrl}/photos`, {
-          access_token: pageToken,
-          url: pictureUrl,
-          published: "false",
-        });
-        mediaId = uploaded.id;
-      } else {
-        throw new Error("Carousel card has an unsupported media type.");
-      }
-      const link = safeCarouselLink(card.link) || `https://facebook.com/${pageId}`;
-      const attachment = {
-        media_fbid: mediaId,
-        link,
-        name: card.headline || page.name || "Facebook Page",
-        description: card.description || "",
-      };
-      if (card.cta && card.cta !== "NO_BUTTON") {
-        attachment.call_to_action = { type: card.cta, value: { link } };
-      }
-      childAttachments.push(attachment);
-    }
+    let primaryVideoUrl =
+      videoUrl ||
+      post.carouselCards.find((card) => card?.type === "video" && typeof card?.mediaUrl === "string" && card.mediaUrl)?.mediaUrl ||
+      null;
 
-    const result = await graphPost(`${graphUrl}/feed`, {
-      access_token: pageToken,
-      message: post.caption || "",
-      child_attachments: JSON.stringify(childAttachments),
-      link: `https://facebook.com/${pageId}`,
-    });
-    return result.id;
+    try {
+      const childAttachments = [];
+      for (const [cardIdx, card] of post.carouselCards.entries()) {
+        if (cardIdx > 0) await paceDelay(350);
+        let mediaId;
+        if (card.type === "video") {
+          assertValidMediaUrl(card.mediaUrl, "video");
+          primaryVideoUrl = primaryVideoUrl || card.mediaUrl;
+          const uploaded = await uploadFacebookMedia(
+            `${graphVideoUrl}/videos`,
+            `${graphUrl}/videos`,
+            card.mediaUrl,
+            {
+              access_token: pageToken,
+              description: card.description || post.caption || "",
+              published: "false",
+            },
+            "file_url",
+            env
+          );
+          mediaId = uploaded.id;
+        } else if (card.type === "image") {
+          const pictureUrl = card.isPageCard
+            ? `https://graph.facebook.com/${encodeURIComponent(pageId)}/picture?type=large`
+            : card.mediaUrl;
+          assertAllowedCarouselImageUrl(pictureUrl, card.isPageCard === true);
+          const uploaded = await uploadFacebookMedia(
+            `${graphUrl}/photos`,
+            `${graphUrl}/photos`,
+            pictureUrl,
+            {
+              access_token: pageToken,
+              published: "false",
+            },
+            "url",
+            env
+          );
+          mediaId = uploaded.id;
+        } else {
+          throw new Error("Carousel card has an unsupported media type.");
+        }
+        const link = safeCarouselLink(card.link) || `https://facebook.com/${pageId}`;
+        const attachment = {
+          media_fbid: mediaId,
+          link,
+          name: card.headline || page.name || "Facebook Page",
+          description: card.description || "",
+        };
+        if (card.cta && card.cta !== "NO_BUTTON") {
+          attachment.call_to_action = { type: card.cta, value: { link } };
+        }
+        childAttachments.push(attachment);
+      }
+
+      const result = await graphPost(`${graphUrl}/feed`, {
+        access_token: pageToken,
+        message: post.caption || "",
+        child_attachments: JSON.stringify(childAttachments),
+        link: `https://facebook.com/${pageId}`,
+      });
+      return result.id;
+    } catch (carouselErr) {
+      if (isFacebookHardStopError(carouselErr)) {
+        // Do not hammer Facebook with a second /videos blast if Meta returned a token, permission, spam, or #1 rejection
+        throw carouselErr;
+      }
+      // Graph API v21.0 often rejects unpublished carousel card uploads or organic mixed video/CTA child_attachments on /{pageId}/feed
+      if (primaryVideoUrl) {
+        console.warn("Carousel upload/feed rejected by Facebook; falling back to single video post:", carouselErr?.message);
+        const fallback = await uploadFacebookMedia(
+          `${graphVideoUrl}/videos`,
+          `${graphUrl}/videos`,
+          primaryVideoUrl,
+          {
+            access_token: pageToken,
+            description: post.caption || "",
+          },
+          "file_url",
+          env
+        );
+        return fallback.id;
+      }
+      throw carouselErr;
+    }
   }
 
   if (!mediaUrls.length && !videoUrl) {
@@ -131,24 +204,41 @@ export async function publishFacebookPost(pageId, pageToken, post, page = {}) {
     return result.id;
   }
 
+  if (post.postType === "reels") {
+    assertValidMediaUrl(videoUrl, "video");
+    return uploadFacebookReelViaRupload(pageId, pageToken, videoUrl, post.caption || "", env);
+  }
+
   if (post.postType === "video") {
     assertValidMediaUrl(videoUrl, "video");
-    const result = await graphPost(`${graphUrl}/videos`, {
-      access_token: pageToken,
-      file_url: videoUrl,
-      description: post.caption || "",
-    });
+    const result = await uploadFacebookMedia(
+      `${graphVideoUrl}/videos`,
+      `${graphUrl}/videos`,
+      videoUrl,
+      {
+        access_token: pageToken,
+        description: post.caption || "",
+      },
+      "file_url",
+      env
+    );
     return result.id;
   }
 
   if (post.postType === "image") {
     if (mediaUrls.length !== 1) throw new Error("Image posts require exactly one image.");
     assertValidMediaUrl(mediaUrls[0], "image");
-    const result = await graphPost(`${graphUrl}/photos`, {
-      access_token: pageToken,
-      url: mediaUrls[0],
-      caption: post.caption || "",
-    });
+    const result = await uploadFacebookMedia(
+      `${graphUrl}/photos`,
+      `${graphUrl}/photos`,
+      mediaUrls[0],
+      {
+        access_token: pageToken,
+        caption: post.caption || "",
+      },
+      "url",
+      env
+    );
     return result.post_id || result.id;
   }
 
@@ -158,12 +248,19 @@ export async function publishFacebookPost(pageId, pageToken, post, page = {}) {
     }
     for (const mediaUrl of mediaUrls) assertValidMediaUrl(mediaUrl, "image");
     const attachments = [];
-    for (const mediaUrl of mediaUrls) {
-      const photo = await graphPost(`${graphUrl}/photos`, {
-        access_token: pageToken,
-        url: mediaUrl,
-        published: "false",
-      });
+    for (const [idx, mediaUrl] of mediaUrls.entries()) {
+      if (idx > 0) await paceDelay(350);
+      const photo = await uploadFacebookMedia(
+        `${graphUrl}/photos`,
+        `${graphUrl}/photos`,
+        mediaUrl,
+        {
+          access_token: pageToken,
+          published: "false",
+        },
+        "url",
+        env
+      );
       attachments.push(JSON.stringify({ media_fbid: photo.id }));
     }
     const params = new URLSearchParams({
@@ -266,8 +363,9 @@ async function graphRequest(path, params) {
     console.error("Facebook Graph API request failed:", {
       status: response.status,
       code: result?.error?.code,
+      message: result?.error?.message,
     });
-    throw new Error("Facebook request failed.");
+    throw new Error(result?.error?.message || "Facebook request failed.");
   }
   return result;
 }
@@ -299,6 +397,250 @@ function safeCarouselLink(value) {
   }
 }
 
+function parseR2MediaKey(mediaUrl) {
+  if (typeof mediaUrl !== "string" || !mediaUrl.includes("/api/v1/media/")) return null;
+  try {
+    const parsed = new URL(mediaUrl);
+    const rawKey = parsed?.pathname?.split("/api/v1/media/")[1];
+    return rawKey ? decodeURIComponent(rawKey) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function uploadFacebookReelViaRupload(pageId, pageToken, mediaUrl, caption, env) {
+  const reelsEndpoint = `https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(pageId)}/video_reels`;
+  const startRes = await fetch(reelsEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      access_token: pageToken,
+      upload_phase: "start",
+    }),
+  });
+  const startData = await startRes.json().catch(() => ({}));
+  if (!startRes.ok || startData?.error || !startData?.video_id) {
+    const errMsg = formatResumableError(startData, startRes.status, "reels-start");
+    if (Number(startData?.error?.code) === 1) {
+      throw new Error(
+        `${errMsg} — Meta Graph API បដិសេធការផុស Reels ដោយ Token នេះ (ត្រូវការ Facebook Login OAuth ដែលមានសិទ្ធិ publish_video + pages_manage_posts)`
+      );
+    }
+    throw new Error(errMsg);
+  }
+
+  const videoId = String(startData.video_id);
+  const uploadUrl =
+    typeof startData.upload_url === "string" && startData.upload_url.startsWith("https://")
+      ? startData.upload_url
+      : `https://rupload.facebook.com/video-upload/${graphApiVersion}/${encodeURIComponent(videoId)}`;
+
+  const key = env?.MEDIA_BUCKET ? parseR2MediaKey(mediaUrl) : null;
+  const r2Object = key ? await env.MEDIA_BUCKET.get(key) : null;
+
+  let transferRes;
+  if (r2Object) {
+    const bytes = await r2Object.arrayBuffer();
+    transferRes = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `OAuth ${pageToken}`,
+        offset: "0",
+        file_size: String(bytes.byteLength),
+        "Content-Type": "application/octet-stream",
+      },
+      body: bytes,
+    });
+  } else {
+    transferRes = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `OAuth ${pageToken}`,
+        file_url: mediaUrl,
+      },
+    });
+  }
+
+  const transferData = await transferRes.json().catch(() => ({}));
+  if (!transferRes.ok || transferData?.error || transferData?.success === false) {
+    throw new Error(formatResumableError(transferData, transferRes.status, "reels-rupload"));
+  }
+
+  const finishRes = await fetch(reelsEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      access_token: pageToken,
+      video_id: videoId,
+      upload_phase: "finish",
+      video_state: "PUBLISHED",
+      description: caption || "",
+    }),
+  });
+  const finishData = await finishRes.json().catch(() => ({}));
+  if (!finishRes.ok || finishData?.error || finishData?.success === false) {
+    throw new Error(formatResumableError(finishData, finishRes.status, "reels-finish"));
+  }
+
+  return String(finishData?.id || videoId);
+}
+
+async function uploadFacebookMedia(binaryEndpoint, urlEndpoint, mediaUrl, fields, urlFieldName, env) {
+  if (env?.MEDIA_BUCKET && typeof mediaUrl === "string" && mediaUrl.includes("/api/v1/media/")) {
+    let parsed = null;
+    try {
+      parsed = new URL(mediaUrl);
+    } catch {
+      parsed = null;
+    }
+    const rawKey = parsed?.pathname?.split("/api/v1/media/")[1];
+    if (rawKey) {
+      const key = decodeURIComponent(rawKey);
+      const object = await env.MEDIA_BUCKET.get(key);
+      if (object) {
+        const bytes = await object.arrayBuffer();
+        const contentType = object.httpMetadata?.contentType || (urlFieldName === "file_url" ? "video/mp4" : "image/jpeg");
+        const filename = key.split("/").pop() || (urlFieldName === "file_url" ? "video.mp4" : "image.jpg");
+        const form = new FormData();
+        for (const [k, v] of Object.entries(fields)) {
+          form.set(k, String(v));
+        }
+        form.set("source", new Blob([bytes], { type: contentType }), filename);
+
+        const response = await fetch(binaryEndpoint, { method: "POST", body: form });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result?.error || (typeof result.id !== "string" && typeof result.post_id !== "string")) {
+          const binErr = result?.error;
+          const binErrSummary = binErr
+            ? `${binErr.message || "Binary upload failed"}${binErr.code != null ? ` (FB #${binErr.code}${binErr.error_subcode ? `/${binErr.error_subcode}` : ""})` : ""}`
+            : `HTTP ${response.status}`;
+          console.error("Facebook binary media upload failed:", {
+            endpoint: binaryEndpoint,
+            status: response.status,
+            code: binErr?.code,
+            subcode: binErr?.error_subcode,
+            message: binErr?.message,
+          });
+          if (isFacebookHardStopError(binErr) && !(fields?.published === "false" && Number(binErr?.code) === 100)) {
+            const code = Number(binErr?.code);
+            let hint;
+            if (code === 190 || code === 368 || code === 459) {
+              hint = " — សម័យ Facebook ផុតកំណត់ ឬជាប់ការពារសុវត្ថិភាព (សូមឈប់ផុសមួយរយៈ ហើយ Sync Extension ថ្មី)";
+            } else if (code === 1 && String(binaryEndpoint).includes("/videos")) {
+              hint = " — Meta Graph API បដិសេធការផុសវីដេអូដោយ Token ពី Extension (ខ្វះសិទ្ធិ publish_video ផ្លូវការ)។ ត្រូវភ្ជាប់តាម Facebook Login (OAuth App) ដែលមានសិទ្ធិ publish_video + pages_manage_posts ទើបអាចផុសវីដេអូបាន។";
+            } else {
+              hint = " — Token របស់ផេកនេះខ្វះសិទ្ធិបង្ហោះ ឬ Meta បដិសេធសំណើ។";
+            }
+            throw new Error(`${binErrSummary}${hint}`);
+          }
+          // Try URL-based upload on binaryEndpoint (e.g. graph-video.facebook.com file_url) then urlEndpoint
+          if (binaryEndpoint !== urlEndpoint) {
+            try {
+              return await graphPost(binaryEndpoint, {
+                ...fields,
+                [urlFieldName]: mediaUrl,
+              });
+            } catch (videoUrlErr) {
+              if (isFacebookHardStopError(videoUrlErr)) throw videoUrlErr;
+              console.warn("Facebook binaryEndpoint file_url fallback failed:", videoUrlErr?.message);
+            }
+          }
+          try {
+            return await graphPost(urlEndpoint, {
+              ...fields,
+              [urlFieldName]: mediaUrl,
+            });
+          } catch (urlErr) {
+            if (isFacebookHardStopError(urlErr)) throw urlErr;
+            // Last-resort 3-phase Resumable Video Upload on graph-video.facebook.com
+            let resumableSummary = "";
+            if (urlFieldName === "file_url" && fields?.published !== "false" && bytes?.byteLength > 0) {
+              try {
+                return await uploadFacebookVideoResumable(binaryEndpoint, bytes, contentType, filename, fields);
+              } catch (resumableErr) {
+                resumableSummary = resumableErr?.message ? ` [resumable: ${resumableErr.message}]` : "";
+                console.warn("Facebook resumable video upload fallback failed:", resumableErr?.message);
+              }
+            }
+            const combined = `${urlErr?.message || "Facebook upload failed."} [binary: ${binErrSummary}]${resumableSummary}`;
+            const hint = /FB #(190|368|459)\b/i.test(combined)
+              ? " — សម័យ Facebook ផុតកំណត់ ឬជាប់ការពារសុវត្ថិភាព (សូមឈប់ផុសមួយរយៈ ហើយ Sync Extension ថ្មី)"
+              : /FB #(1|200)\b|Invalid request/i.test(combined)
+              ? " — Meta Graph API បដិសេធ Token នេះដោយសារខ្វះសិទ្ធិផុសផ្លូវការ (publish_video / pages_manage_posts) — ត្រូវការ Facebook Login (OAuth App)"
+              : "";
+            throw new Error(`${combined}${hint}`);
+          }
+        }
+        return result;
+      }
+    }
+  }
+
+  return graphPost(urlEndpoint, {
+    ...fields,
+    [urlFieldName]: mediaUrl,
+  });
+}
+
+function formatResumableError(data, fallbackStatus, phase) {
+  const err = data?.error;
+  if (err?.message) {
+    const codeTag = err.code != null
+      ? ` (FB #${err.code}${err.error_subcode ? `/${err.error_subcode}` : ""})`
+      : "";
+    return `${err.message}${codeTag}`;
+  }
+  return `Resumable ${phase} failed (${fallbackStatus})`;
+}
+
+async function uploadFacebookVideoResumable(binaryEndpoint, bytes, contentType, filename, fields) {
+  const accessToken = String(fields?.access_token || "");
+  const startRes = await fetch(binaryEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      access_token: accessToken,
+      upload_phase: "start",
+      file_size: String(bytes.byteLength),
+    }),
+  });
+  const startData = await startRes.json().catch(() => ({}));
+  if (!startRes.ok || startData?.error || !startData?.upload_session_id) {
+    throw new Error(formatResumableError(startData, startRes.status, "start"));
+  }
+
+  const sessionId = String(startData.upload_session_id);
+  const transferForm = new FormData();
+  transferForm.set("access_token", accessToken);
+  transferForm.set("upload_phase", "transfer");
+  transferForm.set("upload_session_id", sessionId);
+  transferForm.set("start_offset", String(startData.start_offset ?? 0));
+  transferForm.set("video_file_chunk", new Blob([bytes], { type: contentType }), filename);
+
+  const transferRes = await fetch(binaryEndpoint, { method: "POST", body: transferForm });
+  const transferData = await transferRes.json().catch(() => ({}));
+  if (!transferRes.ok || transferData?.error) {
+    throw new Error(formatResumableError(transferData, transferRes.status, "transfer"));
+  }
+
+  const finishParams = {
+    ...fields,
+    access_token: accessToken,
+    upload_phase: "finish",
+    upload_session_id: sessionId,
+  };
+  const finishRes = await fetch(binaryEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(finishParams),
+  });
+  const finishData = await finishRes.json().catch(() => ({}));
+  if (!finishRes.ok || finishData?.error || (!finishData?.success && !finishData?.id && !startData?.video_id)) {
+    throw new Error(formatResumableError(finishData, finishRes.status, "finish"));
+  }
+  return { id: String(finishData?.id || startData.video_id) };
+}
+
 async function graphPost(url, params) {
   const response = await fetch(url, {
     method: "POST",
@@ -314,11 +656,24 @@ async function graphPost(url, params) {
   }
   if (!response.ok || result?.error || typeof result.id !== "string" &&
       typeof result.post_id !== "string") {
+    const fbErr = result?.error;
     console.error("Facebook publish request failed:", {
+      url,
       status: response.status,
-      code: result?.error?.code,
+      code: fbErr?.code,
+      subcode: fbErr?.error_subcode,
+      message: fbErr?.message,
     });
-    throw new Error(result?.error?.message || "Facebook post failed.");
+    if (fbErr) {
+      const baseMsg = fbErr.error_user_msg && fbErr.error_user_msg !== fbErr.message
+        ? `${fbErr.message} — ${fbErr.error_user_msg}`
+        : fbErr.message || "Facebook post failed.";
+      const codeTag = fbErr.code != null
+        ? ` (FB #${fbErr.code}${fbErr.error_subcode ? `/${fbErr.error_subcode}` : ""})`
+        : "";
+      throw new Error(`${baseMsg}${codeTag}`);
+    }
+    throw new Error("Facebook post failed.");
   }
   return result;
 }

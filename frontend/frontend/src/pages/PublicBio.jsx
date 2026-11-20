@@ -123,8 +123,11 @@ export default function PublicBio({ previewData = null }) {
 
   // Generate Page QR Code for sharing
   useEffect(() => {
-    const currentUrl = window.location.href.split("?")[0];
-    QRCodeLib.toDataURL(currentUrl, {
+    const targetUrl =
+      previewData && page?.slug
+        ? `${window.location.origin}/b/${page.slug}`
+        : window.location.href.split("?")[0];
+    QRCodeLib.toDataURL(targetUrl, {
       width: 400,
       margin: 2,
       color: {
@@ -134,7 +137,7 @@ export default function PublicBio({ previewData = null }) {
     })
       .then((url) => setPageQrDataUrl(url))
       .catch(() => {});
-  }, [slug]);
+  }, [slug, previewData, page?.slug]);
 
   // Generate KHQR Data URL if KHQR string provided
   useEffect(() => {
@@ -166,7 +169,13 @@ export default function PublicBio({ previewData = null }) {
 
     // Phnom Penh UTC+7 current time
     const now = new Date();
-    const ppTimeStr = now.toLocaleTimeString("en-US", { timeZone: "Asia/Phnom_Penh", hour12: false, hour: "2-digit", minute: "2-digit" });
+    const ppTimeStr = now.toLocaleTimeString("en-US", {
+      timeZone: "Asia/Phnom_Penh",
+      hour12: false,
+      hourCycle: "h23",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     const ppDayStr = now.toLocaleDateString("en-US", { timeZone: "Asia/Phnom_Penh", weekday: "short" }).toLowerCase();
 
     const allowedDays = days.length > 0 ? days : ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -176,7 +185,10 @@ export default function PublicBio({ previewData = null }) {
       return { isOpen: false, label: "ថ្ងៃនេះបិទ (Closed Today)", color: "text-rose-400 bg-rose-500/10 border-rose-500/30" };
     }
 
-    const isOpen = ppTimeStr >= openTime && ppTimeStr <= closeTime;
+    const isOpen =
+      openTime <= closeTime
+        ? ppTimeStr >= openTime && ppTimeStr <= closeTime
+        : ppTimeStr >= openTime || ppTimeStr <= closeTime;
     return {
       isOpen,
       label: isOpen ? `កំពុងបើក • បិទម៉ោង ${closeTime}` : `បិទ • បើកម៉ោង ${openTime}`,
@@ -310,7 +322,13 @@ export default function PublicBio({ previewData = null }) {
           ) : (
             <div className={`w-full h-full bg-gradient-to-r ${theme.accent} opacity-40`} />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#090b10] via-transparent to-black/30" />
+          <div
+            className={`absolute inset-0 bg-gradient-to-t ${
+              page?.theme === "minimal"
+                ? "from-[#f8fafc] via-transparent to-black/20"
+                : "from-[#090b10] via-transparent to-black/30"
+            }`}
+          />
         </div>
 
         {/* 🏬 Shop Identity Section */}
@@ -429,7 +447,7 @@ export default function PublicBio({ previewData = null }) {
                   <div className="text-xs text-gray-400">{contacts.phone}</div>
                 </div>
               </div>
-              <ChevronRight size={18} className="text-gray-500 group-hover:text-white transition-colors" />
+              <ChevronRight size={18} className="text-gray-500 group-hover:opacity-80 transition-opacity" />
             </a>
           )}
 
@@ -450,7 +468,7 @@ export default function PublicBio({ previewData = null }) {
                   <div className="text-xs text-gray-400">ផ្ញើសារកុម្ម៉ង់ផ្ទាល់តាម Telegram</div>
                 </div>
               </div>
-              <ChevronRight size={18} className="text-gray-500 group-hover:text-white transition-colors" />
+              <ChevronRight size={18} className="text-gray-500 group-hover:opacity-80 transition-opacity" />
             </a>
           )}
 
@@ -471,7 +489,7 @@ export default function PublicBio({ previewData = null }) {
                   <div className="text-xs text-gray-400">ផ្ញើសារតាម WhatsApp</div>
                 </div>
               </div>
-              <ChevronRight size={18} className="text-gray-500 group-hover:text-white transition-colors" />
+              <ChevronRight size={18} className="text-gray-500 group-hover:opacity-80 transition-opacity" />
             </a>
           )}
 
@@ -558,7 +576,11 @@ export default function PublicBio({ previewData = null }) {
                 const orderText = encodeURIComponent(
                   `សួស្តី! ខ្ញុំចង់កុម្ម៉ង់ទិញ៖ "${item.name}" (តម្លៃ: ${item.price} ${item.currency || "$"}) ពីកាតអាជីវកម្ម ${page.businessName}`
                 );
-                const itemOrderUrl = item.orderLink || (telegramUrl ? `${telegramUrl}?text=${orderText}` : null);
+                const itemOrderUrl =
+                  item.orderLink ||
+                  (telegramUrl
+                    ? `${telegramUrl}${telegramUrl.includes("?") ? "&" : "?"}text=${orderText}`
+                    : null);
 
                 return (
                   <div
@@ -577,7 +599,7 @@ export default function PublicBio({ previewData = null }) {
                     <div className="flex-1 min-w-0 flex flex-col justify-between">
                       <div>
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-bold text-sm text-white truncate">
+                          <h4 className={`font-bold text-sm ${theme.textPrimary} truncate`}>
                             {item.name}
                           </h4>
                           <span className="font-black text-sm text-emerald-400 shrink-0">
@@ -616,7 +638,7 @@ export default function PublicBio({ previewData = null }) {
           </div>
         )}
 
-        {/* 🦶 Footer & Powered By EZA POST */}
+        {/* 🦶 Footer & Powered By Moneaa */}
         <div className="mt-12 text-center text-xs text-gray-500 px-5 space-y-2">
           <div className="flex items-center justify-center gap-2">
             <Eye size={12} />
@@ -630,8 +652,8 @@ export default function PublicBio({ previewData = null }) {
               className="inline-flex items-center gap-1.5 text-gray-400 hover:text-white font-medium transition-colors"
             >
               <span>បង្កើតកាតអាជីវកម្មជាមួយ</span>
-              <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-                EZA POST
+              <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
+                Moneaa (moneaa.site)
               </span>
             </a>
           </div>

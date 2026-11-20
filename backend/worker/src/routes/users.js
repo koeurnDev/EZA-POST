@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "./auth.js";
 import { getPrisma } from "../lib/prisma.js";
-import { encryptFacebookToken } from "../lib/facebook.js";
+import { decryptFacebookToken, encryptFacebookToken } from "../lib/facebook.js";
 
 const users = new Hono();
 
@@ -29,7 +29,7 @@ users.get("/pages", requireAuth, async (c) => {
         name: profileName,
         picture: profilePic,
         category: "គណនីផ្ទាល់ខ្លួន",
-        isSelected: true,
+        isSelected: false,
         enableBot: false,
         enableSchedule: true,
         enableInbox: false
@@ -42,8 +42,7 @@ users.get("/pages", requireAuth, async (c) => {
             name: profileName,
             picture: profilePic,
             category: "គណនីផ្ទាល់ខ្លួន",
-            isConnected: true,
-            isSelected: true
+            isConnected: true
           },
           create: {
             id: String(user.facebookId),
@@ -53,7 +52,7 @@ users.get("/pages", requireAuth, async (c) => {
             category: "គណនីផ្ទាល់ខ្លួន",
             accessToken: user.facebookAccessToken || "active_extension_session",
             isConnected: true,
-            isSelected: true,
+            isSelected: false,
             enableSchedule: true,
             enableBot: false,
             enableInbox: false
@@ -66,22 +65,42 @@ users.get("/pages", requireAuth, async (c) => {
     }
 
     const pageSettings = parsePageSettings(user.pageSettings);
-    const accounts = pages.map((page) => {
+    const accounts = await Promise.all(pages.map(async (page) => {
       const savedSettings = pageSettings.find((settings) => settings.pageId === page.id) ?? {};
+      let hasAccessToken = false;
+      if (typeof page.accessToken === "string" && page.accessToken) {
+        try {
+          const decrypted = await decryptFacebookToken(page.accessToken, c.env);
+          hasAccessToken = isFbToken(decrypted);
+        } catch {
+          hasAccessToken = isFbToken(page.accessToken);
+        }
+      }
+      const isProfile = page.category === "គណនីផ្ទាល់ខ្លួន" || String(page.id) === String(user.facebookId);
       return {
         id: page.id,
         name: page.name,
         picture: page.picture,
         category: page.category || "Facebook Page",
-        isProfile: page.category === "គណនីផ្ទាល់ខ្លួន" || String(page.id) === String(user.facebookId),
-        isSelected: page.isSelected !== false,
+        isProfile,
+        isSelected: isProfile ? page.isSelected === true : page.isSelected !== false,
+        hasAccessToken,
         settings: {
-          enableBot: page.enableBot || savedSettings.enableBot || false,
-          enableSchedule: page.enableSchedule !== false,
-          enableInbox: page.enableInbox || false,
+          enableBot:
+            typeof page.enableBot === "boolean"
+              ? page.enableBot
+              : Boolean(savedSettings.enableBot),
+          enableSchedule:
+            typeof page.enableSchedule === "boolean"
+              ? page.enableSchedule
+              : savedSettings.enableSchedule !== false,
+          enableInbox:
+            typeof page.enableInbox === "boolean"
+              ? page.enableInbox
+              : Boolean(savedSettings.enableInbox),
         },
       };
-    });
+    }));
 
     return c.json({
       success: true,
@@ -165,13 +184,20 @@ users.post("/pages/settings", requireAuth, async (c) => {
       return c.json({ success: false, error: "User not found" }, 404);
     }
 
-    const pageSettings = parsePageSettings(user.pageSettings)
-      .filter((settings) => settings.pageId !== body.pageId);
-    pageSettings.push({ pageId: body.pageId, ...body.settings });
-    await prisma.user.update({
-      where: { id: userId },
-      data: { pageSettings },
-    });
+    const allSettings = parsePageSettings(user.pageSettings);
+    const existingSetting = allSettings.find((settings) => settings.pageId === body.pageId) ?? {};
+    const pageSettings = allSettings.filter((settings) => settings.pageId !== body.pageId);
+    pageSettings.push({ ...existingSetting, pageId: body.pageId, ...body.settings });
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: { pageSettings },
+      }),
+      prisma.facebookPage.updateMany({
+        where: { id: body.pageId, userId },
+        data: { ...body.settings },
+      }),
+    ]);
 
     return c.json({ success: true, message: "Settings updated" });
   } catch (error) {
@@ -183,248 +209,6 @@ users.post("/pages/settings", requireAuth, async (c) => {
 function isFbToken(str) {
   if (!str || typeof str !== "string") return false;
   return /^EAA[A-Za-z0-9_-]{30,}$/.test(str.trim());
-}
-
-function extractTokenFromText(text) {
-  if (!text || typeof text !== "string") return null;
-  const patterns = [
-    /EAAG[A-Za-z0-9_-]{25,}/,
-    /EAAB[A-Za-z0-9_-]{25,}/,
-    /EAAI[A-Za-z0-9_-]{25,}/,
-    /EAA[A-Za-z0-9_-]{50,}/,
-    /"access_token"\s*:\s*"(EAA[^"]+)"/i,
-    /"accessToken"\s*:\s*"(EAA[^"]+)"/i,
-    /window\.__accessToken\s*=\s*["'](EAA[^"']+)["']/i,
-  ];
-  for (const re of patterns) {
-    const m = text.match(re);
-    if (m) return m[1] || m[0];
-  }
-  return null;
-}
-
-function normalizeCookieString(input) {
-  let clean = String(input || "").trim();
-  if (clean.startsWith("[") && clean.endsWith("]")) {
-    try {
-      const arr = JSON.parse(clean);
-      if (Array.isArray(arr)) {
-        clean = arr
-          .filter((c) => c && c.name && c.value)
-          .map((c) => `${c.name}=${c.value}`)
-          .join("; ");
-      }
-    } catch {}
-  } else if (clean.includes("\t") && (clean.includes(".facebook.com") || clean.includes("c_user"))) {
-    const pairs = [];
-    for (const line of clean.split(/\r?\n/)) {
-      const t = line.trim();
-      if (!t || t.startsWith("#")) continue;
-      const parts = t.split("\t");
-      if (parts.length >= 7 && parts[5] && parts[6]) {
-        pairs.push(`${parts[5]}=${parts[6]}`);
-      }
-    }
-    if (pairs.length > 0) clean = pairs.join("; ");
-  }
-  return clean;
-}
-
-function parsePagesFromFacebookHtml(html, cUserId) {
-  const pagesMap = new Map();
-  if (!html || typeof html !== "string") return [];
-
-  // Extract associated Page profiles from Comet JSON payloads embedded in Facebook HTML
-  const profileRegexes = [
-    /"profile"\s*:\s*\{\s*"__typename"\s*:\s*"User"\s*,\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"(?:\s*,\s*"profile_picture"\s*:\s*\{\s*"uri"\s*:\s*"([^"]+)")?/g,
-    /"node"\s*:\s*\{\s*"__typename"\s*:\s*"(?:Page|User)"\s*,\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"(?:\s*,\s*"profile_picture"\s*:\s*\{\s*"uri"\s*:\s*"([^"]+)")?/g,
-    /"additional_profile"\s*:\s*\{\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"/g,
-    /"page"\s*:\s*\{\s*"id"\s*:\s*"(\d+)"\s*,\s*"name"\s*:\s*"([^"]+)"/g,
-  ];
-
-  const decodeUnicode = (s) => {
-    try {
-      return JSON.parse(`"${s.replace(/"/g, '\\"')}"`);
-    } catch {
-      return s;
-    }
-  };
-
-  for (const re of profileRegexes) {
-    let m;
-    while ((m = re.exec(html)) !== null) {
-      const id = m[1];
-      const rawName = m[2];
-      const rawPic = m[3];
-      if (!id || id === String(cUserId)) continue;
-      const name = decodeUnicode(rawName);
-      if (!name || name.length < 1) continue;
-      const picture = rawPic ? decodeUnicode(rawPic).replace(/\\\//g, "/") : `https://graph.facebook.com/${id}/picture?type=large`;
-      if (!pagesMap.has(id)) {
-        pagesMap.set(id, {
-          id,
-          name,
-          picture,
-          category: "Facebook Page",
-        });
-      }
-    }
-  }
-
-  return Array.from(pagesMap.values());
-}
-
-async function extractTokenAndPagesFromCookie(cleanCookie, fallbackUserId = null) {
-  const cUserMatch = cleanCookie.match(/(?:^|[;\s])c_user=["']?(\d+)["']?/i);
-  const cUserId = cUserMatch ? cUserMatch[1] : fallbackUserId;
-
-  const browserHeaders = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    Accept:
-      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Upgrade-Insecure-Requests": "1",
-    Cookie: cleanCookie,
-  };
-
-  const tokenEndpoints = [
-    { url: "https://business.facebook.com/business_locations", referer: "https://business.facebook.com/" },
-    { url: "https://adsmanager.facebook.com/adsmanager/manage/campaigns", referer: "https://adsmanager.facebook.com/" },
-    { url: "https://business.facebook.com/content_management", referer: "https://business.facebook.com/" },
-    {
-      url: "https://m.facebook.com/composer/ocelot/async_loader/?publisher=feed",
-      referer: "https://m.facebook.com/",
-      ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
-    },
-  ];
-
-  let extractedToken = null;
-  let collectedHtml = "";
-
-  for (const ep of tokenEndpoints) {
-    try {
-      const res = await fetch(ep.url, {
-        headers: {
-          ...browserHeaders,
-          Referer: ep.referer,
-          ...(ep.ua ? { "User-Agent": ep.ua } : {}),
-        },
-        redirect: "follow",
-      });
-      const text = await res.text();
-      if (text) {
-        collectedHtml += "\n" + text.slice(0, 250000);
-        const tok = extractTokenFromText(text);
-        if (tok) {
-          extractedToken = tok;
-          break;
-        }
-      }
-    } catch {}
-  }
-
-  if (extractedToken) {
-    return { token: extractedToken, fallbackUser: null, fallbackPages: [] };
-  }
-
-  // Fallback: fetch www.facebook.com/pages/?category=your_pages & www.facebook.com to extract token or Comet profile switcher pages
-  let fbUserName = "Facebook User";
-  const htmlPages = [];
-
-  for (const pageUrl of [
-    "https://web.facebook.com/pages/?category=your_pages",
-    "https://www.facebook.com/pages/?category=your_pages",
-    "https://www.facebook.com/bookmarks",
-  ]) {
-    try {
-      const res = await fetch(pageUrl, {
-        headers: {
-          ...browserHeaders,
-          Referer: "https://www.facebook.com/",
-        },
-        redirect: "follow",
-      });
-      const html = await res.text();
-      if (!html) continue;
-
-      const tok = extractTokenFromText(html);
-      if (tok) {
-        return { token: tok, fallbackUser: null, fallbackPages: [] };
-      }
-
-      const nameMatch =
-        html.match(/"CURRENT_USER_INITIAL_DATA"\s*,\s*\[\]\s*,\s*\{[^}]*"NAME"\s*:\s*"([^"]+)"/) ||
-        html.match(/"NAME"\s*:\s*"([^"]+)"/);
-      if (nameMatch && nameMatch[1]) {
-        try {
-          fbUserName = JSON.parse(`"${nameMatch[1].replace(/"/g, '\\"')}"`);
-        } catch {
-          fbUserName = nameMatch[1];
-        }
-      }
-
-      const parsed = parsePagesFromFacebookHtml(html, cUserId);
-      for (const p of parsed) {
-        if (!htmlPages.some((x) => x.id === p.id)) {
-          htmlPages.push(p);
-        }
-      }
-
-      // Also try GraphQL CometProfileSwitcher query if fb_dtsg is present
-      const dtsgMatch =
-        html.match(/"DTSGInitialData"\s*,\s*\[\]\s*,\s*\{\s*"token"\s*:\s*"([^"]+)"/) ||
-        html.match(/name="fb_dtsg"\s+value="([^"]+)"/);
-      if (dtsgMatch && dtsgMatch[1] && cUserId && htmlPages.length === 0) {
-        const fbDtsg = dtsgMatch[1];
-        try {
-          const gqlParams = new URLSearchParams({
-            av: cUserId,
-            __user: cUserId,
-            __a: "1",
-            fb_dtsg: fbDtsg,
-            fb_api_caller_class: "RelayModern",
-            fb_api_req_friendly_name: "CometProfileSwitcherListQuery",
-            variables: JSON.stringify({ scale: 1 }),
-            doc_id: "6552796808090963",
-          });
-          const gqlRes = await fetch("https://www.facebook.com/api/graphql/", {
-            method: "POST",
-            headers: {
-              ...browserHeaders,
-              "Content-Type": "application/x-www-form-urlencoded",
-              Origin: "https://www.facebook.com",
-              Referer: "https://www.facebook.com/",
-            },
-            body: gqlParams,
-          });
-          const gqlText = await gqlRes.text();
-          const gqlPages = parsePagesFromFacebookHtml(gqlText, cUserId);
-          for (const p of gqlPages) {
-            if (!htmlPages.some((x) => x.id === p.id)) {
-              htmlPages.push(p);
-            }
-          }
-        } catch {}
-      }
-    } catch {}
-  }
-
-  return {
-    token: null,
-    fallbackUser: cUserId
-      ? {
-          id: String(cUserId),
-          name: fbUserName,
-          picture: `https://graph.facebook.com/${cUserId}/picture?type=large`,
-        }
-      : null,
-    fallbackPages: htmlPages,
-  };
 }
 
 users.post("/pages/connect-cookie", requireAuth, async (c) => {
@@ -450,25 +234,13 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
 
   try {
     let userToken = extAccessToken || (isFbToken(rawInput) ? rawInput : null);
-    let cleanCookie = !isFbToken(rawInput) ? normalizeCookieString(rawInput) : "";
     let fbUser = extUser;
     let rawPages = extPages || [];
 
-    const cUserMatch = cleanCookie.match(/(?:^|[;\s])c_user=["']?(\d+)["']?/i);
-    const resolvedFbUserId = cUserMatch ? cUserMatch[1] : (extUser?.id || null);
+    const resolvedFbUserId = extUser?.id || body?.fbUserId || null;
 
-    if (!userToken && cleanCookie) {
-      const extracted = await extractTokenAndPagesFromCookie(cleanCookie, resolvedFbUserId);
-      if (extracted.token) {
-        userToken = extracted.token;
-      } else if (extracted.fallbackUser) {
-        if (!fbUser) fbUser = extracted.fallbackUser;
-        if (rawPages.length === 0 && extracted.fallbackPages.length > 0) {
-          rawPages = extracted.fallbackPages;
-        }
-      }
-    }
-
+    // Anti-ban protection: NEVER replay c_user/xs cookies from Cloudflare datacenter IPs to scrape facebook.com.
+    // All session extraction runs strictly inside the user's residential Chrome Extension.
     if (!fbUser && resolvedFbUserId) {
       fbUser = {
         id: String(resolvedFbUserId),
@@ -477,29 +249,72 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
       };
     }
 
-    // If we have an EAA token, fetch profile and pages via Graph API
+    // If we have an EAA token, fetch profile and pages via official Graph API only (no datacenter cookie scraping)
+    let isDirectPageToken = false;
+    let tokenPermissions = [];
+    let hasPublishPermissions = false;
+
     if (userToken) {
-      const meUrl = new URL("https://graph.facebook.com/v21.0/me");
-      meUrl.searchParams.set("access_token", userToken);
-      meUrl.searchParams.set("fields", "id,name,picture{url}");
-      const meRes = await fetch(meUrl);
+      const meRes = await fetch(
+        `https://graph.facebook.com/v21.0/me?access_token=${encodeURIComponent(userToken)}&fields=id,name,category,picture{url}`
+      );
       const meData = await meRes.json().catch(() => ({}));
       if (meRes.ok && meData?.id) {
-        fbUser = {
-          id: String(meData.id),
-          name: String(meData.name || "Facebook User"),
-          picture: meData.picture?.data?.url || `https://graph.facebook.com/${meData.id}/picture?type=large`,
-        };
+        isDirectPageToken = Boolean(meData.category);
+        if (isDirectPageToken) {
+          hasPublishPermissions = true;
+          rawPages = [
+            {
+              id: String(meData.id),
+              name: String(meData.name || "Facebook Page"),
+              category: meData.category || "Facebook Page",
+              picture: meData.picture,
+              access_token: userToken,
+            },
+          ];
+          if (!fbUser || !fbUser.id) {
+            fbUser = {
+              id: String(meData.id),
+              name: String(meData.name || "Facebook Page"),
+              picture: meData.picture?.data?.url || `https://graph.facebook.com/${meData.id}/picture?type=large`,
+            };
+          }
+        } else {
+          fbUser = {
+            id: String(meData.id),
+            name: String(meData.name || "Facebook User"),
+            picture: meData.picture?.data?.url || `https://graph.facebook.com/${meData.id}/picture?type=large`,
+          };
+        }
+      } else if (!extPages?.length && isFbToken(rawInput)) {
+        return c.json({
+          success: false,
+          error: meData?.error?.message || "Facebook Access Token មិនត្រឹមត្រូវ ឬផុតកំណត់ហើយ!",
+        }, 400);
       }
 
-      const pagesUrl = new URL("https://graph.facebook.com/v21.0/me/accounts");
-      pagesUrl.searchParams.set("access_token", userToken);
-      pagesUrl.searchParams.set("fields", "id,name,access_token,category,picture{url}");
-      pagesUrl.searchParams.set("limit", "100");
-      const pagesRes = await fetch(pagesUrl);
-      const pagesData = await pagesRes.json().catch(() => ({}));
-      if (pagesRes.ok && Array.isArray(pagesData?.data)) {
-        rawPages = pagesData.data;
+      if (!isDirectPageToken) {
+        const permRes = await fetch(
+          `https://graph.facebook.com/v21.0/me/permissions?access_token=${encodeURIComponent(userToken)}`
+        ).catch(() => null);
+        const permData = permRes ? await permRes.json().catch(() => ({})) : {};
+        if (Array.isArray(permData?.data)) {
+          tokenPermissions = permData.data
+            .filter((p) => p?.status === "granted" && p?.permission)
+            .map((p) => p.permission);
+          hasPublishPermissions =
+            tokenPermissions.includes("pages_manage_posts") || tokenPermissions.includes("publish_video");
+        }
+
+        const pagesUrl = new URL("https://graph.facebook.com/v21.0/me/accounts");
+        pagesUrl.searchParams.set("access_token", userToken);
+        pagesUrl.searchParams.set("fields", "id,name,access_token,category,picture{url}");
+        pagesUrl.searchParams.set("limit", "100");
+        const pagesRes = await fetch(pagesUrl);
+        const pagesData = await pagesRes.json().catch(() => ({}));
+        if (pagesRes.ok && Array.isArray(pagesData?.data)) {
+          rawPages = pagesData.data;
+        }
       }
     }
 
@@ -513,40 +328,42 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
     const prisma = getPrisma(c.env);
 
     // Prevent UNIQUE constraint conflict on users.facebookId
-    if (c.env.DB) {
+    if (!isDirectPageToken && c.env.DB) {
       await c.env.DB.prepare("UPDATE users SET facebookId = NULL WHERE facebookId = ? AND id != ?")
         .bind(String(fbUser.id), String(userId))
         .run()
         .catch(() => {});
     }
 
-    const encryptedUserToken = await encryptFacebookToken(userToken || cleanCookie, c.env);
+    const encryptedUserToken = await encryptFacebookToken(userToken || "active_extension_session", c.env);
 
-    await prisma.user.update({
-      where: { id: String(userId) },
-      data: {
-        facebookId: String(fbUser.id),
-        facebookName: String(fbUser.name || "Facebook User"),
-        facebookAccessToken: encryptedUserToken,
-      },
-    });
+    if (!isDirectPageToken) {
+      await prisma.user.update({
+        where: { id: String(userId) },
+        data: {
+          facebookId: String(fbUser.id),
+          facebookName: String(fbUser.name || "Facebook User"),
+          facebookAccessToken: encryptedUserToken,
+        },
+      });
+    }
 
     const destinationsToSave = [];
 
-    // 1. Always include User's Personal Profile / Account so user can post to both personal profile & pages
-    if (fbUser && fbUser.id) {
+    // 1. Include User's Personal Profile / Account when syncing a User session
+    if (!isDirectPageToken && fbUser && fbUser.id) {
       destinationsToSave.push({
         id: String(fbUser.id),
         name: `${fbUser.name} (គណនីផ្ទាល់ខ្លួន)`,
         picture: fbUser.picture || `https://graph.facebook.com/${fbUser.id}/picture?type=large`,
         category: "គណនីផ្ទាល់ខ្លួន",
-        access_token: userToken || cleanCookie
+        access_token: userToken || "active_extension_session"
       });
     }
 
     // 2. Add all Facebook Pages
     for (const p of rawPages) {
-      if (p && p.id && String(p.id) !== String(fbUser?.id)) {
+      if (p && p.id && (isDirectPageToken || String(p.id) !== String(fbUser?.id))) {
         destinationsToSave.push({
           id: String(p.id),
           name: String(p.name),
@@ -555,7 +372,7 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
             (typeof p.picture === "string" ? p.picture : null) ||
             `https://graph.facebook.com/${p.id}/picture?type=large`,
           category: p.category || "Facebook Page",
-          access_token: p.access_token || p.accessToken || userToken || cleanCookie
+          access_token: p.access_token || p.accessToken || userToken || "active_extension_session"
         });
       }
     }
@@ -564,10 +381,9 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
     for (const p of destinationsToSave) {
       if (!p || !p.id || !p.name) continue;
       try {
-        const encryptedPageToken = await encryptFacebookToken(
-          p.access_token || userToken || cleanCookie || "active_extension_session",
-          c.env
-        );
+        const isProfile = p.category === "គណនីផ្ទាល់ខ្លួន";
+        const rawPageToken = p.access_token || userToken || "active_extension_session";
+        const encryptedPageToken = await encryptFacebookToken(rawPageToken, c.env);
         const pictureUrl = p.picture || `https://graph.facebook.com/${p.id}/picture?type=large`;
         const category = p.category || "Facebook Page";
 
@@ -580,7 +396,8 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
             picture: pictureUrl,
             category: category,
             isConnected: true,
-            isSelected: true,
+            isSelected: !isProfile,
+            enableSchedule: true,
           },
           create: {
             id: String(p.id),
@@ -590,7 +407,7 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
             picture: pictureUrl,
             category: category,
             isConnected: true,
-            isSelected: true,
+            isSelected: !isProfile,
           },
         });
 
@@ -599,22 +416,32 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
           name: saved.name,
           picture: saved.picture,
           category: saved.category,
-          isProfile: category === "គណនីផ្ទាល់ខ្លួន",
-          isSelected: true,
+          isProfile,
+          isSelected: !isProfile,
+          hasAccessToken: isFbToken(rawPageToken),
         });
       } catch (pageErr) {
         console.warn("Failed to upsert Facebook page/profile:", p.id, pageErr);
       }
     }
 
+    const hasPublishToken = Boolean(userToken || savedPages.some((p) => !p.isProfile && p.hasAccessToken));
+
     return c.json({
       success: true,
       user: fbUser,
+      hasPublishToken,
+      hasPublishPermissions,
+      grantedPermissions: tokenPermissions,
       pagesCount: savedPages.length,
       pages: savedPages,
       message:
         savedPages.length > 0
-          ? `បានភ្ជាប់ផេកចំនួន ${savedPages.length} ដោយជោគជ័យ!`
+          ? !hasPublishToken
+            ? `បានទាញបញ្ជីផេកចំនួន ${savedPages.length} ប៉ុន្តែមិនទាន់រកឃើញ Facebook Access Token (EAA...) ទេ — សូមទាញយក Extension ថ្មី ហើយ Sync ឡើងវិញ!`
+            : !hasPublishPermissions
+            ? `បានភ្ជាប់ផេកចំនួន ${savedPages.length} (សូមសាកល្បងផុស ឬផ្ទុក Extension ថ្មីឡើងវិញបើជួបកំហុសផុសវីដេអូ)`
+            : `បានភ្ជាប់ផេកចំនួន ${savedPages.length} ដោយជោគជ័យ!`
           : "បានភ្ជាប់គណនី Facebook រួចរាល់ ប៉ុន្តែរកមិនឃើញផេកនៅក្នុងគណនីនេះទេ។",
     });
   } catch (error) {

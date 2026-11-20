@@ -28,33 +28,16 @@ export default function SubtitleStudio() {
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [isBounceEnabled, setIsBounceEnabled] = useState(true);
 
-  // Check if incoming state has video passed from Post.jsx or Tools
+  // Check if incoming state has video passed from Tools
   useEffect(() => {
     if (location.state?.videoUrl && !completedJob) {
-      toast.success("បានផ្ទុកវីដេអូពី EZA-POST! ចុច 'បម្លែងជា Subtitle' ដើម្បីចាប់ផ្តើម។", { duration: 4000 });
+      toast.success("បានផ្ទុកវីដេអូ! ចុច 'បម្លែងជា Subtitle' ដើម្បីចាប់ផ្តើម។", { duration: 4000 });
     }
   }, [location.state]);
 
   const handleSeekRequest = (time) => {
     setSeekTarget({ time: parseFloat(time), token: Date.now() + Math.random() });
     setCurrentTime(parseFloat(time));
-  };
-
-  const handleSendToPost = () => {
-    if (!completedJob) return;
-    const fullText = (completedJob.segments || []).map((s) => s.text).join(" ").trim();
-    const suggestedCaption = fullText.length > 300 ? fullText.substring(0, 300) + "..." : fullText;
-
-    toast.success("បានបញ្ជូនវីដេអូ និង Subtitle ទៅកាន់ទំព័របង្កើតផុស! 🚀");
-    navigate("/post", {
-      state: {
-        rawVideoUrl: completedJob.media_url,
-        videoUrl: completedJob.media_url,
-        filename: completedJob.filename,
-        subtitles: completedJob.segments,
-        suggestedCaption: suggestedCaption,
-      },
-    });
   };
 
   const activeSub = completedJob?.segments?.find(
@@ -76,7 +59,7 @@ export default function SubtitleStudio() {
                 បម្លែងសំឡេងជា <span className="text-indigo-600 dark:text-indigo-400">អក្សររត់ខ្មែរ</span> ស្វ័យប្រវត្តិ
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer">
-                បម្លែងសំឡេង និងវីដេអូជាអក្សររត់ខ្មែរត្រឹមត្រូវក្នុងរយៈពេល ៤ ទៅ ៨ វិនាទី រួចផុសទៅកាន់ផេក Facebook ភ្លាមៗ
+                បម្លែងសំឡេង និងវីដេអូជាអក្សររត់ខ្មែរត្រឹមត្រូវ រួចទាញយកជា SRT ឬ CapCut Draft បានភ្លាមៗ
               </p>
             </div>
 
@@ -109,16 +92,6 @@ export default function SubtitleStudio() {
                   <span className="font-medium truncate max-w-[110px] sm:max-w-xs">{completedJob.filename}</span>
                 </div>
               </div>
-
-              {/* Action Button: Send to Facebook Post Composer */}
-              <button
-                onClick={handleSendToPost}
-                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all shadow-sm font-khmer shrink-0"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">បង្កើតផុស Facebook 🚀</span>
-                <span className="xs:hidden">ផុស FB 🚀</span>
-              </button>
             </div>
 
             {/* Mobile Tab Switcher */}

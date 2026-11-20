@@ -1000,8 +1000,7 @@ app.get('/api/v1/media/:key{.*}', async (c) => {
   const rangeHeader = c.req.header('range');
 
   const object = await c.env.MEDIA_BUCKET.get(key, {
-    range: rangeHeader ? c.req.raw.headers : undefined,
-    onlyIf: c.req.raw.headers
+    range: rangeHeader ? c.req.raw.headers : undefined
   });
 
   if (!object || !('body' in object)) {

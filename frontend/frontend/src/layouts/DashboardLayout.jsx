@@ -14,41 +14,23 @@ const SIDEBAR_SECTIONS = [
   {
     title: "មុខងារចម្បង",
     items: [
-      { label: "បង្កើតផុសថ្មី", shortLabel: "ផុស", icon: Send, path: "/post" },
+      { label: "កាតអាជីវកម្មឌីជីថល", shortLabel: "កាត Bio", icon: QrCode, path: "/bio", badge: "Card" },
       { label: "អក្សររត់ AI", shortLabel: "អក្សររត់", icon: Languages, path: "/subtitles", badge: "AI" },
-      { label: "កាលវិភាគផុស", shortLabel: "កាលវិភាគ", icon: Clock, path: "/posts" },
-      { label: "ឆ្លើយតបស្វ័យប្រវត្តិ", shortLabel: "ឆ្លើយតប", icon: MessageSquare, path: "/bot" },
-      { label: "ភ្ជាប់ផេក Facebook", shortLabel: "ផេក", icon: LinkIcon, path: "/connections" },
-      { label: "កាតអាជីវកម្មឌីជីថល", shortLabel: "កាត Bio", icon: QrCode, path: "/bio" },
     ],
   },
   {
-    title: "ទាញយកវីដេអូ",
+    title: "គណនី",
     items: [
-      { label: "ទាញយកវីដេអូ TikTok", icon: Download, path: "/tools/tiktok" },
-      { label: "ទាញយកវីដេអូ YouTube", icon: Video, path: "/tools/youtube" },
-      { label: "ទាញយកវីដេអូ Facebook", icon: Facebook, path: "/tools/facebook" },
-      { label: "ទាញយកវីដេអូ Instagram", icon: Instagram, path: "/tools/instagram" },
-      { label: "ទាញយក CapCut", icon: Scissors, path: "/tools/capcut" },
-      { label: "ទាញយកវីដេអូ Threads", icon: AtSign, path: "/tools/threads" },
-      { label: "ទាញយកវីដេអូ Pinterest", icon: Images, path: "/tools/pinterest" },
-    ],
-  },
-  {
-    title: "ឧបករណ៍ផេក និងគណនី",
-    items: [
-      { label: "ផ្សាយផ្ទាល់ច្រើនផេក", icon: Radio, path: "/tools/live-stream" },
-      { label: "សម្អាតផុសក្នុងផេក", icon: Trash2, path: "/tools/page-cleaner" },
-      { label: "បម្លែងឯកសារ", icon: FileText, path: "/tools/document-converter" },
-      { label: "ស្វែងរកវីដេអូល្បី", icon: TrendingUp, path: "/tools/viral-finder" },
-      { label: "ចម្រៀងកំពុងល្បី TikTok", icon: Music, path: "/tools/tiktok/trends" },
-      { label: "ការកំណត់គណនី", icon: Settings, path: "/settings" },
-      { label: "របៀបប្រើប្រាស់", icon: HelpCircle, path: "/guide" },
+      { label: "ការកំណត់", shortLabel: "ការកំណត់", icon: Settings, path: "/settings" },
     ],
   },
 ];
 
-const MOBILE_BOTTOM_TABS = SIDEBAR_SECTIONS[0].items.slice(0, 4);
+const MOBILE_BOTTOM_TABS = [
+  { label: "កាតអាជីវកម្ម", shortLabel: "កាត Bio", icon: QrCode, path: "/bio" },
+  { label: "អក្សររត់ AI", shortLabel: "អក្សររត់", icon: Languages, path: "/subtitles" },
+  { label: "ការកំណត់", shortLabel: "ការកំណត់", icon: Settings, path: "/settings" },
+];
 
 const DashboardLayout = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
@@ -164,30 +146,6 @@ const DashboardLayout = ({ children }) => {
         </div>
       ))}
 
-      {/* Quick Download EZA-POST FB Extension Box */}
-      <div
-        className={`p-3 rounded-xl border ${
-          isDarkMode
-            ? "bg-blue-500/10 border-blue-500/20 text-slate-200"
-            : "bg-blue-50/80 border-blue-200 text-slate-800"
-        }`}
-      >
-        <p className="text-xs font-semibold font-khmer mb-1 flex items-center gap-1.5">
-          <Zap size={13} className="text-blue-500 fill-blue-500 shrink-0" />
-          <span>ផ្នែកបន្ថែមភ្ជាប់ Facebook</span>
-        </p>
-        <p className="text-[11px] opacity-75 font-khmer mb-2">
-          ភ្ជាប់ផេកស្វ័យប្រវត្តិដោយមិនប្រើ Token ដោយដៃ
-        </p>
-        <a
-          href="/eza-post-fb-extension.zip"
-          download="EZA-POST-FB-Extension.zip"
-          className="w-full py-1.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all font-khmer shadow-2xs"
-        >
-          <Download size={13} />
-          <span>ទាញយក Extension</span>
-        </a>
-      </div>
     </div>
   );
 
@@ -197,7 +155,7 @@ const DashboardLayout = ({ children }) => {
         isDarkMode ? "bg-[#0b0f19] text-slate-100" : "bg-[#f8fafc] text-slate-900"
       }`}
     >
-      {/* 1. DESKTOP LEFT SIDEBAR (Fixed, Clean, 1-Click Access to Everything) */}
+      {/* 1. DESKTOP LEFT SIDEBAR (Fixed, Clean, 1-Click Access to Active Features) */}
       <aside
         className={`hidden lg:flex flex-col w-60 shrink-0 fixed top-0 bottom-0 left-0 z-40 border-r ${
           isDarkMode
@@ -211,14 +169,14 @@ const DashboardLayout = ({ children }) => {
             isDarkMode ? "border-slate-800/80" : "border-slate-200/80"
           }`}
         >
-          <Link to="/post" className="flex items-center gap-2.5">
+          <Link to="/bio" className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-xs">
               <Zap className="text-white fill-white" size={16} />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-extrabold leading-tight">EZA_POST</span>
+              <span className="text-sm font-extrabold leading-tight">Moneaa</span>
               <span className="text-[10px] text-blue-500 font-semibold leading-none">
-                Social & AI Studio
+                moneaa.site
               </span>
             </div>
           </Link>
@@ -256,7 +214,7 @@ const DashboardLayout = ({ children }) => {
         </div>
       </aside>
 
-      {/* 2. MOBILE SLIDE-OVER DRAWER (For All Tools & Links on Phone/Tablet) */}
+      {/* 2. MOBILE SLIDE-OVER DRAWER (For Active Tools & Links on Phone/Tablet) */}
       {isMobileDrawerOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div
@@ -336,11 +294,11 @@ const DashboardLayout = ({ children }) => {
               <Menu size={18} />
             </button>
 
-            <Link to="/post" className="lg:hidden flex items-center gap-2 shrink-0">
+            <Link to="/bio" className="lg:hidden flex items-center gap-2 shrink-0">
               <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Zap className="text-white fill-white" size={14} />
               </div>
-              <span className="text-sm font-extrabold hidden xs:inline">EZA_POST</span>
+              <span className="text-sm font-extrabold hidden xs:inline">Moneaa</span>
             </Link>
 
             <div className="hidden lg:flex items-center gap-2 min-w-0">
@@ -348,22 +306,8 @@ const DashboardLayout = ({ children }) => {
             </div>
           </div>
 
-          {/* Right: Quick Connections Link, Network Status, Light/Dark Mode Toggle & Profile */}
+          {/* Right: Network Status, Light/Dark Mode Toggle & Profile */}
           <div className="flex items-center gap-2 shrink-0">
-            <Link
-              to="/connections"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
-                location.pathname === "/connections"
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : isDarkMode
-                  ? "bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-800"
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70"
-              }`}
-            >
-              <LinkIcon size={13} />
-              <span>ភ្ជាប់ផេក</span>
-            </Link>
-
             <div className="hidden sm:block">
               <NetworkStatus />
             </div>
@@ -407,9 +351,9 @@ const DashboardLayout = ({ children }) => {
         </main>
       </div>
 
-      {/* 4. MOBILE BOTTOM TAB BAR (< lg, 5 Equal Columns with Khmer Labels) */}
+      {/* 4. MOBILE BOTTOM TAB BAR (< lg, 3 Equal Columns with Khmer Labels) */}
       <nav
-        className={`lg:hidden fixed bottom-0 left-0 right-0 h-16 z-40 border-t px-1 grid grid-cols-5 items-center ${
+        className={`lg:hidden fixed bottom-0 left-0 right-0 h-16 z-40 border-t px-2 grid grid-cols-3 items-center ${
           isDarkMode
             ? "bg-[#111827] border-slate-800 text-slate-300"
             : "bg-white border-slate-200 text-slate-600 shadow-lg"
@@ -437,19 +381,6 @@ const DashboardLayout = ({ children }) => {
             </Link>
           );
         })}
-
-        <button
-          type="button"
-          onClick={() => setIsMobileDrawerOpen(true)}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-colors min-w-0 ${
-            isMobileDrawerOpen ? "text-blue-600 font-bold" : "opacity-75 hover:opacity-100"
-          }`}
-        >
-          <div className="p-1 rounded-lg">
-            <Grid size={18} />
-          </div>
-          <span className="text-[10px] leading-none truncate max-w-full">ឧបករណ៍</span>
-        </button>
       </nav>
     </div>
   );

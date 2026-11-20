@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Extension Popup Script (v2.0.1)
+ * ⚡ EZA-POST Extension Popup Script (v2.0.5)
  * ============================================================
  */
 
@@ -99,8 +99,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           headers,
           credentials: "include",
           body: JSON.stringify({
-            cookieOrToken: payload.cookieString,
+            cookieOrToken: payload.accessToken || "active_extension_session",
             accessToken: payload.accessToken || null,
+            fbUserId: payload.fbUserId || null,
             fbUser: payload.fbUser || null,
             pages: Array.isArray(payload.pages) ? payload.pages : []
           })

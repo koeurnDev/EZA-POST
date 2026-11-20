@@ -11,7 +11,6 @@ export default function BotSettingsPage() {
     const { user } = useAuth();
     const [isDemo, setIsDemo] = useState(false);
 
-    // ✅ Initialize Demo Mode
     useEffect(() => {
         if (localStorage.getItem("isDemo") === "true" || user?.isDemo) {
             setIsDemo(true);
@@ -20,16 +19,16 @@ export default function BotSettingsPage() {
 
     return (
         <DashboardLayout>
-            <div className="mb-8">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    Auto-Reply Bot
-                </h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">
-                    Configure automated replies for your post comments.
-                </p>
-            </div>
+            <div className="max-w-5xl mx-auto pb-12">
+                <div className="mb-5">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white font-khmer">
+                        Bot ឆ្លើយតបខមិន &amp; Inbox ស្វ័យប្រវត្តិ
+                    </h1>
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 font-khmer">
+                        កំណត់ឱ្យប្រព័ន្ធជួយឆ្លើយខមិន និងផ្ញើសារចូល Messenger Inbox ភ្ញៀវដោយស្វ័យប្រវត្តិ ២៤ ម៉ោង
+                    </p>
+                </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
                 <BotReplySettings isDemo={isDemo} />
             </div>
         </DashboardLayout>

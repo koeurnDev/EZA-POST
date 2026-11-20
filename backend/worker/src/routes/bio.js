@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { requireAuth } from "./auth.js";
+import { getOptionalAuthUser, requireAuth } from "./auth.js";
 import { getPrisma } from "../lib/prisma.js";
 
 const bio = new Hono();
@@ -40,21 +40,30 @@ bio.get("/check-slug/:slug", async (c) => {
   const rawSlug = c.req.param("slug");
   const cleanSlug = sanitizeSlug(rawSlug);
 
-  if (!cleanSlug || cleanSlug.length < 3) {
-    return c.json({ success: true, available: false, error: "Slug must be at least 3 characters" });
+  if (!cleanSlug || cleanSlug.length < 3 || cleanSlug.length > 50) {
+    return c.json({
+      success: true,
+      available: false,
+      error: "Slug must be 3-50 alphanumeric characters or hyphens",
+    });
   }
 
   const prisma = getPrisma(c.env);
   try {
-    const existing = await prisma.bioPage.findUnique({
-      where: { slug: cleanSlug },
-      select: { id: true, userId: true },
-    });
+    const [existing, authUser] = await Promise.all([
+      prisma.bioPage.findUnique({
+        where: { slug: cleanSlug },
+        select: { id: true, userId: true },
+      }),
+      getOptionalAuthUser(c),
+    ]);
+
+    const available = !existing || (authUser !== null && existing.userId === authUser.id);
 
     return c.json({
       success: true,
       slug: cleanSlug,
-      available: !existing,
+      available,
     });
   } catch (error) {
     return c.json({ success: false, error: "Failed to check handle availability" }, 500);

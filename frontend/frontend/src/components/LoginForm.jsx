@@ -133,11 +133,11 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
               className="space-y-6"
             >
               {/* Email */}
-              <div className="space-y-2">
-                <label htmlFor={emailId} className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">អ៊ីមែល</label>
+              <div className="space-y-1.5">
+                <label htmlFor={emailId} className="text-xs font-semibold text-slate-400 px-0.5">អ៊ីមែល</label>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors">
-                    <Mail size={18} />
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors">
+                    <Mail size={16} />
                   </div>
                   <input
                     id={emailId}
@@ -146,24 +146,24 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="name@example.com"
-                    className={`w-full pl-14 pr-6 py-4 bg-white/5 border rounded-2xl outline-none text-white placeholder-gray-700 transition-all focus:ring-4 focus:ring-blue-500/10 ${errors.email ? "border-red-500/50" : "border-white/10 focus:border-blue-500"}`}
+                    className={`w-full h-11 pl-10 pr-4 bg-white/5 border rounded-xl outline-none text-white text-xs md:text-sm placeholder-slate-600 transition-all focus:border-blue-500 ${errors.email ? "border-red-500/50" : "border-white/10"}`}
                     disabled={loading}
                   />
                 </div>
-                {errors.email && <p className="text-red-500 text-[10px] font-bold px-1">{errors.email}</p>}
+                {errors.email && <p className="text-red-400 text-[11px] font-medium px-0.5">{errors.email}</p>}
               </div>
 
               {/* Password */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center px-1">
-                  <label htmlFor={passwordId} className="text-xs font-bold text-gray-500 uppercase tracking-widest">លេខសម្ងាត់</label>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center px-0.5">
+                  <label htmlFor={passwordId} className="text-xs font-semibold text-slate-400">លេខសម្ងាត់</label>
                   {onForgotPassword && (
-                    <button type="button" onClick={onForgotPassword} className="text-[10px] font-bold text-blue-500 hover:text-blue-400 uppercase tracking-widest">ភ្លេចលេខសម្ងាត់?</button>
+                    <button type="button" onClick={onForgotPassword} className="text-xs text-blue-400 hover:underline font-medium">ភ្លេចលេខសម្ងាត់?</button>
                   )}
                 </div>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors">
-                    <Lock size={18} />
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors">
+                    <Lock size={16} />
                   </div>
                   <input
                     id={passwordId}
@@ -172,26 +172,26 @@ const LoginForm = ({ onSuccess, onForgotPassword }) => {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="••••••••"
-                    className={`w-full pl-14 pr-14 py-4 bg-white/5 border rounded-2xl outline-none text-white placeholder-gray-700 transition-all focus:ring-4 focus:ring-blue-500/10 ${errors.password ? "border-red-500/50" : "border-white/10 focus:border-blue-500"}`}
+                    className={`w-full h-11 pl-10 pr-10 bg-white/5 border rounded-xl outline-none text-white text-xs md:text-sm placeholder-slate-600 transition-all focus:border-blue-500 ${errors.password ? "border-red-500/50" : "border-white/10"}`}
                     disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-                {errors.password && <p className="text-red-500 text-[10px] font-bold px-1">{errors.password}</p>}
+                {errors.password && <p className="text-red-400 text-[11px] font-medium px-0.5">{errors.password}</p>}
               </div>
 
               <button 
                 type="submit" 
                 disabled={loading}
-                className="h-16 rounded-2xl w-full bg-blue-600 hover:bg-blue-500 text-white font-bold uppercase tracking-widest shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4"
+                className="h-11 rounded-xl w-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs md:text-sm shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2 active:scale-95"
               >
-                {loading ? "កំពុងដំណើរការ..." : <>ចូលគណនី <ArrowRight size={20} /></>}
+                {loading ? "កំពុងដំណើរការ..." : <><span>ចូលគណនី</span> <ArrowRight size={16} /></>}
               </button>
             </MotionDiv>
           )}

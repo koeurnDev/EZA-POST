@@ -21,7 +21,7 @@ export async function generateBotSuggestions(env) {
   }
 
   const cleanKey = env.GEMINI_API_KEY.trim().replace(/^["']|["']$/g, "");
-  const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleanKey}`;
+  const modelEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
   const bodyStr = JSON.stringify({
     contents: [{ parts: [{ text: suggestionPrompt }] }],
     generationConfig: {
@@ -30,30 +30,39 @@ export async function generateBotSuggestions(env) {
     },
   });
 
-  let response;
-  if (env.GEMINI_PROXY) {
-    const doId = env.GEMINI_PROXY.idFromName("gemini-us-west-1");
-    const stub = env.GEMINI_PROXY.get(doId, { locationHint: "wnam" });
-    response = await stub.fetch("https://gemini-proxy/forward", {
+  const callDirectGemini = () =>
+    fetch(modelEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-gemini-target-url": targetUrl,
+        "x-goog-api-key": cleanKey,
       },
       body: bodyStr,
     });
-  } else {
-    response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-      {
+
+  let response;
+  if (env.GEMINI_PROXY) {
+    try {
+      const doId = env.GEMINI_PROXY.idFromName("gemini-us-west-1");
+      const stub = env.GEMINI_PROXY.get(doId, { locationHint: "wnam" });
+      response = await stub.fetch("https://gemini-proxy/forward", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": cleanKey,
+          "x-gemini-target-url": `${modelEndpoint}?key=${cleanKey}`,
         },
         body: bodyStr,
+      });
+      if (!response.ok) {
+        console.warn("Gemini proxy returned non-OK status:", response.status);
+        response = await callDirectGemini();
       }
-    );
+    } catch (proxyError) {
+      console.warn("Gemini proxy fetch failed, falling back to direct Gemini:", proxyError);
+      response = await callDirectGemini();
+    }
+  } else {
+    response = await callDirectGemini();
   }
 
   let result;
@@ -64,8 +73,8 @@ export async function generateBotSuggestions(env) {
     throw new Error("Gemini returned an invalid response.");
   }
   if (!response.ok) {
-    console.error("Gemini suggestions request failed:", response.status);
-    throw new Error("Gemini suggestions request failed.");
+    console.error("Gemini suggestions request failed:", response.status, result?.error?.message || "");
+    throw new Error(result?.error?.message || "Gemini suggestions request failed.");
   }
 
   const text = result?.candidates?.[0]?.content?.parts

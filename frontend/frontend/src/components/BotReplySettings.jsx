@@ -1,5 +1,5 @@
 // ============================================================
-// 🤖 BotReplySettings.jsx — V3 Redesign (Inline Form)
+// 🤖 BotReplySettings.jsx — Simplified Tabbed UX with Quick Templates
 // ============================================================
 
 import React, {
@@ -7,8 +7,8 @@ import React, {
   useEffect,
   useCallback,
   useDeferredValue,
-  Suspense,
 } from "react";
+import { Link } from "react-router-dom";
 import {
   MessageSquare,
   Plus,
@@ -21,24 +21,60 @@ import {
   Filter,
   Image as ImageIcon,
   Loader,
-  HelpCircle,
-  ExternalLink,
-  Zap,
+  Sparkles,
   History,
-  CheckCircle,
-  Bot,
+  RefreshCw,
+  ChevronDown,
+  Flag,
+  CheckCircle2,
   AlertCircle,
-  RefreshCw
+  ExternalLink,
 } from "lucide-react";
 import api, { botAPI } from "../utils/api";
 
-// ✅ Main Component
+const QUICK_TEMPLATES = [
+  {
+    id: "price",
+    label: "💰 សួរតម្លៃ",
+    keyword: "តម្លៃ",
+    reply: "សូមអរគុណបង! ក្រុមការងារបានផ្ញើតម្លៃលម្អិតចូល Inbox បងរួចរាល់ហើយ 💬",
+    enableDm: true,
+    dmReply: "សួស្តីបង [[name]]! អរគុណសម្រាប់ការសួរតម្លៃ។ សូមបងមើលព័ត៌មានលម្អិតខាងក្រោម ឬប្រាប់ឈ្មោះទំនិញដែលបងចាប់អារម្មណ៍បានណា!",
+  },
+  {
+    id: "location",
+    label: "📍 សួរទីតាំង",
+    keyword: "ទីតាំង",
+    reply: "ហាងយើងខ្ញុំមានទីតាំងនៅរាជធានីភ្នំពេញ និងមានសេវាដឹកជញ្ជូនទូទាំង ២៥ ខេត្ត-ក្រុង 🚚",
+    enableDm: false,
+    dmReply: "",
+  },
+  {
+    id: "order",
+    label: "🛒 កម្ម៉ង់ទិញ",
+    keyword: "កម្ម៉ង់",
+    reply: "អរគុណបង! សូមឆែកប្រអប់សារ Inbox ដើម្បីបញ្ជាក់ការកម្ម៉ង់ណា 🛍️",
+    enableDm: true,
+    dmReply: "សួស្តីបង [[name]]! ដើម្បីកម្ម៉ង់ទំនិញ សូមផ្ញើលេខទូរស័ព្ទ និងទីតាំងដឹកជញ្ជូនមកទីនេះបានណា!",
+  },
+  {
+    id: "all",
+    label: "🌐 ឆ្លើយគ្រប់ខមិន",
+    keyword: "",
+    reply: "សូមអរគុណបង [[name]] សម្រាប់ការចាប់អារម្មណ៍! ក្រុមការងារនឹងទាក់ទងទៅបងវិញភ្លាមៗ 🙏",
+    enableDm: true,
+    dmReply: "សួស្តីបង [[name]]! អរគុណដែលបាន Comment។ តើបងចង់សាកសួរព័ត៌មានអ្វីដែរ?",
+  },
+];
+
 const BotReplySettingsContent = React.memo(({ isDemo }) => {
+  const [activeTab, setActiveTab] = useState("rules"); // "rules" | "pages" | "history"
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const [rules, setRules] = useState([]);
-  // Form State
   const [formData, setFormData] = useState({
-    ruleType: "KEYWORD", // KEYWORD, REGEX
-    scope: "ALL",        // ALL, SPECIFIC
+    ruleType: "KEYWORD",
+    scope: "ALL",
     postId: "",
     keyword: "",
     reply: "",
@@ -52,29 +88,41 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [savingRule, setSavingRule] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [availablePages, setAvailablePages] = useState([]);
   const [pageSettings, setPageSettings] = useState([]);
   const [isLoadingPages, setIsLoadingPages] = useState(false);
-  
-  // ✅ Monitored Posts State
+
   const [monitoredPosts, setMonitoredPosts] = useState([]);
   const [isLoadingMonitored, setIsLoadingMonitored] = useState(false);
   const [monitoredPostUrl, setMonitoredPostUrl] = useState("");
   const [monitoredPageId, setMonitoredPageId] = useState("");
   const [isAddingMonitored, setIsAddingMonitored] = useState(false);
 
+  const [recentPosts, setRecentPosts] = useState([]);
+  const [recentPostsError, setRecentPostsError] = useState(null);
+  const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+  const [browsePageId, setBrowsePageId] = useState("");
+
+  const [history, setHistory] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(10);
+
   const deferredSearch = useDeferredValue(searchTerm);
 
-  // ✅ Load rules from API
+  const showNotify = useCallback((msg, type = "success") => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3000);
+  }, []);
+
   const fetchRules = useCallback(async () => {
     try {
       if (isDemo) {
         setRules([
-          { id: 1, ruleType: "KEYWORD", scope: "ALL", keyword: "price", reply: "Our pricing starts at $10/month.", enabled: true },
-          { id: 2, ruleType: "REGEX", scope: "ALL", keyword: "hi|hello|hey", reply: "Hi there! How can I help you?", enabled: true },
-          { id: 3, ruleType: "KEYWORD", scope: "SPECIFIC", postId: "12345", keyword: "discount", reply: "Use code SAVE10!", enabled: false },
+          { id: 1, ruleType: "KEYWORD", scope: "ALL", keyword: "តម្លៃ", reply: "សូមបងឆែកប្រអប់សារ Inbox ណា!", enableDm: true, dmReply: "តម្លៃ $10 បង!", enabled: true },
+          { id: 2, ruleType: "KEYWORD", scope: "ALL", keyword: "ទីតាំង", reply: "នៅភ្នំពេញបង មានដឹកជញ្ជូនទូទាំងប្រទេស!", enabled: true },
         ]);
         setIsEnabled(true);
         setLoading(false);
@@ -82,8 +130,7 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       }
 
       const res = await api.get("/bot/rules");
-      // ✅ Normalize ID for frontend compatibility
-      const normalizedRules = (res.data.rules || []).map(r => ({ ...r, id: r.id || r._id }));
+      const normalizedRules = (res.data.rules || []).map((r) => ({ ...r, id: r.id || r._id }));
       setRules(normalizedRules);
       setIsEnabled(res.data.enabled ?? true);
       setPageSettings(res.data.pageSettings || []);
@@ -95,13 +142,12 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     }
   }, [isDemo]);
 
-  // ✅ Load monitored posts
   const fetchMonitoredPosts = useCallback(async () => {
     if (isDemo) {
-        setMonitoredPosts([
-            { id: '1', facebookPostId: '1234567890', pageId: '1000123', enabled: true, createdAt: new Date() }
-        ]);
-        return;
+      setMonitoredPosts([
+        { id: "1", facebookPostId: "1234567890", pageId: "1000123", enabled: true, createdAt: new Date() },
+      ]);
+      return;
     }
     setIsLoadingMonitored(true);
     try {
@@ -116,18 +162,40 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     }
   }, [isDemo]);
 
+  const fetchHistory = useCallback(async () => {
+    if (isDemo) {
+      setHistory([
+        { id: "1", commentId: "123_456", replyMessage: "សូមបងឆែកប្រអប់សារ!", pageId: "101", status: "success", timestamp: new Date() },
+      ]);
+      return;
+    }
+    setIsLoadingHistory(true);
+    try {
+      const res = await api.get("/bot/history");
+      if (res.data.success) {
+        setHistory(res.data.history || []);
+      }
+    } catch (err) {
+      console.warn("⚠️ History fetch failed:", err);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [isDemo]);
+
   useEffect(() => {
     fetchRules();
     fetchMonitoredPosts();
-    // Also fetch available pages to show in selection
+
     const fetchPages = async () => {
       setIsLoadingPages(true);
       try {
         const res = await api.get("/user/pages");
         if (res.data.success) {
-          setAvailablePages(res.data.accounts || []);
-          if (res.data.accounts?.length > 0) {
-            setMonitoredPageId(res.data.accounts[0].id);
+          const accounts = res.data.accounts || [];
+          setAvailablePages(accounts);
+          if (accounts.length > 0) {
+            setMonitoredPageId(accounts[0].id);
+            setBrowsePageId(accounts[0].id);
           }
         }
       } catch (err) {
@@ -139,31 +207,76 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
     fetchPages();
   }, [fetchRules, fetchMonitoredPosts]);
 
-  // ✅ Performance: Limit items for mobile/2GB RAM
-  const [visibleCount, setVisibleCount] = useState(10);
-  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+  useEffect(() => {
+    fetchHistory();
+    const timer = setInterval(fetchHistory, 30000);
+    return () => clearInterval(timer);
+  }, [fetchHistory]);
 
-  // ✅ Notification helper
-  const showNotify = useCallback((msg, type = "success") => {
-    setNotification({ msg, type });
-    setTimeout(() => setNotification(null), 2500);
-  }, []);
+  const fetchRecentPosts = useCallback(async (pageId) => {
+    if (!pageId || isDemo) return;
+    setIsLoadingRecent(true);
+    setRecentPostsError(null);
+    try {
+      const res = await api.get(`/bot/recent-posts/${pageId}`);
+      if (res.data.success) {
+        setRecentPosts(res.data.posts || []);
+      }
+    } catch (err) {
+      console.warn("⚠️ Recent posts fetch failed:", err);
+      setRecentPosts([]);
+      const apiData = err?.response?.data;
+      setRecentPostsError({
+        isExpired: apiData?.code === "FB_TOKEN_EXPIRED",
+        message:
+          apiData?.message ||
+          "មិនអាចទាញយកផុសថ្មីៗពីផេកនេះបានទេ។ សូមពិនិត្យការតភ្ជាប់ Facebook ឡើងវិញ។",
+      });
+    } finally {
+      setIsLoadingRecent(false);
+    }
+  }, [isDemo]);
 
-  // ✅ Filtered rules
+  useEffect(() => {
+    if (activeTab === "pages" && browsePageId) {
+      fetchRecentPosts(browsePageId);
+    }
+  }, [activeTab, browsePageId, fetchRecentPosts]);
+
+  const isPageBotActive = useCallback(
+    (page) => {
+      const settings = pageSettings.find((s) => s.pageId === page.id);
+      return settings ? settings.enableBot === true : page.settings?.enableBot === true;
+    },
+    [pageSettings]
+  );
+
+  const enabledPagesCount = availablePages.filter(isPageBotActive).length;
+  const activeRulesCount = rules.filter((r) => r.enabled !== false).length;
+
   const filtered = (rules || []).filter(
     (r) =>
       (r.keyword || "").toLowerCase().includes(deferredSearch.toLowerCase()) ||
       (r.reply || "").toLowerCase().includes(deferredSearch.toLowerCase())
   );
 
-  const clearSearch = () => setSearchTerm("");
-
-  // ✅ Handle Form Change
   const handleFormChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // ✅ Reset Form
+  const applyTemplate = (tpl) => {
+    setFormData((prev) => ({
+      ...prev,
+      ruleType: "KEYWORD",
+      scope: "ALL",
+      keyword: tpl.keyword,
+      reply: tpl.reply,
+      enableDm: tpl.enableDm,
+      dmReply: tpl.dmReply,
+    }));
+    showNotify(`បានប្រើគំរូ "${tpl.label}" — បងអាចកែអក្សរ រួចចុចរក្សាទុក!`);
+  };
+
   const resetForm = () => {
     setFormData({
       ruleType: "KEYWORD",
@@ -176,36 +289,38 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       attachmentUrl: null,
     });
     setEditingId(null);
+    setShowAdvanced(false);
   };
 
-  // ✅ Edit Rule (Populate Form)
   const handleEdit = (rule) => {
     setFormData({
       ruleType: rule.ruleType || "KEYWORD",
       scope: rule.scope || "ALL",
       postId: rule.postId || "",
-      keyword: rule.keyword,
+      keyword: rule.keyword === "*" ? "" : rule.keyword || "",
       reply: rule.reply || "",
       dmReply: rule.dmReply || "",
       enableDm: Boolean(rule.enableDm),
       attachmentUrl: rule.attachmentUrl || null,
     });
+    if (rule.ruleType === "REGEX" || rule.scope === "SPECIFIC") {
+      setShowAdvanced(true);
+    }
     setEditingId(rule.id);
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setActiveTab("rules");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // ✅ Save Rule (Create or Update)
   const saveRule = useCallback(async () => {
     const { ruleType, scope, postId, keyword, reply, dmReply, enableDm, attachmentUrl } = formData;
 
-    // Validation
     if (!reply.trim() && !(enableDm && dmReply.trim())) {
       return showNotify("សូមបញ្ចូលសារឆ្លើយតប Comment ឬ សារផ្ញើចូល Inbox (DM)", "error");
     }
-    if (scope === "SPECIFIC" && !postId.trim()) return showNotify("Post ID is required for Specific Post scope", "error");
+    if (scope === "SPECIFIC" && !postId.trim()) {
+      return showNotify("សូមបញ្ចូល Post ID ឬ Link ផុសជាក់លាក់", "error");
+    }
 
-    // 🎯 Extract numeric ID if postId is a URL
     let cleanPostId = postId.trim();
     if (scope === "SPECIFIC" && cleanPostId.includes("facebook.com")) {
       const matches = cleanPostId.match(/(\d{10,20})/g);
@@ -222,53 +337,46 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
       reply: reply.trim(),
       dmReply: enableDm ? dmReply.trim() : null,
       enableDm: Boolean(enableDm),
-      attachmentUrl
+      attachmentUrl,
     };
 
+    setSavingRule(true);
     try {
       if (isDemo) {
         if (editingId) {
-          setRules(prev => prev.map(r => r.id === editingId ? { ...r, ...payload } : r));
-          showNotify("Demo rule updated");
+          setRules((prev) => prev.map((r) => (r.id === editingId ? { ...r, ...payload } : r)));
+          showNotify("បានកែប្រែច្បាប់ (Demo) រួចរាល់");
         } else {
-          setRules(prev => [...prev, { id: Date.now(), ...payload, enabled: true }]);
-          showNotify("Demo rule created");
+          setRules((prev) => [...prev, { id: Date.now(), ...payload, enabled: true }]);
+          showNotify("បានបង្កើតច្បាប់ថ្មី (Demo) រួចរាល់");
         }
       } else {
         if (editingId) {
           await api.put(`/bot/rules/${editingId}`, payload);
-          showNotify("Rule updated successfully");
+          showNotify("បានកែប្រែច្បាប់រួចរាល់ ✅");
         } else {
           await api.post("/bot/rules", payload);
-          showNotify("Rule created successfully");
+          showNotify("បានបង្កើតច្បាប់ថ្មីរួចរាល់ ✅");
         }
         fetchRules();
       }
       resetForm();
     } catch (err) {
-      showNotify(err.response?.data?.message || "Failed to save rule", "error");
+      showNotify(err.response?.data?.error || err.response?.data?.message || "មិនអាចរក្សាទុកច្បាប់បានទេ", "error");
+    } finally {
+      setSavingRule(false);
     }
   }, [formData, editingId, isDemo, fetchRules, showNotify]);
 
-  // ✅ Delete rule
   const deleteRule = useCallback(
     async (id) => {
-      console.log("🖱️ Delete button clicked for ID:", id);
       if (!window.confirm("តើបងពិតជាចង់លុបច្បាប់ (Rule) នេះមែនទេ?")) return;
-      
       try {
-        // 1️⃣ Optimistic Update: Remove from UI immediately so user sees it "gone"
-        setRules(prev => prev.filter(r => r.id !== id));
-        showNotify("កំពុងលុប...");
-
+        setRules((prev) => prev.filter((r) => r.id !== id));
         if (!isDemo) {
-          console.log("🌐 Sending DELETE request to server...");
           const res = await api.delete(`/bot/rules/${id}`);
-          console.log("✅ Server response:", res.data);
-          
           if (res.data.success) {
-            showNotify("បានលុបច្បាប់ (Rule) រួចរាល់");
-            // 2️⃣ Double check sync with server
+            showNotify("បានលុបច្បាប់រួចរាល់");
             fetchRules();
           } else {
             throw new Error(res.data.message || "Failed to delete");
@@ -277,855 +385,711 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
           showNotify("បានលុបច្បាប់សាកល្បងរួចរាល់");
         }
       } catch (err) {
-        console.error("❌ Deletion failed:", err);
         showNotify("មិនអាចលុបបានទេ សូមព្យាយាមម្តងទៀត", "error");
-        fetchRules(); // Revert back if failed
+        fetchRules();
       }
     },
     [fetchRules, showNotify, isDemo]
   );
 
-  // ✅ Toggle enable/disable rule
   const toggleRule = useCallback(
     async (id, current) => {
       try {
         if (isDemo) {
-          setRules(prev => prev.map(r => r.id === id ? { ...r, enabled: !current } : r));
-          showNotify(`Rule ${!current ? "enabled" : "disabled"}`);
+          setRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled: !current } : r)));
         } else {
           await api.patch(`/bot/rules/${id}`, { enabled: !current });
           fetchRules();
-          showNotify(`Rule ${!current ? "enabled" : "disabled"}`);
         }
+        showNotify(!current ? "បានបើកច្បាប់នេះ" : "បានបិទច្បាប់នេះ");
       } catch {
-        showNotify("Toggle failed", "error");
+        showNotify("មិនអាចប្ដូរស្ថានភាពបានទេ", "error");
       }
     },
     [fetchRules, showNotify, isDemo]
   );
 
-  // ✅ Enable / Disable entire bot
-  const toggleBot = useCallback(async (checked) => {
-    try {
-      if (isDemo) {
+  const toggleBot = useCallback(
+    async (checked) => {
+      try {
+        if (!isDemo) {
+          await api.put("/bot/settings", { enabled: checked });
+        }
         setIsEnabled(checked);
-        showNotify(`Bot ${checked ? "enabled" : "disabled"}`);
-      } else {
-        await api.put("/bot/settings", { enabled: checked });
-        setIsEnabled(checked);
-        showNotify(`Bot ${checked ? "enabled" : "disabled"}`);
+        showNotify(checked ? "Bot ត្រូវបានបើកឱ្យដំណើរការ 🟢" : "Bot ត្រូវបានផ្អាកបណ្ដោះអាសន្ន");
+      } catch {
+        showNotify("មិនអាចកែប្រែស្ថានភាព Bot បានទេ", "error");
       }
-    } catch {
-      showNotify("Failed to update bot status", "error");
-    }
-  }, [showNotify, isDemo]);
+    },
+    [showNotify, isDemo]
+  );
 
-  // ✅ Toggle Page Bot Status
-  const togglePageBot = useCallback(async (pageId, checked) => {
-    try {
-      if (isDemo) {
-        setPageSettings(prev => {
-          const newSettings = [...prev];
-          const idx = newSettings.findIndex(s => s.pageId === pageId);
-          if (idx > -1) newSettings[idx].enableBot = checked;
-          else newSettings.push({ pageId, enableBot: checked });
-          return newSettings;
+  const togglePageBot = useCallback(
+    async (pageId, checked) => {
+      try {
+        if (!isDemo) {
+          await botAPI.updatePageSettings(pageId, checked);
+        }
+        setPageSettings((prev) => {
+          const next = [...prev];
+          const idx = next.findIndex((s) => s.pageId === pageId);
+          if (idx > -1) next[idx] = { ...next[idx], enableBot: checked };
+          else next.push({ pageId, enableBot: checked });
+          return next;
         });
-        showNotify(`Bot ${checked ? "enabled" : "disabled"} for this page`);
-        return;
+        setAvailablePages((prev) =>
+          prev.map((p) => (p.id === pageId ? { ...p, settings: { ...p.settings, enableBot: checked } } : p))
+        );
+        showNotify(checked ? "បានបើក Bot សម្រាប់ផេកនេះ" : "បានបិទ Bot សម្រាប់ផេកនេះ");
+      } catch {
+        showNotify("មិនអាចកែប្រែការកំណត់ផេកបានទេ", "error");
       }
+    },
+    [showNotify, isDemo]
+  );
 
-      await botAPI.updatePageSettings(pageId, checked);
-      
-      // Update local state for both pageSettings AND availablePages to keep UI in sync
-      setPageSettings(prev => {
-        const newSettings = [...prev];
-        const idx = newSettings.findIndex(s => s.pageId === pageId);
-        if (idx > -1) newSettings[idx].enableBot = checked;
-        else newSettings.push({ pageId, enableBot: checked });
-        return newSettings;
-      });
-
-      setAvailablePages(prev => prev.map(p => 
-        p.id === pageId ? { ...p, settings: { ...p.settings, enableBot: checked } } : p
-      ));
-
-      showNotify(`Bot ${checked ? "enabled" : "disabled"} for this page`);
-    } catch (err) {
-      showNotify("Failed to update page bot status", "error");
-    }
-  }, [showNotify, isDemo]);
-
-  // ✅ Bulk Toggle Pages
-  const toggleAllPages = useCallback(async (enabled) => {
-    if (availablePages.length === 0) return;
-    
-    const pageIds = availablePages.map(p => p.id);
-    
-    try {
-      if (isDemo) {
-        setPageSettings(prev => pageIds.map(id => ({ pageId: id, enableBot: enabled })));
-        showNotify(`${enabled ? "Enabled" : "Disabled"} bot for all demo pages`);
-        return;
+  const toggleAllPages = useCallback(
+    async (enabled) => {
+      if (availablePages.length === 0) return;
+      const pageIds = availablePages.map((p) => p.id);
+      try {
+        if (!isDemo) {
+          await api.put("/bot/page-settings", { pageIds, enabled });
+        }
+        setPageSettings(pageIds.map((id) => ({ pageId: id, enableBot: enabled })));
+        setAvailablePages((prev) =>
+          prev.map((p) => ({ ...p, settings: { ...p.settings, enableBot: enabled } }))
+        );
+        showNotify(enabled ? "បានបើក Bot គ្រប់ផេករួចរាល់" : "បានបិទ Bot គ្រប់ផេករួចរាល់");
+      } catch {
+        showNotify("បរាជ័យក្នុងការកំណត់គ្រប់ផេក", "error");
       }
+    },
+    [availablePages, isDemo, showNotify]
+  );
 
-      showNotify(enabled ? "កំពុងបើកគ្រប់ Page..." : "កំពុងបិទគ្រប់ Page...");
-      
-      await api.put("/bot/page-settings", { pageIds, enabled });
-      
-      // Update local state
-      setPageSettings(prev => {
-        const newSettings = [...prev];
-        pageIds.forEach(id => {
-          const idx = newSettings.findIndex(s => s.pageId === id);
-          if (idx > -1) newSettings[idx].enableBot = enabled;
-          else newSettings.push({ pageId: id, enableBot: enabled });
-        });
-        return newSettings;
-      });
-
-      setAvailablePages(prev => prev.map(p => ({
-        ...p,
-        settings: { ...p.settings, enableBot: enabled }
-      })));
-
-      showNotify(enabled ? "បានបើកគ្រប់ Page រួចរាល់" : "បានបិទគ្រប់ Page រួចរាល់");
-    } catch (err) {
-      showNotify("បរាជ័យក្នុងការកំណត់គ្រប់ Page", "error");
-    }
-  }, [availablePages, isDemo, showNotify]);
-
-  // ✅ Generate AI Suggestions
   const generateAISuggestions = async () => {
     setGenerating(true);
     try {
       if (isDemo) {
-        await new Promise(r => setTimeout(r, 1000));
-        setFormData(prev => ({
+        await new Promise((r) => setTimeout(r, 600));
+        setFormData((prev) => ({
           ...prev,
-          keyword: "amazing",
-          reply: "Thanks for the kind words! We're glad you like it. ✨",
-          ruleType: "KEYWORD"
+          keyword: "តម្លៃ",
+          reply: "អរគុណបង! តម្លៃពិសេសថ្ងៃនេះត្រឹម $10 ប៉ុណ្ណោះ សូមឆែកប្រអប់សារណា ✨",
+          ruleType: "KEYWORD",
         }));
-        showNotify("AI suggestion applied!");
+        showNotify("AI បានសរសេរគំរូឱ្យរួចរាល់ ✨");
       } else {
         const res = await api.post("/bot/suggestions");
         if (res.data.suggestions && res.data.suggestions.length > 0) {
           const random = res.data.suggestions[Math.floor(Math.random() * res.data.suggestions.length)];
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
             keyword: random.keyword,
             reply: random.reply,
-            ruleType: "KEYWORD"
+            ruleType: "KEYWORD",
           }));
-          showNotify("AI suggestion applied!");
+          showNotify("AI បានសរសេរគំរូឱ្យរួចរាល់ ✨");
         }
       }
     } catch {
-      showNotify("Failed to generate AI suggestion", "error");
+      showNotify("AI មិនអាចបង្កើតគំរូបានទេនៅពេលនេះ", "error");
     } finally {
       setGenerating(false);
     }
   };
 
-  // ✅ Handle Image Upload
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     if (file.size > 5 * 1024 * 1024) {
-      showNotify("File size too large (Max 5MB)", "error");
-      return;
+      return showNotify("រូបភាពធំជាង 5MB សូមជ្រើសរូបតូចជាងនេះ", "error");
     }
 
     setUploading(true);
     const uploadData = new FormData();
     uploadData.append("image", file);
-
     try {
       const res = await api.post("/upload/bot-image", uploadData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-
       if (res.data.success) {
         setFormData((prev) => ({ ...prev, attachmentUrl: res.data.url }));
-        showNotify("Image attached successfully!");
+        showNotify("បានភ្ជាប់រូបភាពជោគជ័យ!");
       }
-    } catch (error) {
-      console.error("Upload failed", error);
-      showNotify("Failed to upload image", "error");
+    } catch {
+      showNotify("មិនអាច Upload រូបភាពបានទេ", "error");
     } finally {
       setUploading(false);
     }
   };
 
-  const removeImage = () => {
-    setFormData((prev) => ({ ...prev, attachmentUrl: null }));
-  };
-
-  // ✅ Add Monitored Post
   const handleAddMonitored = async () => {
     if (!monitoredPostUrl.trim() || !monitoredPageId) {
-        return showNotify("សូមបញ្ចូល Link និងរើស Page", "error");
+      return showNotify("សូមបញ្ចូល Link ផុស និងរើស Page", "error");
     }
-
     setIsAddingMonitored(true);
     try {
-        if (isDemo) {
-            setMonitoredPosts(prev => [{ id: Date.now().toString(), facebookPostId: 'DemoID', pageId: monitoredPageId, enabled: true, createdAt: new Date() }, ...prev]);
-            setMonitoredPostUrl("");
-            showNotify("បានបន្ថែមផុសសម្រាប់ Monitor (Demo)");
-        } else {
-            const res = await api.post("/bot/monitored-posts", { url: monitoredPostUrl, pageId: monitoredPageId });
-            if (res.data.success) {
-                showNotify("បានបន្ថែមផុសសម្រាប់ Monitor រួចរាល់");
-                setMonitoredPostUrl("");
-                fetchMonitoredPosts();
-            }
+      if (isDemo) {
+        setMonitoredPosts((prev) => [
+          { id: Date.now().toString(), facebookPostId: "DemoID", pageId: monitoredPageId, enabled: true, createdAt: new Date() },
+          ...prev,
+        ]);
+        setMonitoredPostUrl("");
+        showNotify("បានបន្ថែមផុសសម្រាប់ Monitor (Demo)");
+      } else {
+        const res = await api.post("/bot/monitored-posts", { url: monitoredPostUrl, pageId: monitoredPageId });
+        if (res.data.success) {
+          showNotify("បានបន្ថែមផុសសម្រាប់តាមដានរួចរាល់");
+          setMonitoredPostUrl("");
+          fetchMonitoredPosts();
         }
+      }
     } catch (err) {
-        showNotify(err.response?.data?.message || "បរាជ័យក្នុងការបន្ថែមផុស", "error");
+      showNotify(err.response?.data?.message || "បរាជ័យក្នុងការបន្ថែមផុស", "error");
     } finally {
-        setIsAddingMonitored(false);
+      setIsAddingMonitored(false);
     }
   };
 
-  // ✅ Recent Posts State (The "Easier Way")
-  const [recentPosts, setRecentPosts] = useState([]);
-  const [isLoadingRecent, setIsLoadingRecent] = useState(false);
-  const [browsePageId, setBrowsePageId] = useState("");
-
-  const fetchRecentPosts = useCallback(async (pageId) => {
-    if (!pageId) return;
-    setIsLoadingRecent(true);
-    try {
-      const res = await api.get(`/bot/recent-posts/${pageId}`);
-      if (res.data.success) {
-        setRecentPosts(res.data.posts || []);
-      }
-    } catch (err) {
-      console.warn("⚠️ Recent posts fetch failed:", err);
-      showNotify("មិនអាចទាញយកផុសបានទេ", "error");
-    } finally {
-      setIsLoadingRecent(false);
-    }
-  }, [showNotify]);
-
-  useEffect(() => {
-    if (browsePageId) fetchRecentPosts(browsePageId);
-  }, [browsePageId, fetchRecentPosts]);
-
-  // ✅ Add Monitored Post by ID directly
   const handleAddMonitoredById = async (postId, pageId) => {
     setIsAddingMonitored(true);
     try {
-        if (isDemo) {
-            setMonitoredPosts(prev => [{ id: Date.now().toString(), facebookPostId: postId, pageId: pageId, enabled: true, createdAt: new Date() }, ...prev]);
-            showNotify("បានបន្ថែមផុសសម្រាប់ Monitor (Demo)");
-        } else {
-            // Re-use existing endpoint with direct ID as URL
-            const res = await api.post("/bot/monitored-posts", { url: postId, pageId: pageId });
-            if (res.data.success) {
-                showNotify("បានបន្ថែមផុសសម្រាប់ Monitor រួចរាល់");
-                fetchMonitoredPosts();
-            }
-        }
-    } catch (err) {
-        showNotify(err.response?.data?.message || "បរាជ័យក្នុងការបន្ថែមផុស", "error");
-    } finally {
-        setIsAddingMonitored(false);
-    }
-  };
-
-  // ✅ Delete Monitored Post
-  const handleDeleteMonitored = async (id) => {
-    if (!window.confirm("តើបងចង់ឈប់ Monitor ផុសនេះមែនទេ?")) return;
-    try {
-        if (isDemo) {
-            setMonitoredPosts(prev => prev.filter(p => p.id !== id));
-            showNotify("បានលុបផុសចេញពី Monitor (Demo)");
-        } else {
-            await api.delete(`/bot/monitored-posts/${id}`);
-            showNotify("បានលុបផុសចេញពី Monitor រួចរាល់");
-            fetchMonitoredPosts();
-        }
-    } catch (err) {
-        showNotify("មិនអាចលុបបានទេ", "error");
-    }
-  };
-
-  // ✅ Bot History State
-  const [history, setHistory] = useState([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-
-  const fetchHistory = useCallback(async () => {
-    if (isDemo) {
-        setHistory([
-            { id: '1', commentId: '123_456', replyMessage: 'Hi! How can we help?', pageId: '101', status: 'success', timestamp: new Date() },
-            { id: '2', commentId: '123_457', replyMessage: 'Pricing starts at $10.', pageId: '101', status: 'success', timestamp: new Date(Date.now() - 3600000) }
+      if (isDemo) {
+        setMonitoredPosts((prev) => [
+          { id: Date.now().toString(), facebookPostId: postId, pageId, enabled: true, createdAt: new Date() },
+          ...prev,
         ]);
-        return;
-    }
-    setIsLoadingHistory(true);
-    try {
-        const res = await api.get("/bot/history");
+        showNotify("បានបន្ថែមផុសសម្រាប់តាមដាន (Demo)");
+      } else {
+        const res = await api.post("/bot/monitored-posts", { url: postId, pageId });
         if (res.data.success) {
-            setHistory(res.data.history || []);
+          showNotify("បានបន្ថែមផុសសម្រាប់តាមដានរួចរាល់");
+          fetchMonitoredPosts();
         }
+      }
     } catch (err) {
-        console.warn("⚠️ History fetch failed:", err);
+      showNotify(err.response?.data?.message || "បរាជ័យក្នុងការបន្ថែមផុស", "error");
     } finally {
-        setIsLoadingHistory(false);
+      setIsAddingMonitored(false);
     }
-  }, [isDemo]);
+  };
 
-  useEffect(() => {
-    fetchHistory();
-    // Auto-refresh history every 30 seconds
-    const timer = setInterval(fetchHistory, 30000);
-    return () => clearInterval(timer);
-  }, [fetchHistory]);
+  const handleDeleteMonitored = async (id) => {
+    if (!window.confirm("តើបងចង់ឈប់តាមដានផុសនេះមែនទេ?")) return;
+    try {
+      if (isDemo) {
+        setMonitoredPosts((prev) => prev.filter((p) => p.id !== id));
+      } else {
+        await api.delete(`/bot/monitored-posts/${id}`);
+        fetchMonitoredPosts();
+      }
+      showNotify("បានឈប់តាមដានផុសនេះរួចរាល់");
+    } catch {
+      showNotify("មិនអាចលុបបានទេ", "error");
+    }
+  };
+
   if (loading) {
     return (
-      <div className="p-12 text-center text-gray-500 flex flex-col items-center gap-3">
+      <div className="p-12 text-center text-gray-500 flex flex-col items-center gap-3 font-khmer">
         <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        Loading bot settings...
+        <span>កំពុងផ្ទុកការកំណត់ Bot...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {/* ✅ Notification Toast */}
+    <div className="space-y-5 font-khmer">
       {notification && (
         <div
-          className={`fixed top-24 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 ${notification.type === "error"
-            ? "bg-red-500 text-white"
-            : "bg-emerald-500 text-white"
-            }`}
+          className={`fixed top-20 right-4 sm:right-6 z-50 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-bold ${
+            notification.type === "error" ? "bg-rose-600 text-white" : "bg-emerald-600 text-white"
+          }`}
         >
-          {notification.type === "error" ? "❌" : "✅"}
-          <span className="font-medium">{notification.msg}</span>
+          {notification.type === "error" ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+          <span>{notification.msg}</span>
         </div>
       )}
 
-      {/* 📘 Quick Guide */}
-      <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-6 shadow-sm">
-        <h3 className="text-lg font-bold text-blue-800 dark:text-blue-400 mb-3 flex items-center gap-2">
-          <HelpCircle size={20} />
-          របៀបប្រើប្រាស់ (Quick Guide)
-        </h3>
-        <ol className="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-2">
-          <li><strong>បើកមុខងារ (Turn ON):</strong> ចុចបើកកុងតាក់ <span className="bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded shadow-sm text-[13px] border dark:border-gray-700 font-medium">Bot កំពុងដំណើរការ</span>។</li>
-          <li><strong>ជ្រើសរើសផេក (Select Pages):</strong> ជ្រើសរើស Page ដែលបងចង់ឱ្យ Bot ទៅជួយឆ្លើយខមិននៅត្រង់ <span className="bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded shadow-sm text-[13px] border dark:border-gray-700 font-medium">ជ្រើសរើស Page ដែលចង់ឱ្យ Bot ឆ្លើយតប</span>។</li>
-          <li><strong>បង្កើតច្បាប់ (Create Rule):</strong> កំណត់ពាក្យដែលភ្ញៀវចូលចិត្តសួរ (Keyword) និងសារឆ្លើយតប (Reply Message) រួចចុច Save។</li>
-        </ol>
-      </div>
-
-      {/* 1️⃣ Top Panel: Bot Status */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className={`p-2.5 sm:p-3 rounded-full flex-shrink-0 ${isEnabled ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"}`}>
-            <Power size={20} className="sm:w-6 sm:h-6" />
+      {/* 1️⃣ Master Status & Quick Readiness Checklist */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div
+              className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                isEnabled
+                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+              }`}
+            >
+              <Power size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                  {isEnabled ? "Bot កំពុងបើកដំណើរការ" : "Bot ត្រូវបានបិទ"}
+                </h2>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                    isEnabled
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                  }`}
+                >
+                  {isEnabled ? "Active" : "Paused"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                បើកកុងតាក់នេះ ដើម្បីឱ្យ Bot ឆ្លើយខមិន និងផ្ញើ Inbox ភ្ញៀវដោយស្វ័យប្រវត្តិ
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
-              {isEnabled ? "Bot កំពុងដំណើរការ" : "Bot ត្រូវបានផ្អាក"}
-            </h2>
-            <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
-              {isEnabled ? "Bot កំពុងឆ្លើយតបខមិន។" : "បើកមុខងារនេះដើម្បីឱ្យ Bot ឆ្លើយតប។"}
-            </p>
-          </div>
-        </div>
 
-        <div className="w-full sm:w-auto flex justify-end">
-          <label className="relative inline-flex items-center cursor-pointer">
+          <label className="relative inline-flex items-center cursor-pointer self-end sm:self-center">
             <input
               type="checkbox"
               className="sr-only peer"
               checked={isEnabled}
               onChange={(e) => toggleBot(e.target.checked)}
             />
-            <div className="w-14 h-7 sm:w-16 sm:h-8 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 sm:after:h-6 sm:after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-green-500"></div>
+            <div className="w-14 h-7 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-7 shadow-inner" />
           </label>
         </div>
-      </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <Filter size={20} className="text-blue-500" />
-              ជ្រើសរើស Page ដែលចង់ឱ្យ Bot ឆ្លើយតប
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              ជ្រើសរើស Page ណាខ្លះដែលបងចង់ឱ្យ Bot តាមដាន និងឆ្លើយតបខមិន។
-            </p>
+        {/* 3-Step Readiness Pills */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-xs">
+            <span className="text-slate-600 dark:text-slate-300">១. បើកមុខងារ Bot</span>
+            <span className={`font-bold ${isEnabled ? "text-emerald-600" : "text-amber-500"}`}>
+              {isEnabled ? "✓ រួចរាល់" : "មិនទាន់បើក"}
+            </span>
           </div>
-          
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button 
-              onClick={() => toggleAllPages(true)}
-              className="flex-1 sm:flex-none px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg hover:bg-blue-100 transition-colors"
-            >
-              បើកគ្រប់ Page
-            </button>
-            <button 
-              onClick={() => toggleAllPages(false)}
-              className="flex-1 sm:flex-none px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              បិទគ្រប់ Page
-            </button>
-          </div>
-        </div>
 
-        {isLoadingPages ? (
-          <div className="flex items-center gap-2 text-sm text-gray-400 animate-pulse">
-            <Loader size={16} className="animate-spin" />
-            កំពុងទាញយក Page...
-          </div>
-        ) : availablePages.length === 0 ? (
-          <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl text-center text-sm text-gray-500 border border-dashed border-gray-200 dark:border-gray-700">
-            មិនមាន Page ណាមួយត្រូវបានភ្ជាប់ទេ។ សូមភ្ជាប់ Page Facebook នៅក្នុងការកំណត់ (Settings)។
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {availablePages.map((page) => {
-              const settings = pageSettings.find(s => s.pageId === page.id);
-              // ✅ Check both User.pageSettings AND FacebookPage.enableBot for consistency
-              const isPageBotEnabled = settings?.enableBot === true || page.settings?.enableBot === true;
-
-              return (
-                <div
-                  key={page.id}
-                  className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isPageBotEnabled
-                    ? "bg-blue-50/50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800/50"
-                    : "bg-gray-50/50 border-gray-100 dark:bg-gray-900/20 dark:border-gray-700"
-                    }`}
-                >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <img
-                      src={page.picture || `https://ui-avatars.com/api/?name=${page.name}&background=random`}
-                      alt={page.name}
-                      className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
-                    />
-                    <div className="overflow-hidden">
-                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
-                        {page.name}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate opacity-60">
-                        {page.id}
-                      </p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer scale-75">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={isPageBotEnabled}
-                      onChange={(e) => togglePageBot(page.id, e.target.checked)}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"></div>
-                  </label>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* 2️⃣ Add New Rule Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Plus size={20} className="text-blue-500" />
-            {editingId ? "កែប្រែច្បាប់" : "បង្កើតច្បាប់ថ្មី"}
-          </h3>
-
-          {/* AI Auto-Generate Button */}
           <button
-            onClick={generateAISuggestions}
-            disabled={generating}
-            className="text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-purple-200 dark:border-purple-800/50"
-            title="AI នឹងជួយបង្កើតច្បាប់ឆ្លើយតបដោយស្វ័យប្រវត្តិ។"
+            type="button"
+            onClick={() => setActiveTab("pages")}
+            className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs transition cursor-pointer"
           >
-            {generating ? "..." : "✨"}
-            AI ជួយបង្កើតឱ្យ
+            <span className="text-slate-600 dark:text-slate-300">២. ផេកដែលបើក Bot</span>
+            <span className={`font-bold ${enabledPagesCount > 0 ? "text-emerald-600" : "text-amber-500"}`}>
+              {enabledPagesCount}/{availablePages.length} ផេក →
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("rules")}
+            className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs transition cursor-pointer"
+          >
+            <span className="text-slate-600 dark:text-slate-300">៣. ច្បាប់ឆ្លើយតប</span>
+            <span className={`font-bold ${activeRulesCount > 0 ? "text-emerald-600" : "text-amber-500"}`}>
+              {activeRulesCount} ច្បាប់សកម្ម →
+            </span>
           </button>
         </div>
-
-        <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Rule Type */}
-            <div>
-              <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
-                ប្រភេទច្បាប់ (Rule Type)
-                <div className="group relative">
-                  <span className="text-gray-400 cursor-help">(?)</span>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    ជ្រើសរើសរបៀបដែល Bot ដំណើរការ។ Keyword គឺផ្អែកលើពាក្យ ចំណែក Regex គឺផ្អែកលើទម្រង់អក្សរ។
-                  </div>
-                </div>
-              </label>
-              <div className="flex bg-gray-100 dark:bg-gray-900 p-1 rounded-xl">
-                {["KEYWORD", "REGEX"].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => handleFormChange("ruleType", type)}
-                    className={`flex-1 py-2 text-base font-medium rounded-lg transition-all ${formData.ruleType === type
-                      ? "bg-white dark:bg-gray-800 text-blue-600 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                      }`}
-                  >
-                    {type === "KEYWORD" ? "ប្រើ Keyword" : "ប្រើ Regex"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Scope */}
-            <div>
-              <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
-                វិសាលភាព (Scope)
-                <div className="group relative">
-                  <span className="text-gray-400 cursor-help">(?)</span>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    អនុវត្តលើគ្រប់ផុសទាំងអស់ ឬផុសណាមួយជាក់លាក់។
-                  </div>
-                </div>
-              </label>
-              <select
-                value={formData.scope}
-                onChange={(e) => handleFormChange("scope", e.target.value)}
-                className="w-full px-5 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              >
-                <option value="ALL">គ្រប់ផុសទាំងអស់ (All Posts)</option>
-                <option value="SPECIFIC">ផុសជាក់លាក់ (Specific Post)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Post ID (Conditional) */}
-          {formData.scope === "SPECIFIC" && (
-            <div>
-              <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Post ID
-              </label>
-              <input
-                type="text"
-                value={formData.postId}
-                onChange={(e) => handleFormChange("postId", e.target.value)}
-                placeholder="បញ្ជូល Facebook Post ID"
-                className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Keyword */}
-            <div>
-              <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                {formData.ruleType === "KEYWORD" ? "Keyword (Optional)" : "Regex Pattern"}
-                <div className="group relative">
-                  <span className="text-gray-400 cursor-help">(?)</span>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    {formData.ruleType === "KEYWORD" ? "ទុកឱ្យនៅទំនេរដើម្បីឆ្លើយតបទៅកាន់គ្រប់ខមិនទាំងអស់។" : "ទម្រង់ Regex សម្រាប់ត្រួតពិនិត្យអត្ថបទ។"}
-                  </div>
-                </div>
-              </label>
-              <input
-                type="text"
-                value={formData.keyword}
-                onChange={(e) => handleFormChange("keyword", e.target.value)}
-                placeholder={formData.ruleType === "KEYWORD" ? "ឧទាហរណ៍៖ តម្លៃ (ទុកឱ្យនៅទំនេរដើម្បីឆ្លើយគ្រប់ខមិន)" : "ឧទាហរណ៍៖ ^(hi|hello)$"}
-                className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
-            </div>
-
-            {/* Reply Message */}
-            <div>
-              <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                សារឆ្លើយតប (Reply Message)
-                <div className="group relative">
-                  <span className="text-gray-400 cursor-help">(?)</span>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    សារដែល Bot នឹងផ្ញើទៅកាន់អតិថិជន។
-                  </div>
-                </div>
-              </label>
-              <input
-                type="text"
-                value={formData.reply}
-                onChange={(e) => handleFormChange("reply", e.target.value)}
-                placeholder="ឧទាហរណ៍៖ សូមបងឆែកប្រអប់សារ!"
-                className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          {/* 📬 Private Message / DM (Messenger Inbox) */}
-          <div className="mt-4 p-5 rounded-2xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={formData.enableDm}
-                  onChange={(e) => handleFormChange("enableDm", e.target.checked)}
-                  className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                />
-                <span>📬 ផ្ញើសារឯកជនចូល Inbox ស្វ័យប្រវត្តិ (Private Message / DM)</span>
-              </label>
-              <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider ${formData.enableDm ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"}`}>
-                {formData.enableDm ? "បើក DM" : "បិទ DM"}
-              </span>
-            </div>
-
-            {formData.enableDm && (
-              <div className="space-y-2 pt-1">
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
-                  សារដែលត្រូវផ្ញើចូល Messenger Inbox របស់ភ្ញៀវ៖
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.dmReply}
-                  onChange={(e) => handleFormChange("dmReply", e.target.value)}
-                  placeholder="ឧទាហរណ៍៖ សួស្តីបង [[name]]! អរគុណសម្រាប់ការចាប់អារម្មណ៍។ តម្លៃទំនិញនេះគឺ $10 បងចង់កុម្ម៉ង់ប៉ុន្មានដែរ?"
-                  className="w-full px-4 py-3 rounded-xl border border-blue-200 dark:border-blue-800/80 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all resize-none"
-                />
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                  💡 គន្លឹះ៖ ប្រើ <code className="bg-white dark:bg-gray-800 px-1 py-0.5 rounded border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">[[name]]</code> ដើម្បីហៅឈ្មោះភ្ញៀវ និង <code className="bg-white dark:bg-gray-800 px-1 py-0.5 rounded border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">{"{សួស្តី|ជំរាបសួរ}"}</code> ដើម្បីបង្វិលពាក្យ Spintax។
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Image Attachment */}
-          <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
-              រូបភាពភ្ជាប់ (Attachment - បើមាន)
-              <div className="group relative">
-                <span className="text-gray-400 cursor-help">(?)</span>
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                  ភ្ជាប់រូបភាពទៅជាមួយសារឆ្លើយតប។
-                </div>
-              </div>
-            </label>
-
-            {formData.attachmentUrl ? (
-              <div className="relative flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl group">
-                <img
-                  src={formData.attachmentUrl}
-                  alt="រូបភាពភ្ជាប់"
-                  className="w-16 h-16 rounded-xl object-cover border border-gray-200 dark:border-gray-600 shadow-sm"
-                />
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">រូបភាពត្រូវបានដាក់បញ្ចូល</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">រូបភាពនេះនឹងផ្ញើទៅជាមួយសារឆ្លើយតប。</p>
-                </div>
-                <button
-                  onClick={removeImage}
-                  className="p-2.5 text-red-500 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-xl transition-colors"
-                  title="លុបរូបភាព"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            ) : (
-              <label className="relative flex flex-col items-center justify-center w-full py-8 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl cursor-pointer bg-gray-50/50 dark:bg-gray-900/20 hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:border-blue-300 dark:hover:border-blue-700 transition-all group">
-                {uploading ? (
-                  <div className="flex flex-col items-center gap-3">
-                    <Loader size={28} className="animate-spin text-blue-500" />
-                    <span className="text-sm font-medium text-blue-500">កំពុងដាក់រូបភាពបញ្ចូល...</span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="w-12 h-12 bg-white dark:bg-gray-800 shadow-sm border border-gray-100 dark:border-gray-700 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
-                      <ImageIcon size={24} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
-                    </div>
-                    <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
-                      ចុចទីនេះដើម្បីបញ្ចូលរូបភាព
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">ប្រភេទ៖ JPG, PNG • ទំហំអតិបរមា៖ 5MB</p>
-                  </>
-                )}
-                <input type="file" className="hidden" accept="image/jpeg, image/png" onChange={handleImageUpload} disabled={uploading} />
-              </label>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
-            <button
-              onClick={resetForm}
-              className="w-full sm:w-auto px-8 py-4 sm:py-2.5 text-gray-600 dark:text-gray-400 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors border sm:border-0 border-gray-200 dark:border-gray-700"
-            >
-              បោះបង់
-            </button>
-            <button
-              onClick={saveRule}
-              className="w-full sm:w-auto px-8 py-4 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
-            >
-              <Save size={18} />
-              {editingId ? "រក្សាទុក" : "បង្កើតថ្មី"}
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* 3️⃣ Rule Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-        <div className="p-4 md:p-5 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <Filter size={18} className="text-blue-500" />
-              បញ្ជីច្បាប់ដែលកំពុងប្រើ (Active Rules)
-            </h3>
+      {/* 2️⃣ Clean 3-Tab Navigation */}
+      <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto">
+        {[
+          { id: "rules", label: `💬 ច្បាប់ឆ្លើយតប (${rules.length})`, icon: MessageSquare },
+          { id: "pages", label: `🚩 ផេក & ផុស (${enabledPagesCount}/${availablePages.length})`, icon: Flag },
+          { id: "history", label: `📜 ប្រវត្តិ (${history.length})`, icon: History },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          return (
             <button
-              onClick={fetchRules}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
-              title="Refresh Rules"
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 min-w-fit flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                active
+                  ? "bg-blue-600 text-white shadow-sm shadow-blue-600/20"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
             >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              <Icon size={15} />
+              <span>{tab.label}</span>
             </button>
-          </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input
-              type="text"
-              placeholder="ស្វែងរកច្បាប់..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-10 py-3.5 text-base rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-            {searchTerm && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        </div>
+          );
+        })}
+      </div>
 
-          {/* Rules List Section */}
-          <div className="overflow-hidden">
-            {filtered.length === 0 ? (
-              <div className="py-12 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl">
-                <div className="flex flex-col items-center gap-2">
-                  <Filter size={32} className="opacity-20" />
-                  <p>{searchTerm ? "មិនមានច្បាប់ដែលត្រូវនឹងការស្វែងរកទេ" : "មិនទាន់មានច្បាប់ឆ្លើយតបនៅឡើយទេ។"}</p>
-                </div>
+      {/* ==================== TAB 1: RULES ==================== */}
+      {activeTab === "rules" && (
+        <div className="space-y-5">
+          {/* Quick Setup Form */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap justify-between items-center gap-3 bg-slate-50/70 dark:bg-slate-800/30">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Plus size={18} className="text-blue-500" />
+                  <span>{editingId ? "កែប្រែសារឆ្លើយតប" : "បង្កើតសារឆ្លើយតបស្វ័យប្រវត្តិ"}</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  ជ្រើសគំរូរហ័សខាងក្រោម ឬសរសេរពាក្យគន្លឹះនិងសារឆ្លើយតបដោយខ្លួនឯង
+                </p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {/* 📱 Mobile Optimized List (Only rendered on mobile) */}
-                <div className="md:hidden space-y-3">
-                  {filtered.slice(0, visibleCount).map((r, idx) => (
-                    <div 
-                      key={r.id || idx} 
-                      className={`p-4 rounded-xl border transition-all active:scale-[0.98] will-change-transform ${r.enabled ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm" : "bg-gray-50 dark:bg-gray-900/40 border-gray-100 dark:border-gray-800 opacity-70"}`}
+
+              <button
+                type="button"
+                onClick={generateAISuggestions}
+                disabled={generating}
+                className="text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 border border-purple-500/20 cursor-pointer disabled:opacity-60"
+              >
+                <Sparkles size={14} />
+                <span>{generating ? "AI កំពុងសរសេរ..." : "ឱ្យ AI ជួយសរសេរ"}</span>
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-4">
+              {/* 1-Click Quick Templates */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">
+                  គំរូរហ័ស (ចុច ១ ដងដើម្បីបំពេញស្រាប់)៖
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {QUICK_TEMPLATES.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => applyTemplate(tpl)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 transition cursor-pointer"
                     >
-                       <div className="flex justify-between items-start mb-3">
-                          <div className="flex flex-col gap-1">
-                            <span className="font-bold text-gray-900 dark:text-white text-sm">
-                              {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
-                            </span>
-                            <div className="flex flex-wrap gap-1.5 items-center">
-                              <span className="text-[8px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">{r.ruleType || "KEYWORD"}</span>
-                              {r.enableDm && r.dmReply ? (
-                                <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 px-1.5 py-0.5 rounded">💬 Comment + 📬 DM</span>
-                              ) : (
-                                <span className="text-[9px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">💬 Comment Only</span>
-                              )}
-                            </div>
-                          </div>
-                          <button 
-                            onClick={() => toggleRule(r.id, r.enabled)}
-                            className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase transition-colors ${r.enabled ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}
-                          >
-                            {r.enabled ? "On" : "Off"}
-                          </button>
-                        </div>
-                        {r.reply && (
-                          <p className="text-gray-600 dark:text-gray-400 text-xs line-clamp-2 mb-2 bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg">
-                            <span className="font-semibold text-gray-500">💬 Comment:</span> {r.reply}
-                          </p>
-                        )}
-                        {r.enableDm && r.dmReply && (
-                          <p className="text-blue-700 dark:text-blue-300 text-xs line-clamp-2 mb-2 bg-blue-50/60 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-100 dark:border-blue-900/40">
-                            <span className="font-semibold text-blue-600 dark:text-blue-400">📬 Inbox DM:</span> {r.dmReply}
-                          </p>
-                        )}
-                       <div className="flex justify-end gap-2">
-                         <button onClick={() => handleEdit(r)} className="p-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded-lg"><Edit2 size={14} /></button>
-                         <button onClick={() => deleteRule(r.id)} className="p-2 text-red-500 bg-red-50 dark:bg-red-500/10 rounded-lg"><Trash2 size={14} /></button>
-                       </div>
-                    </div>
+                      {tpl.label}
+                    </button>
                   ))}
                 </div>
+              </div>
 
-                {/* 💻 Desktop Table View (Only rendered on desktop) */}
-                <div className="hidden md:block bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-                      <tr>
-                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Keyword / Reply</th>
-                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-center">ស្ថានភាព</th>
-                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 text-right">សកម្មភាព</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      {filtered.slice(0, visibleCount).map((r, idx) => (
-                        <tr key={r.id || idx} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors group">
-                           <td className="px-6 py-4">
-                             <div className="flex flex-col gap-1.5">
-                               <div className="flex items-center gap-2">
-                                 <span className="font-bold text-gray-900 dark:text-white">
-                                   {r.keyword === '*' ? <span className="text-gray-400 italic">(ឆ្លើយគ្រប់ខមមិន)</span> : r.keyword}
-                                 </span>
-                                 <span className="text-[9px] uppercase font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded tracking-widest">{r.ruleType || "KEYWORD"}</span>
-                                 {r.enableDm && r.dmReply ? (
-                                   <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded-full">💬 Comment + 📬 DM</span>
-                                 ) : (
-                                   <span className="text-[9px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">💬 Comment Only</span>
-                                 )}
-                               </div>
-                               {r.reply && (
-                                 <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-1">
-                                   <span className="font-semibold text-gray-500">💬 Comment:</span> {r.reply}
-                                 </p>
-                               )}
-                               {r.enableDm && r.dmReply && (
-                                 <p className="text-blue-600 dark:text-blue-400 text-xs line-clamp-1 italic">
-                                   <span className="font-semibold">📬 Inbox DM:</span> {r.dmReply}
-                                 </p>
-                               )}
-                             </div>
-                           </td>
-                           <td className="px-6 py-4 text-center">
-                             <button onClick={() => toggleRule(r.id, r.enabled)} className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${r.enabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-500"}`}>
-                               {r.enabled ? "បើក" : "បិទ"}
-                             </button>
-                           </td>
-                           <td className="px-6 py-4 text-right">
-                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                               <button onClick={() => handleEdit(r)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 size={16} /></button>
-                               <button onClick={() => deleteRule(r.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
-                             </div>
-                           </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {/* Keyword + Comment Reply */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                    ១. ពាក្យដែលភ្ញៀវចូលចិត្តខមិន (Keyword)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.keyword}
+                    onChange={(e) => handleFormChange("keyword", e.target.value)}
+                    placeholder="ឧ. តម្លៃ (ឬទុកទំនេរដើម្បីឆ្លើយគ្រប់ខមិន)"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    ទុកប្រអប់នេះឱ្យទំនេរ ប្រសិនបើចង់ឱ្យ Bot ឆ្លើយតបទៅគ្រប់ Comment ទាំងអស់។
+                  </p>
                 </div>
 
-                {/* 🔘 Load More Button for Mobile Performance */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                    ២. សារឆ្លើយតបក្នុង Comment *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.reply}
+                    onChange={(e) => handleFormChange("reply", e.target.value)}
+                    placeholder="ឧ. សូមបងឆែកប្រអប់សារ Inbox ណា!"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <div className="mt-1 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleFormChange("reply", `${formData.reply} [[name]]`.trim())}
+                      className="text-[11px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold hover:bg-blue-500/20 cursor-pointer"
+                    >
+                      + បន្ថែមឈ្មោះភ្ញៀវ [[name]]
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Private DM Box */}
+              <div className="p-4 rounded-2xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={formData.enableDm}
+                      onChange={(e) => handleFormChange("enableDm", e.target.checked)}
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                    <span>📬 ផ្ញើសារចូល Messenger Inbox ភ្ញៀវបន្ថែមទៀត (DM)</span>
+                  </label>
+                  <span
+                    className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${
+                      formData.enableDm
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                    }`}
+                  >
+                    {formData.enableDm ? "បើក DM" : "បិទ DM"}
+                  </span>
+                </div>
+
+                {formData.enableDm && (
+                  <div className="space-y-2 pt-1">
+                    <textarea
+                      rows={3}
+                      value={formData.dmReply}
+                      onChange={(e) => handleFormChange("dmReply", e.target.value)}
+                      placeholder="ឧ. សួស្តីបង [[name]]! តម្លៃទំនិញនេះគឺ $10 បងចង់កម្ម៉ង់ប៉ុន្មានដែរ?"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleFormChange("dmReply", `${formData.dmReply} [[name]]`.trim())}
+                      className="text-[11px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold hover:bg-blue-500/20 cursor-pointer"
+                    >
+                      + បន្ថែមឈ្មោះភ្ញៀវ [[name]]
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Attachment & Advanced Toggle */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-3">
+                  {formData.attachmentUrl ? (
+                    <div className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <img src={formData.attachmentUrl} alt="Attachment" className="w-8 h-8 rounded-lg object-cover" />
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">មានរូបភាពភ្ជាប់</span>
+                      <button
+                        type="button"
+                        onClick={() => handleFormChange("attachmentUrl", null)}
+                        className="text-rose-500 hover:text-rose-600 cursor-pointer"
+                        title="លុបរូបភាព"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 cursor-pointer transition">
+                      {uploading ? <Loader size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+                      <span>{uploading ? "កំពុងបញ្ចូល..." : "ភ្ជាប់រូបភាព (បើមាន)"}</span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/jpeg, image/png"
+                        onChange={handleImageUpload}
+                        disabled={uploading}
+                      />
+                    </label>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced((v) => !v)}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>កំណត់កម្រិតខ្ពស់</span>
+                    <ChevronDown size={14} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="px-4 py-2.5 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+                    >
+                      បោះបង់
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={saveRule}
+                    disabled={savingRule}
+                    className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60"
+                  >
+                    {savingRule ? <Loader size={16} className="animate-spin" /> : <Save size={16} />}
+                    <span>{editingId ? "រក្សាទុកការកែប្រែ" : "រក្សាទុកច្បាប់នេះ"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Advanced Options (Hidden by default) */}
+              {showAdvanced && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                      របៀបផ្ទៀងផ្ទាត់ពាក្យ (Rule Type)
+                    </label>
+                    <div className="flex bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                      {["KEYWORD", "REGEX"].map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => handleFormChange("ruleType", type)}
+                          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                            formData.ruleType === type
+                              ? "bg-blue-600 text-white"
+                              : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                          }`}
+                        >
+                          {type === "KEYWORD" ? "ពាក្យធម្មតា (Keyword)" : "ទម្រង់ Regex"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                      អនុវត្តលើផុស (Scope)
+                    </label>
+                    <select
+                      value={formData.scope}
+                      onChange={(e) => handleFormChange("scope", e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-800 dark:text-white outline-none"
+                    >
+                      <option value="ALL">គ្រប់ផុសទាំងអស់ (All Posts)</option>
+                      <option value="SPECIFIC">ផុសជាក់លាក់ (Specific Post)</option>
+                    </select>
+                  </div>
+
+                  {formData.scope === "SPECIFIC" && (
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                        Facebook Post ID ឬ Link ផុស
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.postId}
+                        onChange={(e) => handleFormChange("postId", e.target.value)}
+                        placeholder="បញ្ចូល Facebook Post ID ឬ Link..."
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Rules List */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Filter size={16} className="text-blue-500" />
+                  <span>បញ្ជីច្បាប់ដែលកំពុងប្រើ ({filtered.length})</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={fetchRules}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 cursor-pointer"
+                  title="Refresh"
+                >
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                <input
+                  type="text"
+                  placeholder="ស្វែងរកពាក្យគន្លឹះ..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs sm:text-sm">
+                {searchTerm ? "មិនមានច្បាប់ដែលត្រូវនឹងការស្វែងរកទេ" : "មិនទាន់មានច្បាប់ឆ្លើយតបនៅឡើយទេ — ចុចគំរូរហ័សខាងលើដើម្បីចាប់ផ្ដើម!"}
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filtered.slice(0, visibleCount).map((r, idx) => (
+                  <div
+                    key={r.id || idx}
+                    className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition ${
+                      r.enabled === false ? "opacity-60 bg-slate-50/50 dark:bg-slate-800/20" : "hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
+                    }`}
+                  >
+                    <div className="space-y-1.5 min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">
+                          {r.keyword === "*" ? "🌐 ឆ្លើយគ្រប់ខមិន" : `🔑 ${r.keyword}`}
+                        </span>
+                        {r.enableDm && r.dmReply ? (
+                          <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                            💬 Comment + 📬 DM
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                            💬 Comment
+                          </span>
+                        )}
+                        {r.scope === "SPECIFIC" && r.postId && (
+                          <span className="text-[11px] text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full font-semibold">
+                            Post: {r.postId}
+                          </span>
+                        )}
+                      </div>
+                      {r.reply && (
+                        <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
+                          <span className="font-semibold text-slate-400">តប Comment:</span> {r.reply}
+                        </p>
+                      )}
+                      {r.enableDm && r.dmReply && (
+                        <p className="text-xs text-blue-600 dark:text-blue-400 line-clamp-1">
+                          <span className="font-semibold">ផ្ញើ DM:</span> {r.dmReply}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => toggleRule(r.id, r.enabled !== false)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition ${
+                          r.enabled !== false
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                            : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                        }`}
+                      >
+                        {r.enabled !== false ? "បើក" : "បិទ"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(r)}
+                        className="p-2 text-blue-600 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl transition cursor-pointer"
+                        title="កែប្រែ"
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteRule(r.id)}
+                        className="p-2 text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 rounded-xl transition cursor-pointer"
+                        title="លុប"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
                 {filtered.length > visibleCount && (
-                  <div className="flex justify-center pt-4">
-                    <button 
-                      onClick={() => setVisibleCount(prev => prev + 10)}
-                      className="px-6 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 transition-all shadow-sm"
+                  <div className="p-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((prev) => prev + 10)}
+                      className="px-5 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer"
                     >
                       បង្ហាញបន្ថែម ({filtered.length - visibleCount})
                     </button>
@@ -1134,272 +1098,319 @@ const BotReplySettingsContent = React.memo(({ isDemo }) => {
               </div>
             )}
           </div>
-      </div>
-
-      {/* 4️⃣ Select Recent Posts (The "Easier Way") */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-blue-50/50 dark:bg-blue-900/10">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Search size={20} className="text-blue-500" />
-            ជ្រើសរើសផុសដែលទើបនឹងផុស (Pick Recent Posts)
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            រើស Page ដើម្បីមើលផុសថ្មីៗ រួចចុច Monitor លើផុសដែលបងចង់ឱ្យ Bot ជួយឆ្លើយ។
-          </p>
         </div>
+      )}
 
-        <div className="p-6">
-          <div className="w-full md:w-64 mb-6">
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">រើស Page ដើម្បីឆែកមើល</label>
-            <select
-              value={browsePageId}
-              onChange={(e) => setBrowsePageId(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-            >
-              <option value="">-- រើស Page --</option>
-              {availablePages.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
+      {/* ==================== TAB 2: PAGES & MONITORED POSTS ==================== */}
+      {activeTab === "pages" && (
+        <div className="space-y-5">
+          {/* Page Selection */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Flag size={18} className="text-blue-500" />
+                  <span>ជ្រើសរើសផេកដែលចង់ឱ្យ Bot ឆ្លើយតប</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  បើក Bot លើផេកណា នោះរាល់ Comment លើផេកនោះនឹងត្រូវបានឆ្លើយតបដោយស្វ័យប្រវត្តិ
+                </p>
+              </div>
+              {availablePages.length > 0 && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleAllPages(true)}
+                    className="px-3 py-1.5 text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-500/20 cursor-pointer"
+                  >
+                    បើកទាំងអស់
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleAllPages(false)}
+                    className="px-3 py-1.5 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 cursor-pointer"
+                  >
+                    បិទទាំងអស់
+                  </button>
+                </div>
+              )}
+            </div>
 
-          {isLoadingRecent ? (
-            <div className="flex items-center gap-2 text-sm text-gray-400 py-12 justify-center animate-pulse">
-              <Loader size={18} className="animate-spin" />
-              កំពុងទាញយកផុសថ្មីៗ...
-            </div>
-          ) : recentPosts.length === 0 ? (
-            <div className="py-12 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-2xl text-center text-gray-400 text-sm">
-              {browsePageId ? "មិនមានផុសថ្មីៗក្នុង Page នេះទេ" : "សូមរើស Page ដើម្បីមើលផុស"}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recentPosts.map(post => {
-                const isAlreadyMonitored = monitoredPosts.some(p => p.facebookPostId === post.id);
-                return (
-                  <div key={post.id} className="group relative bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden hover:shadow-xl transition-all">
-                    {post.full_picture && (
-                      <img 
-                        src={post.full_picture} 
-                        alt="Post" 
-                        loading="lazy"
-                        className="w-full h-32 object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
-                      />
-                    )}
-                    <div className="p-4">
-                      <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-3 h-8">
-                        {post.message || <span className="italic opacity-50">(គ្មានចំណងជើង)</span>}
-                      </p>
-                      
-                      {/* Metrics Display */}
-                      <div className="flex items-center gap-4 mb-4 text-[11px] font-bold">
-                        <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">
-                          <span>👁️</span>
-                          {post.views?.toLocaleString() || 0} Views
-                        </div>
-                        <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded">
-                          <span>📢</span>
-                          {post.reach?.toLocaleString() || 0} Reach
+            {isLoadingPages ? (
+              <div className="flex items-center gap-2 text-xs text-slate-400 py-6 justify-center">
+                <Loader size={16} className="animate-spin" />
+                <span>កំពុងទាញយកបញ្ជីផេក...</span>
+              </div>
+            ) : availablePages.length === 0 ? (
+              <div className="p-6 bg-slate-50 dark:bg-slate-800/40 rounded-2xl text-center space-y-3 border border-dashed border-slate-200 dark:border-slate-700">
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                  មិនទាន់មានផេក Facebook ត្រូវបានភ្ជាប់ទេ។
+                </p>
+                <Link
+                  to="/connections"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition"
+                >
+                  <span>ទៅភ្ជាប់ផេក Facebook</span>
+                  <ExternalLink size={13} />
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {availablePages.map((page) => {
+                  const active = isPageBotActive(page);
+                  return (
+                    <div
+                      key={page.id}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition ${
+                        active
+                          ? "bg-blue-500/5 border-blue-500/30"
+                          : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={page.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(page.name)}&background=random`}
+                          alt={page.name}
+                          className="w-9 h-9 rounded-lg object-cover shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">{page.name}</p>
+                          <p className="text-[11px] text-slate-400 truncate">ID: {page.id}</p>
                         </div>
                       </div>
-
-                      <button
-                        onClick={() => handleAddMonitoredById(post.id, browsePageId)}
-                        disabled={isAlreadyMonitored || isAddingMonitored}
-                        className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${isAlreadyMonitored 
-                          ? "bg-green-100 text-green-600 cursor-default" 
-                          : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"}`}
-                      >
-                        {isAlreadyMonitored ? (
-                          <>✅ កំពុង Monitor</>
-                        ) : (
-                          <>
-                            {isAddingMonitored ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-                            Monitor ផុសនេះ
-                          </>
-                        )}
-                      </button>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={active}
+                          onChange={(e) => togglePageBot(page.id, e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5" />
+                      </label>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 5️⃣ Manual Monitor Section (The Old Way) */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mt-8">
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Plus size={20} className="text-blue-500" />
-            បន្ថែមផុសចាស់ៗឱ្យ Bot ជួយឆ្លើយ (Manual Monitor)
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            ប្រសិនបើបងមានផុសចាស់ៗដែលចង់ឱ្យ Bot ជួយឆ្លើយខមិន សូមដាក់ Link ផុសនោះនៅទីនេះ។
-          </p>
-        </div>
-
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row gap-4 mb-8">
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Link ផុសពី Facebook</label>
-              <input
-                type="text"
-                placeholder="បិទភ្ជាប់ Link ផុសនៅទីនេះ... (ឧទាហរណ៍៖ https://fb.com/posts/123...)"
-                value={monitoredPostUrl}
-                onChange={(e) => setMonitoredPostUrl(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-              />
-            </div>
-            <div className="w-full md:w-64">
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">រើស Page របស់ផុសនោះ</label>
-              <select
-                value={monitoredPageId}
-                onChange={(e) => setMonitoredPageId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-              >
-                {availablePages.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={handleAddMonitored}
-                disabled={isAddingMonitored}
-                className="w-full md:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
-              >
-                {isAddingMonitored ? <Loader size={18} className="animate-spin" /> : <Plus size={18} />}
-                បន្ថែម
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">បញ្ជីផុសដែលកំពុង Monitor ({monitoredPosts.length})</label>
-            {isLoadingMonitored ? (
-                <div className="py-8 text-center animate-pulse text-gray-400 text-sm">កំពុងទាញយក...</div>
-            ) : monitoredPosts.length === 0 ? (
-                <div className="py-12 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-2xl text-center text-gray-400 text-sm">
-                    មិនទាន់មានផុសណាមួយត្រូវបានបន្ថែមសម្រាប់ Monitor នៅឡើយទេ។
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {monitoredPosts.map(post => (
-                        <div key={post.id} className="p-4 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-xl flex items-center justify-between group">
-                            <div className="overflow-hidden">
-                                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">Post ID: {post.facebookPostId}</p>
-                                <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">
-                                    Page: {availablePages.find(ap => ap.id === post.pageId)?.name || post.pageId}
-                                </p>
-                            </div>
-                            <button 
-                                onClick={() => handleDeleteMonitored(post.id)}
-                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                                title="ឈប់ Monitor"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                    ))}
-                </div>
+                  );
+                })}
+              </div>
             )}
           </div>
-        </div>
-      </div>
-      {/* 6️⃣ Bot History Section (New) */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mt-8">
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <History size={18} className="text-gray-400" />
-              Reply History (ប្រវត្តិនៃការឆ្លើយតប)
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              បញ្ជីឈ្មោះ និងសារដែល Bot បានជួយឆ្លើយតបថ្មីៗបំផុត។
-            </p>
-          </div>
-          <button 
-            onClick={fetchHistory}
-            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500"
-            title="Refresh History"
-          >
-            <Loader size={18} className={isLoadingHistory ? "animate-spin" : ""} />
-          </button>
-        </div>
 
-        <div className="overflow-x-auto">
-          {isLoadingHistory && history.length === 0 ? (
-            <div className="py-12 text-center animate-pulse text-gray-400 text-sm">កំពុងទាញយកប្រវត្តិ...</div>
-          ) : history.length === 0 ? (
-            <div className="py-12 text-center text-gray-400 text-sm italic">
+          {/* Specific Post Monitoring */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Search size={17} className="text-blue-500" />
+                <span>តាមដានផុសជាក់លាក់ / ផុសចាស់ៗ (Optional)</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                បន្ថែមផុសចាស់ៗ ឬផុសពី Page ដែលចង់ឱ្យ Bot តាមដានឆ្លើយខមិនដោយចំពោះ
+              </p>
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-5">
+              {/* Manual Link Input */}
+              <div className="flex flex-col md:flex-row gap-3">
+                <input
+                  type="text"
+                  placeholder="បិទភ្ជាប់ Link ផុស Facebook ទីនេះ..."
+                  value={monitoredPostUrl}
+                  onChange={(e) => setMonitoredPostUrl(e.target.value)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm text-slate-900 dark:text-white outline-none"
+                />
+                <select
+                  value={monitoredPageId}
+                  onChange={(e) => setMonitoredPageId(e.target.value)}
+                  className="md:w-56 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm text-slate-900 dark:text-white outline-none"
+                >
+                  {availablePages.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleAddMonitored}
+                  disabled={isAddingMonitored}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                >
+                  {isAddingMonitored ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
+                  <span>បន្ថែមផុស</span>
+                </button>
+              </div>
+
+              {/* Monitored List */}
+              {monitoredPosts.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-slate-500">កំពុងតាមដាន ({monitoredPosts.length})៖</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {monitoredPosts.map((post) => (
+                      <div
+                        key={post.id}
+                        className="p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                            Post ID: {post.facebookPostId}
+                          </p>
+                          <p className="text-[11px] text-slate-400 truncate">
+                            Page: {availablePages.find((ap) => ap.id === post.pageId)?.name || post.pageId}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMonitored(post.id)}
+                          className="p-2 text-slate-400 hover:text-rose-500 rounded-lg cursor-pointer"
+                          title="ឈប់តាមដាន"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Posts Picker */}
+              {availablePages.length > 0 && (
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">ផុសថ្មីៗពីផេក៖</p>
+                    <select
+                      value={browsePageId}
+                      onChange={(e) => setBrowsePageId(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-white outline-none"
+                    >
+                      {availablePages.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {isLoadingRecent ? (
+                    <div className="py-8 text-center text-xs text-slate-400">កំពុងទាញយកផុសថ្មីៗ...</div>
+                  ) : recentPostsError ? (
+                    <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/70 dark:bg-amber-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300">
+                        <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                        <span>{recentPostsError.message}</span>
+                      </div>
+                      {recentPostsError.isExpired && (
+                        <Link
+                          to="/connections"
+                          className="shrink-0 px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold inline-flex items-center gap-1.5"
+                        >
+                          <span>Sync ផេកឡើងវិញ</span>
+                          <ExternalLink size={12} />
+                        </Link>
+                      )}
+                    </div>
+                  ) : recentPosts.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                      មិនទាន់មានផុសថ្មីៗសម្រាប់បង្ហាញទេ
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {recentPosts.map((post) => {
+                        const isAlreadyMonitored = monitoredPosts.some((p) => p.facebookPostId === post.id);
+                        return (
+                          <div
+                            key={post.id}
+                            className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col justify-between"
+                          >
+                            {post.full_picture && (
+                              <img src={post.full_picture} alt="Post" loading="lazy" className="w-full h-28 object-cover" />
+                            )}
+                            <div className="p-3 space-y-3">
+                              <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
+                                {post.message || "(គ្មានអត្ថបទ)"}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => handleAddMonitoredById(post.id, browsePageId)}
+                                disabled={isAlreadyMonitored || isAddingMonitored}
+                                className={`w-full py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                  isAlreadyMonitored
+                                    ? "bg-emerald-500/15 text-emerald-600 cursor-default"
+                                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                                }`}
+                              >
+                                {isAlreadyMonitored ? "✅ កំពុងតាមដាន" : "+ តាមដានផុសនេះ"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== TAB 3: HISTORY ==================== */}
+      {activeTab === "history" && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+          <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <History size={17} className="text-blue-500" />
+                <span>ប្រវត្តិដែល Bot បានឆ្លើយតប</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                បង្ហាញការឆ្លើយតប Comment និង Inbox ថ្មីៗបំផុត
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={fetchHistory}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-500 cursor-pointer"
+              title="Refresh"
+            >
+              <RefreshCw size={16} className={isLoadingHistory ? "animate-spin" : ""} />
+            </button>
+          </div>
+
+          {history.length === 0 ? (
+            <div className="py-12 text-center text-xs sm:text-sm text-slate-400">
               មិនទាន់មានប្រវត្តិឆ្លើយតបនៅឡើយទេ។
             </div>
           ) : (
-            <>
-              {/* Desktop View */}
-              <table className="hidden md:table w-full text-left">
-                <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-                  <tr>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">ពេលវេលា</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Page / User</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">សារដែលបានតប</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">ស្ថានភាព</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {history.map((h) => (
-                    <tr key={h.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-750 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                        {new Date(h.timestamp).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-gray-900 dark:text-white">ID: {h.commentId?.includes('_') ? h.commentId.split('_').pop() : h.commentId || 'Unknown'}</span>
-                          <span className="text-[10px] text-gray-400">Page: {h.pageId}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1 italic">"{h.replyMessage}"</p>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${h.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                          {h.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* Mobile View */}
-              <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-700">
-                {history.map((h) => (
-                  <div key={h.id} className="p-4 flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-gray-400">{new Date(h.timestamp).toLocaleString()}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${h.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                        {h.status}
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {history.map((h) => (
+                <div key={h.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        Comment: {h.commentId?.includes("_") ? h.commentId.split("_").pop() : h.commentId || "Unknown"}
                       </span>
+                      <span className="text-slate-400">• Page: {h.pageId}</span>
                     </div>
-                    <p className="text-xs font-bold text-gray-900 dark:text-white">ID: {h.commentId}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 italic">"{h.replyMessage}"</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 italic">"{h.replyMessage}"</p>
                   </div>
-                ))}
-              </div>
-            </>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] text-slate-400">
+                      {new Date(h.timestamp).toLocaleString()}
+                    </span>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                        h.status === "success"
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          : "bg-rose-500/15 text-rose-600"
+                      }`}
+                    >
+                      {h.status === "success" ? "ជោគជ័យ" : h.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 });
 
-// ✅ Wrapper
-const BotReplySettingsAPI = ({ isDemo }) => (
-  <BotReplySettingsContent isDemo={isDemo} />
-);
+const BotReplySettingsAPI = ({ isDemo }) => <BotReplySettingsContent isDemo={isDemo} />;
 
 export default BotReplySettingsAPI;
-

@@ -14,7 +14,7 @@ let csrfToken = null;
 
 export const isWorkerNativeApiRequest = (url = "") => {
   const path = url.split(/[?#]/, 1)[0];
-  return /(?:^|\/)(?:api\/)?(?:auth|posts|user|upload|bot|credits|analytics)(?:\/|$)/i.test(path) ||
+  return /(?:^|\/)(?:api\/)?(?:auth|posts|user|upload|bot|credits|analytics|bio)(?:\/|$)/i.test(path) ||
     /(?:^|\/)(?:api\/)?tools\/tiktok\/(?:lookup|download)$/i.test(path);
 };
 

@@ -5,6 +5,7 @@ import {
   isCloudinaryPublicIdInFolder,
   listCloudinaryResources,
   uploadProfileImage,
+  uploadScheduledMedia,
 } from "../lib/cloudinary.js";
 
 const uploads = new Hono();
@@ -14,6 +15,7 @@ uploads.post("/avatar", requireAuth, (c) => handleProfileImageUpload(c, "avatar"
 uploads.post("/cover", requireAuth, (c) => handleProfileImageUpload(c, "cover", 5 * 1024 * 1024));
 uploads.post("/bot-image", requireAuth, handleBotImageUpload);
 uploads.post("/thumbnail", requireAuth, handleThumbnailUpload);
+uploads.post("/post-media", requireAuth, handlePostMediaUpload);
 uploads.get("/video", requireAuth, (c) => listMedia(c, "video", "eza-post/videos"));
 uploads.get("/thumbnail", requireAuth, (c) => listMedia(c, "image", "kr_post/thumbnails"));
 uploads.delete("/video/:id", requireAuth, (c) => deleteMedia(c, "video", "eza-post/videos"));
@@ -202,6 +204,39 @@ async function handleProfileImageUpload(c, fieldName, maxBytes) {
       success: false,
       error: fieldName === "avatar" ? "Avatar upload failed." : "Cover upload failed.",
     }, 500);
+  }
+}
+
+async function handlePostMediaUpload(c) {
+  let body;
+  try {
+    body = await c.req.parseBody();
+  } catch (error) {
+    console.error("Hono post-media multipart parsing failed:", error);
+    return c.json({ success: false, error: "Invalid multipart upload." }, 400);
+  }
+
+  const file = body.media;
+  if (!(file instanceof File)) {
+    return c.json({ success: false, error: "No media file uploaded" }, 400);
+  }
+
+  try {
+    const result = await uploadScheduledMedia(file, c.env);
+    return c.json({
+      success: true,
+      url: result.url,
+      publicId: result.publicId,
+      resourceType: result.resourceType,
+      filename: file.name || (result.resourceType === "video" ? "video.mp4" : "image.jpg"),
+      mimeType: file.type || (result.resourceType === "video" ? "video/mp4" : "image/jpeg"),
+    }, 201);
+  } catch (error) {
+    console.error("Hono post-media upload failed:", error);
+    return c.json({
+      success: false,
+      error: error?.message || "Media upload failed.",
+    }, 400);
   }
 }
 

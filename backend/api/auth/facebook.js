@@ -43,6 +43,7 @@ router.get("/", (req, res) => {
         "public_profile",
         "email",
         "pages_show_list",
+        "business_management",
         "pages_manage_posts",
         "pages_read_engagement",
         "pages_messaging",

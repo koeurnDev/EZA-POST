@@ -1,9 +1,9 @@
 {
-  "name": "eza_post-frontend",
+  "name": "moneaa-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "EZA_POST Frontend — Schedule TikTok videos to Facebook with auto-reply bot.",
+  "description": "Moneaa (moneaa.site) — Digital Business Card with Bakong KHQR & Khmer AI Subtitles Studio.",
   "author": "Koeurn SEAB",
   "license": "MIT",
   "scripts": {

@@ -38,6 +38,8 @@ const Welcome = lazy(() => import("../pages/Welcome"));
 const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("../pages/ResetPassword"));
 const AuthCallback = lazy(() => import("../pages/AuthCallback"));
+const PrivacyPolicy = lazy(() => import("../pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("../pages/TermsOfService"));
 
 // 📱 Digital Business Card & Storefront (Noonlai-Equivalent + Bakong KHQR)
 const BioBuilder = lazy(() => import("../pages/BioBuilder"));
@@ -56,15 +58,8 @@ export default function AppRouter() {
   // Background preload all primary tabs so switching tabs is 0ms instant!
   useEffect(() => {
     const timer = setTimeout(() => {
-      import("../pages/Post");
-      import("../pages/SubtitleStudio");
-      import("../pages/ScheduledPosts");
-      import("../pages/BotSettingsPage");
-      import("../pages/Connections");
       import("../pages/BioBuilder");
-      import("../pages/Tools/TikTokDownloader");
-      import("../pages/Tools/YoutubeDownloader");
-      import("../pages/Tools/FacebookDownloader");
+      import("../pages/SubtitleStudio");
       import("../pages/Settings");
     }, 250);
     return () => clearTimeout(timer);
@@ -81,36 +76,19 @@ export default function AppRouter() {
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
 
           {/* 📱 Public Digital Business Card & Storefront */}
           <Route path="/b/:slug" element={<PublicBio />} />
           <Route path="/bio/:slug" element={<PublicBio />} />
 
-          {/* Redirect /dashboard to /post */}
-          <Route path="/dashboard" element={<Navigate to="/post" replace />} />
-          <Route path="/" element={<Navigate to="/post" replace />} />
+          {/* Default entry: Digital Business Card (/bio) */}
+          <Route path="/dashboard" element={<Navigate to="/bio" replace />} />
+          <Route path="/" element={<Navigate to="/bio" replace />} />
 
-          {/* ==================== Protected Routes ==================== */}
-          <Route
-            path="/post"
-            element={
-              <ProtectedRoute redirectPath="/welcome">
-                <Post />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* 🎬 Khmer AI Subtitle Studio */}
-          <Route
-            path="/subtitles"
-            element={
-              <ProtectedRoute redirectPath="/welcome">
-                <SubtitleStudio />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* 📱 Digital Business Card / Bio Builder */}
+          {/* ==================== Active Primary Routes ==================== */}
+          {/* 📱 1. Digital Business Card / Bio Builder */}
           <Route
             path="/bio"
             element={
@@ -120,156 +98,22 @@ export default function AppRouter() {
             }
           />
 
+          {/* 🎬 2. Khmer AI Subtitle Studio */}
           <Route
-            path="/tools/tiktok"
+            path="/subtitles"
             element={
-              <ProtectedRoute>
-                <TikTokDownloader />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tools/tiktok/trends"
-            element={
-              <ProtectedRoute>
-                <TikTokTrends />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tools/viral-finder"
-            element={
-              <ProtectedRoute>
-                <ViralFinder />
+              <ProtectedRoute redirectPath="/welcome">
+                <SubtitleStudio />
               </ProtectedRoute>
             }
           />
 
-          <Route
-            path="/posts"
-            element={
-              <ProtectedRoute>
-                <ScheduledPosts />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/bot"
-            element={
-              <ProtectedRoute>
-                <BotSettingsPage />
-              </ProtectedRoute>
-            }
-          />
+          {/* ⚙️ Account Settings & Profile */}
           <Route
             path="/settings"
             element={
               <ProtectedRoute>
                 <Settings />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/tools/pinterest"
-            element={
-              <ProtectedRoute>
-                <PinterestDownloader />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tools/youtube"
-            element={
-              <ProtectedRoute>
-                <YoutubeDownloader />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tools/facebook"
-            element={
-              <ProtectedRoute>
-                <FacebookDownloader />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tools/instagram"
-            element={
-              <ProtectedRoute>
-                <InstagramDownloader />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tools/threads"
-            element={
-              <ProtectedRoute>
-                <ThreadsDownloader />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tools/capcut"
-            element={
-              <ProtectedRoute>
-                <CapCutDownloader />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/tools/document-converter"
-            element={
-              <ProtectedRoute>
-                <DocumentConverter />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* 🧹 Facebook Page Cleaner (Bulk Post Wiper) */}
-          <Route
-            path="/tools/page-cleaner"
-            element={
-              <ProtectedRoute>
-                <PageCleaner />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* 🔴 Multi-Page Live Streamer (Fake Live) */}
-          <Route
-            path="/tools/live-stream"
-            element={
-              <ProtectedRoute>
-                <LiveStreamer />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/connections"
-            element={
-              <ProtectedRoute>
-                <Connections />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buy-credits"
-            element={
-              <ProtectedRoute>
-                <BuyCredits />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/viral-posts"
-            element={
-              <ProtectedRoute>
-                <ViralPosts />
               </ProtectedRoute>
             }
           />
@@ -282,14 +126,15 @@ export default function AppRouter() {
             }
           />
 
-          <Route
-            path="/guide"
-            element={
-              <ProtectedRoute>
-                <Guide />
-              </ProtectedRoute>
-            }
-          />
+          {/* ==================== Paused Features (Redirect to /bio) ==================== */}
+          <Route path="/post" element={<Navigate to="/bio" replace />} />
+          <Route path="/posts" element={<Navigate to="/bio" replace />} />
+          <Route path="/bot" element={<Navigate to="/bio" replace />} />
+          <Route path="/connections" element={<Navigate to="/bio" replace />} />
+          <Route path="/tools/*" element={<Navigate to="/bio" replace />} />
+          <Route path="/buy-credits" element={<Navigate to="/bio" replace />} />
+          <Route path="/viral-posts" element={<Navigate to="/bio" replace />} />
+          <Route path="/guide" element={<Navigate to="/bio" replace />} />
 
           {/* ==================== Fallback Route ==================== */}
           <Route

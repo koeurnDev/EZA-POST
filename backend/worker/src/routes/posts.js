@@ -3,7 +3,7 @@ import { requireAuth } from "./auth.js";
 import { deleteScheduledMedia, scheduledUploadLimitBytes, uploadScheduledMedia } from "../lib/cloudinary.js";
 import { getPrisma } from "../lib/prisma.js";
 import { proxyRequestToBackend, proxyToBackend } from "../lib/proxy.js";
-import { processScheduledPosts } from "../lib/scheduled-posts.js";
+import { processScheduledPostById } from "../lib/scheduled-posts.js";
 
 const posts = new Hono();
 
@@ -55,10 +55,14 @@ posts.post("/", requireAuth, async (c) => {
     return c.json({ success: false, error: "Select at least one Facebook Page." }, 400);
   }
 
+  const now = new Date();
   const scheduleTime = payload.scheduleTime
     ? new Date(payload.scheduleTime)
-    : new Date();
-  if (Number.isNaN(scheduleTime.getTime()) || scheduleTime < new Date()) {
+    : now;
+  if (
+    Number.isNaN(scheduleTime.getTime()) ||
+    (payload.scheduleTime && scheduleTime.getTime() < now.getTime() - 60000)
+  ) {
     return c.json({ success: false, error: "Invalid or past schedule time." }, 400);
   }
 
@@ -87,10 +91,10 @@ posts.post("/", requireAuth, async (c) => {
     requestedPostType = videoFile?.type?.startsWith("image/") ||
       videoUrl.includes("/image/upload/") ? "image" : "video";
   }
-  if (!["video", "image"].includes(requestedPostType)) {
-    return c.json({ success: false, error: "Only single video and image posts are supported on this route." }, 400);
+  if (!["video", "reels", "image"].includes(requestedPostType)) {
+    return c.json({ success: false, error: "Only single video, reels, and image posts are supported on this route." }, 400);
   }
-  if (videoFile && requestedPostType === "video" && !videoFile.type.startsWith("video/")) {
+  if (videoFile && ["video", "reels"].includes(requestedPostType) && !videoFile.type.startsWith("video/")) {
     return c.json({ success: false, error: "Video posts require a video file." }, 400);
   }
   if (videoFile && requestedPostType === "image" && !videoFile.type.startsWith("image/")) {
@@ -156,25 +160,31 @@ posts.post("/", requireAuth, async (c) => {
     });
 
     if (scheduleTime.getTime() <= Date.now() + 5000) {
-      if (c.executionCtx && typeof c.executionCtx.waitUntil === "function") {
-        c.executionCtx.waitUntil(processScheduledPosts(c.env));
-      }
+      let refreshed = null;
       try {
-        await processScheduledPosts(c.env);
-        const refreshed = await prisma.scheduledPost.findUnique({
-          where: { id: scheduledPost.id },
-          select: { status: true, lastError: true, publishedIds: true },
-        });
-        if (Array.isArray(refreshed?.lastError) && refreshed.lastError.length > 0) {
-          const firstErr = refreshed.lastError[0]?.error || "Facebook rejected publishing.";
-          return c.json({
-            success: false,
-            error: `Facebook បដិសេធការបង្ហោះ: ${firstErr}`,
-            jobId: scheduledPost.id,
-          }, 400);
-        }
+        refreshed = await processScheduledPostById(c.env, scheduledPost.id);
       } catch (err) {
         console.error("Immediate post processing error:", err);
+        return c.json({
+          success: false,
+          error: `មិនអាចបង្ហោះទៅកាន់ Facebook បានទេ: ${err?.message || "Unknown error"}`,
+          jobId: scheduledPost.id,
+        }, 500);
+      }
+      if (Array.isArray(refreshed?.lastError) && refreshed.lastError.length > 0) {
+        const firstErr = refreshed.lastError[0]?.error || "Facebook rejected publishing.";
+        return c.json({
+          success: false,
+          error: `Facebook បដិសេធការបង្ហោះ: ${firstErr}`,
+          jobId: scheduledPost.id,
+        }, 400);
+      }
+      if (refreshed?.status !== "published" || !Array.isArray(refreshed?.publishedIds) || refreshed.publishedIds.length === 0) {
+        return c.json({
+          success: false,
+          error: "មិនទាន់ទទួលបានការបញ្ជាក់ការបង្ហោះពី Facebook ទេ។ សូមពិនិត្យការតភ្ជាប់ផេកម្តងទៀត!",
+          jobId: scheduledPost.id,
+        }, 400);
       }
     }
 
@@ -401,25 +411,31 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
     });
 
     if (scheduleTime.getTime() <= Date.now() + 5000) {
-      if (c.executionCtx && typeof c.executionCtx.waitUntil === "function") {
-        c.executionCtx.waitUntil(processScheduledPosts(c.env));
-      }
+      let refreshed = null;
       try {
-        await processScheduledPosts(c.env);
-        const refreshed = await prisma.scheduledPost.findUnique({
-          where: { id: scheduledPost.id },
-          select: { status: true, lastError: true, publishedIds: true },
-        });
-        if (Array.isArray(refreshed?.lastError) && refreshed.lastError.length > 0) {
-          const firstErr = refreshed.lastError[0]?.error || "Facebook rejected publishing.";
-          return c.json({
-            success: false,
-            error: `Facebook បដិសេធការបង្ហោះ: ${firstErr}`,
-            jobId: scheduledPost.id,
-          }, 400);
-        }
+        refreshed = await processScheduledPostById(c.env, scheduledPost.id);
       } catch (err) {
         console.error("Immediate mixed-carousel processing error:", err);
+        return c.json({
+          success: false,
+          error: `មិនអាចបង្ហោះទៅកាន់ Facebook បានទេ: ${err?.message || "Unknown error"}`,
+          jobId: scheduledPost.id,
+        }, 500);
+      }
+      if (Array.isArray(refreshed?.lastError) && refreshed.lastError.length > 0) {
+        const firstErr = refreshed.lastError[0]?.error || "Facebook rejected publishing.";
+        return c.json({
+          success: false,
+          error: `Facebook បដិសេធការបង្ហោះ: ${firstErr}`,
+          jobId: scheduledPost.id,
+        }, 400);
+      }
+      if (refreshed?.status !== "published" || !Array.isArray(refreshed?.publishedIds) || refreshed.publishedIds.length === 0) {
+        return c.json({
+          success: false,
+          error: "មិនទាន់ទទួលបានការបញ្ជាក់ការបង្ហោះពី Facebook ទេ។ សូមពិនិត្យការតភ្ជាប់ផេកម្តងទៀត!",
+          jobId: scheduledPost.id,
+        }, 400);
       }
     }
 
@@ -454,7 +470,7 @@ posts.get("/queue", requireAuth, async (c) => {
       prisma.scheduledPost.findMany({
         where: {
           userId,
-          status: { in: ["scheduled", "processing", "expired"] },
+          status: { in: ["scheduled", "processing", "expired", "failed"] },
         },
         orderBy: { scheduleTime: "asc" },
       }),
@@ -474,6 +490,7 @@ posts.get("/queue", requireAuth, async (c) => {
       thumbnailUrl: post.thumbnailUrl,
       scheduleTime: post.scheduleTime,
       status: post.status,
+      lastError: post.lastError ?? null,
       accounts: (post.accounts ?? []).map((accountId) => ({
         id: accountId,
         name: pageMap[accountId]?.name ?? "Unknown Page",
@@ -566,7 +583,7 @@ posts.post("/bulk", requireAuth, async (c) => {
     }
 
     const postType = post.postType ?? "video";
-    if (!["video", "image", "carousel"].includes(postType)) {
+    if (!["video", "reels", "image", "carousel"].includes(postType)) {
       return c.json({ success: false, error: "Post postType is invalid" }, 400);
     }
 

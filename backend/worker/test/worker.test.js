@@ -14,7 +14,6 @@ import {
   deleteCloudinaryResource,
   isCloudinaryPublicIdInFolder,
   listCloudinaryResources,
-  signCloudinaryParameters,
   uploadProfileImage,
   uploadScheduledMedia,
 } from "../src/lib/cloudinary.js";
@@ -28,7 +27,7 @@ import {
   publishFacebookPost,
 } from "../src/lib/facebook.js";
 import { sendPasswordResetEmail } from "../src/lib/email.js";
-import { processScheduledPosts } from "../src/lib/scheduled-posts.js";
+import { processScheduledPostById, processScheduledPosts } from "../src/lib/scheduled-posts.js";
 import { generateBotSuggestions } from "../src/lib/ai.js";
 import { validateRule } from "../src/routes/bot.js";
 import { parseCreditTransactionLimit } from "../src/routes/credits.js";
@@ -652,124 +651,118 @@ test("Hono schedule route requires authentication", async () => {
   assert.equal(response.status, 401);
 });
 
-test("Cloudinary upload signature uses sorted API parameters", async () => {
-  const signature = await signCloudinaryParameters(
-    { timestamp: "1315060510", public_id: "sample", folder: "images" },
-    "secret"
-  );
-  const expected = createHash("sha1")
-    .update("folder=images&public_id=sample&timestamp=1315060510secret")
-    .digest("hex");
-  assert.equal(signature, expected);
-});
-
-test("Cloudinary upload rejects unsupported media before network access", async () => {
+test("R2 upload rejects unsupported media before storage access", async () => {
   await assert.rejects(
     uploadScheduledMedia(new File(["content"], "payload.txt", { type: "text/plain" }), {}),
     /Unsupported scheduled media type/
   );
 });
 
-test("Cloudinary profile-image upload signs the expected folder and returns metadata", async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (url, options) => {
-    assert.equal(
-      url,
-      "https://api.cloudinary.com/v1_1/test-cloud/image/upload"
-    );
-    assert.equal(options.method, "POST");
-    assert.equal(options.body.get("folder"), "kr_post/avatars");
-    assert.equal(options.body.get("api_key"), "test-api-key");
-    assert.ok(options.body.get("signature"));
-    assert.equal(options.body.get("file").name, "avatar.png");
-    return Response.json({
-      secure_url: "https://cdn.example/avatar.png",
-      public_id: "kr_post/avatars/avatar",
-      bytes: 2048,
-    });
-  };
-
-  try {
-    const result = await uploadProfileImage(
-      new File(["image"], "avatar.png", { type: "image/png" }),
-      "kr_post/avatars",
-      {
-        CLOUDINARY_CLOUD_NAME: "test-cloud",
-        CLOUDINARY_API_KEY: "test-api-key",
-        CLOUDINARY_API_SECRET: "test-api-secret",
-      }
-    );
-    assert.deepEqual(result, {
-      url: "https://cdn.example/avatar.png",
-      publicId: "kr_post/avatars/avatar",
-      size: 2048,
-    });
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("Cloudinary media listing uses authenticated Admin API and folder prefix", async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (url, options) => {
-    const requestUrl = new URL(url);
-    assert.equal(requestUrl.pathname, "/v1_1/test-cloud/resources/video/upload");
-    assert.equal(requestUrl.searchParams.get("prefix"), "eza-post/videos");
-    assert.equal(requestUrl.searchParams.get("max_results"), "50");
-    assert.equal(
-      options.headers.Authorization,
-      `Basic ${Buffer.from("test-api-key:test-api-secret").toString("base64")}`
-    );
-    return Response.json({
-      resources: [{
-        public_id: "eza-post/videos/example",
-        secure_url: "https://cdn.example/example.mp4",
-        bytes: 1024,
-        created_at: "2026-10-04T00:00:00Z",
-      }],
-    });
-  };
-
-  try {
-    const resources = await listCloudinaryResources("video", "eza-post/videos", {
-      CLOUDINARY_CLOUD_NAME: "test-cloud",
-      CLOUDINARY_API_KEY: "test-api-key",
-      CLOUDINARY_API_SECRET: "test-api-secret",
-    });
-    assert.equal(resources[0].public_id, "eza-post/videos/example");
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("Cloudinary media deletion signs the ID and rejects IDs outside managed folder", async () => {
+test("R2 profile-image upload stores in MEDIA_BUCKET and returns media URL", async () => {
+  const stored = [];
   const env = {
-    CLOUDINARY_CLOUD_NAME: "test-cloud",
-    CLOUDINARY_API_KEY: "test-api-key",
-    CLOUDINARY_API_SECRET: "test-api-secret",
+    FRONTEND_URL: "https://pages.example",
+    MEDIA_BUCKET: {
+      put: async (key, body, options) => {
+        stored.push({ key, body, options });
+      },
+    },
   };
-  await assert.rejects(
-    deleteCloudinaryResource("video", "kr_post/avatars/private", "eza-post/videos", env),
-    /outside the managed folder/
-  );
-  assert.equal(isCloudinaryPublicIdInFolder("eza-post/videos/clip-1", "eza-post/videos"), true);
-  assert.equal(isCloudinaryPublicIdInFolder("eza-post/videos/../private", "eza-post/videos"), false);
-  assert.equal(isCloudinaryPublicIdInFolder("eza-post/videos\\private", "eza-post/videos"), false);
 
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (url, options) => {
-    assert.equal(url, "https://api.cloudinary.com/v1_1/test-cloud/video/destroy");
-    assert.equal(options.method, "POST");
-    assert.equal(options.body.get("public_id"), "eza-post/videos/sample");
-    assert.equal(options.body.get("api_key"), "test-api-key");
-    assert.ok(options.body.get("signature"));
-    return Response.json({ result: "ok" });
+  const result = await uploadProfileImage(
+    new File(["image"], "avatar.png", { type: "image/png" }),
+    "avatar",
+    env
+  );
+  assert.equal(stored.length, 1);
+  assert.match(stored[0].key, /^profiles\/avatar\/\d+_.+\.png$/);
+  assert.equal(result.publicId, stored[0].key);
+  assert.equal(result.url, `https://pages.example/api/v1/media/${encodeURIComponent(stored[0].key)}`);
+  assert.equal(result.isR2, true);
+});
+
+test("R2 media listing lists objects from MEDIA_BUCKET for the target prefix", async () => {
+  const env = {
+    FRONTEND_URL: "https://pages.example",
+    MEDIA_BUCKET: {
+      list: async ({ prefix }) => {
+        assert.equal(prefix, "scheduled/");
+        return {
+          objects: [{
+            key: "scheduled/example.mp4",
+            size: 1024,
+            uploaded: new Date("2026-10-04T00:00:00Z"),
+          }],
+        };
+      },
+    },
   };
-  try {
-    await deleteCloudinaryResource("video", "eza-post/videos/sample", "eza-post/videos", env);
-  } finally {
-    globalThis.fetch = originalFetch;
+
+  const resources = await listCloudinaryResources("video", "eza-post/videos", env);
+  assert.equal(resources.length, 1);
+  assert.equal(resources[0].public_id, "scheduled/example.mp4");
+  assert.equal(resources[0].secure_url, "https://pages.example/api/v1/media/scheduled%2Fexample.mp4");
+});
+
+test("R2 media deletion removes object from MEDIA_BUCKET and validates IDs", async () => {
+  const deleted = [];
+  const env = {
+    MEDIA_BUCKET: {
+      delete: async (key) => {
+        deleted.push(key);
+      },
+    },
+  };
+
+  assert.equal(isCloudinaryPublicIdInFolder("scheduled/clip-1.mp4", "eza-post/videos"), true);
+  assert.equal(isCloudinaryPublicIdInFolder("   ", "eza-post/videos"), false);
+
+  await deleteCloudinaryResource("video", "scheduled/sample.mp4", "eza-post/videos", env);
+  assert.deepEqual(deleted, ["scheduled/sample.mp4"]);
+});
+
+test("Facebook publisher rejects cookie or placeholder tokens before Graph API call", async () => {
+  for (const invalidToken of ["", "active_extension_session", "c_user=123; xs=secret"]) {
+    await assert.rejects(
+      publishFacebookPost("page-123", invalidToken, { postType: "image", mediaFiles: ["https://cdn.example/a.png"] }),
+      /Access Token/
+    );
   }
+});
+
+test("Bio check-slug allows the authenticated owner's own slug and blocks others", async () => {
+  const secret = "bio-test-secret";
+  const ownerToken = await createAuthToken(
+    { id: "user-1", email: "owner@example.com" },
+    new TextEncoder().encode(secret)
+  );
+  const env = {
+    JWT_SECRET: secret,
+    DB: {
+      prepare: (sql) => ({
+        bind: (...args) => ({
+          first: async () => {
+            if (sql.includes("FROM bio_pages") && args[0] === "my-shop") {
+              return { id: "bio-1", userId: "user-1" };
+            }
+            return null;
+          },
+        }),
+      }),
+    },
+  };
+
+  const ownRes = await worker.request(
+    "/api/bio/check-slug/my-shop",
+    { headers: { Authorization: `Bearer ${ownerToken}` } },
+    env
+  );
+  assert.equal(ownRes.status, 200);
+  assert.equal((await ownRes.json()).available, true);
+
+  const anonRes = await worker.request("/api/bio/check-slug/my-shop", undefined, env);
+  assert.equal(anonRes.status, 200);
+  assert.equal((await anonRes.json()).available, false);
 });
 
 test("Facebook token encryption remains readable by the legacy AES-CBC helper", async () => {
@@ -1061,11 +1054,10 @@ function decodeBase32(value) {
 test("unmigrated API routes fail clearly when the legacy backend is not configured", async () => {
   const response = await worker.request("/api/unmigrated", undefined, {});
 
-  assert.equal(response.status, 503);
+  assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), {
-    error: "Backend origin is not configured",
+    error: "Not found",
   });
-
 });
 
 test("unmigrated post routes continue to proxy to the legacy backend", async () => {
@@ -1381,4 +1373,886 @@ test("API requests preserve the method, query, and body when proxied", async () 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("Facebook publisher uploads binary directly from R2 MEDIA_BUCKET for /api/v1/media URLs", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "https://graph-video.facebook.com/v21.0/page-123/videos");
+    assert.equal(options.method, "POST");
+    assert.ok(options.body instanceof FormData);
+    assert.equal(options.body.get("access_token"), "page-token");
+    assert.equal(options.body.get("description"), "R2 binary video");
+    assert.ok(options.body.get("source") instanceof File || options.body.get("source") instanceof Blob);
+    return Response.json({ id: "r2-fb-video-id" });
+  };
+
+  const env = {
+    MEDIA_BUCKET: {
+      get: async (key) => {
+        assert.equal(key, "scheduled/demo.mp4");
+        return {
+          httpMetadata: { contentType: "video/mp4" },
+          arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+        };
+      },
+    },
+  };
+
+  try {
+    const result = await publishFacebookPost(
+      "page-123",
+      "page-token",
+      {
+        postType: "video",
+        caption: "R2 binary video",
+        videoUrl: "https://eza-post-3kv.pages.dev/api/v1/media/scheduled%2Fdemo.mp4",
+      },
+      {},
+      env
+    );
+    assert.equal(result, "r2-fb-video-id");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("processScheduledPostById processes targeted post directly without batch starvation", async () => {
+  const originalFetch = globalThis.fetch;
+  const encryptedPageToken = await encryptFacebookToken("page-token", {
+    ENCRYPTION_KEY: "test-page-key",
+  });
+  globalThis.fetch = async () => Response.json({ id: "direct-fb-post-1" });
+
+  let statusUpdated = null;
+  const targetPost = {
+    id: "target-post-6",
+    userId: "user-123",
+    caption: "Immediate post",
+    postType: "image",
+    scheduleTime: new Date(),
+    attempts: 0,
+    accounts: ["page-123"],
+    mediaFiles: ["https://cdn.example/photo.jpg"],
+    publishedIds: [],
+    status: "scheduled",
+  };
+  const prisma = {
+    scheduledPost: {
+      findUnique: async ({ where }) => (
+        where.id === "target-post-6"
+          ? {
+              ...targetPost,
+              status: statusUpdated || "scheduled",
+              publishedIds: statusUpdated === "published"
+                ? [{ accountId: "page-123", postId: "direct-fb-post-1" }]
+                : [],
+            }
+          : null
+      ),
+      updateMany: async () => ({ count: 1 }),
+      update: async ({ data }) => { statusUpdated = data.status; },
+    },
+    facebookPage: {
+      findMany: async () => [{
+        id: "page-123",
+        accessToken: encryptedPageToken,
+        enableSchedule: true,
+      }],
+    },
+    postLog: {
+      create: async () => ({}),
+    },
+  };
+
+  try {
+    const refreshed = await processScheduledPostById({ ENCRYPTION_KEY: "test-page-key" }, "target-post-6", prisma);
+    assert.equal(statusUpdated, "published");
+    assert.equal(refreshed.status, "published");
+    assert.equal(refreshed.publishedIds[0].postId, "direct-fb-post-1");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Bot rule validator preserves enableDm and dmReply and allows DM-only rules", () => {
+  assert.deepEqual(
+    validateRule({ keyword: "price", reply: "", enableDm: true, dmReply: "DM price $10" }, false),
+    {
+      data: {
+        keyword: "price",
+        reply: "",
+        dmReply: "DM price $10",
+        ruleType: "KEYWORD",
+        scope: "ALL",
+        enableDm: true,
+      },
+    }
+  );
+  assert.equal(
+    validateRule({ keyword: "price", reply: "", enableDm: false, dmReply: "DM price $10" }, false).error,
+    "Reply is required"
+  );
+});
+
+test("Hono bot suggestions falls back gracefully instead of returning 502 when Gemini is unavailable", async () => {
+  const secret = "bot-suggest-secret";
+  const token = await createAuthToken(
+    { id: "user-1", email: "owner@example.com" },
+    new TextEncoder().encode(secret)
+  );
+  const env = {
+    JWT_SECRET: secret,
+    DB: {
+      prepare: (sql) => ({
+        bind: () => ({
+          first: async () => {
+            if (sql.includes("FROM users")) {
+              return { id: "user-1", email: "owner@example.com", name: "Owner" };
+            }
+            return null;
+          },
+        }),
+      }),
+    },
+  };
+  const res = await worker.request(
+    "/api/bot/suggestions",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+    env
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.success, true);
+  assert.equal(body.source, "template");
+  assert.ok(Array.isArray(body.suggestions) && body.suggestions.length === 5);
+});
+
+test("Hono bot recent-posts returns 400 FB_TOKEN_EXPIRED when Facebook invalidates the session", async () => {
+  const secret = "bot-recent-secret";
+  const token = await createAuthToken(
+    { id: "user-1", email: "owner@example.com" },
+    new TextEncoder().encode(secret)
+  );
+  const encryptedToken = await encryptFacebookToken("expired-fb-token", { ENCRYPTION_KEY: "test-enc" });
+  const env = {
+    JWT_SECRET: secret,
+    ENCRYPTION_KEY: "test-enc",
+    DB: {
+      prepare: (sql) => ({
+        bind: (...args) => ({
+          first: async () => {
+            if (sql.includes("FROM users")) {
+              return { id: "user-1", email: "owner@example.com", name: "Owner" };
+            }
+            if (sql.includes("FROM facebook_pages")) {
+              return { id: "485880817945228", userId: "user-1", accessToken: encryptedToken };
+            }
+            return null;
+          },
+        }),
+      }),
+    },
+  };
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json(
+      {
+        error: {
+          message:
+            "Error validating access token: The session has been invalidated because the user changed their password or Facebook has changed the session for security reasons.",
+          type: "OAuthException",
+          code: 190,
+        },
+      },
+      { status: 400 }
+    );
+
+  try {
+    const res = await worker.request(
+      "/api/bot/recent-posts/485880817945228",
+      { headers: { Authorization: `Bearer ${token}` } },
+      env
+    );
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.success, false);
+    assert.equal(body.code, "FB_TOKEN_EXPIRED");
+    assert.match(body.error, /session has been invalidated/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Facebook publisher falls back to single video post when carousel card upload returns Invalid request", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, params: new URLSearchParams(options.body) });
+    if (calls.length === 1) {
+      // Simulate carousel unpublished video card failing with Facebook Invalid request
+      return Response.json(
+        { error: { message: "Invalid request.", code: 100 } },
+        { status: 400 }
+      );
+    }
+    // Single video fallback succeeds
+    return Response.json({ id: "fallback-video-post-1" });
+  };
+
+  try {
+    const postId = await publishFacebookPost("282987781568016", "page-token", {
+      postType: "carousel",
+      caption: "Promo video",
+      videoUrl: "https://cdn.example/video.mp4",
+      carouselCards: [
+        { type: "video", mediaUrl: "https://cdn.example/video.mp4", headline: "Video" },
+        { type: "image", isPageCard: true, headline: "Page" },
+      ],
+    });
+    assert.equal(postId, "fallback-video-post-1");
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].params.get("published"), "false");
+    assert.equal(calls[1].params.get("published"), null);
+    assert.equal(calls[1].params.get("file_url"), "https://cdn.example/video.mp4");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Facebook publisher preserves binary upload error details when transient R2 binary and URL fallbacks fail", async () => {
+  const originalFetch = globalThis.fetch;
+  const requestedUrls = [];
+  globalThis.fetch = async (url) => {
+    requestedUrls.push(String(url));
+    if (String(url).startsWith("https://graph-video.facebook.com/")) {
+      return Response.json(
+        { error: { message: "Temporary media chunk glitch.", code: 1363041 } },
+        { status: 502 }
+      );
+    }
+    return Response.json({ error: { message: "URL scrape timeout.", code: 1363042 } }, { status: 400 });
+  };
+
+  const env = {
+    MEDIA_BUCKET: {
+      get: async () => ({
+        httpMetadata: { contentType: "video/mp4" },
+        arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+      }),
+    },
+  };
+
+  try {
+    await assert.rejects(
+      publishFacebookPost(
+        "282987781568016",
+        "page-token",
+        {
+          postType: "video",
+          caption: "Test video",
+          videoUrl: "https://eza-post-3kv.pages.dev/api/v1/media/scheduled%2Fdemo.mp4",
+        },
+        {},
+        env
+      ),
+      /URL scrape timeout\. \(FB #1363042\) \[binary: Temporary media chunk glitch\. \(FB #1363041\)\]/
+    );
+    assert.deepEqual(requestedUrls, [
+      "https://graph-video.facebook.com/v21.0/282987781568016/videos",
+      "https://graph-video.facebook.com/v21.0/282987781568016/videos",
+      "https://graph.facebook.com/v21.0/282987781568016/videos",
+      "https://graph-video.facebook.com/v21.0/282987781568016/videos",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Facebook publisher aborts immediately without retry storms on security or FB #1 rejections", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = async () => {
+    fetchCount += 1;
+    return Response.json({ error: { message: "Invalid request.", code: 1 } }, { status: 400 });
+  };
+
+  const env = {
+    MEDIA_BUCKET: {
+      get: async () => ({
+        httpMetadata: { contentType: "video/mp4" },
+        arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+      }),
+    },
+  };
+
+  try {
+    await assert.rejects(
+      publishFacebookPost(
+        "282987781568016",
+        "page-token",
+        {
+          postType: "carousel",
+          caption: "Promo",
+          videoUrl: "https://eza-post-3kv.pages.dev/api/v1/media/scheduled%2Fdemo.mp4",
+          carouselCards: [{ type: "video", mediaUrl: "https://eza-post-3kv.pages.dev/api/v1/media/scheduled%2Fdemo.mp4" }],
+        },
+        {},
+        env
+      ),
+      /Invalid request\. \(FB #1\)/
+    );
+    assert.equal(fetchCount, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Hono Facebook OAuth status reflects configured Worker secrets", async () => {
+  const unconfigured = await worker.request("/api/auth/facebook/status", undefined, {});
+  assert.equal(unconfigured.status, 200);
+  assert.deepEqual(await unconfigured.json(), { success: true, configured: false });
+
+  const configured = await worker.request("/api/auth/facebook/status", undefined, {
+    FB_APP_ID: "app-123",
+    FB_APP_SECRET: "secret-456",
+    FACEBOOK_REDIRECT_URI: "https://eza-post-3kv.pages.dev/api/auth/facebook/callback",
+  });
+  assert.equal(configured.status, 200);
+  assert.deepEqual(await configured.json(), { success: true, configured: true });
+});
+
+test("Hono connect-cookie supports direct Facebook Page Access Token and reports permissions", async () => {
+  const secret = "fb-direct-token-secret";
+  const token = await createAuthToken(
+    { id: "user-1", email: "owner@example.com" },
+    new TextEncoder().encode(secret)
+  );
+  const upsertedPages = [];
+  const env = {
+    JWT_SECRET: secret,
+    ENCRYPTION_KEY: "test-enc",
+    DB: {
+      prepare: (sql) => ({
+        bind: (...args) => ({
+          first: async () => {
+            if (sql.includes("FROM users")) {
+              return { id: "user-1", email: "owner@example.com", name: "Owner" };
+            }
+            if (sql.includes("INSERT INTO facebook_pages") || sql.includes("UPDATE facebook_pages")) {
+              return {
+                id: "282987781568016",
+                name: "girl ordinary",
+                category: "Digital creator",
+                picture: "https://cdn.example/pic.jpg",
+              };
+            }
+            if (sql.includes("FROM facebook_pages")) {
+              return upsertedPages.find((p) => p.id === args[0]) || null;
+            }
+            return null;
+          },
+          run: async () => {
+            if (sql.includes("INSERT INTO facebook_pages") || sql.includes("UPDATE facebook_pages")) {
+              upsertedPages.push({
+                id: "282987781568016",
+                name: "girl ordinary",
+                category: "Digital creator",
+                picture: "https://cdn.example/pic.jpg",
+              });
+            }
+            return { meta: { changes: 1 } };
+          },
+        }),
+      }),
+    },
+  };
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const parsed = new URL(String(url));
+    if (parsed.pathname === "/v21.0/me") {
+      return Response.json({
+        id: "282987781568016",
+        name: "girl ordinary",
+        category: "Digital creator",
+        picture: { data: { url: "https://cdn.example/pic.jpg" } },
+      });
+    }
+    return Response.json({ error: { message: "Unexpected endpoint" } }, { status: 400 });
+  };
+
+  const validPageToken = "EAA" + "A".repeat(60);
+  try {
+    const res = await worker.request(
+      "/api/user/pages/connect-cookie",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ cookieOrToken: validPageToken, accessToken: validPageToken }),
+      },
+      env
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(body.hasPublishToken, true);
+    assert.equal(body.hasPublishPermissions, true);
+    assert.equal(body.pagesCount, 1);
+    assert.equal(body.pages[0].id, "282987781568016");
+    assert.equal(body.pages[0].isProfile, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Facebook publisher falls back to 3-phase resumable upload when direct binary and file_url uploads fail", async () => {
+  const originalFetch = globalThis.fetch;
+  const phases = [];
+  globalThis.fetch = async (url, options) => {
+    if (options.body instanceof FormData) {
+      const uploadPhase = options.body.get("upload_phase");
+      if (uploadPhase === "transfer") {
+        phases.push(`transfer:${options.body.get("upload_session_id")}`);
+        return Response.json({ start_offset: "0", end_offset: "4" });
+      }
+      phases.push("direct-binary");
+      return Response.json({ error: { message: "Multipart chunk failed.", code: 1363041 } }, { status: 500 });
+    }
+    const form = new URLSearchParams(options.body);
+    const uploadPhase = form.get("upload_phase");
+    if (uploadPhase === "start") {
+      phases.push(`start:${form.get("file_size")}`);
+      return Response.json({ upload_session_id: "sess-1", video_id: "resumable-video-99", start_offset: "0" });
+    }
+    if (uploadPhase === "finish") {
+      phases.push(`finish:${form.get("upload_session_id")}`);
+      return Response.json({ success: true });
+    }
+    phases.push(`file_url:${new URL(String(url)).hostname}`);
+    return Response.json({ error: { message: "URL fetch failed.", code: 1363042 } }, { status: 400 });
+  };
+
+  const env = {
+    MEDIA_BUCKET: {
+      get: async () => ({
+        httpMetadata: { contentType: "video/mp4" },
+        arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+      }),
+    },
+  };
+
+  try {
+    const id = await publishFacebookPost(
+      "282987781568016",
+      "page-token",
+      {
+        postType: "video",
+        caption: "Resumable test",
+        videoUrl: "https://eza-post-3kv.pages.dev/api/v1/media/scheduled%2Fdemo.mp4",
+      },
+      {},
+      env
+    );
+    assert.equal(id, "resumable-video-99");
+    assert.deepEqual(phases, [
+      "direct-binary",
+      "file_url:graph-video.facebook.com",
+      "file_url:graph.facebook.com",
+      "start:4",
+      "transfer:sess-1",
+      "finish:sess-1",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("processScheduledPostById marks security/invalid-session posts failed immediately and pauses page schedule", async () => {
+  const originalFetch = globalThis.fetch;
+  const encryptedPageToken = await encryptFacebookToken("expired-token", {
+    ENCRYPTION_KEY: "test-page-key",
+  });
+  globalThis.fetch = async () =>
+    Response.json(
+      { error: { message: "Error validating access token: The session has been invalidated.", code: 190 } },
+      { status: 400 }
+    );
+
+  let postUpdateData = null;
+  let pagePausedData = null;
+  const prisma = {
+    scheduledPost: {
+      findUnique: async () => ({
+        id: "post-sec-1",
+        userId: "user-123",
+        caption: "Hello",
+        postType: "image",
+        scheduleTime: new Date(),
+        attempts: 0,
+        accounts: ["page-123"],
+        mediaFiles: ["https://cdn.example/photo.jpg"],
+        publishedIds: [],
+        status: postUpdateData?.status || "scheduled",
+        lastError: postUpdateData?.lastError || null,
+      }),
+      updateMany: async () => ({ count: 1 }),
+      update: async ({ data }) => { postUpdateData = data; },
+    },
+    facebookPage: {
+      findMany: async () => [{
+        id: "page-123",
+        accessToken: encryptedPageToken,
+        enableSchedule: true,
+      }],
+      update: async ({ data }) => { pagePausedData = data; },
+    },
+  };
+
+  try {
+    const refreshed = await processScheduledPostById({ ENCRYPTION_KEY: "test-page-key" }, "post-sec-1", prisma);
+    assert.equal(refreshed.status, "failed");
+    assert.deepEqual(pagePausedData, { enableSchedule: false });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Worker default export exposes scheduled handler for Cloudflare Cron triggers", () => {
+  assert.equal(typeof worker.fetch, "function");
+  assert.equal(typeof worker.scheduled, "function");
+});
+
+test("Hono connect-cookie returns 400 with Graph error when EAA token is invalid (no cleanCookie ReferenceError)", async () => {
+  const secret = "fb-invalid-token-secret";
+  const token = await createAuthToken(
+    { id: "user-1", email: "owner@example.com" },
+    new TextEncoder().encode(secret)
+  );
+  const env = {
+    JWT_SECRET: secret,
+    DB: {
+      prepare: () => ({
+        bind: () => ({
+          first: async () => ({ id: "user-1", email: "owner@example.com", name: "Owner" }),
+          run: async () => ({ meta: { changes: 1 } }),
+        }),
+      }),
+    },
+  };
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json({ error: { message: "Invalid OAuth access token.", code: 190 } }, { status: 400 });
+
+  const badFbToken = "EAA" + "B".repeat(50);
+  try {
+    const res = await worker.request(
+      "/api/user/pages/connect-cookie",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ cookieOrToken: badFbToken, accessToken: badFbToken }),
+      },
+      env
+    );
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.success, false);
+    assert.equal(body.error, "Invalid OAuth access token.");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Hono page settings updates facebook_pages table and GET /user/pages honors enableSchedule", async () => {
+  const secret = "page-settings-sync-secret";
+  const token = await createAuthToken(
+    { id: "user-1", email: "owner@example.com" },
+    new TextEncoder().encode(secret)
+  );
+  const userState = {
+    id: "user-1",
+    email: "owner@example.com",
+    name: "Owner",
+    facebookId: "fb-1",
+    facebookName: "Owner FB",
+    facebookAccessToken: "active_extension_session",
+    pageSettings: "[]",
+  };
+  const pageState = {
+    id: "page-1",
+    userId: "user-1",
+    name: "Demo Page",
+    accessToken: "active_extension_session",
+    picture: "https://cdn.example/p.jpg",
+    category: "Digital creator",
+    isConnected: 1,
+    isSelected: 1,
+    enableBot: 1,
+    enableSchedule: 1,
+    enableInbox: 0,
+  };
+
+  const env = {
+    JWT_SECRET: secret,
+    DB: {
+      prepare: (sql) => ({
+        bind: (...args) => ({
+          first: async () => {
+            if (sql.includes("FROM users")) return { ...userState };
+            if (sql.includes("FROM facebook_pages")) return { ...pageState };
+            return null;
+          },
+          all: async () => {
+            if (sql.includes("FROM facebook_pages")) return { results: [{ ...pageState }] };
+            return { results: [] };
+          },
+          run: async () => {
+            if (sql.startsWith("UPDATE users SET")) {
+              userState.pageSettings = args[0];
+            }
+            if (sql.startsWith("UPDATE facebook_pages SET")) {
+              // Expect enableBot, enableSchedule, enableInbox, updatedAt, ...whereArgs
+              if (sql.includes("enableSchedule = ?")) {
+                const cols = sql.split("SET ")[1].split(" WHERE")[0].split(", ").map((c) => c.split(" = ")[0]);
+                cols.forEach((col, i) => {
+                  if (col in pageState && col !== "updatedAt") pageState[col] = args[i];
+                });
+              }
+            }
+            return { meta: { changes: 1 } };
+          },
+        }),
+      }),
+    },
+  };
+
+  const saveRes = await worker.request(
+    "/api/user/pages/settings",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        pageId: "page-1",
+        settings: { enableBot: false, enableSchedule: false, enableInbox: true },
+      }),
+    },
+    env
+  );
+  assert.equal(saveRes.status, 200);
+  assert.equal(pageState.enableBot, 0);
+  assert.equal(pageState.enableSchedule, 0);
+  assert.equal(pageState.enableInbox, 1);
+
+  const listRes = await worker.request(
+    "/api/user/pages",
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+    env
+  );
+  assert.equal(listRes.status, 200);
+  const listed = await listRes.json();
+  const demo = listed.accounts.find((a) => a.id === "page-1");
+  assert.deepEqual(demo.settings, {
+    enableBot: false,
+    enableSchedule: false,
+    enableInbox: true,
+  });
+});
+
+test("Facebook publisher publishes Reels via /video_reels and rupload.facebook.com", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    const strUrl = String(url);
+    if (strUrl.startsWith("https://rupload.facebook.com/")) {
+      calls.push({
+        step: "rupload",
+        auth: options.headers.Authorization,
+        offset: options.headers.offset,
+        fileSize: options.headers.file_size,
+        bodyLen: options.body.byteLength,
+      });
+      return Response.json({ success: true });
+    }
+    const form = new URLSearchParams(options.body);
+    const phase = form.get("upload_phase");
+    calls.push({ step: phase, videoState: form.get("video_state") });
+    if (phase === "start") {
+      return Response.json({
+        video_id: "reel-vid-777",
+        upload_url: "https://rupload.facebook.com/video-upload/v21.0/reel-vid-777",
+      });
+    }
+    if (phase === "finish") {
+      return Response.json({ success: true });
+    }
+    return Response.json({}, { status: 400 });
+  };
+
+  const env = {
+    MEDIA_BUCKET: {
+      get: async () => ({
+        arrayBuffer: async () => new Uint8Array([9, 8, 7, 6, 5]).buffer,
+      }),
+    },
+  };
+
+  try {
+    const id = await publishFacebookPost(
+      "282987781568016",
+      "oauth-page-token",
+      {
+        postType: "reels",
+        caption: "Khmer Reel Demo",
+        videoUrl: "https://eza-post-3kv.pages.dev/api/v1/media/scheduled%2Freel.mp4",
+      },
+      {},
+      env
+    );
+    assert.equal(id, "reel-vid-777");
+    assert.deepEqual(calls, [
+      { step: "start", videoState: null },
+      { step: "rupload", auth: "OAuth oauth-page-token", offset: "0", fileSize: "5", bodyLen: 5 },
+      { step: "finish", videoState: "PUBLISHED" },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Hono Facebook data-deletion verifies signed_request and returns confirmation code", async () => {
+  const appSecret = "test-fb-app-secret";
+  const payloadObj = { user_id: "fb-user-999", algorithm: "HMAC-SHA256", issued_at: 1700000000 };
+  const toB64Url = (bytes) =>
+    btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const payloadB64 = toB64Url(new TextEncoder().encode(JSON.stringify(payloadObj)));
+  const hmacKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sigBytes = new Uint8Array(
+    await crypto.subtle.sign("HMAC", hmacKey, new TextEncoder().encode(payloadB64))
+  );
+  const signedRequest = `${toB64Url(sigBytes)}.${payloadB64}`;
+
+  let deletedForUserId = null;
+  let clearedFbUser = false;
+  const env = {
+    FB_APP_SECRET: appSecret,
+    FRONTEND_URL: "https://eza-post-3kv.pages.dev",
+    DB: {
+      prepare: (sql) => ({
+        bind: (...args) => ({
+          first: async () => {
+            if (sql.startsWith("UPDATE users SET")) {
+              clearedFbUser = true;
+              return { id: "local-user-9", facebookId: null };
+            }
+            if (sql.includes("FROM users")) {
+              return { id: "local-user-9", facebookId: "fb-user-999" };
+            }
+            return null;
+          },
+          run: async () => {
+            if (sql.startsWith("DELETE FROM facebook_pages")) deletedForUserId = args[0];
+            if (sql.startsWith("UPDATE users SET")) clearedFbUser = true;
+            return { meta: { changes: 1 } };
+          },
+        }),
+      }),
+    },
+  };
+
+  const badRes = await worker.request(
+    "/api/auth/facebook/data-deletion",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ signed_request: "bad.sig" }),
+    },
+    env
+  );
+  assert.equal(badRes.status, 400);
+
+  const okRes = await worker.request(
+    "/api/auth/facebook/data-deletion",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ signed_request: signedRequest }),
+    },
+    env
+  );
+  assert.equal(okRes.status, 200);
+  const body = await okRes.json();
+  assert.ok(body.confirmation_code);
+  assert.equal(
+    body.url,
+    `https://eza-post-3kv.pages.dev/privacy?deletion_code=${body.confirmation_code}`
+  );
+  assert.equal(deletedForUserId, "local-user-9");
+  assert.equal(clearedFbUser, true);
+});
+
+test("Hono post-media upload stores video/image in MEDIA_BUCKET and returns HTTPS URL", async () => {
+  const secret = "post-media-upload-secret";
+  const token = await createAuthToken(
+    { id: "user-1", email: "owner@example.com" },
+    new TextEncoder().encode(secret)
+  );
+  let storedKey = null;
+  const env = {
+    JWT_SECRET: secret,
+    FRONTEND_URL: "https://eza-post-3kv.pages.dev",
+    DB: {
+      prepare: () => ({
+        bind: () => ({
+          first: async () => ({ id: "user-1", email: "owner@example.com", name: "Owner" }),
+        }),
+      }),
+    },
+    MEDIA_BUCKET: {
+      put: async (key) => {
+        storedKey = key;
+      },
+    },
+  };
+
+  const form = new FormData();
+  form.set("media", new File([new Uint8Array([1, 2, 3, 4])], "demo.mp4", { type: "video/mp4" }));
+  const res = await worker.request(
+    "/api/upload/post-media",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    },
+    env
+  );
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.equal(body.success, true);
+  assert.equal(body.resourceType, "video");
+  assert.ok(storedKey.startsWith("scheduled/"));
+  assert.ok(body.url.startsWith("https://eza-post-3kv.pages.dev/api/v1/media/"));
 });

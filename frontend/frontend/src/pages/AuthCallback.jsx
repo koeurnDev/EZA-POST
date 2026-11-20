@@ -58,14 +58,14 @@ export default function AuthCallback() {
             saveUserData(userData, token);
             setAuthUser(userData);
             toast.success(`ចូលគណនីជាមួយ ${provider} បានជោគជ័យ! 🎉`, { id: toastId });
-            navigate("/post", { replace: true });
+            navigate("/bio", { replace: true });
           } else {
             // Fallback user object
             const fallbackUser = { email: "", name: `${provider} User`, plan: "free", role: "user" };
             saveUserData(fallbackUser, token);
             setAuthUser(fallbackUser);
             toast.success(`ចូលគណនីបានជោគជ័យ!`, { id: toastId });
-            navigate("/post", { replace: true });
+            navigate("/bio", { replace: true });
           }
         })
         .catch((err) => {
@@ -74,7 +74,7 @@ export default function AuthCallback() {
           saveUserData(fallbackUser, token);
           setAuthUser(fallbackUser);
           toast.success(`ចូលគណនីបានជោគជ័យ!`, { id: toastId });
-          navigate("/post", { replace: true });
+          navigate("/bio", { replace: true });
         });
       return;
     }

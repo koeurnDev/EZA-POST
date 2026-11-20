@@ -1,5 +1,5 @@
 // ============================================================
-// 🌐 EZA_POST BACKEND - FINAL PRODUCTION VERSION (Optimized + Modular Ready)
+// 🌐 MONEAA BACKEND (moneaa.site) - PRODUCTION VERSION
 // ============================================================
 
 require("dotenv").config();
@@ -69,6 +69,8 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:3000",
+  "https://moneaa.site",
+  "https://www.moneaa.site",
   "https://eza-post-3kv.pages.dev",
   "https://eza-post.pages.dev",
   "https://ezapost.pages.dev",
@@ -173,9 +175,22 @@ const csrfProtection = csrf({
   }
 });
 
-// ✅ Apply CSRF globally but exempt Webhooks and Uploads
+// ✅ Apply CSRF globally but exempt Auth, Webhooks, Uploads, and Health
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/webhooks') || req.path.startsWith('/api/upload') || req.path === '/api/health') return next();
+  const exempt = [
+    '/api/webhooks',
+    '/api/upload',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/google',
+    '/api/auth/google/callback',
+    '/api/auth/logout',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
+    '/api/auth/status',
+    '/api/health',
+  ];
+  if (exempt.some(path => req.path.startsWith(path))) return next();
   csrfProtection(req, res, next);
 });
 
@@ -211,41 +226,39 @@ app.get('/api/debug/session', (req, res) => {
 app.use("/api/auth", strictLimiter, require("./api/auth"));
 
 // ------------------------------------------------------------
-// ✅ Modular Routes (Posts, Uploads, etc.)
+// ✅ Modular Routes (Active: Profile, Uploads, Auth | Paused: Posts, Bot, Downloaders)
 // ------------------------------------------------------------
-// ✅ Enable Download Tools Only (Non-essential routes commented out for now)
 const routeModules = [
-  ["posts", "./routes/postRoutes"],
-  ["posts/bulk", "./api/posts/bulk"],
-  ["posts/schedule", "./api/posts/schedule"],
-  ["posts/queue", "./api/posts/queue"],
-  ["upload/video", "./api/upload/videoUpload"],
-  ["upload/thumbnail", "./api/upload/uploadThumbnail"],
+  // 🟢 Active Core Routes (Profile & Uploads)
   ["upload/cover", "./api/upload/cover"],
   ["upload/avatar", "./api/upload/avatar"],
-  // ["upload/error-log", "./api/upload/error-log"],
-  ["upload/bot-image", "./api/upload/botImage"],
-  ["bot", "./routes/bot"],
-  ["tiktok", "./api/tiktok", toolLimiter], // Legacy TikTok downloader endpoints
-  ["user/pages", "./api/user/pages"],
   ["user/update", "./api/user/update"],
   ["user/stats", "./api/user/stats"],
-  ["user/connections", "./api/user/connections"],
-  ["analytics", "./api/analytics"],               
-  ["tools/tiktok", "./api/tools/tiktok", toolLimiter],
-  // ["auth/youtube", "./api/auth/youtube"], 
-  // ["auth/tiktok", "./api/auth/tiktok"],   
-  // ["auth/instagram", "./api/auth/instagram"], 
-  ["tools/pinterest", "./api/tools/pinterest", toolLimiter],
-  ["tools/youtube", "./api/tools/youtube", toolLimiter],
-  ["webhooks/facebook", "./api/webhooks/facebook"], 
-  ["tools/facebook", "./api/tools/facebook", toolLimiter],
-  ["tools/instagram", "./api/tools/instagram", toolLimiter],
-  ["tools/capcut", "./api/tools/capcut", toolLimiter],
-  ["tools/threads", "./api/tools/threads", toolLimiter],
-  ["tools/document-converter", "./api/tools/document_converter", toolLimiter],
-  ["page-cleaner", "./routes/pageCleanerRoutes"],
-  ["live-stream", "./routes/liveStreamRoutes"],
+
+  // ⏸️ Paused Features (Temporarily disabled to save server resources)
+  // ["posts", "./routes/postRoutes"],
+  // ["posts/bulk", "./api/posts/bulk"],
+  // ["posts/schedule", "./api/posts/schedule"],
+  // ["posts/queue", "./api/posts/queue"],
+  // ["upload/video", "./api/upload/videoUpload"],
+  // ["upload/thumbnail", "./api/upload/uploadThumbnail"],
+  // ["upload/bot-image", "./api/upload/botImage"],
+  // ["bot", "./routes/bot"],
+  // ["tiktok", "./api/tiktok", toolLimiter],
+  // ["user/pages", "./api/user/pages"],
+  // ["user/connections", "./api/user/connections"],
+  // ["analytics", "./api/analytics"],               
+  // ["tools/tiktok", "./api/tools/tiktok", toolLimiter],
+  // ["tools/pinterest", "./api/tools/pinterest", toolLimiter],
+  // ["tools/youtube", "./api/tools/youtube", toolLimiter],
+  // ["webhooks/facebook", "./api/webhooks/facebook"], 
+  // ["tools/facebook", "./api/tools/facebook", toolLimiter],
+  // ["tools/instagram", "./api/tools/instagram", toolLimiter],
+  // ["tools/capcut", "./api/tools/capcut", toolLimiter],
+  // ["tools/threads", "./api/tools/threads", toolLimiter],
+  // ["tools/document-converter", "./api/tools/document_converter", toolLimiter],
+  // ["page-cleaner", "./routes/pageCleanerRoutes"],
+  // ["live-stream", "./routes/liveStreamRoutes"],
 ];
 
 for (const [route, file, limiter] of routeModules) {
@@ -367,56 +380,48 @@ app.use((err, req, res, next) => {
 });
 
 // ------------------------------------------------------------
-// ✅ Scheduler & Bot Loop (Runs every 5 minutes instead of 60 seconds)
+// ⏸️ Background Loops & Schedulers (PAUSED to minimize CPU/RAM & DB Load)
 // ------------------------------------------------------------
-const { processScheduledPosts, cleanupOldPosts } = require("./utils/scheduler");
-const botEngine = require("./utils/botEngine");
+// const { processScheduledPosts, cleanupOldPosts } = require("./utils/scheduler");
+// const botEngine = require("./utils/botEngine");
 
+// ⏸️ Post scheduler & Bot loops paused
+// setInterval(() => {
+//   processScheduledPosts();
+//   botEngine.run();
+//   if (Math.random() < 0.05) cleanupOldPosts();
+// }, 5 * 60 * 1000);
 
-setInterval(() => {
-  processScheduledPosts();
+// setTimeout(() => botEngine.run(), 15000);
 
-  // ✅ Run bot every 5 minutes for better performance (reduced from 60s)
-  botEngine.run();
+// setInterval(() => {
+//   botEngine.processPendingReplies();
+// }, 10 * 1000);
 
-  // Run cleanup occasionally (e.g., 1% chance or separate interval)
-  if (Math.random() < 0.05) cleanupOldPosts();
-}, 5 * 60 * 1000); // Changed from 60 * 1000 to 5 * 60 * 1000
+// ⏸️ Facebook Token Refresh & Metrics sync paused
+// const { checkAndRefreshTokens } = require("./utils/tokenRefresher");
+// setInterval(() => {
+//   checkAndRefreshTokens();
+// }, 24 * 60 * 60 * 1000);
+// setTimeout(checkAndRefreshTokens, 10000);
 
-// Run bot once on startup after 15s
-setTimeout(() => botEngine.run(), 15000);
+// const { startMetricsScheduler, startCampaignMetricsScheduler } = require("./utils/metricsScheduler");
+// startMetricsScheduler();
+// startCampaignMetricsScheduler();
 
-// ⚡ Fast Bot Queue Worker: Processes pending replies every 10 seconds for real-time response
-setInterval(() => {
-  botEngine.processPendingReplies();
-}, 10 * 1000);
-
-// 🔄 Daily Token Refresh Check (Runs every 24 hours)
-const { checkAndRefreshTokens } = require("./utils/tokenRefresher");
-setInterval(() => {
-  checkAndRefreshTokens();
-}, 24 * 60 * 60 * 1000); // 24 hours
-// Run once on startup to catch up
-setTimeout(checkAndRefreshTokens, 10000);
-
-// 📊 Metrics Sync Scheduler
-const { startMetricsScheduler, startCampaignMetricsScheduler } = require("./utils/metricsScheduler");
-startMetricsScheduler();
-startCampaignMetricsScheduler();
-
-// 🧹 Start Temp Cleaner (Runs every 5 mins, deletes files older than 15 mins)
+// 🧹 Start Temp Cleaner (Kept active: runs every 5 mins, deletes files older than 15 mins)
 const { startTempCleanupJob } = require("./utils/tempCleaner");
 startTempCleanupJob();
 
-// 👷 Start Background Worker (BullMQ)
-require("./workers/postWorker");
+// ⏸️ BullMQ Background Worker paused
+// require("./workers/postWorker");
 
 // ------------------------------------------------------------
 // ✅ Start Server
 // ------------------------------------------------------------
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 EZA_POST Backend running on port ${PORT}`);
+  console.log(`🚀 Moneaa Backend (moneaa.site) running on port ${PORT}`);
   console.log(`🌐 Mode: ${process.env.NODE_ENV || "development"}`);
 
   // 🔍 Debug Env Vars (Safe Log)

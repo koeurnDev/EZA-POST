@@ -17,6 +17,11 @@
 		}
 	],
 	"workers_dev": true,
+	"triggers": {
+		"crons": [
+			"* * * * *"
+		]
+	},
 	"placement": {
 		"mode": "smart"
 	},

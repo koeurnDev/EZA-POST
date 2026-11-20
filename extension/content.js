@@ -1,13 +1,13 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Facebook Sync Extension — Content Bridge Script (v2.0.1)
+ * ⚡ EZA-POST Facebook Sync Extension — Content Bridge Script (v2.0.5)
  * ============================================================
  */
 
 (function () {
   // Mark DOM so the EZA-POST web app immediately knows the extension is installed
   document.documentElement.setAttribute("data-eza-extension", "installed");
-  document.documentElement.setAttribute("data-eza-extension-version", "2.0.2");
+  document.documentElement.setAttribute("data-eza-extension-version", "2.0.5");
 
   function isExtensionValid() {
     return typeof chrome !== "undefined" && Boolean(chrome?.runtime?.id);
@@ -36,8 +36,8 @@
           {
             source: "EZA_EXTENSION",
             action: "EXTENSION_STATUS",
-            installed: true,
-            version: response.version || "2.0.1",
+              installed: true,
+            version: response.version || "2.0.5",
             fbLoggedIn: Boolean(response.fbLoggedIn),
             fbUserId: response.fbUserId || null
           },
@@ -97,7 +97,6 @@
               action: "FB_SYNC_PAYLOAD",
               ok: Boolean(response.ok),
               fbUserId: response.fbUserId || null,
-              cookieString: response.cookieString || "",
               accessToken: response.accessToken || null,
               fbUser: response.fbUser || null,
               pages: Array.isArray(response.pages) ? response.pages : [],
@@ -111,6 +110,58 @@
           {
             source: "EZA_EXTENSION",
             action: "FB_SYNC_PAYLOAD",
+            ok: false,
+            error: "Extension context invalidated, សូម Refresh ទំព័រ!"
+          },
+          "*"
+        );
+      }
+    } else if (action === "PREPARE_COMPOSER_POST") {
+      if (!isExtensionValid()) {
+        window.postMessage(
+          {
+            source: "EZA_EXTENSION",
+            action: "COMPOSER_ASSIST_RESULT",
+            ok: false,
+            error: "Extension ត្រូវបាន Reload — សូម Refresh ទំព័រនេះម្តងទៀត!"
+          },
+          "*"
+        );
+        return;
+      }
+
+      try {
+        chrome.runtime.sendMessage(
+          { action: "OPEN_FB_COMPOSER_ASSIST", payload: event.data.payload || {} },
+          (response) => {
+            if (chrome.runtime.lastError || !response) {
+              window.postMessage(
+                {
+                  source: "EZA_EXTENSION",
+                  action: "COMPOSER_ASSIST_RESULT",
+                  ok: false,
+                  error: "មិនអាចបើក Meta Business Suite តាម Extension បានទេ"
+                },
+                "*"
+              );
+              return;
+            }
+            window.postMessage(
+              {
+                source: "EZA_EXTENSION",
+                action: "COMPOSER_ASSIST_RESULT",
+                ok: Boolean(response.ok),
+                error: response.error || null
+              },
+              "*"
+            );
+          }
+        );
+      } catch {
+        window.postMessage(
+          {
+            source: "EZA_EXTENSION",
+            action: "COMPOSER_ASSIST_RESULT",
             ok: false,
             error: "Extension context invalidated, សូម Refresh ទំព័រ!"
           },

@@ -2,18 +2,17 @@
 // ⚙️ Settings.jsx — Elite Command Center 2026
 // ============================================================
 
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 import { 
     LogOut, Moon, Sun, CheckCircle2, 
-    Fingerprint, Zap, Cpu, Cloud, ShieldCheck
+    Fingerprint, Zap, Cpu, Cloud, ShieldCheck, Sparkles, CreditCard
 } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
-import apiUtils from "../utils/apiUtils";
 import toast from "react-hot-toast";
 
 export default function Settings() {
@@ -27,27 +26,6 @@ export default function Settings() {
     const [qrCode, setQrCode] = useState(null);
     const [verifyCode, setVerifyCode] = useState("");
     const [isVerifying, setIsVerifying] = useState(false);
-
-    // 📄 Facebook Pages State
-    const [pages, setPages] = useState([]);
-    const [loadingPages, setLoadingPages] = useState(true);
-
-    useEffect(() => {
-        const fetchPages = async () => {
-            try {
-                const res = await apiUtils.getUserPages();
-                if (res.data.success) {
-                    // Filter to only show selected/active pages in the hub
-                    setPages(res.data.accounts.filter(p => p.isSelected) || []);
-                }
-            } catch (err) {
-                console.error("Failed to fetch pages in settings", err);
-            } finally {
-                setLoadingPages(false);
-            }
-        };
-        fetchPages();
-    }, []);
 
     return (
         <DashboardLayout>
@@ -109,47 +87,56 @@ export default function Settings() {
 
                     {/* 👉 Right Column: Preferences & Pages */}
                     <div className="lg:col-span-4 space-y-6 md:space-y-8">
-                        {/* Facebook Pages Hub */}
+                        {/* Active Services Hub */}
                         <MotionDiv 
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-3xl md:rounded-[2.5rem] p-6 md:p-8 border border-white/20 dark:border-white/5 shadow-xl"
                         >
-                            <div className="flex items-center justify-between mb-8">
+                            <div className="flex items-center justify-between mb-6">
                                 <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
                                     <div className="w-8 h-8 bg-blue-500/10 text-blue-500 rounded-lg flex items-center justify-center">
-                                        <CheckCircle2 size={18} />
+                                        <Sparkles size={18} />
                                     </div>
-                                    Pages
+                                    មុខងារសកម្ម
                                 </h3>
-                                <button 
-                                    onClick={() => window.location.href = "/connections"}
-                                    className="text-xs font-black text-blue-500 uppercase tracking-widest hover:underline"
-                                >
-                                    Manage
-                                </button>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full">
+                                    Active
+                                </span>
                             </div>
                             
-                            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                {loadingPages ? (
-                                    <div className="flex justify-center py-8">
-                                        <div className="w-6 h-6 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-                                    </div>
-                                ) : pages.length === 0 ? (
-                                    <div className="p-6 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl md:rounded-3xl">
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No pages connected</p>
-                                    </div>
-                                ) : (
-                                    pages.map(page => (
-                                        <div key={page.id} className="flex items-center gap-4 p-3 md:p-4 bg-black/5 dark:bg-black/20 rounded-2xl border border-white/5">
-                                            <img src={page.picture} alt="" className="w-10 h-10 rounded-xl object-cover" />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-black text-xs md:text-sm text-gray-900 dark:text-white truncate">{page.name}</p>
-                                                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Connected</p>
-                                            </div>
+                            <div className="space-y-3">
+                                <Link 
+                                    to="/bio"
+                                    className="flex items-center justify-between p-3.5 bg-black/5 dark:bg-black/20 hover:bg-blue-500/10 rounded-2xl border border-white/5 transition-all group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                            <CreditCard size={18} />
                                         </div>
-                                    ))
-                                )}
+                                        <div>
+                                            <p className="font-black text-xs md:text-sm text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors">ឌីជីថលកាត (Bio Card)</p>
+                                            <p className="text-[10px] font-bold text-gray-400">គ្រប់គ្រង Profile & KHQR</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-bold text-blue-500 group-hover:translate-x-0.5 transition-transform">→</span>
+                                </Link>
+
+                                <Link 
+                                    to="/subtitles"
+                                    className="flex items-center justify-between p-3.5 bg-black/5 dark:bg-black/20 hover:bg-indigo-500/10 rounded-2xl border border-white/5 transition-all group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                            <Zap size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-xs md:text-sm text-gray-900 dark:text-white group-hover:text-indigo-500 transition-colors">ស្ទូឌីយោ Subtitle AI</p>
+                                            <p className="text-[10px] font-bold text-gray-400">អក្សររត់ខ្មែរ & CapCut Draft</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-bold text-indigo-500 group-hover:translate-x-0.5 transition-transform">→</span>
+                                </Link>
                             </div>
                         </MotionDiv>
                         {/* Visual Appearance Protocol */}

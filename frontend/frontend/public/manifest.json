@@ -1,12 +1,18 @@
+{
+  "short_name": "Moneaa",
+  "name": "Moneaa - Digital Business Card & Subtitle Studio",
+  "description": "Digital Business Card with Bakong KHQR & Khmer AI Subtitle Studio",
+  "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "/vite.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "start_url": "/bio",
+  "background_color": "#08090c",
+  "theme_color": "#2563eb",
+  "display": "standalone",
+  "orientation": "portrait"
 }

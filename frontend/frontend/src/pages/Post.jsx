@@ -1,17 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import DashboardLayout from "../layouts/DashboardLayout";
 import {
     Upload, Link as LinkIcon, X, Calendar, Clock, Layers, Plus, Trash2,
-    ChevronDown, Share2, Youtube, Instagram, Facebook, Zap, Shield,
-    Maximize2, Volume2, VolumeX, MessageSquare, EyeOff, Loader2, AlertCircle, Search,
-    Languages, Sparkles
+    ChevronDown, Share2, Zap, Volume2, VolumeX, MessageSquare, Loader2,
+    Search, Languages, ExternalLink, RefreshCw, Image as ImageIcon, Video
 } from "lucide-react";
-import apiUtils, { fetchCsrfToken } from "../utils/apiUtils";
+import apiUtils from "../utils/apiUtils";
 import { postsAPI } from "../utils/api";
-import { saveDraftFile, getDraftFile, clearDraftFile } from "../utils/draftDB";
-import { useAuth } from "../hooks/useAuth";
+import { clearDraftFile } from "../utils/draftDB";
 import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,23 +18,14 @@ import { generateThumbnailFromVideo, generateGalleryFromVideo, dataURLtoFile } f
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
 
 export default function Post() {
-    const { user } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
 
-    const [postFormat, setPostFormat] = useState("carousel"); // "carousel" or "single"
-    const [videoTab, setVideoTab] = useState("upload");
-
-    const [platforms, setPlatforms] = useState({
-        facebook: true,
-        youtube: false,
-        tiktok: false,
-        instagram: false
-    });
+    const [postFormat, setPostFormat] = useState("single"); // "single" (default, simpler) or "carousel"
 
     const [file, setFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
-    const [rawVideoUrl, setRawVideoUrl] = useState(null); // Stores raw CDN URL for backend
+    const [rawVideoUrl, setRawVideoUrl] = useState(null);
     const [tiktokUrl, setTiktokUrl] = useState("");
     const [mediaItems, setMediaItems] = useState([]);
     const [thumbnail, setThumbnail] = useState(null);
@@ -53,9 +42,10 @@ export default function Post() {
     const [carouselCtaText, setCarouselCtaText] = useState("ចុច Like Page ដើម្បីបាន\nវីដេអូថ្មីៗ");
     const [selectedPages, setSelectedPages] = useState([]);
     const [availablePages, setAvailablePages] = useState([]);
+    const [isLoadingPages, setIsLoadingPages] = useState(true);
     const [scheduleTime, setScheduleTime] = useState("");
-    const [staggerDelay, setStaggerDelay] = useState(0);
 
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const [aiOptions, setAiOptions] = useState({
         safeMode: false,
         pitchShift: false,
@@ -66,17 +56,13 @@ export default function Post() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingVideo, setIsLoadingVideo] = useState(false);
     const [isDraftLoaded, setIsDraftLoaded] = useState(false);
-    const [connectedPlatforms, setConnectedPlatforms] = useState({ youtube: false, tiktok: false, instagram: false });
     const [publishMode, setPublishMode] = useState("now");
 
     const [activeView, setActiveView] = useState("create");
-    const [isMetadataExpanded, setIsMetadataExpanded] = useState(false);
-    const [pageCardSettings, setPageCardSettings] = useState({ enabled: true });
     const [galleryOptions, setGalleryOptions] = useState([]);
     const [queue, setQueue] = useState([]);
-    const [queueError, setQueueError] = useState(null);
+    const [isLoadingQueue, setIsLoadingQueue] = useState(false);
     const [previewVideoModal, setPreviewVideoModal] = useState(null);
-    const [openCtaMenu, setOpenCtaMenu] = useState(null);
     const [autoReplyBot, setAutoReplyBot] = useState(false);
     const [videoData, setVideoData] = useState(null);
     const [videoError, setVideoError] = useState(false);
@@ -84,10 +70,13 @@ export default function Post() {
     const [isFixing, setIsFixing] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [isPageSelectorOpen, setIsPageSelectorOpen] = useState(false);
-
-
-    // --- 🚀 Auto Features State ---
     const [isPreviewMuted, setIsPreviewMuted] = useState(true);
+    const [extensionInstalled, setExtensionInstalled] = useState(false);
+    const [extensionVersion, setExtensionVersion] = useState("");
+    const [fbOauthConfigured, setFbOauthConfigured] = useState(false);
+    const [isOpeningComposer, setIsOpeningComposer] = useState(false);
+    const [lastPublishError, setLastPublishError] = useState("");
+
     const carouselRef = useRef(null);
     const fileInputRef = useRef(null);
 
@@ -106,7 +95,6 @@ export default function Post() {
     useEffect(() => {
         const loadDraft = async () => {
             try {
-                // 1. Load Global Preferences (Persistent)
                 const savedPrefs = localStorage.getItem("postPreferences");
                 if (savedPrefs) {
                     const prefs = JSON.parse(savedPrefs);
@@ -114,7 +102,6 @@ export default function Post() {
                     if (prefs.cta) setCta(prefs.cta);
                 }
 
-                // 2. Load Post Draft (Temporary)
                 const savedDraft = localStorage.getItem("postDraft");
                 if (savedDraft) {
                     const parsed = JSON.parse(savedDraft);
@@ -123,7 +110,7 @@ export default function Post() {
                     setTargetLink(parsed.targetLink || "");
                     if (parsed.carouselCtaText) setCarouselCtaText(parsed.carouselCtaText);
                     if (parsed.cta) setCta(parsed.cta);
-                    if (parsed.selectedPages) setSelectedPages(parsed.selectedPages);
+                    if (Array.isArray(parsed.selectedPages)) setSelectedPages(parsed.selectedPages);
                     if (parsed.autoReplyBot !== undefined) setAutoReplyBot(parsed.autoReplyBot);
 
                     if (parsed.cachedPage) {
@@ -144,76 +131,95 @@ export default function Post() {
 
     useEffect(() => {
         if (!isDraftLoaded) return;
-        const saveTimer = setTimeout(async () => {
+        const saveTimer = setTimeout(() => {
             const selectedPageId = selectedPages[0];
             const cachedPage = availablePages.find(p => p.id === selectedPageId);
 
-            // Save Temporary Draft
-            const draftData = {
+            localStorage.setItem("postDraft", JSON.stringify({
                 caption, headline, targetLink, postFormat, selectedPages, cachedPage, carouselCtaText, cta, autoReplyBot
-            };
-            localStorage.setItem("postDraft", JSON.stringify(draftData));
-
-            // Save Global Preferences (Persistent)
-            const prefsData = { carouselCtaText, cta };
-            localStorage.setItem("postPreferences", JSON.stringify(prefsData));
-        }, 3000); // 🚀 Increased to 3s to reduce jank while typing
+            }));
+            localStorage.setItem("postPreferences", JSON.stringify({ carouselCtaText, cta }));
+        }, 1500);
         return () => clearTimeout(saveTimer);
     }, [caption, headline, targetLink, postFormat, selectedPages, isDraftLoaded, availablePages, carouselCtaText, cta, autoReplyBot]);
 
-
     useEffect(() => {
         const fetchInitialData = async () => {
+            setIsLoadingPages(true);
             try {
-                const [pagesRes, connRes] = await Promise.all([
-                    apiUtils.getUserPages(),
-                    apiUtils.getUserConnections()
-                ]);
-
+                const pagesRes = await apiUtils.getUserPages();
                 if (pagesRes.data.success) {
-                    setAvailablePages(pagesRes.data.accounts);
-                    if (pagesRes.data.accounts.length > 0) {
-                        const allPageIds = pagesRes.data.accounts.map(p => p.id);
-                        setSelectedPages(allPageIds);
-                        const firstPage = pagesRes.data.accounts[0];
-                        setHeadline(firstPage.name);
-                        setTargetLink(firstPage.link || `https://facebook.com/${firstPage.id}`);
+                    const accounts = pagesRes.data.accounts || [];
+                    setAvailablePages(accounts);
+                    if (accounts.length > 0) {
+                        setSelectedPages(prev => {
+                            const validPrev = prev.filter(id => accounts.some(a => a.id === id));
+                            if (validPrev.length > 0) return validPrev;
+                            const enabledPages = accounts.filter(p => p.isSelected !== false && !p.isProfile);
+                            if (enabledPages.length > 0) return enabledPages.map(p => p.id);
+                            return [accounts[0].id];
+                        });
+                        const firstPage = accounts[0];
+                        setHeadline(prev => prev || firstPage.name);
+                        setTargetLink(prev => prev || firstPage.link || `https://facebook.com/${firstPage.id}`);
                     }
-                }
-
-                if (connRes.data.success) {
-                    setConnectedPlatforms(connRes.data.connections);
                 }
             } catch (err) {
                 const details = err?.details || err?.response?.data;
-                const diagnostic = [
-                    details?.error || err?.message,
-                    details?.errorCode ? `Code: ${details.errorCode}` : null,
-                    details?.diagnosticId ? `Reference: ${details.diagnosticId}` : null,
-                ].filter(Boolean).join(" | ");
-                console.error("Data synchronization failed", {
-                    status: err?.response?.status,
-                    details,
-                    error: err,
-                });
-                toast.error(diagnostic || "Failed to synchronize account data. Please try again.");
+                toast.error(details?.error || err?.message || "មិនអាចទាញយកបញ្ជីផេកបានទេ");
+            } finally {
+                setIsLoadingPages(false);
             }
         };
         fetchInitialData();
+        axios
+            .get(`${API_BASE}/api/auth/facebook/status`, { withCredentials: true })
+            .then((res) => setFbOauthConfigured(Boolean(res.data?.configured)))
+            .catch(() => setFbOauthConfigured(false));
+
+        const checkExt = () => {
+            if (document.documentElement.getAttribute("data-eza-extension") === "installed") {
+                setExtensionInstalled(true);
+                setExtensionVersion(document.documentElement.getAttribute("data-eza-extension-version") || "");
+            }
+        };
+        checkExt();
+        const onExtMsg = (event) => {
+            if (event.source === window && event.data?.source === "EZA_EXTENSION" && event.data?.action === "EXTENSION_STATUS") {
+                if (event.data.installed) {
+                    setExtensionInstalled(true);
+                    if (event.data.version) setExtensionVersion(String(event.data.version));
+                }
+            }
+        };
+        window.addEventListener("message", onExtMsg);
+        window.postMessage({ source: "EZA_WEB_APP", action: "CHECK_EXTENSION" }, "*");
+        const extPoll = setInterval(checkExt, 1500);
+        return () => {
+            window.removeEventListener("message", onExtMsg);
+            clearInterval(extPoll);
+        };
     }, []);
 
-    const togglePlatform = (platform) => {
-        if (platform === 'facebook') {
-            setPlatforms(prev => ({ ...prev, facebook: !prev.facebook }));
-            return;
+    const fetchQueue = useCallback(async () => {
+        setIsLoadingQueue(true);
+        try {
+            const data = await postsAPI.getQueue();
+            if (data?.success) {
+                setQueue(Array.isArray(data.posts) ? data.posts : []);
+            }
+        } catch (err) {
+            console.warn("Queue fetch failed:", err);
+        } finally {
+            setIsLoadingQueue(false);
         }
+    }, []);
 
-        if (!connectedPlatforms[platform]) {
-            toast.error(`Unauthorized node: Connect ${platform.toUpperCase()} in terminal.`);
-            return;
+    useEffect(() => {
+        if (activeView === "queue") {
+            fetchQueue();
         }
-        setPlatforms(prev => ({ ...prev, [platform]: !prev[platform] }));
-    };
+    }, [activeView, fetchQueue]);
 
     const handleClearPreview = async () => {
         setFile(null);
@@ -226,13 +232,10 @@ export default function Post() {
         setRightSideImage(null);
         setRightSideImagePreview(null);
         setGalleryOptions([]);
-        setAutoReplyBot(false);
         setVideoData(null);
         setVideoError(false);
         setIsFixed(false);
 
-        
-        // Clear draft files from IndexedDB
         try {
             await Promise.all([
                 clearDraftFile("draft_video"),
@@ -240,20 +243,18 @@ export default function Post() {
                 clearDraftFile("draft_card2")
             ]);
         } catch (e) { console.warn("Failed to clear draft files", e); }
-        
-        toast.success("Preview cleared.");
+
+        toast.success("បានសម្អាតមាតិកាសាកល្បងរួចរាល់");
     };
 
     const handlePageSelection = (pageId) => {
         setSelectedPages(prev => {
             if (prev.includes(pageId)) {
-                if (prev.length === 1) return prev; 
                 return prev.filter(id => id !== pageId);
-            } else {
-                return [...prev, pageId];
             }
+            return [...prev, pageId];
         });
-        
+
         const pageObj = availablePages.find(p => p.id === pageId);
         if (pageObj && selectedPages.length === 0) {
             setHeadline(pageObj.name);
@@ -269,64 +270,53 @@ export default function Post() {
         }
     };
 
-
-
-
+    // Build preview items based on postFormat
     useEffect(() => {
         setMediaItems(() => {
-            const items = [];
-            
-            // 1. Main Media (Video or Image) - Card 1
-            items.push({
-                id: 'video-main',
-                type: file?.type?.startsWith('image/') ? 'image' : 'video',
-                preview: previewUrl || (file ? URL.createObjectURL(file) : null),
-                file: file,
-                url: previewUrl,
-                isPlaceholder: !(file || previewUrl)
-            });
-            
-            // 2. Right Side Image - Card 2
-            items.push({
-                id: 'right-side-image',
-                type: 'image',
-                preview: rightSideImagePreview,
-                file: rightSideImage,
-                isRightSide: true,
-                isPlaceholder: !rightSideImagePreview
-            });
-            
-            // 3. Page Destination Card - Card 3
-            items.push({
-                id: 'card-destination-final',
-                type: 'image',
-                isPageCard: true,
-                isPlaceholder: false
-            });
-            
+            const items = [
+                {
+                    id: "video-main",
+                    type: file?.type?.startsWith("image/") ? "image" : "video",
+                    preview: previewUrl || (file ? URL.createObjectURL(file) : null),
+                    file,
+                    url: previewUrl,
+                    isPlaceholder: !(file || previewUrl)
+                }
+            ];
+
+            if (postFormat === "carousel") {
+                items.push({
+                    id: "right-side-image",
+                    type: "image",
+                    preview: rightSideImagePreview,
+                    file: rightSideImage,
+                    isRightSide: true,
+                    isPlaceholder: !rightSideImagePreview
+                });
+                items.push({
+                    id: "card-destination-final",
+                    type: "image",
+                    isPageCard: true,
+                    isPlaceholder: false
+                });
+            }
+
             return items;
         });
-    }, [file, previewUrl, rightSideImage, rightSideImagePreview, headline, targetLink]);
-
-    const handleThumbnailChange = (e) => {
-        const selectedFile = e.target.files[0];
-        if (selectedFile) {
-            setThumbnail(selectedFile);
-            setThumbnailPreview(URL.createObjectURL(selectedFile));
-        }
-    };
+    }, [postFormat, file, previewUrl, rightSideImage, rightSideImagePreview]);
 
     const handleFileChange = (e) => {
-        const selectedFile = e.target.files[0];
+        const selectedFile = e.target.files?.[0];
         if (selectedFile) validateAndSetMedia(selectedFile);
+        e.target.value = "";
     };
 
     const validateAndSetMedia = (selectedFile) => {
         const isVideo = selectedFile.type.startsWith("video/");
         const isImage = selectedFile.type.startsWith("image/");
 
-        if (!isVideo && !isImage) return toast.error("Invalid media type.");
-        if (selectedFile.size > 500 * 1024 * 1024) return toast.error("Payload too heavy (>500MB).");
+        if (!isVideo && !isImage) return toast.error("សូមជ្រើសរើសឯកសារវីដេអូ ឬ រូបភាពប៉ុណ្ណោះ");
+        if (selectedFile.size > 90 * 1024 * 1024) return toast.error("ទំហំឯកសារធំពេក (អតិបរមា 90MB)");
 
         if (isImage) {
             setFile(selectedFile);
@@ -334,85 +324,78 @@ export default function Post() {
             setTiktokUrl("");
             setThumbnail(null);
             setThumbnailPreview(null);
-            toast.success("Image payload added.");
+            toast.success("បានដាក់បញ្ចូលរូបភាពរួចរាល់!");
             return;
         }
 
-        // Video logic
         const video = document.createElement("video");
         video.preload = "metadata";
         video.onloadedmetadata = async () => {
             window.URL.revokeObjectURL(video.src);
-
             setFile(selectedFile);
-            const url = URL.createObjectURL(selectedFile);
-            setPreviewUrl(url);
+            setPreviewUrl(URL.createObjectURL(selectedFile));
             setTiktokUrl("");
 
             try {
                 const thumbDataUrl = await generateThumbnailFromVideo(selectedFile);
                 setThumbnailPreview(thumbDataUrl);
-                const thumbFile = dataURLtoFile(thumbDataUrl, "thumbnail.jpg");
-                setThumbnail(thumbFile);
+                setThumbnail(dataURLtoFile(thumbDataUrl, "thumbnail.jpg"));
 
-                // Generate 6 gallery options
                 const frames = await generateGalleryFromVideo(selectedFile, 6);
                 setGalleryOptions(frames);
-
-                // Auto-fill Card 2 with the first frame if empty
                 if (frames.length > 0 && !rightSideImagePreview) {
                     setRightSideImagePreview(frames[0]);
                     setRightSideImage(dataURLtoFile(frames[0], "card2-auto.jpg"));
                 }
             } catch (e) { console.warn("Visual extraction failed", e); }
-            
+
             setVideoError(false);
-            setVideoData({ id: 'upload', type: 'video' });
-            toast.success("Identity payload added.");
+            setVideoData({ id: "upload", type: "video" });
+            toast.success("បានដាក់បញ្ចូលវីដេអូរួចរាល់!");
         };
         video.src = URL.createObjectURL(selectedFile);
     };
 
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const dropped = e.dataTransfer?.files?.[0];
+        if (dropped) validateAndSetMedia(dropped);
+    };
+
     const handleLoadTiktok = async () => {
-        if (!tiktokUrl) return;
+        if (!tiktokUrl.trim()) return toast.error("សូមបិទភ្ជាប់ Link វីដេអូ TikTok ជាមុនសិន!");
         setIsLoadingVideo(true);
         setVideoError(false);
         setIsFixed(false);
-        const toastId = toast.loading("Intercepting TikTok data...");
+        const toastId = toast.loading("កំពុងទាញយកវីដេអូពី TikTok...");
         try {
-            const response = await axios.post(`${API_BASE}/api/posts/tiktok/fetch`, { url: tiktokUrl }, { withCredentials: true });
+            const response = await axios.post(`${API_BASE}/api/tools/tiktok/lookup`, { url: tiktokUrl }, { withCredentials: true });
             const data = response.data;
-            if (data.success) {
-                setVideoData(data.video);
-                setRawVideoUrl(data.video.rawPath || data.video.url);
+            if (data.success && data.video) {
+                const directPlayUrl = data.video.no_watermark_url || data.video.playUrl || data.video.url || "";
+                setVideoData({ ...data.video, url: directPlayUrl });
+                setRawVideoUrl(data.video.rawPath || directPlayUrl || null);
                 setFile(null);
-                
-                // 📝 Auto-fill Caption and Headline if empty
+
                 if (data.video.title && !caption) setCaption(data.video.title);
                 if (data.video.title && !headline) setHeadline(data.video.title);
 
-                // 📸 SLIDESHOW HANDLING: Generate Video automatically
-                if (data.video.type === 'slideshow' && data.video.images?.length > 0) {
+                if (data.video.type === "slideshow" && data.video.images?.length > 0) {
                     handleGenerateSlideshow(data.video);
+                } else if (!directPlayUrl) {
+                    throw new Error("មិនអាចទាញយកតំណវីដេអូ TikTok នេះបានទេ (សូមទាញយកជាឯកសារ MP4 រួច Upload)!");
                 } else {
-                    const streamUrl = `${API_BASE}/api/tools/tiktok/stream?id=${data.video.id}&url=${encodeURIComponent(data.video.url)}`;
+                    const streamUrl = `${API_BASE}/api/tools/tiktok/stream?id=${encodeURIComponent(data.video.id || "")}&url=${encodeURIComponent(directPlayUrl)}`;
                     setPreviewUrl(streamUrl);
 
                     if (data.video.cover) {
                         setThumbnailPreview(data.video.cover);
-                        
-                        // 🖼️ INSTANT CARD 2 AUTO-FILL (Like upload)
-                        if (!rightSideImagePreview) {
-                            setRightSideImagePreview(data.video.cover);
-                        }
-
+                        if (!rightSideImagePreview) setRightSideImagePreview(data.video.cover);
                         try {
                             const blobRes = await fetch(data.video.cover);
                             const blob = await blobRes.blob();
-                            const thumbFile = new File([blob], "tiktok-thumb.jpg", { type: "image/jpeg" });
-                            setThumbnail(thumbFile);
-                            
-                            // Also set as Card 2 file if it was chosen
+                            setThumbnail(new File([blob], "tiktok-thumb.jpg", { type: "image/jpeg" }));
                             if (!rightSideImage) {
                                 setRightSideImage(new File([blob], "card2-tiktok.jpg", { type: "image/jpeg" }));
                             }
@@ -421,9 +404,8 @@ export default function Post() {
                         try {
                             const thumbDataUrl = await generateThumbnailFromVideo(streamUrl);
                             setThumbnailPreview(thumbDataUrl);
-                            const thumbFile = dataURLtoFile(thumbDataUrl, "thumbnail.jpg");
-                            setThumbnail(thumbFile);
-                        } catch (e) { console.warn("Visual extraction failed for TikTok video", e); }
+                            setThumbnail(dataURLtoFile(thumbDataUrl, "thumbnail.jpg"));
+                        } catch {}
                     }
 
                     try {
@@ -433,21 +415,21 @@ export default function Post() {
                             setRightSideImagePreview(frames[0]);
                             setRightSideImage(dataURLtoFile(frames[0], "card2-auto.jpg"));
                         }
-                    } catch (e) { console.warn("Gallery extraction failed for TikTok video", e); }
+                    } catch {}
 
-                    toast.success("Payload decrypted.", { id: toastId });
+                    toast.success("ទាញយកវីដេអូ TikTok រួចរាល់!", { id: toastId });
                 }
             } else throw new Error(data.error);
         } catch (err) {
-            console.error("TikTok Fetch Error:", err);
-            toast.error(err.response?.data?.error || "Interception failed.", { id: toastId });
+            toast.error(err.response?.data?.error || "មិនអាចទាញយកវីដេអូ TikTok បានទេ", { id: toastId });
+        } finally {
+            setIsLoadingVideo(false);
         }
-        finally { setIsLoadingVideo(false); }
     };
 
     const handleGenerateSlideshow = async (video) => {
         setIsLoadingVideo(true);
-        const toastId = toast.loading("Generating HD Slideshow...");
+        const toastId = toast.loading("កំពុងបង្កើតវីដេអូ Slideshow...");
         try {
             const res = await axios.post(`${API_BASE}/api/tools/tiktok/combine`, {
                 images: video.images,
@@ -457,32 +439,27 @@ export default function Post() {
             }, { withCredentials: true });
 
             if (res.data.success) {
-                // The backend returns streamUrl and local path
                 const streamUrl = res.data.streamUrl || res.data.url;
                 const combinedUrl = `${API_BASE}${streamUrl}`;
                 setPreviewUrl(combinedUrl);
-                
-                // Set the rawVideoUrl for final post distribution
+
                 if (res.data.path) {
                     setRawVideoUrl(res.data.path);
-                } else if (streamUrl && streamUrl.includes('?')) {
-                    const urlParams = new URLSearchParams(streamUrl.split('?')[1]);
-                    const localPath = urlParams.get('path');
+                } else if (streamUrl && streamUrl.includes("?")) {
+                    const localPath = new URLSearchParams(streamUrl.split("?")[1]).get("path");
                     if (localPath) setRawVideoUrl(localPath);
                 }
-                
-                setIsFixed(true); 
-                toast.success("HD Slideshow generated!", { id: toastId });
 
-                // Generate Card 2 from the new video
+                setIsFixed(true);
+                toast.success("បង្កើតវីដេអូជោគជ័យ!", { id: toastId });
+
                 try {
                     const frames = await generateGalleryFromVideo(combinedUrl, 6);
                     setGalleryOptions(frames);
-                } catch (e) {}
+                } catch {}
             }
-        } catch (err) {
-            console.error("Slideshow generation failed:", err);
-            toast.error("Failed to generate HD Slideshow.", { id: toastId });
+        } catch {
+            toast.error("មិនអាចបង្កើត Slideshow បានទេ", { id: toastId });
         } finally {
             setIsLoadingVideo(false);
         }
@@ -492,7 +469,6 @@ export default function Post() {
         const targetData = customVideoData || videoData;
         if (!targetData?.id || isFixing) return;
         setIsFixing(true);
-        // Silent background optimization (no toast loading)
         try {
             const res = await axios.post(`${API_BASE}/api/tools/tiktok/compatible`, {
                 id: targetData.id,
@@ -502,17 +478,15 @@ export default function Post() {
             if (res.data.success) {
                 const fixedUrl = `${API_BASE}/api/tools/tiktok/stream?id=${targetData.id}&url=${encodeURIComponent(res.data.path)}`;
                 setPreviewUrl(fixedUrl);
-                setRawVideoUrl(res.data.path); // Use the local fixed path for posting
+                setRawVideoUrl(res.data.path);
                 setIsFixed(true);
                 setVideoError(false);
-                
-                // Regenerate thumbnails from fixed video silently
+
                 try {
                     const thumbDataUrl = await generateThumbnailFromVideo(fixedUrl);
                     setThumbnailPreview(thumbDataUrl);
-                    const frames = await generateGalleryFromVideo(fixedUrl, 6);
-                    setGalleryOptions(frames);
-                } catch (e) {}
+                    setGalleryOptions(await generateGalleryFromVideo(fixedUrl, 6));
+                } catch {}
             }
         } catch (err) {
             console.warn("Background optimization failed:", err.message);
@@ -521,117 +495,289 @@ export default function Post() {
         }
     };
 
-    const handleSubmit = async () => {
-        if (selectedPages.length === 0) return toast.error("សូមជ្រើសរើសផេកយ៉ាងតិច ១ ដើម្បីបង្ហោះ!");
-        if (!file && !previewUrl) return toast.error("សូមដាក់បញ្ចូលវីដេអូ ឬរូបភាព!");
+    const isExtensionAtLeastV205 = (ver) => {
+        const parts = String(ver || "").split(".").map((n) => Number.parseInt(n, 10) || 0);
+        const [maj = 0, min = 0, pat = 0] = parts;
+        return maj > 2 || (maj === 2 && (min > 0 || pat >= 5));
+    };
 
-        if (publishMode === 'schedule') {
+    const handleSubmit = async () => {
+        if (selectedPages.length === 0) {
+            return toast.error("សូមជ្រើសរើសផេកយ៉ាងតិច ១ ដើម្បីបង្ហោះ!");
+        }
+        if (postFormat === "reels" && (!file && !previewUrl || (file && !file.type.startsWith("video/")))) {
+            return toast.error("Facebook Reels តម្រូវឱ្យដាក់ឯកសារវីដេអូ (.mp4)!");
+        }
+        if (postFormat === "carousel" && !file && !previewUrl) {
+            return toast.error("ផុសបែប Carousel តម្រូវឱ្យមានវីដេអូ!");
+        }
+        if (postFormat === "carousel" && file && !file.type.startsWith("video/")) {
+            return toast.error("ផុសបែប Carousel តម្រូវឱ្យដាក់វីដេអូ (សូមប្ដូរទៅ 'ផុសធម្មតា' សម្រាប់រូបភាព)!");
+        }
+        if (postFormat === "single" && !file && !previewUrl && !caption.trim()) {
+            return toast.error("សូមសរសេរអត្ថបទ ឬបន្ថែមវីដេអូ/រូបភាពជាមុនសិន!");
+        }
+
+        if (publishMode === "schedule") {
             if (!scheduleTime) {
-                return toast.error("សូមជ្រើសរើសថ្ងៃ និងម៉ោងត្រូវបង្ហោះ (Schedule Time)!");
+                return toast.error("សូមជ្រើសរើសថ្ងៃ និងម៉ោងត្រូវបង្ហោះ!");
             }
-            const schedDate = new Date(scheduleTime);
-            const diffMinutes = (schedDate.getTime() - Date.now()) / (1000 * 60);
+            const diffMinutes = (new Date(scheduleTime).getTime() - Date.now()) / (1000 * 60);
             if (diffMinutes < 10) {
-                return toast.error("Meta Graph API តម្រូវឱ្យកក់ពេលយ៉ាងតិច ១០ នាទីមុនពេលផុស (សូមរើសយ៉ាងតិច ១០ នាទីបន្ទាប់ពីនេះ)!");
+                return toast.error("សូមកំណត់ពេលវេលាយ៉ាងតិច ១០ នាទីបន្ទាប់ពីពេលនេះ!");
             }
         }
 
+        const isVideoPublish =
+            postFormat === "carousel" ||
+            postFormat === "reels" ||
+            Boolean(file?.type?.startsWith("video/")) ||
+            Boolean(rawVideoUrl) ||
+            Boolean(previewUrl && !file?.type?.startsWith("image/"));
+
+        if (!fbOauthConfigured && isVideoPublish) {
+            const isExtReady =
+                extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
+            const currentVer =
+                extensionVersion || document.documentElement.getAttribute("data-eza-extension-version") || "";
+            if (isExtReady && isExtensionAtLeastV205(currentVer)) {
+                return handlePublishViaBusinessSuite();
+            }
+            if (isExtReady) {
+                toast.error(
+                    `Extension របស់អ្នកជាកំណែចាស់ (${currentVer || "< 2.0.5"}) — សូម Reload/អាប់ដេត Extension v2.0.5 ក្នុង chrome://extensions ជាមុនសិន!`,
+                    { duration: 8000 }
+                );
+                return;
+            }
+            toast.error(
+                "Server មិនទាន់មាន Facebook Login OAuth ទេ! សូមដំឡើង EZA-POST Extension v2.0.5 ដើម្បីផុសវីដេអូតាម Business Suite ដោយសុវត្ថិភាព។",
+                { duration: 8000 }
+            );
+            return;
+        }
+
         setIsSubmitting(true);
-        const toastId = toast.loading("កំពុងដំណើរការបង្ហោះទៅកាន់ Facebook Pages...");
+        const toastId = toast.loading(
+            publishMode === "schedule"
+                ? "កំពុងរក្សាទុកការកក់ពេលផុស..."
+                : "កំពុងបង្ហោះទៅកាន់ Facebook Pages..."
+        );
 
         try {
             const formData = new FormData();
             formData.append("caption", caption);
             formData.append("accounts", JSON.stringify(selectedPages));
-            formData.append("platforms", JSON.stringify(Object.keys(platforms).filter(k => platforms[k])));
+            formData.append("platforms", JSON.stringify(["facebook"]));
 
             if (file) formData.append("video", file);
             else if (rawVideoUrl) formData.append("videoUrl", rawVideoUrl);
             else if (previewUrl) formData.append("videoUrl", previewUrl);
 
             if (thumbnail) formData.append("thumbnail", thumbnail);
-            if (rightSideImage) formData.append("rightSideImage", rightSideImage);
-            if (publishMode === 'schedule' && scheduleTime) formData.append("scheduleTime", scheduleTime);
-            if (staggerDelay) formData.append("staggerDelay", staggerDelay);
+            if (postFormat === "carousel" && rightSideImage) formData.append("rightSideImage", rightSideImage);
+            if (publishMode === "schedule" && scheduleTime) formData.append("scheduleTime", new Date(scheduleTime).toISOString());
             formData.append("aiOptions", JSON.stringify(aiOptions));
             formData.append("enableBot", autoReplyBot);
 
             let endpoint = `${API_BASE}/api/posts/mixed-carousel`;
-            if (postFormat === 'single') {
+            if (postFormat === "single" || postFormat === "reels") {
                 endpoint = `${API_BASE}/api/posts`;
-                formData.append("postType", "single");
+                formData.append("postType", postFormat);
             } else {
                 formData.append("postType", "carousel");
                 const cardsPayload = [
                     ...mediaItems.map(item => ({
                         id: item.id,
                         type: item.type,
-                        headline: item.type === 'video' ? headline : carouselCtaText.replace(/\n/g, ' '),
-                        description: item.type === 'video' ? (cardDescription || "Swipe to see more") : "",
+                        headline: item.type === "video" ? headline : carouselCtaText.replace(/\n/g, " "),
+                        description: item.type === "video" ? (cardDescription || "Swipe to see more") : "",
                         cta,
                         isPageCard: item.isPageCard,
                         imageUrl: item.imageUrl,
                         isRightSide: item.isRightSide
                     })),
                     {
-                        id: 'card-destination-final',
-                        type: 'image',
+                        id: "card-destination-final",
+                        type: "image",
                         isPageCard: true,
-                        headline: 'មើលច្រើនទៀតនៅ',
-                        description: 'FACEBOOK.COM',
+                        headline: "មើលច្រើនទៀតនៅ",
+                        description: "FACEBOOK.COM",
                         link: targetLink,
-                        cta: cta || 'LEARN_MORE'
+                        cta: cta || "LEARN_MORE"
                     }
                 ];
                 formData.append("carouselCards", JSON.stringify(cardsPayload));
             }
 
             const response = await axios.post(endpoint, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+                headers: { "Content-Type": "multipart/form-data" },
                 withCredentials: true,
-                timeout: 300000 // 5 minute timeout for multi-page transcoding
+                timeout: 300000
             });
 
             const data = response.data;
             if (data.success) {
-                toast.success("Distribution successful.", { id: toastId });
-                setFile(null); setPreviewUrl(null); setRawVideoUrl(null); setTiktokUrl(""); setMediaItems([]);
-                
-                const isAutoCard2 = rightSideImage && rightSideImage.name && rightSideImage.name.startsWith("card2-");
+                toast.success(
+                    publishMode === "schedule"
+                        ? "កក់ពេលបង្ហោះរួចរាល់! 📅"
+                        : "បានបង្ហោះទៅកាន់ Facebook រួចរាល់! 🎉",
+                    { id: toastId }
+                );
+                setFile(null);
+                setPreviewUrl(null);
+                setRawVideoUrl(null);
+                setTiktokUrl("");
+                setCaption("");
+                setMediaItems([]);
+
+                const isAutoCard2 = rightSideImage?.name?.startsWith("card2-");
                 if (isAutoCard2) {
-                    setRightSideImage(null); 
+                    setRightSideImage(null);
                     setRightSideImagePreview(null);
                 }
 
-                setThumbnail(null); setThumbnailPreview(null);
-
+                setThumbnail(null);
+                setThumbnailPreview(null);
                 localStorage.removeItem("postDraft");
-                
-                const clearPromises = [
+
+                await Promise.all([
                     clearDraftFile("draft_video"),
-                    clearDraftFile("draft_thumb")
-                ];
-                if (isAutoCard2 || !rightSideImage) {
-                    clearPromises.push(clearDraftFile("draft_card2"));
+                    clearDraftFile("draft_thumb"),
+                    ...(isAutoCard2 || !rightSideImage ? [clearDraftFile("draft_card2")] : [])
+                ]);
+
+                if (publishMode === "schedule") {
+                    fetchQueue();
                 }
-                await Promise.all(clearPromises);
-            } else throw new Error(data.error || "Unknown distribution error");
+            } else {
+                throw new Error(data.error || "មិនអាចបង្ហោះបានទេ");
+            }
         } catch (err) {
-            console.error("Submit Error:", err);
-            let errMsg = "Distribution failure.";
-            
-            if (err.code === 'ECONNABORTED') {
+            console.error("❌ Post publish error:", err.response?.data?.error || err.message, err.response?.data || err);
+            let errMsg = "មិនអាចបង្ហោះបានទេ សូមព្យាយាមម្តងទៀត";
+            if (err.code === "ECONNABORTED") {
                 errMsg = "ប្រព័ន្ធកំពុងដំណើរការនៅ Backend។ សូមរង់ចាំបន្តិច រួចពិនិត្យមើលក្នុង Facebook របស់អ្នក។";
             } else if (err.response?.data?.error) {
                 errMsg = err.response.data.error;
             } else if (err.message) {
                 errMsg = err.message;
             }
-            
-            toast.error(errMsg, { id: toastId, duration: 6000 });
+            toast.error(errMsg, { id: toastId, duration: 8000 });
+            setLastPublishError(errMsg);
+        } finally {
+            setIsSubmitting(false);
         }
-        finally { 
-            setIsSubmitting(false); 
+    };
+
+    const handlePublishViaBusinessSuite = async () => {
+        if (selectedPages.length === 0) {
+            return toast.error("សូមជ្រើសរើសផេកយ៉ាងតិច ១ ដើម្បីបង្ហោះ!");
+        }
+        const isExtReady =
+            extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
+        if (!isExtReady) {
+            toast.error("សូមដំឡើង ឬ Reload EZA-POST Extension (v2.0.5) ជាមុនសិន!");
+            return;
+        }
+        const currentVer =
+            extensionVersion || document.documentElement.getAttribute("data-eza-extension-version") || "";
+        if (!isExtensionAtLeastV205(currentVer)) {
+            toast.error(
+                `សូមអាប់ដេត ឬ Reload Extension v2.0.5 ក្នុង chrome://extensions (បច្ចុប្បន្ន: ${currentVer || "ចាស់"}) ហើយ Refresh ទំព័រនេះ!`,
+                { duration: 8000 }
+            );
+            return;
+        }
+        if (!file && !previewUrl && !caption.trim()) {
+            return toast.error("សូមសរសេរអត្ថបទ ឬបន្ថែមវីដេអូ/រូបភាពជាមុនសិន!");
+        }
+
+        const primaryPage = availablePages.find((p) => p.id === selectedPages[0]);
+        setIsOpeningComposer(true);
+        const toastId = toast.loading("កំពុងរៀបចំឯកសារ និងបើក Meta Business Suite...");
+
+        try {
+            let mediaUrl = null;
+            let filename = file?.name || "video.mp4";
+            let mimeType = file?.type || "video/mp4";
+
+            if (file) {
+                const uploadForm = new FormData();
+                uploadForm.append("media", file);
+                const upRes = await axios.post(`${API_BASE}/api/upload/post-media`, uploadForm, {
+                    headers: { "Content-Type": "multipart/form-data" },
+                    withCredentials: true,
+                    timeout: 300000
+                });
+                if (!upRes.data?.success || !upRes.data?.url) {
+                    throw new Error(upRes.data?.error || "មិនអាចផ្ទុកឯកសារឡើង Edge Storage បានទេ");
+                }
+                mediaUrl = upRes.data.url;
+                filename = upRes.data.filename || filename;
+                mimeType = upRes.data.mimeType || mimeType;
+            } else if (rawVideoUrl && rawVideoUrl.startsWith("https://")) {
+                mediaUrl = rawVideoUrl;
+            } else if (previewUrl && previewUrl.startsWith("https://")) {
+                mediaUrl = previewUrl;
+            }
+
+            const scheduleLabel =
+                publishMode === "schedule" && scheduleTime
+                    ? new Date(scheduleTime).toLocaleString()
+                    : "";
+
+            const assistResult = await new Promise((resolve) => {
+                const timer = setTimeout(() => {
+                    window.removeEventListener("message", listener);
+                    resolve({ ok: false, error: "Extension មិនឆ្លើយតប — សូមអាប់ដេត Extension v2.0.5 ហើយ Refresh ទំព័រ!" });
+                }, 40000);
+
+                const listener = (event) => {
+                    if (
+                        event.source === window &&
+                        event.data?.source === "EZA_EXTENSION" &&
+                        event.data?.action === "COMPOSER_ASSIST_RESULT"
+                    ) {
+                        clearTimeout(timer);
+                        window.removeEventListener("message", listener);
+                        resolve(event.data);
+                    }
+                };
+                window.addEventListener("message", listener);
+                window.postMessage(
+                    {
+                        source: "EZA_WEB_APP",
+                        action: "PREPARE_COMPOSER_POST",
+                        payload: {
+                            pageId: selectedPages[0],
+                            pageName: primaryPage?.name || "",
+                            caption,
+                            mediaUrl,
+                            filename,
+                            mimeType,
+                            scheduleLabel
+                        }
+                    },
+                    "*"
+                );
+            });
+
+            if (!assistResult.ok) {
+                throw new Error(assistResult.error || "មិនអាចបើក Meta Business Suite បានទេ");
+            }
+            setLastPublishError("");
+            toast.success("បានបើក Meta Business Suite ដោយបញ្ចូលវីដេអូ & Caption រួចរាល់! 🎉", {
+                id: toastId,
+                duration: 6000
+            });
+        } catch (err) {
+            toast.error(err.response?.data?.error || err.message || "មានបញ្ហាក្នុងការបើក Business Suite", {
+                id: toastId,
+                duration: 7000
+            });
+        } finally {
+            setIsOpeningComposer(false);
         }
     };
 
@@ -639,196 +785,226 @@ export default function Post() {
         try {
             await postsAPI.cancel(postId);
             setQueue(prev => prev.filter(p => p.id !== postId));
-            toast.success("Post removed from terminal.");
-        } catch (error) {
-            toast.error("Critical failure during cancellation.");
+            toast.success("បានលុបការកក់ពេលផុសនេះចោលរួចរាល់");
+        } catch {
+            toast.error("មិនអាចលុបការកក់ពេលនេះបានទេ");
         }
     };
 
+    const hasMedia = Boolean(file || previewUrl);
+    const mainPreviewItem = mediaItems[0];
+
     return (
         <DashboardLayout>
-            <div className="max-w-5xl mx-auto px-1 sm:px-4 md:px-6 py-2 md:py-4 pb-16 flex flex-col items-center">
-                {/* 🚀 Header + View Switcher in a Single Clean Row on Desktop */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 w-full">
+            <div className="max-w-4xl mx-auto px-1 sm:px-4 py-2 md:py-4 pb-16 space-y-5 font-khmer">
+                {/* Header + View Switcher */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                        <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
                             បង្កើត និងកំណត់ពេល <span className="text-blue-600 dark:text-blue-400">ផុសមាតិកា</span>
                         </h1>
-                        <p className="text-xs text-gray-500 mt-0.5">ផុសវីដេអូ និងរូបភាពទៅកាន់ផេក Facebook ច្រើនក្នុងពេលតែមួយ</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                            ងាយស្រួលក្នុង ៣ ជំហាន៖ រើសផេក → ដាក់មាតិកា → ចុចបង្ហោះ ឬកក់ម៉ោង
+                        </p>
                     </div>
 
-                    {/* 🚀 Dynamic View Orchestrator */}
                     <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10 w-full sm:w-fit shrink-0">
                         {[
-                            { id: 'create', label: 'បង្កើតមាតិកា', icon: Plus },
-                            { id: 'queue', label: 'បញ្ជីកំពុងដំណើរការ', icon: Layers }
+                            { id: "create", label: "បង្កើតផុសថ្មី", icon: Plus },
+                            { id: "queue", label: "បញ្ជីកក់ម៉ោង", icon: Layers }
                         ].map(tab => (
                             <button
                                 key={tab.id}
+                                type="button"
                                 onClick={() => setActiveView(tab.id)}
-                                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeView === tab.id
-                                    ? "bg-white dark:bg-gray-900 text-blue-600 shadow-xs border border-gray-200/80 dark:border-white/10"
-                                    : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-                                    }`}
+                                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    activeView === tab.id
+                                        ? "bg-white dark:bg-gray-900 text-blue-600 shadow-xs border border-gray-200/80 dark:border-white/10"
+                                        : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                                }`}
                             >
-                                <tab.icon size={13} />
+                                <tab.icon size={14} />
                                 <span>{tab.label}</span>
                             </button>
                         ))}
                     </div>
                 </div>
 
-                <AnimatePresence mode="wait">
-                    {activeView === 'create' ? (
-                        <motion.div
-                            key="create"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.15 }}
-                            className="space-y-4 w-full"
-                        >
-                            {/* 🎛️ Post Format Selector (Carousel vs Single Video) */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-1 bg-gray-100 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 w-full sm:w-fit">
-                                <button
-                                    type="button"
-                                    onClick={() => setPostFormat("carousel")}
-                                    className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                                        postFormat === "carousel"
-                                            ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xs"
-                                            : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-                                    }`}
-                                >
-                                    <span>🎠 វីដេអូ និងកាតផេក</span>
-                                </button>
+                {activeView === "create" ? (
+                    <div className="space-y-4">
+                        {/* Format Switcher */}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="grid grid-cols-3 gap-1 p-1 bg-gray-100 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 w-full sm:w-fit">
                                 <button
                                     type="button"
                                     onClick={() => setPostFormat("single")}
-                                    className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                    className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                         postFormat === "single"
                                             ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xs"
                                             : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
                                     }`}
                                 >
-                                    <span>🎥 វីដេអូទោល</span>
+                                    <span>🎥 ផុសធម្មតា</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPostFormat("reels")}
+                                    className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        postFormat === "reels"
+                                            ? "bg-white dark:bg-gray-800 text-pink-600 dark:text-pink-400 shadow-xs"
+                                            : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                    }`}
+                                >
+                                    <span>📱 Facebook Reels</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPostFormat("carousel")}
+                                    className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        postFormat === "carousel"
+                                            ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xs"
+                                            : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                    }`}
+                                >
+                                    <span>🎠 កាតផេក (Carousel)</span>
                                 </button>
                             </div>
+                        </div>
 
-                            {/* 🎯 Destination: Multi-Select Dropdown */}
-                            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs relative">
-                                <div className="flex items-center justify-between mb-3.5">
-                                    <div className="space-y-0.5">
-                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">ជ្រើសរើសផេកផុស</h3>
-                                        <p className="text-xs text-gray-500">អាចជ្រើសរើសបានច្រើនផេកក្នុងពេលតែមួយ</p>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-gray-500">កាតផេក</span>
-                                            <button
-                                                onClick={() => setPageCardSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
-                                                className={`w-9 h-5 rounded-full transition-all relative ${pageCardSettings.enabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-white/10'}`}
-                                            >
-                                                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${pageCardSettings.enabled ? 'left-[18px]' : 'left-0.5'}`} />
-                                            </button>
-                                        </div>
-                                    </div>
+                        {/* STEP 1: Select Destination Pages */}
+                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <div>
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                        ជំហានទី ១៖ ជ្រើសរើសផេក Facebook
+                                    </h3>
+                                    <p className="text-xs text-gray-500">រើសផេក ១ ឬច្រើនដែលអ្នកចង់ផុសចូល</p>
                                 </div>
+                                {availablePages.length > 0 && (
+                                    <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-bold">
+                                        បានរើស {selectedPages.length}/{availablePages.length}
+                                    </span>
+                                )}
+                            </div>
 
-                                {/* Multi-Select Header */}
+                            {isLoadingPages ? (
+                                <div className="py-4 flex items-center gap-2 text-xs text-gray-400">
+                                    <Loader2 size={15} className="animate-spin" />
+                                    <span>កំពុងទាញយកបញ្ជីផេក...</span>
+                                </div>
+                            ) : availablePages.length === 0 ? (
+                                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                                        មិនទាន់មានផេក Facebook ត្រូវបានភ្ជាប់ទេ។ សូមភ្ជាប់ផេកជាមុនសិន!
+                                    </p>
+                                    <Link
+                                        to="/connections"
+                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 shrink-0"
+                                    >
+                                        <span>ទៅភ្ជាប់ផេក Facebook</span>
+                                        <ExternalLink size={13} />
+                                    </Link>
+                                </div>
+                            ) : (
                                 <div className="relative">
                                     <button
+                                        type="button"
                                         onClick={() => setIsPageSelectorOpen(!isPageSelectorOpen)}
-                                        className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-2xl p-4 md:p-5 flex items-center justify-between group transition-all hover:border-blue-500/30"
+                                        className="w-full bg-gray-50 dark:bg-black/60 border border-gray-200 dark:border-white/10 rounded-xl p-3.5 flex items-center justify-between hover:border-blue-500/40 transition cursor-pointer"
                                     >
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0 shadow-lg shadow-blue-500/20">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0">
                                                 {selectedPages.length}
                                             </div>
-                                            <div className="text-left overflow-hidden">
-                                                <p className="text-[11px] md:text-xs font-black text-gray-400 uppercase tracking-widest leading-none mb-1">ផេកដែលបានជ្រើសរើស</p>
-                                                <p className="text-sm md:text-base font-bold text-gray-900 dark:text-white truncate">
-                                                    {selectedPages.length === availablePages.length 
-                                                        ? "ជ្រើសរើសទាំងអស់" 
-                                                        : selectedPages.length === 0 
-                                                            ? "មិនទាន់មានផេកត្រូវបានជ្រើសរើស" 
-                                                            : `${selectedPages.length} ផេកត្រូវបានជ្រើសរើស`}
+                                            <div className="text-left min-w-0">
+                                                <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">
+                                                    {selectedPages.length === 0
+                                                        ? "ចុចទីនេះដើម្បីជ្រើសរើសផេក..."
+                                                        : selectedPages.length === availablePages.length
+                                                            ? `បានជ្រើសរើសទាំងអស់ (${availablePages.length} ផេក)`
+                                                            : availablePages
+                                                                .filter(p => selectedPages.includes(p.id))
+                                                                .map(p => p.name)
+                                                                .join(", ")}
                                                 </p>
                                             </div>
                                         </div>
-                                        <ChevronDown size={20} className={`text-gray-400 transition-transform ${isPageSelectorOpen ? 'rotate-180' : ''}`} />
+                                        <ChevronDown size={18} className={`text-gray-400 transition-transform shrink-0 ${isPageSelectorOpen ? "rotate-180" : ""}`} />
                                     </button>
 
-                                    {/* Dropdown Menu */}
                                     <AnimatePresence>
                                         {isPageSelectorOpen && (
                                             <motion.div
-                                                initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                exit={{ opacity: 0, y: 10, scale: 0.98 }}
-                                                className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-[#1a1a1a] border border-gray-100 dark:border-white/10 rounded-[2rem] shadow-2xl z-[100] overflow-hidden backdrop-blur-xl"
+                                                initial={{ opacity: 0, y: 6 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: 6 }}
+                                                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
                                             >
-                                                <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/2">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="relative flex-1">
-                                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                                                            <input 
-                                                                type="text"
-                                                                placeholder="ស្វែងរកផេក..."
-                                                                value={searchQuery}
-                                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                                className="w-full bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl py-2.5 pl-9 pr-4 text-xs font-bold outline-none focus:border-blue-500 transition-all"
-                                                                autoFocus
-                                                            />
-                                                        </div>
-                                                        <button 
-                                                            onClick={toggleAllPages}
-                                                            className="px-4 py-2.5 bg-blue-600/10 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all whitespace-nowrap"
-                                                        >
-                                                            {selectedPages.length === availablePages.length ? "រើសម្នាក់ៗ" : "រើសទាំងអស់"}
-                                                        </button>
+                                                <div className="p-3 border-b border-gray-100 dark:border-white/5 flex items-center gap-2">
+                                                    <div className="relative flex-1">
+                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="ស្វែងរកឈ្មោះផេក..."
+                                                            value={searchQuery}
+                                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                                            className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs font-medium outline-none focus:border-blue-500"
+                                                            autoFocus
+                                                        />
                                                     </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={toggleAllPages}
+                                                        className="px-3 py-2 bg-blue-600/10 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-600 hover:text-white transition whitespace-nowrap cursor-pointer"
+                                                    >
+                                                        {selectedPages.length === availablePages.length ? "រើសតែ ១" : "រើសទាំងអស់"}
+                                                    </button>
                                                 </div>
 
-                                                <div className="max-h-[350px] overflow-y-auto p-2 no-scrollbar">
-                                                    <div className="grid grid-cols-1 gap-1">
-                                                        {availablePages
-                                                            .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                                                            .map(page => {
-                                                                const isSelected = selectedPages.includes(page.id);
-                                                                return (
-                                                                    <div
-                                                                        key={page.id}
-                                                                        onClick={() => handlePageSelection(page.id)}
-                                                                        className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all group ${isSelected ? 'bg-blue-500/10' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                                                                    >
-                                                                        <div className="flex items-center gap-3">
-                                                                            <img src={page.picture} className="w-9 h-9 rounded-full border border-white/10" />
-                                                                            <div className="flex flex-col">
-                                                                                <p className={`text-[13px] font-bold ${isSelected ? 'text-blue-600' : 'text-gray-900 dark:text-white'}`}>{page.name}</p>
-                                                                                <span className={`text-[10px] font-bold ${page.isProfile || page.category === "គណនីផ្ទាល់ខ្លួន" ? 'text-purple-500' : 'text-slate-400'}`}>
-                                                                                    {page.isProfile || page.category === "គណនីផ្ទាល់ខ្លួន" ? "គណនីផ្ទាល់ខ្លួន" : "ផេក Facebook"}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-200 dark:border-white/10'}`}>
-                                                                            {isSelected && <Zap size={10} className="text-white fill-white" />}
+                                                <div className="max-h-72 overflow-y-auto p-2 space-y-1">
+                                                    {availablePages
+                                                        .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                                                        .map(page => {
+                                                            const isSelected = selectedPages.includes(page.id);
+                                                            return (
+                                                                <div
+                                                                    key={page.id}
+                                                                    onClick={() => handlePageSelection(page.id)}
+                                                                    className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition ${
+                                                                        isSelected ? "bg-blue-500/10" : "hover:bg-gray-50 dark:hover:bg-white/5"
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                                        <img
+                                                                            src={page.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(page.name)}`}
+                                                                            alt={page.name}
+                                                                            className="w-8 h-8 rounded-full object-cover shrink-0"
+                                                                        />
+                                                                        <div className="min-w-0">
+                                                                            <p className={`text-xs sm:text-sm font-bold truncate ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-white"}`}>
+                                                                                {page.name}
+                                                                            </p>
+                                                                            <span className={`text-[10px] font-semibold ${page.isProfile || page.category === "គណនីផ្ទាល់ខ្លួន" ? "text-purple-500" : "text-gray-400"}`}>
+                                                                                {page.isProfile || page.category === "គណនីផ្ទាល់ខ្លួន" ? "គណនីផ្ទាល់ខ្លួន" : "ផេក Facebook"}
+                                                                            </span>
                                                                         </div>
                                                                     </div>
-                                                                );
-                                                            })}
-                                                        
-                                                        {availablePages.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
-                                                            <div className="py-12 text-center">
-                                                                <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">រកមិនឃើញផេកទេ</p>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isSelected}
+                                                                        onChange={() => {}}
+                                                                        className="w-4 h-4 rounded text-blue-600 pointer-events-none"
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        })}
                                                 </div>
 
-                                                <div className="p-4 bg-gray-50/50 dark:bg-white/2 border-t border-gray-100 dark:border-white/5 flex justify-center">
-                                                    <button 
+                                                <div className="p-2.5 border-t border-gray-100 dark:border-white/5">
+                                                    <button
+                                                        type="button"
                                                         onClick={() => setIsPageSelectorOpen(false)}
-                                                        className="w-full py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all"
+                                                        className="w-full py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold text-xs cursor-pointer"
                                                     >
                                                         រួចរាល់
                                                     </button>
@@ -837,441 +1013,526 @@ export default function Post() {
                                         )}
                                     </AnimatePresence>
                                 </div>
-                            </div>
+                            )}
+                        </div>
 
-                            {/* 🔗 TikTok Link Field */}
-                            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs w-full">
-                                <div className="flex flex-col md:flex-row items-center gap-4">
-                                    <div className="flex-1 w-full">
-                                        <div className="flex items-center gap-2 mb-2 px-1">
-                                            <LinkIcon size={14} className="text-pink-500" />
-                                            <label className="text-xs font-bold text-gray-700 dark:text-gray-300">ដាក់តំណភ្ជាប់វីដេអូ TikTok</label>
-                                        </div>
-                                        <div className="flex flex-col sm:flex-row gap-2.5">
-                                            <input
-                                                type="text"
-                                                value={tiktokUrl || ""}
-                                                onChange={(e) => setTiktokUrl(e.target.value)}
-                                                placeholder="បិទភ្ជាប់តំណវីដេអូ TikTok ទីនេះ..."
-                                                className="w-full bg-gray-100/70 dark:bg-white/5 rounded-xl px-4 py-2.5 font-medium outline-none transition-all text-xs sm:text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 border border-gray-200 dark:border-white/10 focus:border-pink-500"
-                                            />
-                                            <Button onClick={handleLoadTiktok} isLoading={isLoadingVideo} className="h-10 px-5 rounded-xl bg-pink-600 text-white shadow-sm active:scale-95 transition-all text-xs font-semibold w-full sm:w-auto shrink-0">
-                                                ទាញយកវីដេអូ
-                                            </Button>
-                                        </div>
-                                    </div>
+                        {/* STEP 2: Caption & Media Upload / TikTok */}
+                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                        ជំហានទី ២៖ សរសេរអត្ថបទ និងដាក់វីដេអូ ឬរូបភាព
+                                    </h3>
                                 </div>
-                            </div>
-
-                            {/* 📱 Universal Visualizer (Preview) */}
-                            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs w-full">
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-white/5 gap-3">
-                                        <div className="flex items-center gap-2.5 select-none">
-                                            <div className="w-7 h-7 bg-blue-500/10 text-blue-600 rounded-lg flex items-center justify-center">
-                                                <Layers size={15} />
-                                            </div>
-                                            <h3 className="text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-200">ការបង្ហាញសាកល្បង</h3>
-                                        </div>
-                                        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                                            <div className="flex items-center gap-2 mr-2 bg-purple-500/10 px-2.5 py-1.5 rounded-xl border border-purple-500/20">
-                                                <div className="flex items-center gap-1.5">
-                                                    <MessageSquare size={12}  className="text-purple-600" />
-                                                    <span className="text-[10px] md:text-[11px] font-black text-purple-600 uppercase tracking-tight">Bot</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => setAutoReplyBot(!autoReplyBot)}
-                                                    className={`w-7 md:w-8 h-3.5 md:h-4 rounded-full transition-all relative ${autoReplyBot ? 'bg-purple-600' : 'bg-gray-200 dark:bg-white/10'}`}
-                                                >
-                                                    <div className={`absolute top-0.5 w-2.5 md:w-3 h-2.5 md:h-3 rounded-full bg-white transition-all ${autoReplyBot ? 'left-[16px] md:left-[18px]' : 'left-0.5'}`} />
-                                                </button>
-                                            </div>
+                                <div className="flex items-center gap-2">
+                                    {hasMedia && (
+                                        <>
                                             <button
+                                                type="button"
+                                                onClick={() => navigate("/subtitles", { state: { videoUrl: previewUrl, file } })}
+                                                className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                                            >
+                                                <Languages size={14} />
+                                                <span>ដាក់អក្សររត់ AI</span>
+                                            </button>
+                                            <button
+                                                type="button"
                                                 onClick={handleClearPreview}
-                                                className="p-2 md:p-2.5 bg-gray-50 dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 rounded-lg transition-all border border-gray-100 dark:border-white/5 shadow-sm active:scale-90"
-                                                title="លុប"
+                                                className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
                                             >
-                                                <Trash2 size={14}  />
+                                                <Trash2 size={13} />
+                                                <span>លុបចេញ</span>
                                             </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Caption */}
+                            <textarea
+                                value={caption}
+                                onChange={(e) => setCaption(e.target.value)}
+                                placeholder="សរសេរ Caption ឬខ្លឹមសារផុសរបស់អ្នកនៅទីនេះ..."
+                                className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-blue-500 resize-y min-h-[96px]"
+                                rows={3}
+                            />
+
+                            {/* Media Upload Dropzone OR Preview */}
+                            {!hasMedia ? (
+                                <div
+                                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                    onDragLeave={() => setIsDragging(false)}
+                                    onDrop={handleDrop}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-all ${
+                                        isDragging
+                                            ? "border-blue-500 bg-blue-500/10"
+                                            : "border-gray-200 dark:border-white/15 bg-gray-50/70 dark:bg-black/20 hover:border-blue-500/50 hover:bg-blue-50/30 dark:hover:bg-blue-900/10"
+                                    }`}
+                                >
+                                    <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto mb-3">
+                                        <Upload size={22} />
+                                    </div>
+                                    <p className="text-sm font-bold text-gray-900 dark:text-white">
+                                        ចុចទីនេះ ឬអូសវីដេអូ / រូបភាពដាក់ចូល
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1 flex items-center justify-center gap-3">
+                                        <span className="inline-flex items-center gap-1"><Video size={12} /> MP4, MOV, WebM</span>
+                                        <span className="inline-flex items-center gap-1"><ImageIcon size={12} /> JPG, PNG</span>
+                                        <span>(អតិបរមា 90MB)</span>
+                                    </p>
+                                </div>
+                            ) : postFormat !== "carousel" ? (
+                                /* Clean Single Media Preview */
+                                <div className="relative rounded-2xl overflow-hidden border border-gray-200 dark:border-white/10 bg-black">
+                                    {mainPreviewItem?.type === "video" ? (
+                                        <div className="relative max-h-[420px] flex items-center justify-center bg-black">
+                                            <video
+                                                key={mainPreviewItem.preview}
+                                                src={mainPreviewItem.preview}
+                                                poster={thumbnailPreview}
+                                                className="w-full max-h-[420px] object-contain"
+                                                autoPlay
+                                                muted={isPreviewMuted}
+                                                loop
+                                                playsInline
+                                                controls
+                                                onError={() => {
+                                                    if (!isFixed) {
+                                                        setVideoError(true);
+                                                        handleFixH265();
+                                                    }
+                                                }}
+                                            />
+                                            {videoError && (
+                                                <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center p-4 text-center">
+                                                    <Loader2 size={28} className="text-pink-500 animate-spin mb-2" />
+                                                    <p className="text-white text-xs font-bold">កំពុងបម្លែងវីដេអូឱ្យដំណើរការ...</p>
+                                                </div>
+                                            )}
                                             <button
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="p-2 md:p-2.5 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-white rounded-lg transition-all border border-gray-100 dark:border-white/5 shadow-sm active:scale-90"
-                                                title="បន្ថែម"
+                                                type="button"
+                                                onClick={() => setIsPreviewMuted(!isPreviewMuted)}
+                                                className="absolute top-3 left-3 p-2 bg-black/60 rounded-lg text-white hover:bg-black/80 cursor-pointer"
+                                                title={isPreviewMuted ? "បើកសំឡេង" : "បិទសំឡេង"}
                                             >
-                                                <Plus size={18}  />
-                                            </button>
-                                            <button
-                                                onClick={() => navigate('/subtitles', { state: { videoUrl: previewUrl, file } })}
-                                                className="px-2.5 py-1.5 md:py-2 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg transition-all border border-indigo-500/20 shadow-sm active:scale-95 flex items-center gap-1.5 text-xs font-bold font-khmer"
-                                                title="កាត់ត Subtitle ខ្មែរជាមួយ AI"
-                                            >
-                                                <Languages size={15} />
-                                                <span className="hidden sm:inline">អក្សររត់ AI</span>
+                                                {isPreviewMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
                                             </button>
                                         </div>
-                                    </div>
-
-                                    {/* 📝 Caption Editing */}
-                                    <div className="px-1 space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 overflow-hidden shadow-inner shrink-0">
-                                                {(() => {
-                                                    const selectedPage = availablePages.find(p => p.id === selectedPages[0]);
-                                                    return selectedPage?.picture ? (
-                                                        <img src={selectedPage.picture} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-[10px]">KR</div>
-                                                    );
-                                                })()}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm md:text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
-                                                    {availablePages.find(p => p.id === selectedPages[0])?.name || "ជ្រើសរើសផេក"}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="group/caption-preview relative mt-3 md:mt-4 px-1 pb-4 md:pb-6">
-                                        <textarea
-                                            value={caption}
-                                            onChange={(e) => setCaption(e.target.value)}
-                                            placeholder="សរសេររៀបរាប់មាតិការបស់អ្នក..."
-                                            className="w-full bg-transparent border-none p-0 text-base md:text-[17px] font-normal text-gray-800 dark:text-gray-200 leading-relaxed outline-none focus:ring-0 rounded-lg resize-none min-h-[40px] scrollbar-hide"
-                                            rows={2}
-                                            spellCheck={false}
+                                    ) : (
+                                        <img
+                                            src={mainPreviewItem?.preview}
+                                            alt="Preview"
+                                            className="w-full max-h-[420px] object-contain mx-auto"
                                         />
-                                    </div>
-
-                                    <div
-                                        ref={carouselRef}
-                                        className="flex overflow-x-auto justify-start md:justify-center md:grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pb-8 md:pb-12 px-4 md:px-1 snap-x scrollbar-hide w-full"
-                                    >
-
-                                        {mediaItems.map((item, idx) => (
-                                            <div
-                                                key={item.id}
-                                                className="min-w-[260px] w-[80%] md:w-full bg-white dark:bg-[#242526] rounded-xl overflow-hidden shadow-md border border-gray-200 dark:border-white/5 flex flex-col snap-center flex-shrink-0 transition-all duration-300 group/card"
-                                            >
-                                                {/* Media Section */}
-                                                <div 
-                                                    className={`relative aspect-square overflow-hidden cursor-pointer ${item.isPlaceholder ? 'bg-gray-50 dark:bg-black/20 border-2 border-dashed border-gray-200 dark:border-white/10' : 'bg-black'}`}
-                                                    onClick={() => {
-                                                        if (item.id === 'video-main') {
-                                                            fileInputRef.current?.click();
-                                                        } else if (item.isRightSide) {
-                                                            const input = document.createElement('input');
-                                                            input.type = 'file';
-                                                            input.accept = 'image/*';
-                                                            input.onchange = (ev) => {
-                                                                const f = ev.target.files[0];
-                                                                if (f) {
-                                                                    setRightSideImage(f);
-                                                                    setRightSideImagePreview(URL.createObjectURL(f));
-                                                                }
-                                                            };
-                                                            input.click();
-                                                        }
-                                                    }}
-                                                >
-                                                    {item.isPlaceholder ? (
-                                                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 md:gap-3">
-                                                            <div className="w-10 h-10 md:w-12 md:h-12 bg-white dark:bg-white/5 rounded-full flex items-center justify-center shadow-sm group-hover/card:scale-110 transition-transform">
-                                                                <Plus className="text-blue-500" size={20}  />
-                                                            </div>
-                                                            <div className="text-center px-4">
-                                                                <p className="text-xs md:text-[13px] font-bold text-gray-900 dark:text-white mb-0.5">{item.id === 'video-main' ? 'បន្ថែមវីដេអូ' : 'បន្ថែមរូបភាព'}</p>
-                                                                <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">{item.id === 'video-main' ? 'MAIN MEDIA' : 'CARD 2 IMAGE'}</p>
-                                                            </div>
-                                                        </div>
-                                                    ) : item.type === 'video' ? (
-                                                        <>
-                                                            <video 
-                                                                key={item.preview}
-                                                                src={item.preview} 
-                                                                poster={thumbnailPreview}
-                                                                className="w-full h-full object-cover" 
-                                                                autoPlay 
-                                                                muted={isPreviewMuted} 
-                                                                loop 
-                                                                playsInline 
-                                                                preload="auto"
-                                                                onCanPlay={(e) => {
-                                                                    if (isPreviewMuted) {
-                                                                        const playPromise = e.target.play();
-                                                                        if (playPromise !== undefined) {
-                                                                            playPromise.catch(() => {});
-                                                                        }
-                                                                    }
-                                                                }}
-                                                                onLoadedData={(e) => e.target.play().catch(() => {})}
-                                                                onError={() => {
-                                                                    if (item.id === 'video-main' && !isFixed) {
-                                                                        setVideoError(true);
-                                                                        handleFixH265(); // Auto-fix on error
-                                                                    }
-                                                                }}
-                                                            />
-                                                            
-                                                            {videoError && item.id === 'video-main' && (
-                                                                <div className="absolute inset-0 bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center animate-pulse z-40">
-                                                                    <Loader2 size={32} className="text-pink-500 animate-spin mb-4" />
-                                                                    <p className="text-white font-bold mb-1 text-xs">Optimizing playback...</p>
-                                                                    <p className="text-[10px] text-gray-400 px-4">Preparing video for your device.</p>
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                     ) : item.isPageCard ? (
-                                                        <div className="absolute inset-0 bg-gray-50 dark:bg-black/20 flex flex-col items-center justify-center text-center p-6 group-hover/card:bg-black/10 transition-all">
-                                                            <div className="w-16 h-16 md:w-20 md:h-20 bg-white dark:bg-gray-800 rounded-xl mb-4 overflow-hidden flex items-center justify-center border border-gray-200 dark:border-white/5 shadow-lg group-hover/card:scale-105 transition-transform">
-                                                                {(() => {
-                                                                    const selectedPage = availablePages.find(p => p.id === selectedPages[0]);
-                                                                    return selectedPage?.picture ? (
-                                                                        <img src={selectedPage.picture} className="w-full h-full object-cover" />
-                                                                    ) : (
-                                                                        <Share2 className="text-gray-400" size={24}  />
-                                                                    );
-                                                                })()}
-                                                            </div>
-                                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">មើលច្រើនទៀតនៅ</p>
-                                                            <h4 className="text-sm md:text-base font-black text-gray-900 dark:text-white uppercase tracking-tighter truncate w-full px-4">
-                                                                {availablePages.find(p => p.id === selectedPages[0])?.name || "FACEBOOK.COM"}
-                                                            </h4>
-                                                        </div>
-                                                     ) : (
-                                                         <img src={item.preview} className="w-full h-full object-cover" />
-                                                     )}
-
-                                                    {/* Overlays (Only for non-placeholders) */}
-                                                    {!item.isPlaceholder && (
-                                                        <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/20 transition-all flex items-center justify-center">
-                                                            {(item.id === 'video-main' || item.isRightSide) && (
-                                                                <div className="flex flex-col items-center gap-2 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                                                                    <div className="w-9 h-9 md:w-10 md:h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 text-white shadow-xl">
-                                                                        <Upload size={16}  />
-                                                                    </div>
-                                                                    <p className="text-[10px] md:text-[11px] font-bold text-white uppercase tracking-widest">ប្តូររូបភាព</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {item.type === 'video' && (
-                                                        <div className="absolute top-2.5 left-2.5 z-20">
-                                                            <button 
-                                                                 onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setIsPreviewMuted(!isPreviewMuted);
-                                                                 }}
-                                                                className="p-1.5 md:p-2 bg-black/40 backdrop-blur-sm rounded-lg border border-white/10 text-white hover:bg-black/60 transition-all"
-                                                            >
-                                                                {isPreviewMuted ? <VolumeX size={12}  /> : <Volume2 size={12}  />}
-                                                            </button>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Quick Gallery */}
-                                                    {galleryOptions.length > 0 && (item.id === 'video-main' || item.isRightSide) && (
-                                                        <div className="absolute inset-x-0 bottom-0 p-2 md:p-3 bg-black/80 translate-y-full group-hover/card:translate-y-0 transition-transform flex flex-col gap-2 z-30">
-                                                            <div className="flex justify-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-                                                                {galleryOptions.map((frame, fIdx) => (
-                                                                    <div
-                                                                        key={fIdx}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            if (item.id === 'video-main') {
-                                                                                setThumbnailPreview(frame);
-                                                                                setThumbnail(dataURLtoFile(frame, `thumb-${fIdx}.jpg`));
-                                                                            } else {
-                                                                                setRightSideImagePreview(frame);
-                                                                                setRightSideImage(dataURLtoFile(frame, `card2-${fIdx}.jpg`));
-                                                                            }
-                                                                        }}
-                                                                        className={`w-7 h-7 md:w-8 md:h-8 rounded-md overflow-hidden border-2 flex-shrink-0 ${(item.id === 'video-main' ? thumbnailPreview : rightSideImagePreview) === frame ? 'border-blue-500' : 'border-white/20'}`}
-                                                                    >
-                                                                        <img src={frame} className="w-full h-full object-cover" />
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Bottom Bar */}
-                                                <div className="px-3 py-3 bg-[#f0f2f5] dark:bg-[#242526] border-t border-gray-200 dark:border-white/5 flex items-center gap-2 relative">
-                                                    <div className="flex-1 min-w-0">
-                                                        {item.isPageCard ? (
-                                                            <p className="text-[11px] md:text-[12px] font-black text-gray-900 dark:text-gray-100 uppercase tracking-tighter">FACEBOOK.COM</p>
-                                                        ) : (
-                                                            <textarea
-                                                                value={carouselCtaText}
-                                                                onChange={(e) => setCarouselCtaText(e.target.value)}
-                                                                className="w-full bg-transparent border-none p-0 text-[11px] md:text-[12px] font-bold text-gray-900 dark:text-gray-100 leading-tight outline-none focus:ring-0 rounded resize-none overflow-hidden scrollbar-hide block"
-                                                                rows={2}
-                                                                spellCheck={false}
-                                                            />
-                                                        )}
-                                                    </div>
-
-                                                    <div className="flex-shrink-0 relative group/cta-select transition-all">
-                                                        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-white dark:bg-[#3a3b3c] rounded-md border border-gray-300 dark:border-white/10 shadow-sm">
-                                                            <span className="text-[9px] md:text-[11px] font-bold text-gray-900 dark:text-white">
-                                                                {cta === 'FOLLOW' ? 'តាមដាន' :
-                                                                 cta === 'LEARN_MORE' ? 'ស្វែងយល់' :
-                                                                 cta === 'SEND_MESSAGE' ? 'ផ្ញើសារ' :
-                                                                 cta === 'SIGN_UP' ? 'ចុះឈ្មោះ' :
-                                                                 cta === 'BOOK_NOW' ? 'កក់ទុក' :
-                                                                 cta === 'SHOP_NOW' ? 'ទិញ' : 'តាមដាន'}
-                                                            </span>
-                                                            <ChevronDown size={10} className="text-gray-500" />
-                                                        </div>
-                                                        {!item.isPageCard && (
-                                                            <select
-                                                                value={cta}
-                                                                onChange={(e) => setCta(e.target.value)}
-                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                            >
-                                                                <option value="FOLLOW">តាមដាន</option>
-                                                                <option value="LEARN_MORE">ស្វែងយល់បន្ថែម</option>
-                                                                <option value="SEND_MESSAGE">ផ្ញើសារ</option>
-                                                                <option value="SIGN_UP">ចុះឈ្មោះ</option>
-                                                                <option value="BOOK_NOW">កក់ទុក</option>
-                                                                <option value="SHOP_NOW">ទិញឥឡូវនេះ</option>
-                                                            </select>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                     </div>
-                                 </div>
-
-
-                            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-5 md:p-10 shadow-xl">
-                                <h3 className="text-sm md:text-xl font-black text-gray-900 dark:text-white mb-4 md:mb-6 uppercase tracking-tighter">ឧបករណ៍ជំនួយ</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-4">
-                                    {[
-                                        { id: 'safeMode', label: 'Safe Mode', activeClass: 'bg-blue-500/10 border-blue-500/30 text-blue-600' },
-                                        { id: 'pitchShift', label: 'Voice Fix', activeClass: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-600' },
-                                        { id: 'flip', label: 'Flip Video', activeClass: 'bg-pink-500/10 border-pink-500/30 text-pink-600' }
-                                    ].map(opt => (
+                                    )}
+                                    <div className="p-3 bg-gray-50 dark:bg-gray-800/80 border-t border-gray-200 dark:border-white/10 flex items-center justify-between">
+                                        <span className="text-xs text-gray-500 dark:text-gray-300 font-medium">
+                                            {file ? file.name : "វីដេអូដែលបានភ្ជាប់"}
+                                        </span>
                                         <button
-                                            key={opt.id}
-                                            onClick={() => setAiOptions(prev => ({ ...prev, [opt.id]: !prev[opt.id] }))}
-                                            className={`p-3.5 md:p-6 rounded-xl md:rounded-2xl border-2 transition-all font-black uppercase text-[10px] md:text-xs tracking-wider active:scale-[0.98] ${
-                                                aiOptions[opt.id]
-                                                    ? opt.activeClass
-                                                    : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700 dark:bg-black dark:border-white/10 dark:text-gray-400 dark:hover:text-white'
-                                            }`}
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 hover:border-blue-500 cursor-pointer"
                                         >
-                                            {opt.label}
+                                            ប្តូរវីដេអូ / រូបភាព
                                         </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* 🚀 Final Actions */}
-                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-2xl md:rounded-[2.5rem] p-5 md:p-10 shadow-2xl space-y-5 md:space-y-8">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-8">
-                                    <div className="flex flex-col gap-3 md:gap-4 w-full md:w-auto">
-                                        <label className="text-[10px] md:text-sm font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest px-1 text-left">ជំម្រើសនៃការបង្ហោះ</label>
-                                        <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-xl md:rounded-[1.5rem] w-full md:w-fit border border-gray-200 dark:border-white/5">
-                                            {[
-                                                { id: 'now', label: 'ផុសឥឡូវ', icon: Zap },
-                                                { id: 'schedule', label: 'កក់ពេល', icon: Calendar }
-                                            ].map(mode => (
-                                                <button
-                                                    key={mode.id}
-                                                    onClick={() => setPublishMode(mode.id)}
-                                                    className={`flex-1 md:flex-none flex items-center justify-center gap-2 md:gap-3 px-3 md:px-6 py-2.5 md:py-3 rounded-lg md:rounded-2xl text-[9px] md:text-sm font-black uppercase tracking-widest transition-all ${publishMode === mode.id
-                                                        ? "bg-white dark:bg-gray-800 text-blue-600 shadow-md border border-gray-100 dark:border-white/10"
-                                                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
-                                                >
-                                                    <mode.icon size={12}  />
-                                                    {mode.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <AnimatePresence>
-                                        {publishMode === 'schedule' && (
-                                            <motion.div
-                                                initial={{ opacity: 0, x: 20 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                exit={{ opacity: 0, x: 20 }}
-                                                className="w-full md:w-72"
-                                            >
-                                                <label className="text-[10px] md:text-sm font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest block mb-2 px-1 text-left">កំណត់ពេលវេលាបង្ហោះ</label>
-                                                <div className="relative group">
-                                                    <input
-                                                        type="datetime-local"
-                                                        value={scheduleTime}
-                                                        onChange={(e) => setScheduleTime(e.target.value)}
-                                                        className="w-full bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-xl px-4 py-3.5 text-xs md:text-sm font-bold outline-none focus:border-blue-500 transition-all"
-                                                    />
-                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-blue-500 transition-colors">
-                                                        <Clock size={14}  />
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-
-                                    <div className="w-full md:w-auto">
-                                        <Button
-                                            onClick={handleSubmit}
-                                            isLoading={isSubmitting}
-                                            className={`w-full md:w-auto md:px-20 h-14 md:h-20 rounded-xl md:rounded-[2rem] text-xs md:text-base font-black uppercase tracking-widest transition-all active:scale-[0.97] shadow-xl ${publishMode === 'schedule'
-                                                    ? "bg-indigo-600 text-white shadow-indigo-500/20"
-                                                    : "bg-blue-600 text-white shadow-blue-500/20"
-                                                }`}
-                                        >
-                                            {publishMode === 'schedule' ? "កក់ពេលផុស" : "បង្ហោះឥឡូវ"}
-                                        </Button>
                                     </div>
                                 </div>
-                            </div>
-                        </motion.div>
-                    ) : (
-                        <motion.div
-                            key="queue"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                            className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/5 rounded-2xl md:rounded-3xl p-5 md:p-10 shadow-xl"
-                        >
-                            <h2 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white mb-6 md:mb-8 tracking-tighter uppercase">បញ្ជីកំពុងដំណើរការ</h2>
-                            {queue.length === 0 ? (
-                                <div className="py-20 text-center text-gray-400 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">No active protocols in terminal.</div>
                             ) : (
-                                <div className="space-y-3 md:space-y-4">
-                                    {queue.map(post => (
-                                        <div key={post.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 md:p-6 bg-gray-50 dark:bg-black border border-gray-100 dark:border-white/5 rounded-xl md:rounded-2xl gap-4">
-                                            <div className="flex items-center gap-3 md:gap-4">
-                                                <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500/10 rounded-lg md:rounded-xl flex items-center justify-center text-blue-600 shrink-0"><Clock size={18}  /></div>
-                                                <div className="min-w-0">
-                                                    <p className="text-[10px] md:text-xs font-black text-gray-900 dark:text-white uppercase truncate">{new Date(post.scheduledAt).toLocaleString()}</p>
-                                                    <p className="text-[8px] md:text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">ស្ថានភាព: កំពុងដំណើរការ</p>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => cancelScheduledPost(post.id)}
-                                                className="flex items-center justify-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all w-full sm:w-auto"
+                                /* Carousel 3-Card Preview */
+                                <div
+                                    ref={carouselRef}
+                                    className="flex overflow-x-auto md:grid md:grid-cols-3 gap-4 pb-2 snap-x"
+                                >
+                                    {mediaItems.map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className="min-w-[240px] w-[80%] md:w-full bg-white dark:bg-[#242526] rounded-xl overflow-hidden shadow-md border border-gray-200 dark:border-white/10 flex flex-col snap-center shrink-0"
+                                        >
+                                            <div
+                                                className={`relative aspect-square overflow-hidden cursor-pointer ${
+                                                    item.isPlaceholder ? "bg-gray-50 dark:bg-black/20 border-2 border-dashed border-gray-200 dark:border-white/10" : "bg-black"
+                                                }`}
+                                                onClick={() => {
+                                                    if (item.id === "video-main") {
+                                                        fileInputRef.current?.click();
+                                                    } else if (item.isRightSide) {
+                                                        const input = document.createElement("input");
+                                                        input.type = "file";
+                                                        input.accept = "image/*";
+                                                        input.onchange = (ev) => {
+                                                            const f = ev.target.files?.[0];
+                                                            if (f) {
+                                                                setRightSideImage(f);
+                                                                setRightSideImagePreview(URL.createObjectURL(f));
+                                                            }
+                                                        };
+                                                        input.click();
+                                                    }
+                                                }}
                                             >
-                                                <Trash2 size={14}  />
-                                                <span className="text-[9px] md:text-[10px] font-black uppercase">លុបចោល</span>
-                                            </button>
+                                                {item.isPlaceholder ? (
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
+                                                        <Plus className="text-blue-500" size={22} />
+                                                        <p className="text-xs font-bold text-gray-700 dark:text-white">
+                                                            {item.id === "video-main" ? "បន្ថែមវីដេអូ" : "បន្ថែមរូបភាព Card 2"}
+                                                        </p>
+                                                    </div>
+                                                ) : item.type === "video" ? (
+                                                    <video
+                                                        key={item.preview}
+                                                        src={item.preview}
+                                                        poster={thumbnailPreview}
+                                                        className="w-full h-full object-cover"
+                                                        autoPlay
+                                                        muted={isPreviewMuted}
+                                                        loop
+                                                        playsInline
+                                                    />
+                                                ) : item.isPageCard ? (
+                                                    <div className="absolute inset-0 bg-gray-50 dark:bg-black/30 flex flex-col items-center justify-center text-center p-4">
+                                                        <div className="w-16 h-16 bg-white dark:bg-gray-800 rounded-xl mb-3 overflow-hidden flex items-center justify-center border border-gray-200 dark:border-white/10">
+                                                            {(() => {
+                                                                const selectedPage = availablePages.find(p => p.id === selectedPages[0]);
+                                                                return selectedPage?.picture ? (
+                                                                    <img src={selectedPage.picture} alt="" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <Share2 className="text-gray-400" size={22} />
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                        <p className="text-[10px] font-bold text-gray-400 mb-0.5">មើលច្រើនទៀតនៅ</p>
+                                                        <h4 className="text-xs font-bold text-gray-900 dark:text-white truncate w-full">
+                                                            {availablePages.find(p => p.id === selectedPages[0])?.name || "FACEBOOK.COM"}
+                                                        </h4>
+                                                    </div>
+                                                ) : (
+                                                    <img src={item.preview} alt="" className="w-full h-full object-cover" />
+                                                )}
+
+                                                {galleryOptions.length > 0 && (item.id === "video-main" || item.isRightSide) && (
+                                                    <div className="absolute inset-x-0 bottom-0 p-2 bg-black/75 flex justify-center gap-1 overflow-x-auto">
+                                                        {galleryOptions.map((frame, fIdx) => (
+                                                            <div
+                                                                key={fIdx}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (item.id === "video-main") {
+                                                                        setThumbnailPreview(frame);
+                                                                        setThumbnail(dataURLtoFile(frame, `thumb-${fIdx}.jpg`));
+                                                                    } else {
+                                                                        setRightSideImagePreview(frame);
+                                                                        setRightSideImage(dataURLtoFile(frame, `card2-${fIdx}.jpg`));
+                                                                    }
+                                                                }}
+                                                                className={`w-7 h-7 rounded overflow-hidden border-2 shrink-0 ${
+                                                                    (item.id === "video-main" ? thumbnailPreview : rightSideImagePreview) === frame
+                                                                        ? "border-blue-500"
+                                                                        : "border-white/20"
+                                                                }`}
+                                                            >
+                                                                <img src={frame} alt="" className="w-full h-full object-cover" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="px-3 py-2.5 bg-gray-100 dark:bg-[#242526] border-t border-gray-200 dark:border-white/5 flex items-center gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    {item.isPageCard ? (
+                                                        <p className="text-[11px] font-bold text-gray-900 dark:text-gray-100">FACEBOOK.COM</p>
+                                                    ) : (
+                                                        <textarea
+                                                            value={carouselCtaText}
+                                                            onChange={(e) => setCarouselCtaText(e.target.value)}
+                                                            className="w-full bg-transparent text-[11px] font-bold text-gray-900 dark:text-gray-100 outline-none resize-none"
+                                                            rows={2}
+                                                        />
+                                                    )}
+                                                </div>
+                                                {!item.isPageCard && (
+                                                    <select
+                                                        value={cta}
+                                                        onChange={(e) => setCta(e.target.value)}
+                                                        className="px-2 py-1 rounded-md bg-white dark:bg-[#3a3b3c] border border-gray-300 dark:border-white/10 text-[10px] font-bold text-gray-900 dark:text-white"
+                                                    >
+                                                        <option value="FOLLOW">តាមដាន</option>
+                                                        <option value="LEARN_MORE">ស្វែងយល់</option>
+                                                        <option value="SEND_MESSAGE">ផ្ញើសារ</option>
+                                                        <option value="SIGN_UP">ចុះឈ្មោះ</option>
+                                                        <option value="BOOK_NOW">កក់ទុក</option>
+                                                        <option value="SHOP_NOW">ទិញ</option>
+                                                    </select>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+
+                            {/* Inline TikTok Link Bar */}
+                            <div className="pt-2 border-t border-gray-100 dark:border-white/5">
+                                <label className="text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5 mb-2">
+                                    <LinkIcon size={13} className="text-pink-500" />
+                                    <span>ឬទាញយកវីដេអូពី TikTok Link (Optional)</span>
+                                </label>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <input
+                                        type="text"
+                                        value={tiktokUrl || ""}
+                                        onChange={(e) => setTiktokUrl(e.target.value)}
+                                        placeholder="បិទភ្ជាប់ Link វីដេអូ TikTok ទីនេះ..."
+                                        className="flex-1 bg-gray-50 dark:bg-white/5 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 outline-none focus:border-pink-500"
+                                    />
+                                    <Button
+                                        type="button"
+                                        onClick={handleLoadTiktok}
+                                        isLoading={isLoadingVideo}
+                                        className="h-10 px-4 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shrink-0"
+                                    >
+                                        ទាញយកវីដេអូ
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Collapsible Advanced Video Tools */}
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAdvanced(v => !v)}
+                                    className="text-xs font-semibold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 flex items-center gap-1 cursor-pointer"
+                                >
+                                    <span>ការកំណត់វីដេអូបន្ថែម (Advanced)</span>
+                                    <ChevronDown size={14} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+                                </button>
+                                {showAdvanced && (
+                                    <div className="grid grid-cols-3 gap-2.5 mt-3">
+                                        {[
+                                            { id: "safeMode", label: "Safe Mode" },
+                                            { id: "pitchShift", label: "កែសំឡេង" },
+                                            { id: "flip", label: "ត្រឡប់វីដេអូ" }
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.id}
+                                                type="button"
+                                                onClick={() => setAiOptions(prev => ({ ...prev, [opt.id]: !prev[opt.id] }))}
+                                                className={`p-3 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                                                    aiOptions[opt.id]
+                                                        ? "bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400"
+                                                        : "bg-gray-50 dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400"
+                                                }`}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* STEP 3: Schedule & Publish */}
+                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                    ជំហានទី ៣៖ បង្ហោះ ឬកំណត់ម៉ោង
+                                </h3>
+
+                                {/* Auto-Reply Bot Toggle */}
+                                <label className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 cursor-pointer select-none w-fit">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoReplyBot}
+                                        onChange={(e) => setAutoReplyBot(e.target.checked)}
+                                        className="w-4 h-4 rounded text-purple-600"
+                                    />
+                                    <MessageSquare size={14} className="text-purple-600 dark:text-purple-400" />
+                                    <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
+                                        បើក Bot ឆ្លើយខមិនស្វ័យប្រវត្តិ
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                                    <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10">
+                                        {[
+                                            { id: "now", label: "⚡ ផុសឥឡូវនេះ" },
+                                            { id: "schedule", label: "📅 កក់ម៉ោងផុស" }
+                                        ].map(mode => (
+                                            <button
+                                                key={mode.id}
+                                                type="button"
+                                                onClick={() => setPublishMode(mode.id)}
+                                                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                                    publishMode === mode.id
+                                                        ? "bg-white dark:bg-gray-800 text-blue-600 shadow-xs"
+                                                        : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                                                }`}
+                                            >
+                                                {mode.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {publishMode === "schedule" && (
+                                        <input
+                                            type="datetime-local"
+                                            value={scheduleTime}
+                                            onChange={(e) => setScheduleTime(e.target.value)}
+                                            className="bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white outline-none focus:border-blue-500"
+                                        />
+                                    )}
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                                    {extensionInstalled && (
+                                        <button
+                                            type="button"
+                                            onClick={handlePublishViaBusinessSuite}
+                                            disabled={isOpeningComposer || isSubmitting}
+                                            className={`px-4 h-12 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 border ${
+                                                !fbOauthConfigured
+                                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-lg shadow-emerald-500/20"
+                                                    : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-white border-slate-200 dark:border-slate-700"
+                                            }`}
+                                        >
+                                            {isOpeningComposer ? (
+                                                <>
+                                                    <Loader2 size={15} className="animate-spin" />
+                                                    <span>កំពុងបើក Business Suite...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Zap size={15} />
+                                                    <span>ផុសតាម Business Suite (Extension)</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
+
+                                    <Button
+                                        type="button"
+                                        onClick={handleSubmit}
+                                        isLoading={isSubmitting || isOpeningComposer}
+                                        className={`w-full md:w-auto px-8 h-12 rounded-xl text-sm font-bold text-white shadow-lg cursor-pointer ${
+                                            publishMode === "schedule"
+                                                ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20"
+                                                : "bg-blue-600 hover:bg-blue-700 shadow-blue-500/20"
+                                        }`}
+                                    >
+                                        {publishMode === "schedule" ? "📅 កក់ពេលបង្ហោះ" : "🚀 បង្ហោះទៅ Facebook ឥឡូវ"}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {(!fbOauthConfigured || /FB #1|Invalid request/i.test(lastPublishError)) && extensionInstalled && (
+                                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                                    <span className="text-emerald-700 dark:text-emerald-300 font-medium">
+                                        💡 ប្រើប៊ូតុង <strong>«ផុសតាម Business Suite (Extension)»</strong> ដើម្បីឱ្យ Extension បញ្ចូលវីដេអូ &amp; Caption ផ្ទាល់លើ Browser អ្នក (មិនជាប់ FB #1 និងសុវត្ថិភាព ១០០%)។
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={handlePublishViaBusinessSuite}
+                                        disabled={isOpeningComposer}
+                                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold shrink-0 cursor-pointer"
+                                    >
+                                        បើក Business Suite ឥឡូវ
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    /* Queue Tab */
+                    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                                បញ្ជីផុសកំពុងរង់ចាំម៉ោង ({queue.length})
+                            </h2>
+                            <button
+                                type="button"
+                                onClick={fetchQueue}
+                                className="p-2 rounded-xl bg-gray-100 dark:bg-white/5 hover:bg-gray-200 text-gray-500 cursor-pointer"
+                                title="Refresh"
+                            >
+                                <RefreshCw size={15} className={isLoadingQueue ? "animate-spin" : ""} />
+                            </button>
+                        </div>
+
+                        {isLoadingQueue ? (
+                            <div className="py-12 flex items-center justify-center gap-2 text-xs text-gray-400">
+                                <Loader2 size={16} className="animate-spin" />
+                                <span>កំពុងផ្ទុកបញ្ជី...</span>
+                            </div>
+                        ) : queue.length === 0 ? (
+                            <div className="py-14 text-center text-gray-400 text-xs sm:text-sm">
+                                មិនទាន់មានផុសកំពុងរង់ចាំម៉ោងនៅឡើយទេ។
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {queue.map(post => {
+                                    const timeValue = post.scheduleTime || post.scheduledAt;
+                                    return (
+                                        <div
+                                            key={post.id}
+                                            className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl gap-3"
+                                        >
+                                            <div className="flex items-start gap-3 min-w-0">
+                                                <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
+                                                    <Clock size={18} />
+                                                </div>
+                                                <div className="min-w-0 space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                                            post.status === "failed"
+                                                                ? "bg-rose-500/15 text-rose-500"
+                                                                : post.status === "expired"
+                                                                ? "bg-amber-500/15 text-amber-500"
+                                                                : "bg-blue-500/15 text-blue-500"
+                                                        }`}>
+                                                            {post.status || "scheduled"}
+                                                        </span>
+                                                        <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">
+                                                            {post.caption || "(ផុសគ្មានអត្ថបទ)"}
+                                                        </p>
+                                                    </div>
+                                                    {Array.isArray(post.lastError) && post.lastError[0]?.error && (
+                                                        <p className="text-[11px] text-rose-500 line-clamp-2">
+                                                            {post.lastError[0].error}
+                                                        </p>
+                                                    )}
+                                                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                                                        <span>
+                                                            📅 {timeValue ? new Date(timeValue).toLocaleString() : "ភ្លាមៗ"}
+                                                        </span>
+                                                        {Array.isArray(post.accounts) && post.accounts.length > 0 && (
+                                                            <span>
+                                                                • ផេក៖ {post.accounts.map(a => a.name || a.id).join(", ")}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => cancelScheduledPost(post.id)}
+                                                className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl text-xs font-bold cursor-pointer shrink-0"
+                                            >
+                                                <Trash2 size={14} />
+                                                <span>បោះបង់</span>
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
-            {/* 🎬 Full Screen Video Preview Modal */}
+            {/* Full Screen Video Preview Modal */}
             <AnimatePresence>
                 {previewVideoModal && (
                     <motion.div
@@ -1281,40 +1542,29 @@ export default function Post() {
                         className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
                         onClick={() => setPreviewVideoModal(null)}
                     >
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="relative max-w-5xl max-h-[90vh] w-full bg-black rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center"
+                        <div
+                            className="relative max-w-4xl max-h-[90vh] w-full bg-black rounded-2xl overflow-hidden border border-white/10"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <video
-                                src={previewVideoModal}
-                                controls
-                                autoPlay
-                                playsInline
-                                preload="auto"
-                                className="w-full h-full max-h-[90vh] object-contain"
-                            />
+                            <video src={previewVideoModal} controls autoPlay playsInline className="w-full max-h-[90vh] object-contain" />
                             <button
+                                type="button"
                                 onClick={() => setPreviewVideoModal(null)}
-                                className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full text-white transition-all z-10"
+                                className="absolute top-3 right-3 p-2 bg-black/60 rounded-full text-white cursor-pointer"
                             >
-                                <X size={20} />
+                                <X size={18} />
                             </button>
-                        </motion.div>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Hidden Input for Manual Uploads */}
             <input
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleFileChange}
                 accept="video/*,image/*"
-                multiple
             />
         </DashboardLayout>
     );

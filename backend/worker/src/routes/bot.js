@@ -8,18 +8,74 @@ const bot = new Hono();
 const ruleTypes = new Set(["KEYWORD", "REGEX"]);
 const ruleScopes = new Set(["ALL", "SPECIFIC"]);
 
+const FALLBACK_BOT_SUGGESTIONS = [
+  {
+    keyword: "តម្លៃ",
+    reply: "សូមអរគុណបង! ក្រុមការងារបានផ្ញើតម្លៃលម្អិតចូលប្រអប់សារ Inbox បងរួចរាល់ហើយ 💬",
+    category: "pricing",
+  },
+  {
+    keyword: "ទីតាំង",
+    reply: "ហាងយើងខ្ញុំនៅភ្នំពេញ និងមានសេវាដឹកជញ្ជូនទូទាំង ២៥ ខេត្ត-ក្រុង 🚚",
+    category: "location",
+  },
+  {
+    keyword: "កម្ម៉ង់",
+    reply: "អរគុណបង! សូមឆែកប្រអប់សារ Inbox ដើម្បីបញ្ជាក់ព័ត៌មានកម្ម៉ង់ណា 🛍️",
+    category: "order",
+  },
+  {
+    keyword: "ដឹកជញ្ជូន",
+    reply: "សេវាដឹកជញ្ជូនរហ័សទាន់ចិត្ត ១-២ ថ្ងៃដល់ដៃទូទាំងប្រទេស 📦",
+    category: "delivery",
+  },
+  {
+    keyword: "សួស្តី",
+    reply: "សួស្តីបង [[name]]! អរគុណសម្រាប់ការទំនាក់ទំនង តើបងចង់សាកសួរទំនិញមួយណាដែរ?",
+    category: "greeting",
+  },
+];
+
+function isFacebookTokenExpiredError(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /error validating access token|session has been invalidated|oauthexception|access token.*expired|invalid oauth access token|not authorized|missing valid facebook access token/i.test(
+    message
+  );
+}
+
 bot.post("/suggestions", requireAuth, async (c) => {
   try {
     const suggestions = await generateBotSuggestions(c.env);
-    return c.json({ success: true, suggestions });
+    return c.json({ success: true, suggestions, source: "gemini" });
   } catch (error) {
-    console.error("Hono bot suggestions generation failed:", error);
-    const status = error instanceof Error &&
-      error.message === "GEMINI_API_KEY Worker secret is not configured." ? 503 : 502;
+    console.warn("Gemini bot suggestions failed, using fallback suggestions:", error?.message || error);
+    if (c.env.AI && typeof c.env.AI.run === "function") {
+      try {
+        const aiResult = await c.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+          messages: [
+            {
+              role: "user",
+              content: "Return ONLY a valid JSON array of 5 objects with keys keyword, reply, category for Khmer Facebook shop comment auto-replies (pricing, delivery, location, order, greeting).",
+            },
+          ],
+        });
+        const rawText = typeof aiResult?.response === "string" ? aiResult.response : "";
+        const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed.every((item) => item?.keyword && item?.reply)) {
+            return c.json({ success: true, suggestions: parsed.slice(0, 5), source: "workers-ai" });
+          }
+        }
+      } catch (aiError) {
+        console.warn("Workers AI fallback suggestions failed:", aiError?.message || aiError);
+      }
+    }
     return c.json({
-      success: false,
-      message: "Failed to generate suggestions",
-    }, status);
+      success: true,
+      suggestions: FALLBACK_BOT_SUGGESTIONS,
+      source: "template",
+    });
   }
 });
 
@@ -150,6 +206,8 @@ bot.put("/rules/:id", requireAuth, async (c) => {
         id: true,
         keyword: true,
         reply: true,
+        dmReply: true,
+        enableDm: true,
         ruleType: true,
         scope: true,
         postId: true,
@@ -341,11 +399,21 @@ bot.get("/recent-posts/:pageId", requireAuth, async (c) => {
     const posts = await fetchRecentFacebookPosts(page.id, accessToken);
     return c.json({ success: true, posts });
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    if (isFacebookTokenExpiredError(errMsg)) {
+      console.warn("Facebook token expired/invalidated while fetching recent posts:", errMsg);
+      return c.json({
+        success: false,
+        code: "FB_TOKEN_EXPIRED",
+        message: "សម័យ Facebook របស់ផេកនេះផុតកំណត់ហើយ! សូមចូល Connections ដើម្បី Sync ផេកឡើងវិញ។",
+        error: errMsg,
+      }, 400);
+    }
     console.error("Hono recent Facebook posts fetch failed:", error);
     return c.json({
       success: false,
       message: "Failed to fetch recent posts from Facebook",
-      error: error instanceof Error ? error.message : String(error),
+      error: errMsg,
     }, 500);
   }
 });
@@ -355,7 +423,7 @@ export function validateRule(body, partial) {
     return { error: "Rule data is required" };
   }
   const data = {};
-  const fields = ["keyword", "reply", "ruleType", "scope", "postId", "attachmentUrl"];
+  const fields = ["keyword", "reply", "dmReply", "ruleType", "scope", "postId", "attachmentUrl"];
   for (const field of fields) {
     const hasField = Object.hasOwn(body, field);
     if (partial && !hasField) continue;
@@ -373,10 +441,9 @@ export function validateRule(body, partial) {
         data.scope = "ALL";
         continue;
       }
-      if (field === "reply") return { error: "Reply is required" };
-      if (["postId", "attachmentUrl"].includes(field)) continue;
+      if (["reply", "dmReply", "postId", "attachmentUrl"].includes(field)) continue;
     }
-    if (["postId", "attachmentUrl"].includes(field) && value === null) {
+    if (["postId", "attachmentUrl", "dmReply"].includes(field) && value === null) {
       data[field] = null;
       continue;
     }
@@ -386,10 +453,19 @@ export function validateRule(body, partial) {
     data[field] = value;
   }
 
-  if (!partial && (!data.reply || !data.reply.trim())) {
+  if (Object.hasOwn(body, "enableDm")) {
+    if (typeof body.enableDm !== "boolean") {
+      return { error: "enableDm must be a boolean" };
+    }
+    data.enableDm = body.enableDm;
+  }
+
+  const hasCommentReply = Boolean(data.reply && data.reply.trim());
+  const hasDmReply = Boolean((data.enableDm ?? body.enableDm) && data.dmReply && data.dmReply.trim());
+  if (!partial && !hasCommentReply && !hasDmReply) {
     return { error: "Reply is required" };
   }
-  if (partial && Object.hasOwn(data, "reply") && !data.reply.trim()) {
+  if (partial && Object.hasOwn(data, "reply") && !data.reply.trim() && !hasDmReply && !(data.enableDm === true && body.dmReply?.trim())) {
     return { error: "Reply is required" };
   }
   if (data.ruleType && !ruleTypes.has(data.ruleType)) {
@@ -414,6 +490,7 @@ export function validateRule(body, partial) {
   if (Object.hasOwn(data, "keyword") && !data.keyword.trim()) data.keyword = "*";
   if (Object.hasOwn(data, "postId") && data.postId === "") data.postId = null;
   if (Object.hasOwn(data, "attachmentUrl") && data.attachmentUrl === "") data.attachmentUrl = null;
+  if (Object.hasOwn(data, "dmReply") && data.dmReply === "") data.dmReply = null;
   return { data };
 }
 

@@ -27,6 +27,7 @@ const facebookScopes = [
   "public_profile",
   "email",
   "pages_show_list",
+  "business_management",
   "pages_manage_posts",
   "pages_read_engagement",
   "pages_messaging",
@@ -741,6 +742,18 @@ auth.post("/google", async (c) => {
   }
 });
 
+auth.get("/facebook/status", (c) => {
+  const configured = Boolean(
+    typeof c.env.FB_APP_ID === "string" &&
+      c.env.FB_APP_ID &&
+      typeof c.env.FB_APP_SECRET === "string" &&
+      c.env.FB_APP_SECRET &&
+      typeof c.env.FACEBOOK_REDIRECT_URI === "string" &&
+      c.env.FACEBOOK_REDIRECT_URI
+  );
+  return c.json({ success: true, configured });
+});
+
 auth.get("/facebook", requireAuth, async (c) => {
   try {
     const appId = requiredFacebookEnv(c.env, "FB_APP_ID");
@@ -881,6 +894,148 @@ auth.delete("/facebook", requireAuth, async (c) => {
   }
 });
 
+async function extractSignedRequestFromContext(c) {
+  const contentType = c.req.header("Content-Type") || "";
+  if (contentType.toLowerCase().includes("application/json")) {
+    const body = await c.req.json().catch(() => null);
+    return typeof body?.signed_request === "string" ? body.signed_request : null;
+  }
+  const form = await c.req.formData().catch(() => null);
+  const value = form?.get("signed_request");
+  if (typeof value === "string") return value;
+  const text = await c.req.text().catch(() => "");
+  return new URLSearchParams(text).get("signed_request");
+}
+
+function decodeBase64Url(input) {
+  const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+export async function parseAndVerifySignedRequest(signedRequest, appSecret) {
+  if (typeof signedRequest !== "string" || !signedRequest.includes(".") || !appSecret) {
+    return null;
+  }
+  const [encodedSig, payloadB64, ...extra] = signedRequest.split(".");
+  if (!encodedSig || !payloadB64 || extra.length > 0) return null;
+
+  let sigBytes;
+  let data;
+  try {
+    sigBytes = decodeBase64Url(encodedSig);
+    data = JSON.parse(new TextDecoder().decode(decodeBase64Url(payloadB64)));
+  } catch {
+    return null;
+  }
+
+  if (!data || typeof data !== "object") return null;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const expectedSig = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payloadB64))
+  );
+  if (sigBytes.length !== expectedSig.length) return null;
+  let diff = 0;
+  for (let i = 0; i < sigBytes.length; i++) diff |= sigBytes[i] ^ expectedSig[i];
+  if (diff !== 0) return null;
+
+  return data;
+}
+
+auth.post("/facebook/data-deletion", async (c) => {
+  const appSecret = c.env?.FB_APP_SECRET;
+  if (!appSecret) {
+    return c.json({ error: "Facebook integration is not configured." }, 503);
+  }
+  const signedRequest = await extractSignedRequestFromContext(c);
+  const payload = await parseAndVerifySignedRequest(signedRequest, appSecret);
+  if (!payload || !payload.user_id) {
+    return c.json({ error: "Invalid signed_request signature." }, 400);
+  }
+
+  const fbUserId = String(payload.user_id);
+  const confirmationCode = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  try {
+    const prisma = getPrisma(c.env);
+    const existing = await prisma.user.findFirst({
+      where: { facebookId: fbUserId },
+      select: { id: true },
+    });
+    if (existing) {
+      await prisma.$transaction([
+        prisma.facebookPage.deleteMany({ where: { userId: existing.id } }),
+        prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            facebookId: null,
+            facebookAccessToken: null,
+            facebookName: null,
+            facebookTokenExpiresAt: null,
+            pageSettings: [],
+          },
+        }),
+      ]);
+    }
+    const baseFrontend = (c.env.FRONTEND_URL || "https://eza-post-3kv.pages.dev").replace(/\/$/, "");
+    return c.json({
+      url: `${baseFrontend}/privacy?deletion_code=${confirmationCode}`,
+      confirmation_code: confirmationCode,
+    });
+  } catch (error) {
+    console.error("Facebook data deletion callback failed:", error);
+    return c.json({ error: "Failed to process data deletion request." }, 500);
+  }
+});
+
+auth.post("/facebook/deauthorize", async (c) => {
+  const appSecret = c.env?.FB_APP_SECRET;
+  if (!appSecret) {
+    return c.json({ error: "Facebook integration is not configured." }, 503);
+  }
+  const signedRequest = await extractSignedRequestFromContext(c);
+  const payload = await parseAndVerifySignedRequest(signedRequest, appSecret);
+  if (!payload || !payload.user_id) {
+    return c.json({ error: "Invalid signed_request signature." }, 400);
+  }
+
+  const fbUserId = String(payload.user_id);
+  try {
+    const prisma = getPrisma(c.env);
+    const existing = await prisma.user.findFirst({
+      where: { facebookId: fbUserId },
+      select: { id: true },
+    });
+    if (existing) {
+      await prisma.$transaction([
+        prisma.facebookPage.updateMany({
+          where: { userId: existing.id },
+          data: { isConnected: false, enableSchedule: false },
+        }),
+        prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            facebookAccessToken: null,
+            facebookTokenExpiresAt: null,
+          },
+        }),
+      ]);
+    }
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("Facebook deauthorize callback failed:", error);
+    return c.json({ error: "Failed to process deauthorization." }, 500);
+  }
+});
+
 auth.post("/2fa/setup", requireAuth, async (c) => {
   try {
     const user = c.get("authUser");
@@ -1015,6 +1170,28 @@ auth.get("/status", async (c) => {
     return c.json({ authenticated: false, user: null, error: "Auth status check failed" }, 500);
   }
 });
+
+export async function getOptionalAuthUser(c) {
+  const cookieToken = getCookie(c, "token");
+  const authorization = c.req.header("Authorization");
+  const token = cookieToken || (authorization?.startsWith("Bearer ") ? authorization.slice(7) : null);
+
+  if (!token || !c.env?.JWT_SECRET) {
+    return null;
+  }
+
+  try {
+    const { payload } = await jwtVerify(token, getJwtSecret(c.env), {
+      algorithms: ["HS256"],
+    });
+    if (typeof payload.id !== "string") {
+      return null;
+    }
+    return { id: payload.id, email: payload.email };
+  } catch {
+    return null;
+  }
+}
 
 export async function requireAuth(c, next) {
   const cookieToken = getCookie(c, "token");

@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { PageLoader } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -16,6 +16,7 @@ import EmptyState from "../components/ui/EmptyState";
 import Button from "../components/ui/Button";
 
 export default function ScheduledPosts() {
+    const navigate = useNavigate();
     const MotionDiv = motion.div;
     const MotionAnimatePresence = AnimatePresence;
     const { user } = useAuth();
@@ -146,7 +147,7 @@ export default function ScheduledPosts() {
                             </button>
                         </div>
                         <Button
-                            onClick={() => window.location.href = "/post"}
+                            onClick={() => navigate("/post")}
                             className="w-full sm:w-auto rounded-xl px-4 h-10 shadow-sm text-xs font-semibold"
                         >
                             <Plus size={15} className="mr-1.5" /> បង្កើតផុសថ្មី
@@ -161,7 +162,7 @@ export default function ScheduledPosts() {
                         title="Your queue is empty"
                         description="Keep your audience engaged by scheduling content ahead of time."
                         actionLabel="Schedule Now"
-                        onAction={() => window.location.href = "/dashboard"}
+                        onAction={() => navigate("/post")}
                     />
                 ) : (
                     <div className="space-y-10 md:space-y-12">
@@ -194,7 +195,11 @@ export default function ScheduledPosts() {
                                                     <div className={`${viewMode === 'list' ? 'w-24 h-16 md:w-32 md:h-20 rounded-xl md:rounded-2xl' : 'w-full h-40 md:h-48'} bg-gray-50 dark:bg-gray-900 relative overflow-hidden flex-shrink-0`}>
                                                         {q.thumbnailUrl ? (
                                                             <img
-                                                                src={`${import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, "")}${q.thumbnailUrl}`}
+                                                                src={
+                                                                    q.thumbnailUrl.startsWith("http")
+                                                                        ? q.thumbnailUrl
+                                                                        : `${(import.meta.env.VITE_API_BASE_URL || "").replace(/\/api$/, "")}${q.thumbnailUrl}`
+                                                                }
                                                                 alt="Thumbnail"
                                                                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                                                             />
@@ -208,7 +213,13 @@ export default function ScheduledPosts() {
                                                         
                                                         {/* Status Overlay */}
                                                         <div className="absolute top-2 md:top-3 left-2 md:left-3">
-                                                            <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-black uppercase tracking-tighter backdrop-blur-xl shadow-lg border border-white/20 ${q.status === 'scheduled' ? 'bg-blue-600/90 text-white' : 'bg-amber-500/90 text-white'}`}>
+                                                            <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-black uppercase tracking-tighter backdrop-blur-xl shadow-lg border border-white/20 ${
+                                                                q.status === 'scheduled'
+                                                                    ? 'bg-blue-600/90 text-white'
+                                                                    : q.status === 'failed'
+                                                                    ? 'bg-rose-600/90 text-white'
+                                                                    : 'bg-amber-500/90 text-white'
+                                                            }`}>
                                                                 {q.status}
                                                             </span>
                                                         </div>
@@ -216,9 +227,14 @@ export default function ScheduledPosts() {
 
                                                     {/* Content Info */}
                                                     <div className={`p-4 md:p-5 flex-1 flex flex-col ${viewMode === 'list' ? 'p-0' : ''}`}>
-                                                        <h4 className="font-bold text-sm md:text-base text-gray-900 dark:text-white line-clamp-2 mb-3 md:mb-4 leading-snug">
+                                                        <h4 className="font-bold text-sm md:text-base text-gray-900 dark:text-white line-clamp-2 mb-2 leading-snug">
                                                             {q.caption || "Untitled Post"}
                                                         </h4>
+                                                        {Array.isArray(q.lastError) && q.lastError[0]?.error && (
+                                                            <p className="text-[11px] text-rose-600 dark:text-rose-400 line-clamp-2 mb-3">
+                                                                {q.lastError[0].error}
+                                                            </p>
+                                                        )}
 
                                                         <div className="flex items-center justify-between mt-auto">
                                                             <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded-lg md:rounded-xl border border-gray-100 dark:border-gray-700">

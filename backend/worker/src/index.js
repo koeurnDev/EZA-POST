@@ -77,11 +77,13 @@ app.all("/uploads/*", proxyOrNotFound);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 
-export default app;
-
-export async function scheduled(_controller, env, context) {
-  context.waitUntil(processScheduledPosts(env));
-}
+export default {
+  fetch: app.fetch,
+  request: app.request.bind(app),
+  scheduled(_controller, env, context) {
+    context.waitUntil(processScheduledPosts(env));
+  },
+};
 
 export class GeminiProxyDO {
   constructor(state, env) {

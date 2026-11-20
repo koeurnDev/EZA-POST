@@ -164,6 +164,9 @@ export function createD1Client(db) {
             ...p,
             isConnected: Boolean(p.isConnected),
             isSelected: Boolean(p.isSelected),
+            enableBot: Boolean(p.enableBot),
+            enableSchedule: p.enableSchedule === undefined || p.enableSchedule === null ? true : Boolean(p.enableSchedule),
+            enableInbox: Boolean(p.enableInbox),
           }));
         }
 
@@ -191,6 +194,9 @@ export function createD1Client(db) {
             ...p,
             isConnected: Boolean(p.isConnected),
             isSelected: Boolean(p.isSelected),
+            enableBot: Boolean(p.enableBot),
+            enableSchedule: p.enableSchedule === undefined || p.enableSchedule === null ? true : Boolean(p.enableSchedule),
+            enableInbox: Boolean(p.enableInbox),
           }));
         }
 
@@ -216,6 +222,11 @@ export function createD1Client(db) {
         if (!record.id) {
           record.id = crypto.randomUUID();
         }
+        if (hasTimestamps) {
+          const nowIso = new Date().toISOString();
+          if (!record.createdAt) record.createdAt = nowIso;
+          if (!record.updatedAt) record.updatedAt = nowIso;
+        }
         const keys = Object.keys(record);
         const values = keys.map((k) => serializeValue(k, record[k]));
         const placeholders = keys.map(() => "?").join(", ");
@@ -237,7 +248,8 @@ export function createD1Client(db) {
         const updateValues = updateKeys.map((k) => serializeValue(k, data[k]));
 
         if (hasTimestamps && !("updatedAt" in data)) {
-          setClauses.push("updatedAt = CURRENT_TIMESTAMP");
+          setClauses.push("updatedAt = ?");
+          updateValues.push(new Date().toISOString());
         }
 
         const query = `UPDATE ${tableName} SET ${setClauses.join(", ")} ${whereSql} RETURNING *`;
@@ -252,7 +264,8 @@ export function createD1Client(db) {
         const updateValues = updateKeys.map((k) => serializeValue(k, data[k]));
 
         if (hasTimestamps && !("updatedAt" in data)) {
-          setClauses.push("updatedAt = CURRENT_TIMESTAMP");
+          setClauses.push("updatedAt = ?");
+          updateValues.push(new Date().toISOString());
         }
 
         const query = `UPDATE ${tableName} SET ${setClauses.join(", ")} ${whereSql}`;
