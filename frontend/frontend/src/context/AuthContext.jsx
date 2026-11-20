@@ -13,14 +13,18 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     console.log("🔐 AuthProvider Mounted");
   }, []);
+  // ✅ Seed from localStorage immediately — zero flash on reload
   const [user, setUser] = useState(() => {
     try {
-      return getUserData();
+      return getUserData() ?? null;
     } catch {
       return null;
     }
   });
-  const [loading, setLoading] = useState(true);
+  // loading=true only when NO cached user (first visit / logged-out)
+  const [loading, setLoading] = useState(() => {
+    try { return !getUserData(); } catch { return true; }
+  });
 
   // ------------------------------------------------------------
   // ✅ Check session on app load
@@ -182,7 +186,7 @@ export const AuthProvider = ({ children }) => {
   // ------------------------------------------------------------
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };

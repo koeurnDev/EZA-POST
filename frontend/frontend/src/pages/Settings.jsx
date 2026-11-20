@@ -1,183 +1,173 @@
 // ============================================================
-// ⚙️ Settings.jsx — Elite Command Center 2026
+// ⚙️ Settings.jsx — Moneaa Clean Settings Page
 // ============================================================
 
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
-import { 
-    LogOut, Moon, Sun, CheckCircle2, 
-    Fingerprint, Zap, Cpu, Cloud, ShieldCheck, Sparkles, CreditCard
+import {
+  LogOut, Moon, Sun, User, Mail, CreditCard,
+  Zap, ChevronRight, Shield, Pencil
 } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
 import toast from "react-hot-toast";
 
 export default function Settings() {
-    const MotionDiv = motion.div;
-    const MotionAnimatePresence = AnimatePresence;
-    const { user, logout } = useAuth();
-    const { theme, toggleTheme } = useTheme();
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-    // 🔐 2FA State
-    const [qrCode, setQrCode] = useState(null);
-    const [verifyCode, setVerifyCode] = useState("");
-    const [isVerifying, setIsVerifying] = useState(false);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success("ចាកចេញបានជោគជ័យ!");
+    } catch {
+      toast.error("មានបញ្ហា សូមព្យាយាមម្តងទៀត");
+    }
+  };
 
-    return (
-        <DashboardLayout>
-            {/* Mesh Gradient Background - Optimized for low-end devices */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20 dark:opacity-40 hidden md:block">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500 blur-[120px] rounded-full animate-pulse" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+  return (
+    <DashboardLayout>
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-4 font-['Kantumruy_Pro']">
+
+        {/* ── Page Title ── */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-white tracking-tight">ការកំណត់</h1>
+          <p className="text-sm text-slate-400 mt-1">គ្រប់គ្រងគណនី និងការកំណត់ផ្ទាល់ខ្លួន</p>
+        </div>
+
+        {/* ── Profile Card ── */}
+        <div className="bg-[#10131b] border border-white/8 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">គណនី</span>
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+            >
+              <Pencil size={12} />
+              កែប្រែ
+            </button>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Avatar */}
+            <div className="w-14 h-14 rounded-xl bg-blue-600 flex items-center justify-center font-black text-white text-xl shadow-lg shadow-blue-600/20 flex-shrink-0">
+              {user?.avatar ? (
+                <img src={user.avatar} alt="avatar" className="w-full h-full object-cover rounded-xl" />
+              ) : (
+                (user?.name?.[0] || "U").toUpperCase()
+              )}
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12 relative z-10">
-                {/* Header */}
-                <div className="mb-8 md:mb-12 px-1">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-xs font-black text-blue-500 uppercase tracking-[0.2em]">
-                            App Setup
-                        </div>
-                        <div className="h-px w-12 bg-blue-500/20" />
-                    </div>
-                    <h1 className="text-4xl md:text-6xl font-black text-gray-900 dark:text-white tracking-tighter mb-4">
-                        Settings <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Hub.</span>
-                    </h1>
-                    <p className="text-gray-500 dark:text-gray-400 font-medium text-base md:text-lg max-w-2xl leading-relaxed">
-                        Set up your account, security, and preferences from this simple page.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
-                    {/* 👈 Left Column: Profile Settings */}
-                    <div className="lg:col-span-8 space-y-6 md:space-y-8">
-                        <MotionDiv 
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-3xl md:rounded-[2.5rem] p-6 md:p-8 border border-white/20 dark:border-white/5 shadow-xl"
-                        >
-                            <div className="flex items-center justify-between mb-8">
-                                <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white tracking-tight">Profile Setup</h3>
-                                <button 
-                                    onClick={() => setIsEditModalOpen(true)}
-                                    className="h-10 px-4 md:px-6 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-blue-500/20"
-                                >
-                                    Edit Profile
-                                </button>
-                            </div>
-                            
-                            <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6 mb-4 md:mb-8">
-                                <div className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-2xl md:rounded-[1.8rem] flex items-center justify-center text-3xl md:text-4xl font-black text-white shadow-2xl">
-                                    {user?.name?.[0] || "U"}
-                                </div>
-                                <div className="flex-1">
-                                    <h4 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tight">{user?.name || "User"}</h4>
-                                    <p className="text-gray-500 font-medium mt-1 text-base truncate max-w-[280px] md:max-w-none">{user?.email}</p>
-                                    <div className="mt-3 px-3 py-1 bg-emerald-500/10 text-emerald-500 w-fit mx-auto sm:mx-0 rounded text-xs font-black uppercase tracking-widest">
-                                        {user?.plan || "PRO"} PLAN
-                                    </div>
-                                </div>
-                            </div>
-                        </MotionDiv>
-                    </div>
-
-                    {/* 👉 Right Column: Preferences & Pages */}
-                    <div className="lg:col-span-4 space-y-6 md:space-y-8">
-                        {/* Active Services Hub */}
-                        <MotionDiv 
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-3xl md:rounded-[2.5rem] p-6 md:p-8 border border-white/20 dark:border-white/5 shadow-xl"
-                        >
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-blue-500/10 text-blue-500 rounded-lg flex items-center justify-center">
-                                        <Sparkles size={18} />
-                                    </div>
-                                    មុខងារសកម្ម
-                                </h3>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full">
-                                    Active
-                                </span>
-                            </div>
-                            
-                            <div className="space-y-3">
-                                <Link 
-                                    to="/bio"
-                                    className="flex items-center justify-between p-3.5 bg-black/5 dark:bg-black/20 hover:bg-blue-500/10 rounded-2xl border border-white/5 transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center group-hover:scale-105 transition-transform">
-                                            <CreditCard size={18} />
-                                        </div>
-                                        <div>
-                                            <p className="font-black text-xs md:text-sm text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors">ឌីជីថលកាត (Bio Card)</p>
-                                            <p className="text-[10px] font-bold text-gray-400">គ្រប់គ្រង Profile & KHQR</p>
-                                        </div>
-                                    </div>
-                                    <span className="text-xs font-bold text-blue-500 group-hover:translate-x-0.5 transition-transform">→</span>
-                                </Link>
-
-                                <Link 
-                                    to="/subtitles"
-                                    className="flex items-center justify-between p-3.5 bg-black/5 dark:bg-black/20 hover:bg-indigo-500/10 rounded-2xl border border-white/5 transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center group-hover:scale-105 transition-transform">
-                                            <Zap size={18} />
-                                        </div>
-                                        <div>
-                                            <p className="font-black text-xs md:text-sm text-gray-900 dark:text-white group-hover:text-indigo-500 transition-colors">ស្ទូឌីយោ Subtitle AI</p>
-                                            <p className="text-[10px] font-bold text-gray-400">អក្សររត់ខ្មែរ & CapCut Draft</p>
-                                        </div>
-                                    </div>
-                                    <span className="text-xs font-bold text-indigo-500 group-hover:translate-x-0.5 transition-transform">→</span>
-                                </Link>
-                            </div>
-                        </MotionDiv>
-                        {/* Visual Appearance Protocol */}
-                         <MotionDiv 
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-3xl md:rounded-[2.5rem] p-6 md:p-8 border border-white/20 dark:border-white/5 shadow-xl"
-                        >
-                            <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-8 tracking-tight flex items-center gap-3">
-                                <div className="w-8 h-8 bg-orange-500/10 text-orange-500 rounded-lg flex items-center justify-center">
-                                    <Zap size={18} />
-                                </div>
-                                Look
-                            </h3>
-                            <div className="p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] bg-black/5 dark:bg-black/20 border border-white/5 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-[0.8rem] md:rounded-[1rem] flex items-center justify-center shadow-2xl transition-all ${theme === "dark" ? "bg-indigo-600 text-white" : "bg-orange-500 text-white"}`}>
-                                        {theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
-                                    </div>
-                                    <div>
-                                        <p className="font-black text-[11px] md:text-xs uppercase tracking-widest text-gray-900 dark:text-white">Dark Mode</p>
-                                        <p className="text-[11px] md:text-xs font-bold text-gray-400 uppercase tracking-[0.15em]">{theme === "dark" ? "Active" : "Standby"}</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={toggleTheme}
-                                    className={`w-12 h-7 md:w-14 md:h-8 rounded-full transition-all relative ${theme === "dark" ? "bg-indigo-600 shadow-lg shadow-indigo-600/20" : "bg-gray-200"}`}
-                                >
-                                    <div className={`absolute top-1 w-5 h-5 md:w-6 md:h-6 rounded-full bg-white transition-all shadow-md ${theme === "dark" ? "left-6 md:left-7" : "left-1"}`} />
-                                </button>
-                            </div>
-                        </MotionDiv>
-
-                    </div>
-                </div>
-
-                <EditProfileModal
-                    isOpen={isEditModalOpen}
-                    onClose={() => setIsEditModalOpen(false)}
-                />
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-white text-base truncate">{user?.name || "User"}</p>
+              <p className="text-xs text-slate-400 mt-0.5 truncate">{user?.email}</p>
+              <span className="inline-block mt-1.5 px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold rounded-full uppercase tracking-wider border border-blue-500/20">
+                {user?.plan || "free"} plan
+              </span>
             </div>
-        </DashboardLayout>
-    );
+          </div>
+        </div>
+
+        {/* ── Active Features ── */}
+        <div className="bg-[#10131b] border border-white/8 rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-white/5">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">មុខងារ</span>
+          </div>
+
+          <Link to="/bio" className="flex items-center gap-4 px-5 py-4 hover:bg-white/3 transition-colors group border-b border-white/5">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+              <CreditCard size={18} className="text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-white group-hover:text-blue-400 transition-colors">ឌីជីថលកាតអាជីវកម្ម</p>
+              <p className="text-xs text-slate-500 mt-0.5">Bio Card · Bakong KHQR</p>
+            </div>
+            <ChevronRight size={16} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+          </Link>
+
+          <Link to="/subtitles" className="flex items-center gap-4 px-5 py-4 hover:bg-white/3 transition-colors group">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
+              <Zap size={18} className="text-indigo-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors">ស្ទូឌីយោ Subtitle AI</p>
+              <p className="text-xs text-slate-500 mt-0.5">អក្សររត់ខ្មែរ · CapCut Draft</p>
+            </div>
+            <ChevronRight size={16} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+          </Link>
+        </div>
+
+        {/* ── Appearance ── */}
+        <div className="bg-[#10131b] border border-white/8 rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-white/5">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">រូបរាង</span>
+          </div>
+
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${theme === "dark" ? "bg-indigo-500/10" : "bg-orange-500/10"}`}>
+                {theme === "dark"
+                  ? <Moon size={18} className="text-indigo-400" />
+                  : <Sun size={18} className="text-orange-400" />}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Dark Mode</p>
+                <p className="text-xs text-slate-500 mt-0.5">{theme === "dark" ? "បើក" : "បិទ"}</p>
+              </div>
+            </div>
+
+            {/* Toggle Switch */}
+            <button
+              onClick={toggleTheme}
+              className={`relative w-11 h-6 rounded-full transition-all duration-200 ${theme === "dark" ? "bg-blue-600" : "bg-slate-600"}`}
+            >
+              <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${theme === "dark" ? "left-5" : "left-0.5"}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Security ── */}
+        <div className="bg-[#10131b] border border-white/8 rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-white/5">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">សុវត្ថិភាព</span>
+          </div>
+
+          <Link to="/forgot-password" className="flex items-center gap-4 px-5 py-4 hover:bg-white/3 transition-colors group">
+            <div className="w-10 h-10 rounded-xl bg-slate-500/10 flex items-center justify-center flex-shrink-0">
+              <Shield size={18} className="text-slate-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-white group-hover:text-slate-300 transition-colors">ប្តូរលេខសម្ងាត់</p>
+              <p className="text-xs text-slate-500 mt-0.5">Reset Password</p>
+            </div>
+            <ChevronRight size={16} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+          </Link>
+        </div>
+
+        {/* ── Logout ── */}
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-red-500/8 border border-red-500/15 text-red-400 hover:bg-red-500/15 hover:text-red-300 transition-all text-sm font-semibold"
+        >
+          <LogOut size={16} />
+          ចាកចេញពីគណនី
+        </button>
+
+        {/* ── Footer ── */}
+        <p className="text-center text-xs text-slate-600 pb-4">
+          Moneaa v1.0 · <a href="https://moneaa.site" className="hover:text-slate-400 transition-colors">moneaa.site</a>
+        </p>
+
+      </div>
+
+      <EditProfileModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+      />
+    </DashboardLayout>
+  );
 }
