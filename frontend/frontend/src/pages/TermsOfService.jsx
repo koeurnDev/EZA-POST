@@ -14,12 +14,21 @@ export default function TermsOfService() {
             <ArrowLeft size={14} />
             <span>ត្រឡប់ទៅ EZA-POST</span>
           </Link>
-          <Link
-            to="/privacy"
-            className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white"
-          >
-            Privacy Policy
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/privacy"
+              className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white"
+            >
+              Privacy Policy
+            </Link>
+            <span>•</span>
+            <Link
+              to="/data-deletion"
+              className="text-xs font-semibold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 font-bold"
+            >
+              Data Deletion
+            </Link>
+          </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">

@@ -177,6 +177,11 @@ export default function Welcome() {
             <span>•</span>
             <span>moneaa.site</span>
           </div>
+          <div className="flex items-center gap-4 text-slate-400">
+            <Link to="/privacy" className="hover:text-white transition-colors">គោលការណ៍ឯកជនភាព</Link>
+            <Link to="/terms" className="hover:text-white transition-colors">លក្ខខណ្ឌប្រើប្រាស់</Link>
+            <Link to="/data-deletion" className="hover:text-white transition-colors">Data Deletion</Link>
+          </div>
           <p>© 2026 Moneaa. រក្សាសិទ្ធិគ្រប់យ៉ាង។</p>
         </div>
       </footer>

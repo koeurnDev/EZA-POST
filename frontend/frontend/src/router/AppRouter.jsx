@@ -40,6 +40,7 @@ const ResetPassword = lazy(() => import("../pages/ResetPassword"));
 const AuthCallback = lazy(() => import("../pages/AuthCallback"));
 const PrivacyPolicy = lazy(() => import("../pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("../pages/TermsOfService"));
+const DataDeletion = lazy(() => import("../pages/DataDeletion"));
 
 // 📱 Digital Business Card & Storefront (Noonlai-Equivalent + Bakong KHQR)
 const BioBuilder = lazy(() => import("../pages/BioBuilder"));
@@ -78,6 +79,7 @@ export default function AppRouter() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/data-deletion" element={<DataDeletion />} />
 
           {/* 📱 Public Digital Business Card & Storefront */}
           <Route path="/b/:slug" element={<PublicBio />} />
@@ -126,15 +128,163 @@ export default function AppRouter() {
             }
           />
 
-          {/* ==================== Paused Features (Redirect to /bio) ==================== */}
-          <Route path="/post" element={<Navigate to="/bio" replace />} />
-          <Route path="/posts" element={<Navigate to="/bio" replace />} />
-          <Route path="/bot" element={<Navigate to="/bio" replace />} />
-          <Route path="/connections" element={<Navigate to="/bio" replace />} />
-          <Route path="/tools/*" element={<Navigate to="/bio" replace />} />
-          <Route path="/buy-credits" element={<Navigate to="/bio" replace />} />
-          <Route path="/viral-posts" element={<Navigate to="/bio" replace />} />
-          <Route path="/guide" element={<Navigate to="/bio" replace />} />
+          {/* ==================== Social Media & Publishing Tools ==================== */}
+          <Route
+            path="/post"
+            element={
+              <ProtectedRoute redirectPath="/welcome">
+                <Post />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/posts"
+            element={
+              <ProtectedRoute>
+                <ScheduledPosts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/bot"
+            element={
+              <ProtectedRoute>
+                <BotSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/connections"
+            element={
+              <ProtectedRoute>
+                <Connections />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ==================== Video Downloaders & Tools ==================== */}
+          <Route
+            path="/tools/tiktok"
+            element={
+              <ProtectedRoute>
+                <TikTokDownloader />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/tiktok/trends"
+            element={
+              <ProtectedRoute>
+                <TikTokTrends />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/viral-finder"
+            element={
+              <ProtectedRoute>
+                <ViralFinder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/pinterest"
+            element={
+              <ProtectedRoute>
+                <PinterestDownloader />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/youtube"
+            element={
+              <ProtectedRoute>
+                <YoutubeDownloader />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/facebook"
+            element={
+              <ProtectedRoute>
+                <FacebookDownloader />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/instagram"
+            element={
+              <ProtectedRoute>
+                <InstagramDownloader />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/threads"
+            element={
+              <ProtectedRoute>
+                <ThreadsDownloader />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/capcut"
+            element={
+              <ProtectedRoute>
+                <CapCutDownloader />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/document-converter"
+            element={
+              <ProtectedRoute>
+                <DocumentConverter />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/page-cleaner"
+            element={
+              <ProtectedRoute>
+                <PageCleaner />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/live-stream"
+            element={
+              <ProtectedRoute>
+                <LiveStreamer />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ==================== Credits, Viral & Guide ==================== */}
+          <Route
+            path="/buy-credits"
+            element={
+              <ProtectedRoute>
+                <BuyCredits />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/viral-posts"
+            element={
+              <ProtectedRoute>
+                <ViralPosts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/guide"
+            element={
+              <ProtectedRoute>
+                <Guide />
+              </ProtectedRoute>
+            }
+          />
 
           {/* ==================== Fallback Route ==================== */}
           <Route

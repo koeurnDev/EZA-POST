@@ -238,7 +238,7 @@ export default function BioBuilder() {
     const fullUrl = `${window.location.origin}/b/${formData.slug}`;
     QRCodeLib.toDataURL(fullUrl, { width: 600, margin: 2, color: { dark: "#000000", light: "#ffffff" } })
       .then((url) => setQrDownloadUrl(url))
-      .catch(() => {});
+      .catch(() => { });
   }, [formData.slug]);
 
   const handleSlugChange = (val) => {

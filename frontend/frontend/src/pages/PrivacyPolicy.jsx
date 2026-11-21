@@ -17,12 +17,21 @@ export default function PrivacyPolicy() {
             <ArrowLeft size={14} />
             <span>ត្រឡប់ទៅ EZA-POST</span>
           </Link>
-          <Link
-            to="/terms"
-            className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white"
-          >
-            Terms of Service
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/terms"
+              className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white"
+            >
+              Terms of Service
+            </Link>
+            <span>•</span>
+            <Link
+              to="/data-deletion"
+              className="text-xs font-semibold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 font-bold"
+            >
+              Data Deletion
+            </Link>
+          </div>
         </div>
 
         {deletionCode && (
@@ -84,6 +93,7 @@ export default function PrivacyPolicy() {
             <ul className="list-disc pl-5 space-y-1">
               <li>In EZA-POST: Go to <strong>Settings / Connections</strong> and disconnect your Facebook account.</li>
               <li>In Facebook: Go to <strong>Settings &amp; Privacy → Settings → Business Integrations / Apps and Websites</strong>, select <strong>EZA-POST</strong>, and click <strong>Remove</strong>. Meta automatically notifies our deletion endpoint (<code className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800">/api/auth/facebook/data-deletion</code>) to purge your tokens immediately.</li>
+              <li>Official Instructions: You can review our full step-by-step instructions or submit an email request on our <Link to="/data-deletion" className="font-bold text-blue-600 dark:text-blue-400 hover:underline">User Data Deletion Instructions Page</Link>.</li>
             </ul>
           </section>
         </div>

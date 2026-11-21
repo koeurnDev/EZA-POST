@@ -14,14 +14,38 @@ const SIDEBAR_SECTIONS = [
   {
     title: "មុខងារចម្បង",
     items: [
-      { label: "កាតអាជីវកម្មឌីជីថល", shortLabel: "កាត Bio", icon: QrCode, path: "/bio", badge: "Card" },
+      { label: "កាតអាជីវកម្មឌីជីថល", shortLabel: "កាត Bio", icon: QrCode, path: "/bio", badge: "Pro" },
       { label: "អក្សររត់ AI", shortLabel: "អក្សររត់", icon: Languages, path: "/subtitles", badge: "AI" },
+      { label: "បង្កើតផុសថ្មី", shortLabel: "ផុស", icon: Send, path: "/post" },
+      { label: "កាលវិភាគផុស", shortLabel: "កាលវិភាគ", icon: Clock, path: "/posts" },
+      { label: "ឆ្លើយតបស្វ័យប្រវត្តិ", shortLabel: "ឆ្លើយតប", icon: MessageSquare, path: "/bot" },
+      { label: "ភ្ជាប់ផេក Facebook", shortLabel: "ផេក", icon: LinkIcon, path: "/connections" },
     ],
   },
   {
-    title: "គណនី",
+    title: "ទាញយកវីដេអូ",
     items: [
-      { label: "ការកំណត់", shortLabel: "ការកំណត់", icon: Settings, path: "/settings" },
+      { label: "ទាញយកវីដេអូ TikTok", icon: Download, path: "/tools/tiktok" },
+      { label: "ទាញយកវីដេអូ YouTube", icon: Video, path: "/tools/youtube" },
+      { label: "ទាញយកវីដេអូ Facebook", icon: Facebook, path: "/tools/facebook" },
+      { label: "ទាញយកវីដេអូ Instagram", icon: Instagram, path: "/tools/instagram" },
+      { label: "ទាញយក CapCut", icon: Scissors, path: "/tools/capcut" },
+      { label: "ទាញយកវីដេអូ Threads", icon: AtSign, path: "/tools/threads" },
+      { label: "ទាញយកវីដេអូ Pinterest", icon: Images, path: "/tools/pinterest" },
+    ],
+  },
+  {
+    title: "ឧបករណ៍ផេក និងគណនី",
+    items: [
+      { label: "ផ្សាយផ្ទាល់ច្រើនផេក", icon: Radio, path: "/tools/live-stream" },
+      { label: "សម្អាតផុសក្នុងផេក", icon: Trash2, path: "/tools/page-cleaner" },
+      { label: "បម្លែងឯកសារ", icon: FileText, path: "/tools/document-converter" },
+      { label: "ស្វែងរកវីដេអូល្បី", icon: TrendingUp, path: "/tools/viral-finder" },
+      { label: "ចម្រៀងកំពុងល្បី TikTok", icon: Music, path: "/tools/tiktok/trends" },
+      { label: "វីដេអូល្បីៗ", icon: Zap, path: "/viral-posts" },
+      { label: "ទិញ Credits", icon: CreditCard, path: "/buy-credits" },
+      { label: "របៀបប្រើប្រាស់", icon: HelpCircle, path: "/guide" },
+      { label: "ការកំណត់គណនី", icon: Settings, path: "/settings" },
     ],
   },
 ];
@@ -29,6 +53,7 @@ const SIDEBAR_SECTIONS = [
 const MOBILE_BOTTOM_TABS = [
   { label: "កាតអាជីវកម្ម", shortLabel: "កាត Bio", icon: QrCode, path: "/bio" },
   { label: "អក្សររត់ AI", shortLabel: "អក្សររត់", icon: Languages, path: "/subtitles" },
+  { label: "បង្កើតផុស", shortLabel: "ផុស", icon: Send, path: "/post" },
   { label: "ការកំណត់", shortLabel: "ការកំណត់", icon: Settings, path: "/settings" },
 ];
 
@@ -306,8 +331,22 @@ const DashboardLayout = ({ children }) => {
             </div>
           </div>
 
-          {/* Right: Network Status, Light/Dark Mode Toggle & Profile */}
+          {/* Right: Quick Connections Link, Network Status, Light/Dark Mode Toggle & Profile */}
           <div className="flex items-center gap-2 shrink-0">
+            <Link
+              to="/connections"
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+                location.pathname === "/connections"
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : isDarkMode
+                  ? "bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-800"
+                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70"
+              }`}
+            >
+              <LinkIcon size={13} />
+              <span>ភ្ជាប់ផេក</span>
+            </Link>
+
             <div className="hidden sm:block">
               <NetworkStatus />
             </div>
@@ -351,9 +390,9 @@ const DashboardLayout = ({ children }) => {
         </main>
       </div>
 
-      {/* 4. MOBILE BOTTOM TAB BAR (< lg, 3 Equal Columns with Khmer Labels) */}
+      {/* 4. MOBILE BOTTOM TAB BAR (< lg, 5 Equal Columns with Khmer Labels) */}
       <nav
-        className={`lg:hidden fixed bottom-0 left-0 right-0 h-16 z-40 border-t px-2 grid grid-cols-3 items-center ${
+        className={`lg:hidden fixed bottom-0 left-0 right-0 h-16 z-40 border-t px-1 grid grid-cols-5 items-center ${
           isDarkMode
             ? "bg-[#111827] border-slate-800 text-slate-300"
             : "bg-white border-slate-200 text-slate-600 shadow-lg"
@@ -381,6 +420,19 @@ const DashboardLayout = ({ children }) => {
             </Link>
           );
         })}
+
+        <button
+          type="button"
+          onClick={() => setIsMobileDrawerOpen(true)}
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-colors min-w-0 ${
+            isMobileDrawerOpen ? "text-blue-600 font-bold" : "opacity-75 hover:opacity-100"
+          }`}
+        >
+          <div className="p-1 rounded-lg">
+            <Grid size={18} />
+          </div>
+          <span className="text-[10px] leading-none truncate max-w-full">ឧបករណ៍</span>
+        </button>
       </nav>
     </div>
   );
