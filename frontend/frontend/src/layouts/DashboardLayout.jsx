@@ -6,7 +6,7 @@ import NetworkStatus from "../components/NetworkStatus";
 import {
   Send, Clock, HelpCircle, Link as LinkIcon, MessageSquare, Zap, Settings, LogOut, Sun, Moon, Grid, X,
   Download, Video, Instagram, AtSign, Facebook, Images, Scissors, Music, TrendingUp, FileText, Languages,
-  Radio, Trash2, QrCode, Menu
+  Radio, Trash2, QrCode, Menu, CreditCard
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
