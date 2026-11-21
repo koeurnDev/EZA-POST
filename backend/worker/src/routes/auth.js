@@ -27,12 +27,8 @@ const facebookScopes = [
   "public_profile",
   "email",
   "pages_show_list",
-  "business_management",
   "pages_manage_posts",
   "pages_read_engagement",
-  "pages_messaging",
-  "pages_manage_metadata",
-  "pages_read_user_content",
   "publish_video",
 ];
 
