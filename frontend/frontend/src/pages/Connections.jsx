@@ -739,14 +739,14 @@ export default function Connections() {
                                                                 }`}
                                                             >
                                                                 <div
-                                                                    className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all shadow-xs ${
+                                                                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-sm ${
                                                                         (
                                                                             setting.key === "enableSchedule"
                                                                                 ? page.settings?.enableSchedule !== false
                                                                                 : page.settings?.[setting.key]
                                                                         )
-                                                                            ? "left-5.5"
-                                                                            : "left-0.5"
+                                                                            ? "translate-x-5"
+                                                                            : "translate-x-0"
                                                                     }`}
                                                                 />
                                                             </button>

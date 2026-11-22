@@ -1415,10 +1415,10 @@ export default function Post() {
                                 </div>
                             )}
 
-                            {(postFormat === "video_cta" || postFormat === "photo_cta" || postFormat === "instant_experience") && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10">
+                            {(postFormat === "video_pe" || postFormat === "photo_pe" || postFormat === "video_cta" || postFormat === "photo_cta" || postFormat === "instant_experience") && (
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10">
                                     <div className="space-y-1">
-                                        <label className="text-[11px] font-bold text-gray-500">ចំណងជើង (Headline)</label>
+                                        <label className="text-[11px] font-bold text-gray-500">ចំណងជើងកាត (Headline)</label>
                                         <input
                                             type="text"
                                             value={headline}
@@ -1428,22 +1428,12 @@ export default function Post() {
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[11px] font-bold text-gray-500">ការពិពណ៌នាខ្លី (Description)</label>
-                                        <input
-                                            type="text"
-                                            value={cardDescription}
-                                            onChange={(e) => setCardDescription(e.target.value)}
-                                            placeholder="ព័ត៌មានបន្ថែមខាងក្រោម..."
-                                            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-blue-500"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[11px] font-bold text-gray-500">តំណភ្ជាប់គោលដៅ (Website / Link URL)</label>
+                                        <label className="text-[11px] font-bold text-gray-500">តំណភ្ជាប់គោលដៅ (Link URL ពេលចុចកាត)</label>
                                         <input
                                             type="url"
                                             value={targetLink}
                                             onChange={(e) => setTargetLink(e.target.value)}
-                                            placeholder="https://..."
+                                            placeholder="https://facebook.com/..."
                                             className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-blue-500"
                                         />
                                     </div>
@@ -1720,10 +1710,19 @@ export default function Post() {
                                                 <div className="flex-1 min-w-0">
                                                     {item.isPageCard ? (
                                                         <p className="text-[11px] font-bold text-gray-900 dark:text-gray-100">FACEBOOK.COM</p>
+                                                    ) : item.id === "video-main" ? (
+                                                        <input
+                                                            type="text"
+                                                            value={headline}
+                                                            onChange={(e) => setHeadline(e.target.value)}
+                                                            placeholder="ចំណងជើង Card 1..."
+                                                            className="w-full bg-transparent text-[11px] font-bold text-gray-900 dark:text-gray-100 outline-none"
+                                                        />
                                                     ) : (
                                                         <textarea
                                                             value={carouselCtaText}
                                                             onChange={(e) => setCarouselCtaText(e.target.value)}
+                                                            placeholder="អត្ថបទ Card 2..."
                                                             className="w-full bg-transparent text-[11px] font-bold text-gray-900 dark:text-gray-100 outline-none resize-none"
                                                             rows={2}
                                                         />

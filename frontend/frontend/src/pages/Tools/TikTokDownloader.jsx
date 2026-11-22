@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { 
     Search, Download, Check, Play, X, ChevronRight, Loader2, 
     Image as ImageIcon, Video, Music, Layers, Sparkles, 
-    Zap, Trash2, ExternalLink
+    Zap, Trash2, ExternalLink, Send
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../../utils/api";
@@ -75,6 +75,7 @@ export default function TikTokDownloader() {
     const [forceCompatible, setForceCompatible] = useState(false);
     const [videoError, setVideoError] = useState(false);
     const location = useLocation();
+    const navigate = useNavigate();
 
     // 🚀 Auto-Lookup on Paste
     useEffect(() => {
@@ -377,42 +378,17 @@ export default function TikTokDownloader() {
                 className="relative z-10 p-4 md:p-8 max-w-6xl mx-auto space-y-8 pb-24"
             >
                 {/* 🏷️ Header */}
-                <div className="text-center space-y-3">
-                    <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-600 dark:text-pink-400 text-xs font-bold uppercase tracking-wider">
-                        <Sparkles size={14} /> TikTok Preview
+                <div className="text-center space-y-2.5">
+                    <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-600 dark:text-pink-400 text-xs font-bold">
+                        <Sparkles size={14} /> ទាញយកវីដេអូ TikTok គ្មាន Watermark
                     </motion.div>
-                    <motion.h1 variants={itemVariants} className="text-3xl md:text-5xl font-black tracking-tight text-gray-900 dark:text-white">
-                        TikTok <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">Preview</span>
+                    <motion.h1 variants={itemVariants} className="text-2xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+                        ទាញយកវីដេអូ <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">TikTok HD</span>
                     </motion.h1>
-                    <motion.p variants={itemVariants} className="text-gray-500 dark:text-gray-400 max-w-md mx-auto text-sm md:text-base px-4">
-                        Preview public TikTok videos. Downloading and profile tools require the Node backend.
+                    <motion.p variants={itemVariants} className="text-gray-500 dark:text-gray-400 max-w-lg mx-auto text-xs md:text-sm px-4">
+                        បិទភ្ជាប់ Link វីដេអូ TikTok ដើម្បីទាញយកជា MP4 ច្បាស់ឥតជាប់ Logo ឬបញ្ជូនទៅផុសលើ Facebook Page ភ្លាមៗក្នុង 1-Click
                     </motion.p>
                 </div>
-
-                {/* 📑 Tabs */}
-                <motion.div variants={itemVariants} className="flex justify-center">
-                    <div className="inline-flex p-1 bg-gray-200/50 dark:bg-white/5 backdrop-blur-xl rounded-2xl border border-white/20">
-                        {['single', 'profile'].map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                disabled={tab === "profile"}
-                                title={tab === "profile" ? "Profile tools require the Node backend." : undefined}
-                                className={`relative px-4 md:px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                                    activeTab === tab ? "text-gray-900 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                                } ${tab === "profile" ? "cursor-not-allowed opacity-50" : ""}`}
-                            >
-                                {activeTab === tab && (
-                                    <motion.div 
-                                        layoutId="activeTab"
-                                        className="absolute inset-0 bg-white dark:bg-white/10 shadow-lg rounded-xl z-0"
-                                    />
-                                )}
-                                <span className="relative z-10 capitalize">{tab === 'single' ? 'Single Video' : 'Profile & Bulk (Node)'}</span>
-                            </button>
-                        ))}
-                    </div>
-                </motion.div>
 
                 <AnimatePresence mode="wait">
                     {activeTab === "single" ? (
@@ -563,6 +539,26 @@ export default function TikTokDownloader() {
                                                             >
                                                                 {isVideoDownloading ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
                                                                 <span>{isVideoDownloading ? "កំពុងទាញយក... (Downloading...)" : "ទាញយកវីដេអូ (Download MP4)"}</span>
+                                                            </button>
+                                                        )}
+
+                                                        {(videoData.no_watermark_url || videoData.playUrl) && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    navigate("/post", {
+                                                                        state: {
+                                                                            postFormat: "video_pe",
+                                                                            videoUrl: videoData.no_watermark_url || videoData.playUrl,
+                                                                            rawVideoUrl: videoData.no_watermark_url || videoData.playUrl,
+                                                                            suggestedCaption: videoData.title || ""
+                                                                        }
+                                                                    })
+                                                                }
+                                                                className="h-12 md:h-13 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm md:text-base shadow-lg shadow-blue-500/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                                                            >
+                                                                <Send size={18} />
+                                                                <span>យកទៅផុស Facebook ភ្លាម (1-Click)</span>
                                                             </button>
                                                         )}
 

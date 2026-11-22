@@ -254,54 +254,12 @@ const DashboardLayout = ({ children }) => {
             </button>
           </div>
         </div>
-
-        {/* Mobile Smooth Horizontal Quick Strip (< md) */}
-        <div
-          className={`md:hidden flex items-center gap-1.5 px-3 py-2 overflow-x-auto no-scrollbar border-t ${
-            isDarkMode ? "border-slate-800/80 bg-[#0f1523]" : "border-slate-200/70 bg-slate-50/90"
-          }`}
-        >
-          {PRIMARY_NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : isDarkMode
-                    ? "bg-slate-800/90 text-slate-300 border border-slate-700/80"
-                    : "bg-white text-slate-700 border border-slate-200/90"
-                }`}
-              >
-                <Icon size={13} />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setIsToolsOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
-              isToolRouteActive || isToolsOpen
-                ? "bg-blue-600 text-white shadow-sm"
-                : isDarkMode
-                ? "bg-slate-800/90 text-slate-300 border border-slate-700/80"
-                : "bg-white text-slate-700 border border-slate-200/90"
-            }`}
-          >
-            <Grid size={13} />
-            <span>ឧបករណ៍ទាំងអស់</span>
-          </button>
-        </div>
       </header>
 
       {/* Clean Modal / Bottom-Sheet for All Extra Tools (Smooth on Phone & Desktop) */}
       {isToolsOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={() => setIsToolsOpen(false)}
         >
           <div
@@ -316,7 +274,7 @@ const DashboardLayout = ({ children }) => {
             <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <Grid size={16} className="text-blue-500" />
-                <span className="text-sm font-extrabold">មុខងារ និងឧបករណ៍បន្ថែមទាំងអស់</span>
+                <span className="text-sm font-extrabold">មុខងារ និងឧបករណ៍ទាំងអស់</span>
               </div>
               <button
                 type="button"
@@ -325,6 +283,34 @@ const DashboardLayout = ({ children }) => {
               >
                 <X size={16} />
               </button>
+            </div>
+
+            {/* Primary Shortcuts on Mobile inside Modal */}
+            <div className="md:hidden space-y-2">
+              <p className="text-xs font-bold text-slate-400">មុខងារចម្បង</p>
+              <div className="grid grid-cols-2 gap-2">
+                {PRIMARY_NAV_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setIsToolsOpen(false)}
+                      className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-bold transition-all ${
+                        isActive
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : isDarkMode
+                          ? "bg-slate-800/70 border-slate-700/80 text-slate-200"
+                          : "bg-slate-50 border-slate-200/80 text-slate-700"
+                      }`}
+                    >
+                      <Icon size={16} className={isActive ? "text-white shrink-0" : "text-blue-500 shrink-0"} />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
