@@ -21,12 +21,14 @@ const POST_FORMATS = [
     { id: "video_pe", label: "🎠 Video PE", needsAdAccount: true, accept: "video/*" },
     { id: "video", label: "🎥 វីដេអូ", accept: "video/*", useBusinessSuite: true },
     { id: "reels", label: "📱 Reels", accept: "video/*", useBusinessSuite: true },
+    { id: "stories", label: "📖 Stories", accept: "video/*,image/*" },
     { id: "photos", label: "🖼️ រូបភាព (1-10)", multiImage: true, accept: "image/*" },
     { id: "photo_pe", label: "🗂️ Photo PE", multiImage: true, needsAdAccount: true, accept: "image/*" },
     { id: "text_link", label: "📝 អត្ថបទ / Link", accept: "image/*" },
     { id: "video_cta", label: "🎬 Video CTA", needsAdAccount: true, accept: "video/*" },
     { id: "photo_cta", label: "🏷️ Photo CTA", needsAdAccount: true, accept: "image/*" },
-    { id: "instant_experience", label: "⚡ Instant Exp", needsAdAccount: true, accept: "image/*" },
+    { id: "instant_experience", label: "⚡ Instant Experience", needsAdAccount: true, accept: "image/*,video/*" },
+    { id: "other_socials", label: "🌐 Post to Other Socials", accept: "video/*,image/*" },
     { id: "live", label: "🔴 Live Stream", route: "/tools/live-stream" },
 ];
 
@@ -120,6 +122,72 @@ export default function Post() {
     const [extensionVersion, setExtensionVersion] = useState("");
     const [isOpeningComposer, setIsOpeningComposer] = useState(false);
     const [lastPublishedResult, setLastPublishedResult] = useState(null);
+
+    // 🌐 Post to Other Socials (Telegram Auto-Publish + Multi-Platform Studio Assist)
+    const [telegramBotToken, setTelegramBotToken] = useState(() => localStorage.getItem("eza_tg_bot_token") || "");
+    const [telegramChatId, setTelegramChatId] = useState(() => localStorage.getItem("eza_tg_chat_id") || "");
+    const [alsoPostToTelegram, setAlsoPostToTelegram] = useState(() => localStorage.getItem("eza_also_tg") === "true");
+    const [selectedSocialPlatforms, setSelectedSocialPlatforms] = useState(["telegram", "tiktok", "youtube"]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem("eza_tg_bot_token", telegramBotToken.trim());
+            localStorage.setItem("eza_tg_chat_id", telegramChatId.trim());
+            localStorage.setItem("eza_also_tg", String(alsoPostToTelegram));
+        } catch {}
+    }, [telegramBotToken, telegramChatId, alsoPostToTelegram]);
+
+    const toggleSocialPlatform = (platId) => {
+        setSelectedSocialPlatforms((prev) =>
+            prev.includes(platId) ? prev.filter((p) => p !== platId) : [...prev, platId]
+        );
+    };
+
+    const publishToTelegramChannel = async ({ mediaFile, mediaUrl, isVideo, textCaption, btnTitle, btnUrl }) => {
+        const token = telegramBotToken.trim();
+        const chatId = telegramChatId.trim();
+        if (!token || !chatId) {
+            throw new Error("សូមបញ្ចូល Telegram Bot Token និង Channel/Chat ID (@channel ឬ -100...) ជាមុនសិន!");
+        }
+        const replyMarkup =
+            btnUrl && /^https?:\/\//i.test(btnUrl)
+                ? JSON.stringify({
+                      inline_keyboard: [[{ text: btnTitle || "ស្វែងយល់បន្ថែម (Learn More)", url: btnUrl }]]
+                  })
+                : null;
+
+        const baseApi = `https://api.telegram.org/bot${encodeURIComponent(token)}`;
+        if (mediaFile || mediaUrl) {
+            const method = isVideo ? "sendVideo" : "sendPhoto";
+            const fieldName = isVideo ? "video" : "photo";
+            const form = new FormData();
+            form.append("chat_id", chatId);
+            if (textCaption) form.append("caption", textCaption);
+            if (replyMarkup) form.append("reply_markup", replyMarkup);
+            if (mediaFile) {
+                form.append(fieldName, mediaFile);
+            } else {
+                form.append(fieldName, mediaUrl);
+            }
+            const res = await fetch(`${baseApi}/${method}`, { method: "POST", body: form });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.ok) {
+                throw new Error(data?.description || "មិនអាចបង្ហោះទៅ Telegram បានទេ");
+            }
+            return data.result;
+        } else {
+            const form = new FormData();
+            form.append("chat_id", chatId);
+            form.append("text", textCaption || btnUrl || "New Post");
+            if (replyMarkup) form.append("reply_markup", replyMarkup);
+            const res = await fetch(`${baseApi}/sendMessage`, { method: "POST", body: form });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.ok) {
+                throw new Error(data?.description || "មិនអាចផ្ញើសារទៅ Telegram បានទេ");
+            }
+            return data.result;
+        }
+    };
 
     const carouselRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -841,6 +909,18 @@ export default function Post() {
                 id: toastId,
                 duration: 7000
             });
+            if (alsoPostToTelegram && telegramBotToken.trim() && telegramChatId.trim()) {
+                publishToTelegramChannel({
+                    mediaFile: file || multiImages[0]?.file || null,
+                    mediaUrl: uploadedVideoUrl || uploadedImageUrl || uploadedPhotoUrls[0] || null,
+                    isVideo: Boolean(uploadedVideoUrl || (file && file.type.startsWith("video/"))),
+                    textCaption: [headline.trim(), caption.trim()].filter(Boolean).join("\n\n"),
+                    btnTitle: headline.trim() || "មើលបន្ថែម",
+                    btnUrl: targetLink.trim()
+                })
+                    .then(() => toast.success("✈️ បានបង្ហោះចូល Telegram Channel/Group ជោគជ័យ!"))
+                    .catch((tgErr) => toast.error(`Telegram: ${tgErr.message}`));
+            }
             setFile(null);
             setPreviewUrl(null);
             setRawVideoUrl(null);
@@ -870,15 +950,78 @@ export default function Post() {
     const activeFormatMeta = POST_FORMATS.find((f) => f.id === postFormat) || POST_FORMATS[2];
 
     const handleSubmit = async () => {
+        const hasSingleVideo = Boolean((file && file.type.startsWith("video/")) || rawVideoUrl || (previewUrl && !file?.type?.startsWith("image/")));
+        const hasSingleImage = Boolean((file && file.type.startsWith("image/")) || (previewUrl && file?.type?.startsWith("image/")));
+
+        if (postFormat === "other_socials") {
+            if (selectedSocialPlatforms.length === 0) {
+                return toast.error("សូមជ្រើសរើសបណ្តាញសង្គមយ៉ាងតិច ១ (Telegram, TikTok, YouTube, Instagram, Threads ឬ X)!");
+            }
+            setIsSubmitting(true);
+            const toastId = toast.loading("កំពុងបង្ហោះទៅកាន់បណ្តាញសង្គមដែលបានជ្រើសរើស...");
+            try {
+                const fullText = [headline.trim(), caption.trim(), targetLink.trim()].filter(Boolean).join("\n\n");
+                if (fullText) {
+                    try {
+                        await navigator.clipboard.writeText(fullText);
+                    } catch {}
+                }
+
+                if (selectedSocialPlatforms.includes("telegram")) {
+                    await publishToTelegramChannel({
+                        mediaFile: file || multiImages[0]?.file || null,
+                        mediaUrl: rawVideoUrl || (previewUrl?.startsWith("https://") ? previewUrl : null),
+                        isVideo: hasSingleVideo,
+                        textCaption: [headline.trim(), caption.trim()].filter(Boolean).join("\n\n"),
+                        btnTitle: headline.trim() || "មើលបន្ថែម",
+                        btnUrl: targetLink.trim()
+                    });
+                }
+
+                const studioUrls = [];
+                if (selectedSocialPlatforms.includes("tiktok")) {
+                    studioUrls.push("https://www.tiktok.com/tiktokstudio/upload");
+                }
+                if (selectedSocialPlatforms.includes("youtube")) {
+                    studioUrls.push("https://studio.youtube.com/");
+                }
+                if (selectedSocialPlatforms.includes("instagram")) {
+                    studioUrls.push("https://www.instagram.com/");
+                }
+                if (selectedSocialPlatforms.includes("threads")) {
+                    studioUrls.push(`https://www.threads.net/intent/post?text=${encodeURIComponent(fullText || "New post")}`);
+                }
+                if (selectedSocialPlatforms.includes("x")) {
+                    studioUrls.push(`https://x.com/intent/tweet?text=${encodeURIComponent(fullText || "New post")}`);
+                }
+
+                for (const url of studioUrls) {
+                    window.open(url, "_blank", "noopener,noreferrer");
+                }
+
+                toast.success(
+                    selectedSocialPlatforms.includes("telegram")
+                        ? "🎉 បានបង្ហោះចូល Telegram ជោគជ័យ និងបានចម្លង Caption បើកផ្ទាំងបណ្តាញសង្គមរួចរាល់!"
+                        : "🎉 បានចម្លង Caption ស្វ័យប្រវត្តិ និងបើកផ្ទាំងបង្ហោះបណ្តាញសង្គមរួចរាល់!",
+                    { id: toastId, duration: 6000 }
+                );
+            } catch (err) {
+                toast.error(err.message || "មិនអាចបង្ហោះទៅបណ្តាញសង្គមផ្សេងបានទេ", { id: toastId });
+            } finally {
+                setIsSubmitting(false);
+            }
+            return;
+        }
+
         if (selectedPages.length === 0) {
             return toast.error("សូមជ្រើសរើសផេកយ៉ាងតិច ១ ដើម្បីបង្ហោះ!");
         }
 
-        const hasSingleVideo = Boolean((file && file.type.startsWith("video/")) || rawVideoUrl || (previewUrl && !file?.type?.startsWith("image/")));
-        const hasSingleImage = Boolean((file && file.type.startsWith("image/")) || (previewUrl && file?.type?.startsWith("image/")));
-
         if (postFormat === "reels" && !hasSingleVideo) {
             return toast.error("Facebook Reels តម្រូវឱ្យដាក់ឯកសារវីដេអូ (.mp4)!");
+        }
+        if (postFormat === "stories" && !hasSingleVideo && !hasSingleImage && multiImages.length === 0) {
+            return toast.error("Facebook Story តម្រូវឱ្យដាក់រូបភាព ឬវីដេអូ (9:16)!");
         }
         if (postFormat === "video" && !hasSingleVideo && !caption.trim()) {
             return toast.error("សូមដាក់វីដេអូ ឬសរសេរអត្ថបទជាមុនសិន!");
@@ -898,8 +1041,8 @@ export default function Post() {
         if (postFormat === "photo_pe" && multiImages.length < 2) {
             return toast.error("Photo PE Carousel តម្រូវឱ្យដាក់រូបភាពយ៉ាងតិច ២ សន្លឹក!");
         }
-        if (postFormat === "instant_experience" && !canvasId && !targetLink.trim()) {
-            return toast.error("សូមជ្រើសរើស Instant Experience (Canvas) ឬដាក់ Link URL!");
+        if (postFormat === "instant_experience" && !hasSingleImage && !hasSingleVideo && !canvasId && !targetLink.trim()) {
+            return toast.error("សូមដាក់រូបភាព/វីដេអូ ឬជ្រើសរើស Canvas ID សម្រាប់ Instant Experience!");
         }
         if (postFormat === "text_link" && !caption.trim() && !targetLink.trim()) {
             return toast.error("សូមសរសេរអត្ថបទ ឬបញ្ចូល Link URL ជាមុនសិន!");
@@ -1322,8 +1465,8 @@ export default function Post() {
                             </div>
                         )}
 
-                        {/* 10-Format Smooth Horizontal Pill Switcher */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar p-1.5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-white/10 shadow-xs">
+                        {/* 12-Format Wrapped Pill Switcher (All visible on Desktop & Mobile without clipping) */}
+                        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-white/10 shadow-xs">
                             {POST_FORMATS.map((fmt) => {
                                 const isActive = postFormat === fmt.id;
                                 return (
@@ -1337,10 +1480,10 @@ export default function Post() {
                                             }
                                             setPostFormat(fmt.id);
                                         }}
-                                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                                             isActive
                                                 ? "bg-blue-600 text-white shadow-sm"
-                                                : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
+                                                : "bg-gray-50 dark:bg-white/[0.04] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 border border-gray-200/70 dark:border-white/5"
                                         }`}
                                     >
                                         <span>{fmt.label}</span>
@@ -1505,21 +1648,40 @@ export default function Post() {
                                 </div>
                             )}
 
+                            {postFormat === "stories" && (
+                                <div className="p-3.5 rounded-xl bg-pink-500/[0.06] border border-pink-500/20 space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-xs font-bold text-pink-700 dark:text-pink-300">
+                                            📖 Facebook Page Stories (9:16 Video Story & Photo Story)
+                                        </span>
+                                        <span className="px-2 py-0.5 rounded-md bg-pink-600 text-white text-[10px] font-bold">
+                                            1-Click Multi-Page Story
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-gray-600 dark:text-gray-400">
+                                        ដាក់រូបភាព ឬវីដេអូបញ្ឈរ (9:16) ខាងក្រោម ដើម្បីបង្ហោះចូល <strong>Facebook Story</strong> របស់ផេកទាំងអស់ដែលបានជ្រើសរើសក្នុង 1-Click។
+                                    </p>
+                                </div>
+                            )}
+
                             {postFormat === "instant_experience" && (
                                 <div className="p-3.5 rounded-xl bg-purple-500/[0.06] border border-purple-500/20 space-y-2.5">
                                     <div className="flex items-center justify-between gap-2">
                                         <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
-                                            ⚡ ជ្រើសរើស Instant Experience (Canvas ID)
+                                            ⚡ Instant Experience (បង្កើត Canvas ថ្មីស្វ័យប្រវត្តិ ឬរើស Canvas ID ដែលមានស្រាប់)
                                         </span>
                                         {loadingCanvases && <Loader2 size={14} className="animate-spin text-purple-500" />}
                                     </div>
+                                    <p className="text-[11px] text-gray-600 dark:text-gray-400">
+                                        ✨ <strong>បង្កើតថ្មីស្វ័យប្រវត្តិ៖</strong> ទុកប្រអប់ Canvas ID ឱ្យទទេ រួចដាក់រូបភាព ចំណងជើង និង Link URL ខាងក្រោម — ប្រព័ន្ធនឹងបង្កើត Instant Experience Canvas ថ្មីលើផេក និងបង្ហោះឡើង Timeline ភ្លាមៗ!
+                                    </p>
                                     {canvases.length > 0 && (
                                         <select
                                             value={canvasId}
                                             onChange={(e) => setCanvasId(e.target.value)}
                                             className="w-full bg-white dark:bg-gray-900 border border-purple-500/30 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 dark:text-white outline-none"
                                         >
-                                            <option value="">-- ជ្រើស Canvas របស់ផេក --</option>
+                                            <option value="">✨ បង្កើត Instant Experience Canvas ថ្មីស្វ័យប្រវត្តិ</option>
                                             {canvases.map((cv) => (
                                                 <option key={cv.id} value={cv.id}>
                                                     {cv.name || "Instant Experience"} (ID: {cv.id})
@@ -1531,9 +1693,101 @@ export default function Post() {
                                         type="text"
                                         value={canvasId}
                                         onChange={(e) => setCanvasId(e.target.value)}
-                                        placeholder="ឬវាយ Canvas ID ដោយដៃ (ឧទាហរណ៍ 1234567890...)"
+                                        placeholder="ទុកទទេដើម្បីបង្កើត Canvas ថ្មីស្វ័យប្រវត្តិ ឬវាយ Canvas ID ដែលមានស្រាប់..."
                                         className="w-full bg-white dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-gray-900 dark:text-white outline-none"
                                     />
+                                </div>
+                            )}
+
+                            {postFormat === "other_socials" && (
+                                <div className="p-4 rounded-xl bg-sky-500/[0.06] border border-sky-500/20 space-y-3.5">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <span className="text-xs font-bold text-sky-700 dark:text-sky-300">
+                                            🌐 Post to Other Socials (បង្ហោះទៅ Telegram, TikTok, YouTube, Instagram, Threads, X)
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { id: "telegram", label: "✈️ Telegram Channel/Group (Auto API)" },
+                                            { id: "tiktok", label: "🎵 TikTok Studio" },
+                                            { id: "youtube", label: "▶️ YouTube Shorts / Studio" },
+                                            { id: "instagram", label: "📸 Instagram Reels / Feed" },
+                                            { id: "threads", label: "🧵 Threads" },
+                                            { id: "x", label: "𝕏 Twitter / X" }
+                                        ].map((plat) => {
+                                            const active = selectedSocialPlatforms.includes(plat.id);
+                                            return (
+                                                <button
+                                                    key={plat.id}
+                                                    type="button"
+                                                    onClick={() => toggleSocialPlatform(plat.id)}
+                                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                                                        active
+                                                            ? "bg-sky-600 text-white border-sky-600 shadow-xs"
+                                                            : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10"
+                                                    }`}
+                                                >
+                                                    {active ? "✓ " : ""}{plat.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {selectedSocialPlatforms.includes("telegram") && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                                                    🤖 Telegram Bot Token (ពី @BotFather)
+                                                </label>
+                                                <input
+                                                    type="password"
+                                                    value={telegramBotToken}
+                                                    onChange={(e) => setTelegramBotToken(e.target.value)}
+                                                    placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ..."
+                                                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-sky-500"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                                                    📢 Telegram Channel ឬ Group Chat ID
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={telegramChatId}
+                                                    onChange={(e) => setTelegramChatId(e.target.value)}
+                                                    placeholder="@your_channel ឬ -1001234567890"
+                                                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-sky-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                                                ចំណងជើង / ប៊ូតុង (Headline / Button Text)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={headline}
+                                                onChange={(e) => setHeadline(e.target.value)}
+                                                placeholder="បញ្ចូលចំណងជើង..."
+                                                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                                                តំណភ្ជាប់ប៊ូតុង (Link URL - Optional)
+                                            </label>
+                                            <input
+                                                type="url"
+                                                value={targetLink}
+                                                onChange={(e) => setTargetLink(e.target.value)}
+                                                placeholder="https://..."
+                                                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -1937,19 +2191,39 @@ export default function Post() {
                                     ជំហានទី ៣៖ បង្ហោះ ឬកំណត់ម៉ោង
                                 </h3>
 
-                                {/* Auto-Reply Bot Toggle */}
-                                <label className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 cursor-pointer select-none w-fit">
-                                    <input
-                                        type="checkbox"
-                                        checked={autoReplyBot}
-                                        onChange={(e) => setAutoReplyBot(e.target.checked)}
-                                        className="w-4 h-4 rounded text-purple-600"
-                                    />
-                                    <MessageSquare size={14} className="text-purple-600 dark:text-purple-400" />
-                                    <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
-                                        បើក Bot ឆ្លើយខមិនស្វ័យប្រវត្តិ
-                                    </span>
-                                </label>
+                                {/* Auto-Reply Bot & Cross-Post Telegram Toggles */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {postFormat !== "other_socials" && (
+                                        <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/20 cursor-pointer select-none w-fit">
+                                            <input
+                                                type="checkbox"
+                                                checked={alsoPostToTelegram}
+                                                onChange={(e) => {
+                                                    setAlsoPostToTelegram(e.target.checked);
+                                                    if (e.target.checked && (!telegramBotToken.trim() || !telegramChatId.trim())) {
+                                                        toast("សូមបញ្ចូល Telegram Bot Token និង Chat ID ក្នុងផ្ទាំង '🌐 Post to Other Socials' ជាមុនសិន!", { icon: "✈️" });
+                                                    }
+                                                }}
+                                                className="w-4 h-4 rounded text-sky-600"
+                                            />
+                                            <span className="text-xs font-bold text-sky-700 dark:text-sky-300">
+                                                ✈️ បង្ហោះចូល Telegram ព្រមគ្នា
+                                            </span>
+                                        </label>
+                                    )}
+                                    <label className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 cursor-pointer select-none w-fit">
+                                        <input
+                                            type="checkbox"
+                                            checked={autoReplyBot}
+                                            onChange={(e) => setAutoReplyBot(e.target.checked)}
+                                            className="w-4 h-4 rounded text-purple-600"
+                                        />
+                                        <MessageSquare size={14} className="text-purple-600 dark:text-purple-400" />
+                                        <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
+                                            បើក Bot ឆ្លើយខមិនស្វ័យប្រវត្តិ
+                                        </span>
+                                    </label>
+                                </div>
                             </div>
 
                             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">

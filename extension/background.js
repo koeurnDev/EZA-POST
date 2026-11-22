@@ -1999,16 +1999,254 @@ async function publishAdCreativeInBrowser(payload, senderTabId = null) {
         }
       }
 
+      if (format === "stories") {
+        sendProgress("២/៣ កំពុងបង្ហោះ Story (9:16) ឡើងផេក Facebook...");
+        let storyPosted = false;
+        let lastStoryErr = null;
+
+        if (payload?.videoUrl) {
+          let videoBlob = null;
+          try {
+            const vRes = await fetchWithTimeout(payload.videoUrl, {}, 25000).catch(() => null);
+            if (vRes?.ok) videoBlob = await vRes.blob();
+          } catch {}
+
+          for (const pt of pageTokens) {
+            try {
+              const startRes = await extGraphPost(
+                `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/video_stories`,
+                {
+                  access_token: pt,
+                  upload_phase: "start"
+                },
+                10000
+              );
+              const storyVidId = startRes?.video_id;
+              const uploadUrl =
+                startRes?.upload_url ||
+                (storyVidId ? `https://rupload.facebook.com/video-upload/v21.0/${encodeURIComponent(storyVidId)}` : null);
+
+              if (storyVidId && uploadUrl) {
+                let uploadedOk = false;
+                if (videoBlob && videoBlob.size > 0) {
+                  const upRes = await fetchWithTimeout(
+                    uploadUrl,
+                    {
+                      method: "POST",
+                      headers: {
+                        Authorization: `OAuth ${pt}`,
+                        offset: "0",
+                        file_size: String(videoBlob.size)
+                      },
+                      body: videoBlob
+                    },
+                    35000
+                  ).catch(() => null);
+                  if (upRes?.ok) uploadedOk = true;
+                }
+                if (!uploadedOk) {
+                  const upUrlRes = await fetchWithTimeout(
+                    uploadUrl,
+                    {
+                      method: "POST",
+                      headers: {
+                        Authorization: `OAuth ${pt}`,
+                        file_url: payload.videoUrl
+                      }
+                    },
+                    25000
+                  ).catch(() => null);
+                  if (upUrlRes?.ok) uploadedOk = true;
+                }
+
+                if (uploadedOk) {
+                  const finRes = await extGraphPost(
+                    `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/video_stories`,
+                    {
+                      access_token: pt,
+                      video_id: String(storyVidId),
+                      upload_phase: "finish"
+                    },
+                    12000
+                  );
+                  const sid = String(finRes?.post_id || storyVidId);
+                  results.push({
+                    pageId,
+                    pageName,
+                    storyId: sid,
+                    postUrl: `https://www.facebook.com/${pageId}`,
+                    publishedToTimeline: true
+                  });
+                  storyPosted = true;
+                  break;
+                }
+              }
+            } catch (e) {
+              lastStoryErr = e;
+            }
+          }
+
+          if (!storyPosted) {
+            try {
+              const uploaded = await extUploadPageVideo(pageId, pageTokens, payload.videoUrl, {
+                published: true,
+                description: payload?.caption || "",
+                title: payload?.headline || pageName
+              });
+              results.push({
+                pageId,
+                pageName,
+                storyId: uploaded.id,
+                postUrl: `https://www.facebook.com/${pageId}/videos/${uploaded.id}`,
+                publishedToTimeline: true
+              });
+              storyPosted = true;
+            } catch (e) {
+              lastStoryErr = e;
+            }
+          }
+        } else {
+          const rawImgUrl =
+            payload?.imageUrl ||
+            (Array.isArray(payload?.imageUrls) && payload.imageUrls[0]) ||
+            payload?.thumbnailUrl ||
+            (await extResolvePageAvatarCdn(pageId, pageTokens));
+
+          const fbImg = await extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, rawImgUrl);
+          for (const pt of pageTokens) {
+            try {
+              let photoId = fbImg?.photoId || null;
+              if (!photoId) {
+                const upPhoto = await extGraphPost(
+                  `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/photos`,
+                  {
+                    access_token: pt,
+                    published: "false",
+                    url: rawImgUrl
+                  },
+                  12000
+                );
+                if (upPhoto?.id) photoId = String(upPhoto.id);
+              }
+              if (photoId) {
+                const stRes = await extGraphPost(
+                  `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/photo_stories`,
+                  {
+                    access_token: pt,
+                    photo_id: photoId
+                  },
+                  12000
+                );
+                const sid = String(stRes?.post_id || stRes?.id || photoId);
+                results.push({
+                  pageId,
+                  pageName,
+                  storyId: sid,
+                  postUrl: `https://www.facebook.com/${pageId}`,
+                  publishedToTimeline: true
+                });
+                storyPosted = true;
+                break;
+              }
+            } catch (e) {
+              lastStoryErr = e;
+            }
+          }
+
+          if (!storyPosted) {
+            for (const pt of pageTokens) {
+              try {
+                const data = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/photos`, {
+                  access_token: pt,
+                  published: "true",
+                  url: fbImg.url || rawImgUrl,
+                  ...(payload?.caption ? { caption: payload.caption } : {})
+                });
+                if (data?.post_id || data?.id) {
+                  const sid = String(data.post_id || data.id);
+                  results.push({
+                    pageId,
+                    pageName,
+                    storyId: sid,
+                    postUrl: `https://www.facebook.com/${sid}`,
+                    publishedToTimeline: true
+                  });
+                  storyPosted = true;
+                  break;
+                }
+              } catch (e) {
+                lastStoryErr = e;
+              }
+            }
+          }
+        }
+
+        if (!storyPosted) throw lastStoryErr || new Error("មិនអាចបង្ហោះ Story ឡើងផេកបានទេ");
+        continue;
+      }
+
       if (format === "photo_cta" || format === "instant_experience") {
         const rawImgUrl = payload?.imageUrl || payload?.thumbnailUrl || (await extResolvePageAvatarCdn(pageId, pageTokens));
         const fbImg = await extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, rawImgUrl);
+        let resolvedCanvasId = payload?.canvasId || "";
+
+        if (format === "instant_experience" && !resolvedCanvasId && pageTokens.length > 0) {
+          sendProgress("២/៣ កំពុងបង្កើត Instant Experience Canvas ថ្មីលើផេក...");
+          for (const pt of pageTokens.slice(0, 1)) {
+            try {
+              const elementIds = [];
+              if (fbImg?.photoId) {
+                const phEl = await extGraphPost(
+                  `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/canvas_elements`,
+                  {
+                    access_token: pt,
+                    element_type: "PHOTO",
+                    photo: fbImg.photoId
+                  },
+                  6000
+                ).catch(() => null);
+                if (phEl?.id) elementIds.push(String(phEl.id));
+              }
+              const btnEl = await extGraphPost(
+                `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/canvas_elements`,
+                {
+                  access_token: pt,
+                  element_type: "BUTTON",
+                  text: JSON.stringify({
+                    text: payload?.headline || pageName,
+                    font_family: "sans-serif",
+                    font_size: 16,
+                    color: "#FFFFFF"
+                  }),
+                  background_color: "#1877F2",
+                  link_url: typeof payload?.canvasUrl === "string" && /^https?:\/\//i.test(payload.canvasUrl) ? payload.canvasUrl : defaultPageUrl
+                },
+                6000
+              ).catch(() => null);
+              if (btnEl?.id) elementIds.push(String(btnEl.id));
+
+              if (elementIds.length > 0) {
+                const cvRes = await extGraphPost(
+                  `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/canvases`,
+                  {
+                    access_token: pt,
+                    name: payload?.headline || `${pageName} Instant Experience`,
+                    body_element_ids: JSON.stringify(elementIds),
+                    is_published: "true"
+                  },
+                  8000
+                ).catch(() => null);
+                if (cvRes?.id) resolvedCanvasId = String(cvRes.id);
+              }
+            } catch {}
+          }
+        }
+
         const canvasLink =
           format === "instant_experience"
-            ? (typeof payload?.canvasUrl === "string" && /^https?:\/\//i.test(payload.canvasUrl)
-                ? payload.canvasUrl
-                : payload?.canvasId
-                  ? `https://fb.com/canvas_doc/${encodeURIComponent(payload.canvasId)}`
-                  : baseLink)
+            ? (resolvedCanvasId
+                ? `https://fb.com/canvas_doc/${encodeURIComponent(resolvedCanvasId)}`
+                : baseLink)
             : baseLink;
         const resolvedCta = extBuildCta(payload?.cta || "LEARN_MORE", canvasLink, pageId);
         let feedErr = null;
