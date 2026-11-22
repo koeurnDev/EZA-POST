@@ -26,7 +26,7 @@ const app = new Hono<{ Bindings: Env }>();
 // Enable CORS for web frontend
 app.use('*', cors({
   origin: '*',
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'Range']
 }));
 
@@ -988,8 +988,95 @@ app.get('/api/v1/media/:id/waveform', (c) => {
   return c.json({ peaks, sample_rate: 16000, duration: 25.0 });
 });
 
+// 8b. OpenGraph Carousel Card Bridge & Page Avatar Proxy for Facebook Scraper (facebookexternalhit)
+function escapeHtmlAttr(val: string): string {
+  return String(val || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+app.on(['GET', 'HEAD'], '/api/v1/page-avatar/:pageId', async (c) => {
+  const rawParam = c.req.param('pageId') || '';
+  const cleanId = rawParam.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+  const fallbackName = c.req.query('name') || 'Facebook Page';
+  const fbPicUrl = `https://graph.facebook.com/v21.0/${encodeURIComponent(cleanId)}/picture?type=large&width=720&height=720`;
+  try {
+    const res = await fetch(fbPicUrl, { redirect: 'follow' });
+    const ct = res.headers.get('content-type') || '';
+    if (res.ok && ct.startsWith('image/')) {
+      const buf = await res.arrayBuffer();
+      return new Response(c.req.method === 'HEAD' ? null : buf, {
+        status: 200,
+        headers: {
+          'Content-Type': ct,
+          'Content-Length': String(buf.byteLength),
+          'Cache-Control': 'public, max-age=86400'
+        }
+      });
+    }
+  } catch {}
+  const uiAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackName)}&size=600&background=1877F2&color=fff&format=png`;
+  const fallbackRes = await fetch(uiAvatarUrl);
+  const buf = await fallbackRes.arrayBuffer();
+  return new Response(c.req.method === 'HEAD' ? null : buf, {
+    status: 200,
+    headers: {
+      'Content-Type': 'image/png',
+      'Content-Length': String(buf.byteLength),
+      'Cache-Control': 'public, max-age=86400'
+    }
+  });
+});
+
+app.on(['GET', 'HEAD'], '/api/v1/og-card', async (c) => {
+  const img = c.req.query('img') || '';
+  const title = c.req.query('title') || 'Facebook Page';
+  const desc = c.req.query('desc') || '';
+  const to = c.req.query('to') || 'https://www.facebook.com';
+  const safeDest = /^https?:\/\//i.test(to) ? to : 'https://www.facebook.com';
+  const ua = c.req.header('user-agent') || '';
+  const isCrawler = /facebookexternalhit|Facebot|meta-externalagent|WhatsApp|TelegramBot|Twitterbot|bot|crawler|spider/i.test(ua);
+
+  if (!isCrawler && c.req.method === 'GET') {
+    return Response.redirect(safeDest, 302);
+  }
+
+  const selfUrl = c.req.url;
+  const html = `<!doctype html>
+<html lang="km">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtmlAttr(title)}</title>
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${escapeHtmlAttr(selfUrl)}" />
+  <meta property="og:title" content="${escapeHtmlAttr(title)}" />
+  <meta property="og:description" content="${escapeHtmlAttr(desc)}" />
+  ${img ? `<meta property="og:image" content="${escapeHtmlAttr(img)}" />
+  <meta property="og:image:secure_url" content="${escapeHtmlAttr(img)}" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1080" />
+  <meta property="og:image:height" content="1080" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="${escapeHtmlAttr(img)}" />` : ''}
+</head>
+<body>
+  <script>window.location.replace(${JSON.stringify(safeDest)});</script>
+</body>
+</html>`;
+
+  return new Response(c.req.method === 'HEAD' ? null : html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600'
+    }
+  });
+});
+
 // 9. Stream Media from Cloudflare R2
-app.get('/api/v1/media/:key{.*}', async (c) => {
+app.on(['GET', 'HEAD'], '/api/v1/media/:key{.*}', async (c) => {
   if (!c.env.MEDIA_BUCKET) {
     return c.text('R2 storage not configured. Please enable R2 in Cloudflare dashboard.', 503);
   }
@@ -1013,12 +1100,17 @@ app.get('/api/v1/media/:key{.*}', async (c) => {
   headers.set('Accept-Ranges', 'bytes');
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
 
+  const lowerKey = key.toLowerCase();
   if (!headers.get('Content-Type') || headers.get('Content-Type') === 'application/octet-stream') {
-    if (key.endsWith('.mp3')) headers.set('Content-Type', 'audio/mp3');
-    else if (key.endsWith('.mp4')) headers.set('Content-Type', 'video/mp4');
-    else if (key.endsWith('.wav')) headers.set('Content-Type', 'audio/wav');
-    else if (key.endsWith('.m4a')) headers.set('Content-Type', 'audio/mp4');
-    else if (key.endsWith('.webm')) headers.set('Content-Type', 'video/webm');
+    if (lowerKey.endsWith('.jpg') || lowerKey.endsWith('.jpeg')) headers.set('Content-Type', 'image/jpeg');
+    else if (lowerKey.endsWith('.png')) headers.set('Content-Type', 'image/png');
+    else if (lowerKey.endsWith('.webp')) headers.set('Content-Type', 'image/webp');
+    else if (lowerKey.endsWith('.gif')) headers.set('Content-Type', 'image/gif');
+    else if (lowerKey.endsWith('.mp3')) headers.set('Content-Type', 'audio/mp3');
+    else if (lowerKey.endsWith('.mp4')) headers.set('Content-Type', 'video/mp4');
+    else if (lowerKey.endsWith('.wav')) headers.set('Content-Type', 'audio/wav');
+    else if (lowerKey.endsWith('.m4a')) headers.set('Content-Type', 'audio/mp4');
+    else if (lowerKey.endsWith('.webm')) headers.set('Content-Type', 'video/webm');
   }
 
   const range = (object as any).range;
@@ -1026,10 +1118,12 @@ app.get('/api/v1/media/:key{.*}', async (c) => {
     const start = range.offset ?? 0;
     const end = range.length ? start + range.length - 1 : object.size - 1;
     headers.set('Content-Range', `bytes ${start}-${end}/${object.size}`);
-    return new Response(object.body, { status: 206, headers });
+    headers.set('Content-Length', String(end - start + 1));
+    return new Response(c.req.method === 'HEAD' ? null : object.body, { status: 206, headers });
   }
 
-  return new Response(object.body, { headers });
+  headers.set('Content-Length', String(object.size));
+  return new Response(c.req.method === 'HEAD' ? null : object.body, { headers });
 });
 
 // 10. Authentication Endpoints (Edge-Powered Registration & Login)

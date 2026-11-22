@@ -625,8 +625,48 @@ export default function Post() {
                 if (file.type?.startsWith("image/")) uploadedImageUrl = url;
                 else uploadedVideoUrl = url;
             }
-            const uploadedThumbUrl = thumbnail ? await uploadMediaFileToEdge(thumbnail) : null;
-            const uploadedRightUrl = rightSideImage ? await uploadMediaFileToEdge(rightSideImage) : null;
+
+            // Guarantee thumbnail & Card 2 image files exist for Video PE before uploading to Edge R2
+            let thumbFileToUpload = thumbnail;
+            if (!thumbFileToUpload && postFormat === "video_pe") {
+                if (thumbnailPreview?.startsWith("data:image/")) {
+                    thumbFileToUpload = dataURLtoFile(thumbnailPreview, "thumbnail.jpg");
+                } else if (galleryOptions[0]?.startsWith("data:image/")) {
+                    thumbFileToUpload = dataURLtoFile(galleryOptions[0], "thumbnail.jpg");
+                } else if (file && file.type?.startsWith("video/")) {
+                    try {
+                        const genDataUrl = await generateThumbnailFromVideo(file);
+                        thumbFileToUpload = dataURLtoFile(genDataUrl, "thumbnail.jpg");
+                    } catch {}
+                } else if (previewUrl) {
+                    try {
+                        const genDataUrl = await generateThumbnailFromVideo(previewUrl);
+                        thumbFileToUpload = dataURLtoFile(genDataUrl, "thumbnail.jpg");
+                    } catch {}
+                }
+            }
+
+            let rightFileToUpload = rightSideImage;
+            if (!rightFileToUpload && postFormat === "video_pe") {
+                if (rightSideImagePreview?.startsWith("data:image/")) {
+                    rightFileToUpload = dataURLtoFile(rightSideImagePreview, "card2.jpg");
+                } else if (galleryOptions[1]?.startsWith("data:image/")) {
+                    rightFileToUpload = dataURLtoFile(galleryOptions[1], "card2.jpg");
+                } else {
+                    rightFileToUpload = thumbFileToUpload;
+                }
+            }
+
+            const primaryPageId = selectedPages[0] || "";
+            const primaryPageObj = availablePages.find((p) => p.id === primaryPageId);
+            const pageAvatarProxyUrl = `${window.location.origin}/api/v1/page-avatar/${encodeURIComponent(primaryPageId)}.jpg?name=${encodeURIComponent(primaryPageObj?.name || "Page")}`;
+
+            const uploadedThumbUrl = thumbFileToUpload
+                ? await uploadMediaFileToEdge(thumbFileToUpload)
+                : (thumbnailPreview?.startsWith("https://") ? thumbnailPreview : pageAvatarProxyUrl);
+            const uploadedRightUrl = rightFileToUpload
+                ? await uploadMediaFileToEdge(rightFileToUpload)
+                : (rightSideImagePreview?.startsWith("https://") ? rightSideImagePreview : uploadedThumbUrl);
 
             const uploadedPhotoUrls = [];
             if (postFormat === "photos") {
@@ -644,51 +684,70 @@ export default function Post() {
             }
 
             const safeCta = sanitizeCtaValue(cta);
+            const destBaseLink = targetLink.trim() || `https://facebook.com/${primaryPageId}`;
+            const buildOgCardBridgeLink = (imgUrl, cardTitle, cardDesc, destUrl, cardIndex) => {
+                const params = new URLSearchParams({
+                    img: imgUrl || pageAvatarProxyUrl,
+                    title: cardTitle || primaryPageObj?.name || "Facebook Page",
+                    desc: cardDesc || "",
+                    to: destUrl || destBaseLink,
+                    c: String(cardIndex),
+                    t: String(Date.now())
+                });
+                return `${window.location.origin}/api/v1/og-card?${params.toString()}`;
+            };
+
             let cardsPayload = [];
             if (postFormat === "video_pe") {
+                const card1Title = headline || primaryPageObj?.name || "Facebook Page";
+                const card1Desc = cardDescription || "Swipe to see more";
+                const card2Title = carouselCtaText.replace(/\n/g, " ") || card1Title;
                 cardsPayload = [
                     {
                         id: "video-main",
                         type: "video",
                         mediaUrl: uploadedVideoUrl,
-                        headline: headline || "",
-                        description: cardDescription || "Swipe to see more",
-                        link: targetLink.trim(),
+                        pictureUrl: uploadedThumbUrl,
+                        headline: card1Title,
+                        description: card1Desc,
+                        link: buildOgCardBridgeLink(uploadedThumbUrl, card1Title, card1Desc, destBaseLink, 0),
                         cta: safeCta
                     },
-                    ...(uploadedRightUrl
-                        ? [
-                              {
-                                  id: "right-side-image",
-                                  type: "image",
-                                  mediaUrl: uploadedRightUrl,
-                                  headline: carouselCtaText.replace(/\n/g, " "),
-                                  description: "",
-                                  link: targetLink.trim(),
-                                  cta: safeCta
-                              }
-                          ]
-                        : []),
+                    {
+                        id: "right-side-image",
+                        type: "image",
+                        mediaUrl: uploadedRightUrl,
+                        pictureUrl: uploadedRightUrl,
+                        headline: card2Title,
+                        description: "",
+                        link: buildOgCardBridgeLink(uploadedRightUrl, card2Title, "", destBaseLink, 1),
+                        cta: safeCta
+                    },
                     {
                         id: "card-destination-final",
                         type: "image",
-                        isPageCard: true,
+                        isPageCard: false,
+                        mediaUrl: pageAvatarProxyUrl,
+                        pictureUrl: pageAvatarProxyUrl,
                         headline: "មើលច្រើនទៀតនៅ",
                         description: "FACEBOOK.COM",
-                        link: targetLink.trim(),
+                        link: buildOgCardBridgeLink(pageAvatarProxyUrl, "មើលច្រើនទៀតនៅ", "FACEBOOK.COM", destBaseLink, 2),
                         cta: safeCta
                     }
                 ];
             } else if (postFormat === "photo_pe") {
                 for (const [idx, img] of multiImages.entries()) {
                     const imgUrl = img.file ? await uploadMediaFileToEdge(img.file) : img.preview;
+                    const cardTitle = img.headline || headline || primaryPageObj?.name || "Facebook Page";
+                    const cardDest = img.link || destBaseLink;
                     cardsPayload.push({
                         id: img.id || `photo-card-${idx}`,
                         type: "image",
                         mediaUrl: imgUrl,
-                        headline: img.headline || headline || "",
+                        pictureUrl: imgUrl,
+                        headline: cardTitle,
                         description: cardDescription || "",
-                        link: img.link || targetLink.trim() || "",
+                        link: buildOgCardBridgeLink(imgUrl, cardTitle, cardDescription || "", cardDest, idx),
                         cta: sanitizeCtaValue(img.cta || safeCta)
                     });
                 }
@@ -699,12 +758,22 @@ export default function Post() {
                 return { id, name: found?.name || "Facebook Page" };
             });
 
+            const primaryOgLink =
+                cardsPayload[0]?.link ||
+                buildOgCardBridgeLink(
+                    uploadedImageUrl || uploadedThumbUrl,
+                    headline.trim() || primaryPageObj?.name || "Facebook Page",
+                    cardDescription.trim(),
+                    destBaseLink,
+                    0
+                );
+
             toast.loading("កំពុងបង្ហោះឡើង Facebook Page Timeline ផ្ទាល់ពី Browser...", { id: toastId });
 
             const extResult = await new Promise((resolve) => {
                 const timer = setTimeout(() => {
                     window.removeEventListener("message", listener);
-                    resolve({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.3.6 ហើយ Refresh ទំព័រ!" });
+                    resolve({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.3.8 ហើយ Refresh ទំព័រ!" });
                 }, 120000);
 
                 const listener = (event) => {
@@ -730,7 +799,7 @@ export default function Post() {
                             caption,
                             headline: headline.trim(),
                             description: cardDescription.trim(),
-                            link: targetLink.trim(),
+                            link: postFormat === "text_link" ? targetLink.trim() : primaryOgLink,
                             cta: safeCta,
                             canvasId,
                             canvasUrl: postFormat === "instant_experience" ? targetLink.trim() : "",

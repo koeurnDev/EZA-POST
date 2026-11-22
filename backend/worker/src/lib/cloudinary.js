@@ -21,6 +21,13 @@ function getFrontendUrl(env) {
   return (env.FRONTEND_URL || "https://eza-post-3kv.pages.dev").replace(/\/$/, "");
 }
 
+function encodeR2KeyPath(key) {
+  return String(key)
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
 export async function uploadScheduledMedia(file, env) {
   if (!(file instanceof File)) throw new Error("Scheduled media must be a file.");
   if (!allowedMimeTypes.has(file.type)) {
@@ -53,7 +60,7 @@ export async function uploadScheduledMedia(file, env) {
     }
   });
 
-  const mediaUrl = `${getFrontendUrl(env)}/api/v1/media/${encodeURIComponent(key)}`;
+  const mediaUrl = `${getFrontendUrl(env)}/api/v1/media/${encodeR2KeyPath(key)}`;
 
   return {
     url: mediaUrl,
@@ -84,7 +91,7 @@ export async function uploadProfileImage(file, folder, env) {
     }
   });
 
-  const mediaUrl = `${getFrontendUrl(env)}/api/v1/media/${encodeURIComponent(key)}`;
+  const mediaUrl = `${getFrontendUrl(env)}/api/v1/media/${encodeR2KeyPath(key)}`;
 
   return {
     url: mediaUrl,

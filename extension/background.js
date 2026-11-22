@@ -1757,36 +1757,29 @@ async function publishAdCreativeInBrowser(payload) {
           } catch {
             pageVideoId = null;
           }
-        }
-
-        const resolvedAvatarCdn = await extResolvePageAvatarCdn(pageId, pageTokens);
-        const thumbFbImg = payload?.thumbnailUrl
-          ? await extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, payload.thumbnailUrl)
-          : { hash: null, url: resolvedAvatarCdn };
-
-        const resolvedCardImages = [];
-        for (const card of cards) {
-          if (card.type === "video") {
-            resolvedCardImages.push(thumbFbImg);
-          } else if (card.isPageCard) {
-            resolvedCardImages.push({ hash: null, url: resolvedAvatarCdn });
-          } else {
-            const srcImg = card.mediaUrl || resolvedAvatarCdn;
-            resolvedCardImages.push(
-              await extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, srcImg)
-            );
+          if (!pageVideoId && actId && adsToken) {
+            try {
+              const avId = await extUploadAdVideo(actId, adsToken, payload.videoUrl);
+              await extWaitForVideoReady(avId, adsToken);
+              pageVideoId = avId;
+            } catch {
+              pageVideoId = null;
+            }
           }
         }
 
+        const pageAvatarProxy = `https://moneaa.site/api/v1/page-avatar/${encodeURIComponent(pageId)}.jpg?name=${encodeURIComponent(pageName)}`;
+        const thumbUrl = payload?.thumbnailUrl || pageAvatarProxy;
+
         const buildFeedCards = (includeVideoId, includeCta = true) =>
-          cards.map((card, idx) => {
+          cards.map((card) => {
             const cardLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
             const cardCta = includeCta ? extBuildCta(card.cta || payload?.cta, cardLink, pageId) : undefined;
-            const imgAsset = resolvedCardImages[idx];
+            const cardPic = card.pictureUrl || (card.type === "video" ? thumbUrl : (card.mediaUrl || pageAvatarProxy));
             if (card.type === "video") {
               return {
                 ...(includeVideoId && pageVideoId ? { video_id: pageVideoId } : {}),
-                picture: imgAsset?.url || resolvedAvatarCdn,
+                picture: cardPic,
                 link: cardLink,
                 name: card.headline || payload?.headline || pageName,
                 description: card.description || payload?.description || "",
@@ -1794,7 +1787,7 @@ async function publishAdCreativeInBrowser(payload) {
               };
             }
             return {
-              picture: imgAsset?.url || resolvedAvatarCdn,
+              picture: cardPic,
               link: cardLink,
               name: card.headline || payload?.headline || pageName,
               description: card.description || payload?.description || "",
