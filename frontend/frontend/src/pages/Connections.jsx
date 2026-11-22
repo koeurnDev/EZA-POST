@@ -39,6 +39,7 @@ export default function Connections() {
 
     // 🧩 EZA-POST FB Extension Live Status
     const [extensionInstalled, setExtensionInstalled] = useState(false);
+    const [extensionVersion, setExtensionVersion] = useState(null);
     const [fbBrowserLoggedIn, setFbBrowserLoggedIn] = useState(false);
     const [fbBrowserUserId, setFbBrowserUserId] = useState(null);
     const [isSyncingViaExt, setIsSyncingViaExt] = useState(false);
@@ -57,6 +58,8 @@ export default function Connections() {
         const checkDomAttr = () => {
             if (document.documentElement.getAttribute("data-eza-extension") === "installed") {
                 setExtensionInstalled(true);
+                const ver = document.documentElement.getAttribute("data-eza-extension-version");
+                if (ver) setExtensionVersion(ver);
             }
         };
         checkDomAttr();
@@ -66,10 +69,11 @@ export default function Connections() {
                 return;
             }
 
-            const { action, installed, fbLoggedIn, fbUserId, ok, cookieString, accessToken, adsToken, adAccounts: extAdAccounts, fbUser, pages: extPages, error } = event.data;
+            const { action, installed, version, fbLoggedIn, fbUserId, ok, cookieString, accessToken, adsToken, adAccounts: extAdAccounts, fbUser, pages: extPages, error } = event.data;
 
             if (action === "EXTENSION_STATUS") {
                 if (installed) setExtensionInstalled(true);
+                if (version) setExtensionVersion(version);
                 setFbBrowserLoggedIn(Boolean(fbLoggedIn));
                 setFbBrowserUserId(fbUserId || null);
             } else if (action === "FB_SYNC_PAYLOAD") {
@@ -167,9 +171,9 @@ export default function Connections() {
             extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
 
         if (!isDomInstalled) {
-            toast("សូមទាញយក និងដំឡើង EZA-POST Extension ជាមុនសិន!", {
+            toast("សូមទាញយក និងដំឡើង EZA-POST Extension v2.2.0 ជាមុនសិន (បើដំឡើងរួច សូមចុច Refresh F5 ម្តង)!", {
                 icon: "🧩",
-                duration: 4500
+                duration: 5500
             });
             installGuideRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             return;
@@ -264,6 +268,16 @@ export default function Connections() {
                                             <> • <strong className="text-blue-600 dark:text-blue-400">{adAccounts.length}</strong> Ad Accounts (PE / CTA Ready)</>
                                         )}
                                     </p>
+                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.0") && (
+                                        <a
+                                            href="/eza-post-fb-extension.zip"
+                                            download="EZA-POST-FB-Extension.zip"
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition font-khmer"
+                                        >
+                                            <Download size={11} />
+                                            <span>Extension កំណែចាស់ — ទាញយក v2.2.0 ថ្មី</span>
+                                        </a>
+                                    )}
                                 </div>
                             </div>
 
@@ -322,10 +336,21 @@ export default function Connections() {
                                         />
                                         <span>
                                             {extensionInstalled
-                                                ? "បានដំឡើង Extension រួចរាល់"
+                                                ? `បានដំឡើង Extension${extensionVersion ? ` v${extensionVersion}` : ""}`
                                                 : "មិនទាន់ដំឡើង Extension"}
                                         </span>
                                     </span>
+
+                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.0") && (
+                                        <a
+                                            href="/eza-post-fb-extension.zip"
+                                            download="EZA-POST-FB-Extension.zip"
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition font-khmer"
+                                        >
+                                            <Download size={12} />
+                                            <span>អាប់ដេតទៅ v2.2.0 (គាំទ្រ Ads & PE/CTA)</span>
+                                        </a>
+                                    )}
 
                                     {extensionInstalled && (
                                         <span
@@ -468,7 +493,7 @@ export default function Connections() {
                                         បើកកុងតាក់ និងដំឡើងក្នុង Chrome
                                     </h3>
                                     <p className="text-xs text-slate-600 dark:text-slate-400 font-khmer leading-relaxed">
-                                        បើកផ្ទាំងថ្មីក្នុង Chrome ចូលទៅ <code>chrome://extensions</code> បើកកុងតាក់ <strong>Developer mode</strong> រួចចុច <strong>Load unpacked</strong> ជ្រើសរើស Folder ដែលបានពន្លា។
+                                        ចូល <code>chrome://extensions</code> បើក <strong>Developer mode</strong> លុបកំណែចាស់ចោល (បើមាន) រួចចុច <strong>Load unpacked</strong> ជ្រើស Folder ថ្មី និងចុច <strong>Refresh ទំព័រ (F5)</strong>។
                                     </p>
                                 </div>
                                 <button

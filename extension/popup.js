@@ -15,6 +15,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnOpenDashboard = document.getElementById("btnOpenDashboard");
   const messageBox = document.getElementById("messageBox");
   const messageContent = document.getElementById("messageContent");
+  const extVersion = document.getElementById("extVersion");
+
+  if (extVersion && chrome?.runtime?.getManifest) {
+    extVersion.textContent = `v${chrome.runtime.getManifest().version || "2.2.0"}`;
+  }
 
   let fbUserId = null;
 
@@ -34,8 +39,30 @@ document.addEventListener("DOMContentLoaded", async () => {
         ]
       });
       if (tabs && tabs.length > 0 && tabs[0].url) {
-        const u = new URL(tabs[0].url);
+        const activeTab = tabs.find((t) => t.active) || tabs[0];
+        const u = new URL(activeTab.url);
         serverUrl = u.origin;
+
+        // Pull JWT directly from an already-open tab even if user hasn't refreshed after installing/updating extension
+        if (!ezaAuthToken && activeTab.id && chrome?.scripting?.executeScript) {
+          try {
+            const [{ result }] = await chrome.scripting.executeScript({
+              target: { tabId: activeTab.id },
+              func: () => localStorage.getItem("eza_post_token") || localStorage.getItem("token") || ""
+            });
+            if (result) {
+              ezaAuthToken = result;
+              chrome.storage.local.set({ ezaAuthToken: result, serverUrl }).catch(() => {});
+            }
+          } catch (e) {}
+        }
+      }
+
+      if (!ezaAuthToken && chrome?.cookies?.get) {
+        const cookie = await chrome.cookies.get({ url: serverUrl, name: "token" }).catch(() => null);
+        if (cookie?.value) {
+          ezaAuthToken = cookie.value;
+        }
       }
     } catch (e) {}
 
