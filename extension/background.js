@@ -1132,13 +1132,37 @@ async function openFacebookComposerAssist(payload) {
   return { ok: true, tabId: createdTab.id };
 }
 
+const FB_VALID_CTA_TYPES = new Set([
+  "LEARN_MORE",
+  "SHOP_NOW",
+  "SIGN_UP",
+  "BOOK_NOW",
+  "WATCH_MORE",
+  "WATCH_VIDEO",
+  "CONTACT_US",
+  "ORDER_NOW",
+  "APPLY_NOW",
+  "DOWNLOAD",
+  "GET_OFFER",
+  "GET_QUOTE",
+  "SUBSCRIBE",
+  "SEE_MORE",
+  "LIKE_PAGE",
+  "MESSAGE_PAGE",
+  "WHATSAPP_MESSAGE"
+]);
+
 function extBuildCta(cta, link, pageId) {
   if (!cta || cta === "NO_BUTTON") return undefined;
-  if (cta === "SEND_MESSAGE" || cta === "MESSAGE_PAGE") {
-    return { type: "MESSAGE_PAGE", value: { app_destination: "MESSENGER" } };
-  }
   const safeLink = typeof link === "string" && /^https?:\/\//i.test(link) ? link : `https://facebook.com/${pageId}`;
-  return { type: cta, value: { link: safeLink } };
+  if (cta === "SEND_MESSAGE" || cta === "MESSAGE_PAGE") {
+    return { type: "MESSAGE_PAGE", value: { link: safeLink } };
+  }
+  if (cta === "FOLLOW") {
+    return { type: "LEARN_MORE", value: { link: safeLink } };
+  }
+  const normalizedType = FB_VALID_CTA_TYPES.has(cta) ? cta : "LEARN_MORE";
+  return { type: normalizedType, value: { link: safeLink } };
 }
 
 async function extGraphPost(url, bodyParams) {
@@ -1754,10 +1778,10 @@ async function publishAdCreativeInBrowser(payload) {
           }
         }
 
-        const buildFeedCards = (includeVideoId) =>
+        const buildFeedCards = (includeVideoId, includeCta = true) =>
           cards.map((card, idx) => {
             const cardLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
-            const cardCta = extBuildCta(card.cta || payload?.cta, cardLink, pageId);
+            const cardCta = includeCta ? extBuildCta(card.cta || payload?.cta, cardLink, pageId) : undefined;
             const imgAsset = resolvedCardImages[idx];
             if (card.type === "video") {
               return {
@@ -1779,8 +1803,8 @@ async function publishAdCreativeInBrowser(payload) {
           });
 
         const candidateLists = pageVideoId
-          ? [buildFeedCards(true), buildFeedCards(false)]
-          : [buildFeedCards(false)];
+          ? [buildFeedCards(true, true), buildFeedCards(false, true), buildFeedCards(false, false)]
+          : [buildFeedCards(false, true), buildFeedCards(false, false)];
 
         let postedFeed = false;
         let lastFeedErr = null;

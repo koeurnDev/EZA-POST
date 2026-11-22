@@ -31,15 +31,22 @@ const POST_FORMATS = [
 ];
 
 const CTA_OPTIONS = [
-    { value: "LEARN_MORE", label: "ស្វែងយល់ (Learn More)" },
+    { value: "LEARN_MORE", label: "ស្វែងយល់បន្ថែម (Learn More)" },
+    { value: "WATCH_MORE", label: "មើលវីដេអូបន្ថែម (Watch More)" },
     { value: "SHOP_NOW", label: "ទិញឥឡូវ (Shop Now)" },
-    { value: "SEND_MESSAGE", label: "ផ្ញើសារ (Send Message)" },
+    { value: "ORDER_NOW", label: "កម្ម៉ង់ឥឡូវ (Order Now)" },
     { value: "SIGN_UP", label: "ចុះឈ្មោះ (Sign Up)" },
     { value: "BOOK_NOW", label: "កក់ទុក (Book Now)" },
-    { value: "WATCH_MORE", label: "មើលបន្ថែម (Watch More)" },
-    { value: "CALL_NOW", label: "ហៅទូរស័ព្ទ (Call Now)" },
-    { value: "FOLLOW", label: "តាមដាន (Follow)" },
+    { value: "CONTACT_US", label: "ទាក់ទងមកយើង (Contact Us)" },
+    { value: "SEND_MESSAGE", label: "ផ្ញើសារ (Send Message)" },
+    { value: "NO_BUTTON", label: "គ្មានប៊ូតុង (No Button)" },
 ];
+
+const VALID_FEED_CTAS = new Set(CTA_OPTIONS.map((o) => o.value));
+function sanitizeCtaValue(val) {
+    if (!val || val === "FOLLOW" || !VALID_FEED_CTAS.has(val)) return "LEARN_MORE";
+    return val;
+}
 
 function normalizePostFormat(fmt) {
     if (fmt === "single") return "video";
@@ -136,7 +143,7 @@ export default function Post() {
                 if (savedPrefs) {
                     const prefs = JSON.parse(savedPrefs);
                     if (prefs.carouselCtaText) setCarouselCtaText(prefs.carouselCtaText);
-                    if (prefs.cta) setCta(prefs.cta);
+                    if (prefs.cta) setCta(sanitizeCtaValue(prefs.cta));
                 }
 
                 const savedDraft = localStorage.getItem("postDraft");
@@ -146,7 +153,7 @@ export default function Post() {
                     setHeadline(parsed.headline || "");
                     setTargetLink(parsed.targetLink || "");
                     if (parsed.carouselCtaText) setCarouselCtaText(parsed.carouselCtaText);
-                    if (parsed.cta) setCta(parsed.cta);
+                    if (parsed.cta) setCta(sanitizeCtaValue(parsed.cta));
                     if (Array.isArray(parsed.selectedPages)) setSelectedPages(parsed.selectedPages);
                     if (parsed.autoReplyBot !== undefined) setAutoReplyBot(parsed.autoReplyBot);
 
@@ -636,6 +643,7 @@ export default function Post() {
                 }
             }
 
+            const safeCta = sanitizeCtaValue(cta);
             let cardsPayload = [];
             if (postFormat === "video_pe") {
                 cardsPayload = [
@@ -646,7 +654,7 @@ export default function Post() {
                         headline: headline || "",
                         description: cardDescription || "Swipe to see more",
                         link: targetLink.trim(),
-                        cta
+                        cta: safeCta
                     },
                     ...(uploadedRightUrl
                         ? [
@@ -657,7 +665,7 @@ export default function Post() {
                                   headline: carouselCtaText.replace(/\n/g, " "),
                                   description: "",
                                   link: targetLink.trim(),
-                                  cta
+                                  cta: safeCta
                               }
                           ]
                         : []),
@@ -668,7 +676,7 @@ export default function Post() {
                         headline: "មើលច្រើនទៀតនៅ",
                         description: "FACEBOOK.COM",
                         link: targetLink.trim(),
-                        cta: cta || "LEARN_MORE"
+                        cta: safeCta
                     }
                 ];
             } else if (postFormat === "photo_pe") {
@@ -681,7 +689,7 @@ export default function Post() {
                         headline: img.headline || headline || "",
                         description: cardDescription || "",
                         link: img.link || targetLink.trim() || "",
-                        cta: img.cta || cta || "LEARN_MORE"
+                        cta: sanitizeCtaValue(img.cta || safeCta)
                     });
                 }
             }
@@ -723,7 +731,7 @@ export default function Post() {
                             headline: headline.trim(),
                             description: cardDescription.trim(),
                             link: targetLink.trim(),
-                            cta,
+                            cta: safeCta,
                             canvasId,
                             canvasUrl: postFormat === "instant_experience" ? targetLink.trim() : "",
                             videoUrl: uploadedVideoUrl,
