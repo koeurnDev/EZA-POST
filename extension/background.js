@@ -1393,36 +1393,68 @@ async function extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, imageU
   return { hash: null, photoId: null, url: imageUrl };
 }
 
-async function extWaitForVideoReady(videoId, token) {
-  if (!videoId || !token) return;
-  for (let i = 0; i < 5; i++) {
+async function extWaitForVideoReady(videoId, tokenOrTokens, sendProgress = null) {
+  if (!videoId) return false;
+  const tokens = (Array.isArray(tokenOrTokens) ? tokenOrTokens : [tokenOrTokens]).filter(Boolean);
+  if (tokens.length === 0) return false;
+
+  for (let i = 0; i < 25; i++) {
+    if (i > 0 && i % 2 === 0 && typeof sendProgress === "function") {
+      sendProgress(`២/៣ កំពុងរង់ចាំ Facebook ដំណើរការវីដេអូសម្រាប់ Carousel (${i * 2}s)...`);
+    }
     try {
-      for (const host of ["https://adsmanager-graph.facebook.com", "https://graph.facebook.com"]) {
-        const res = await fetchWithTimeout(
-          `${host}/v21.0/${encodeURIComponent(videoId)}?fields=status&access_token=${encodeURIComponent(token)}`,
-          { credentials: "include" },
-          3500
-        ).catch(() => null);
-        if (!res?.ok) continue;
-        const data = await res.json().catch(() => ({}));
-        const st = data?.status?.video_status || data?.status?.processing_phase?.status;
-        if (st === "ready" || st === "complete") return;
-        if (st === "error") return;
-        break;
+      for (const tok of tokens.slice(0, 2)) {
+        for (const host of ["https://graph.facebook.com", "https://adsmanager-graph.facebook.com"]) {
+          const res = await fetchWithTimeout(
+            `${host}/v21.0/${encodeURIComponent(videoId)}?fields=status&access_token=${encodeURIComponent(tok)}`,
+            { credentials: "include" },
+            3500
+          ).catch(() => null);
+          if (!res?.ok) continue;
+          const data = await res.json().catch(() => ({}));
+          const st = data?.status?.video_status || data?.status?.processing_phase?.status;
+          if (st === "ready" || st === "complete") return true;
+          if (st === "error" || st === "failed") return false;
+          break;
+        }
       }
     } catch {}
-    await sleep(1000);
+    await sleep(1500);
   }
+  return true;
+}
+
+async function extExtractExtraUserTokens() {
+  const found = [];
+  const endpoints = [
+    "https://business.facebook.com/business_locations",
+    "https://m.facebook.com/composer/ocelot/async_loader/?publisher=feed",
+    "https://adsmanager.facebook.com/adsmanager/manage/campaigns"
+  ];
+  await Promise.all(
+    endpoints.map(async (url) => {
+      try {
+        const res = await fetchWithTimeout(url, { credentials: "include" }, 4500).catch(() => null);
+        if (!res?.ok) return;
+        const text = await res.text().catch(() => "");
+        const matches = text.match(/EAA[A-Za-z0-9_-]{35,}/g);
+        if (matches) found.push(...matches);
+      } catch {}
+    })
+  );
+  return Array.from(new Set(found));
 }
 
 async function extResolvePageAccessToken(pageId, adsToken) {
   const tokens = [];
-  if (adsToken) {
-    for (const host of ["https://adsmanager-graph.facebook.com", "https://graph.facebook.com"]) {
+  const resolveFromUserTok = async (uTok) => {
+    if (!uTok) return;
+    for (const host of ["https://graph.facebook.com", "https://adsmanager-graph.facebook.com"]) {
       try {
-        const res = await fetch(
-          `${host}/v21.0/${encodeURIComponent(pageId)}?fields=access_token&access_token=${encodeURIComponent(adsToken)}`,
-          { credentials: "include" }
+        const res = await fetchWithTimeout(
+          `${host}/v21.0/${encodeURIComponent(pageId)}?fields=access_token&access_token=${encodeURIComponent(uTok)}`,
+          { credentials: "include" },
+          3500
         ).catch(() => null);
         if (res?.ok) {
           const data = await res.json().catch(() => ({}));
@@ -1431,9 +1463,10 @@ async function extResolvePageAccessToken(pageId, adsToken) {
       } catch {}
     }
     try {
-      const accRes = await fetch(
-        `https://graph.facebook.com/v21.0/me/accounts?fields=id,access_token&limit=100&access_token=${encodeURIComponent(adsToken)}`,
-        { credentials: "include" }
+      const accRes = await fetchWithTimeout(
+        `https://graph.facebook.com/v21.0/me/accounts?fields=id,access_token&limit=100&access_token=${encodeURIComponent(uTok)}`,
+        { credentials: "include" },
+        4000
       ).catch(() => null);
       if (accRes?.ok) {
         const accData = await accRes.json().catch(() => ({}));
@@ -1443,22 +1476,28 @@ async function extResolvePageAccessToken(pageId, adsToken) {
         if (match?.access_token) tokens.push(String(match.access_token));
       }
     } catch {}
+  };
+
+  if (adsToken) {
+    await resolveFromUserTok(adsToken);
   }
   try {
     const stored = await chrome.storage.local.get(["lastSyncedPageTokens", "lastSyncedUserToken"]).catch(() => ({}));
     const savedTok = stored?.lastSyncedPageTokens?.[String(pageId)];
     if (savedTok) tokens.push(String(savedTok));
     if (stored?.lastSyncedUserToken) {
-      const uRes = await fetch(
-        `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}?fields=access_token&access_token=${encodeURIComponent(stored.lastSyncedUserToken)}`,
-        { credentials: "include" }
-      ).catch(() => null);
-      if (uRes?.ok) {
-        const uData = await uRes.json().catch(() => ({}));
-        if (uData?.access_token) tokens.push(String(uData.access_token));
-      }
+      await resolveFromUserTok(stored.lastSyncedUserToken);
     }
   } catch {}
+  if (tokens.length === 0) {
+    try {
+      const extraUserTokens = await extExtractExtraUserTokens();
+      for (const uTok of extraUserTokens.slice(0, 3)) {
+        await resolveFromUserTok(uTok);
+        if (tokens.length > 0) break;
+      }
+    } catch {}
+  }
   if (tokens.length === 0) {
     try {
       const bizCtx = await extractBusinessPagesAndTokens();
@@ -1469,6 +1508,179 @@ async function extResolvePageAccessToken(pageId, adsToken) {
     } catch {}
   }
   return Array.from(new Set(tokens.filter((t) => /^EAA[A-Za-z0-9_-]{30,}$/.test(t))));
+}
+
+async function extUploadVideoContainerForCarousel(pageId, allTokens, actId, adsToken, videoUrl, thumbUrl, sendProgress) {
+  let videoBlob = null;
+  let thumbBlob = null;
+  let filename = "video.mp4";
+
+  await Promise.all([
+    (async () => {
+      try {
+        const vRes = await fetchWithTimeout(videoUrl, {}, 25000);
+        if (vRes.ok) {
+          videoBlob = await vRes.blob();
+          const parts = videoUrl.split("/");
+          const tail = decodeURIComponent(parts[parts.length - 1] || "").split("?")[0];
+          if (tail && tail.includes(".")) filename = tail.split("/").pop();
+        }
+      } catch {}
+    })(),
+    (async () => {
+      if (!thumbUrl) return;
+      try {
+        const tRes = await fetchWithTimeout(thumbUrl, { redirect: "follow" }, 10000);
+        if (tRes.ok) {
+          const b = await tRes.blob();
+          if (b && b.size > 0 && !String(b.type).includes("svg")) thumbBlob = b;
+        }
+      } catch {}
+    })()
+  ]);
+
+  // 1. Primary: Upload unpublished video container to /{pageId}/videos (published=false + thumb) exactly like fb.uploadVideoForCarousel
+  for (const pt of allTokens) {
+    if (videoBlob && videoBlob.size > 0) {
+      for (const host of ["https://graph.facebook.com", "https://graph-video.facebook.com", "https://adsmanager-graph.facebook.com"]) {
+        try {
+          const form = new FormData();
+          form.set("access_token", pt);
+          form.set("published", "false");
+          form.set("source", videoBlob, filename);
+          if (thumbBlob) form.set("thumb", thumbBlob, "thumb.jpg");
+
+          const res = await fetchWithTimeout(
+            `${host}/v21.0/${encodeURIComponent(pageId)}/videos`,
+            {
+              method: "POST",
+              credentials: "include",
+              body: form
+            },
+            35000
+          );
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data?.id) {
+            const vidId = String(data.id);
+            await extWaitForVideoReady(vidId, [pt, ...allTokens], sendProgress);
+            return vidId;
+          }
+        } catch {}
+      }
+    }
+
+    for (const host of ["https://graph.facebook.com", "https://graph-video.facebook.com"]) {
+      try {
+        const data = await extGraphPost(
+          `${host}/v21.0/${encodeURIComponent(pageId)}/videos`,
+          {
+            access_token: pt,
+            file_url: videoUrl,
+            published: "false"
+          },
+          20000
+        );
+        if (data?.id) {
+          const vidId = String(data.id);
+          await extWaitForVideoReady(vidId, [pt, ...allTokens], sendProgress);
+          return vidId;
+        }
+      } catch {}
+    }
+  }
+
+  // 2. Fallback: Upload to Ad Account /advideos
+  if (actId && adsToken) {
+    try {
+      const avId = await extUploadAdVideo(actId, adsToken, videoUrl);
+      if (avId) {
+        await extWaitForVideoReady(avId, [adsToken, ...allTokens], sendProgress);
+        return avId;
+      }
+    } catch {}
+  }
+
+  return null;
+}
+
+async function extUploadPhotoContainerForCarousel(pageId, allTokens, photoUrl, isPageCard = false, fallbackPhotoUrl = "") {
+  const uploadBlobOrUrl = async (targetUrl) => {
+    if (!targetUrl) return null;
+    let blob = null;
+    try {
+      const imgRes = await fetchWithTimeout(targetUrl, { redirect: "follow" }, 10000);
+      if (imgRes.ok) {
+        const b = await imgRes.blob();
+        if (b && b.size > 0 && !String(b.type).includes("svg")) blob = b;
+      }
+    } catch {}
+
+    for (const pt of allTokens) {
+      if (blob) {
+        for (const host of ["https://graph.facebook.com", "https://adsmanager-graph.facebook.com"]) {
+          try {
+            const form = new FormData();
+            form.set("access_token", pt);
+            form.set("published", "false");
+            form.set("source", blob, "photo.jpg");
+            const res = await fetchWithTimeout(
+              `${host}/v21.0/${encodeURIComponent(pageId)}/photos`,
+              {
+                method: "POST",
+                credentials: "include",
+                body: form
+              },
+              12000
+            );
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data?.id) return String(data.id);
+          } catch {}
+        }
+      }
+      try {
+        const data = await extGraphPost(
+          `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/photos`,
+          {
+            access_token: pt,
+            published: "false",
+            url: targetUrl
+          },
+          10000
+        );
+        if (data?.id) return String(data.id);
+      } catch {}
+    }
+    return null;
+  };
+
+  // Exact match with postService.js lines 212-233 for Page Card: fetch /{pageId}/picture?width=1000&redirect=false first
+  if (isPageCard) {
+    for (const pt of allTokens.slice(0, 2)) {
+      try {
+        const picRes = await fetchWithTimeout(
+          `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/picture?width=1000&redirect=false&access_token=${encodeURIComponent(pt)}`,
+          { credentials: "include" },
+          4000
+        ).catch(() => null);
+        if (picRes?.ok) {
+          const picData = await picRes.json().catch(() => ({}));
+          const realPicUrl = picData?.data?.url;
+          if (realPicUrl) {
+            const pid = await uploadBlobOrUrl(realPicUrl);
+            if (pid) return pid;
+          }
+        }
+      } catch {}
+    }
+  }
+
+  const primaryId = await uploadBlobOrUrl(photoUrl);
+  if (primaryId) return primaryId;
+
+  if (fallbackPhotoUrl && fallbackPhotoUrl !== photoUrl) {
+    return await uploadBlobOrUrl(fallbackPhotoUrl);
+  }
+  return null;
 }
 
 async function extUploadPageVideo(pageId, pageTokens, videoUrl, { published = true, description = "", title = "", ctaSpec = null } = {}) {
@@ -2290,73 +2502,104 @@ async function publishAdCreativeInBrowser(payload, senderTabId = null) {
         const allTokens = Array.from(new Set([...pageTokens, ...(adsToken ? [adsToken] : [])].filter(Boolean)));
         const pageAvatarProxy = `https://moneaa.site/api/v1/page-avatar/${encodeURIComponent(pageId)}.jpg?name=${encodeURIComponent(pageName)}`;
         const thumbUrl = payload?.thumbnailUrl || pageAvatarProxy;
+        const rawDestLink =
+          typeof payload?.rawTargetLink === "string" && /^https?:\/\//i.test(payload.rawTargetLink)
+            ? payload.rawTargetLink
+            : defaultPageUrl;
 
         let pageVideoId = null;
+        let cardPhotoIds = cards.map(() => null);
         let cardImageAssets = cards.map(() => ({ hash: null }));
 
-        if (format === "video_pe" && payload?.videoUrl) {
-          sendProgress("២/៣ កំពុងបង្ហោះវីដេអូ និងរូបកាតទាំង ៣ ទៅ Facebook...");
-          const uploadVideoTask = (async () => {
-            if (actId && adsToken) {
-              try {
-                const avId = await Promise.race([
-                  extUploadAdVideo(actId, adsToken, payload.videoUrl),
-                  new Promise((_, rej) => setTimeout(() => rej(new Error("Ad video upload timeout")), 22000))
-                ]);
-                if (avId) {
-                  await extWaitForVideoReady(avId, adsToken);
-                  return avId;
-                }
-              } catch {}
-            }
-            try {
-              const pv = await Promise.race([
-                extUploadPageVideo(pageId, allTokens.slice(0, 1), payload.videoUrl, { published: false }),
-                new Promise((_, rej) => setTimeout(() => rej(new Error("Page video upload timeout")), 18000))
-              ]);
-              if (pv?.id) {
-                await extWaitForVideoReady(pv.id, pv.token);
-                return pv.id;
-              }
-            } catch {}
-            return null;
-          })();
+        sendProgress("២/៣ កំពុងបង្ហោះ Video Container និង Photo Containers សម្រាប់ Carousel...");
 
-          const uploadImagesTask =
-            actId && adsToken
-              ? Promise.all(
-                  cards.map((card) => {
-                    const picUrl =
-                      card.type === "video"
-                        ? thumbUrl
-                        : card.pictureUrl || card.mediaUrl || pageAvatarProxy;
-                    return extUploadAdImage(actId, adsToken, picUrl).catch(() => ({ hash: null }));
-                  })
-                )
-              : Promise.resolve(cards.map(() => ({ hash: null })));
+        const nonVideoPicUrl =
+          cards.find((c) => c.type !== "video" && !c.isPageCard && (c.pictureUrl || c.mediaUrl))?.pictureUrl ||
+          cards.find((c) => c.type !== "video" && !c.isPageCard && (c.pictureUrl || c.mediaUrl))?.mediaUrl ||
+          thumbUrl;
 
-          const [resolvedVidId, resolvedImgAssets] = await Promise.all([uploadVideoTask, uploadImagesTask]);
-          pageVideoId = resolvedVidId;
-          cardImageAssets = resolvedImgAssets;
+        const uploadVideoTask =
+          format === "video_pe" && payload?.videoUrl
+            ? extUploadVideoContainerForCarousel(
+                pageId,
+                allTokens,
+                actId,
+                adsToken,
+                payload.videoUrl,
+                thumbUrl,
+                sendProgress
+              )
+            : Promise.resolve(null);
+
+        const uploadPhotoContainersTask = Promise.all(
+          cards.map((card, idx) => {
+            if (card.type === "video") return Promise.resolve(null);
+            const isPgCard = Boolean(card.isPageCard) || idx === cards.length - 1;
+            const picUrl = card.pictureUrl || card.mediaUrl || pageAvatarProxy;
+            return extUploadPhotoContainerForCarousel(pageId, allTokens, picUrl, isPgCard, nonVideoPicUrl).catch(
+              () => null
+            );
+          })
+        );
+
+        const uploadAdImagesTask =
+          actId && adsToken
+            ? Promise.all(
+                cards.map((card) => {
+                  const picUrl =
+                    card.type === "video" ? thumbUrl : card.pictureUrl || card.mediaUrl || pageAvatarProxy;
+                  return extUploadAdImage(actId, adsToken, picUrl).catch(() => ({ hash: null }));
+                })
+              )
+            : Promise.resolve(cards.map(() => ({ hash: null })));
+
+        const [resolvedVidId, resolvedPhotoIds, resolvedImgAssets] = await Promise.all([
+          uploadVideoTask,
+          uploadPhotoContainersTask,
+          uploadAdImagesTask
+        ]);
+        pageVideoId = resolvedVidId;
+        cardPhotoIds = resolvedPhotoIds;
+        cardImageAssets = resolvedImgAssets;
+
+        // Allow Facebook 1.8s to index newly created photo containers (exact match with fb.js uploadPhotoForCarousel)
+        if (cardPhotoIds.some(Boolean)) {
+          await sleep(1800);
         }
 
-        sendProgress("៣/៣ កំពុងបង្កើត 3-Card Carousel ឡើង Page Timeline...");
+        sendProgress("៣/៣ កំពុងបង្កើត 3-Card Video Carousel ឡើង Page Timeline...");
 
         const buildFeedCards = (videoMode = "none", includeCta = true) =>
           cards.map((card, idx) => {
-            const cardLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
-            const cardCta = includeCta ? extBuildCta(card.cta || payload?.cta, cardLink, pageId) : undefined;
-            const cardPic = card.pictureUrl || (card.type === "video" ? thumbUrl : (card.mediaUrl || pageAvatarProxy));
+            const cardOgLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
+            const cardRawDest =
+              typeof card.rawLink === "string" && /^https?:\/\//i.test(card.rawLink)
+                ? card.rawLink
+                : rawDestLink;
+            const cardPic = card.pictureUrl || (card.type === "video" ? thumbUrl : card.mediaUrl || pageAvatarProxy);
             const imgHash = cardImageAssets[idx]?.hash || null;
             const cardName = card.headline || payload?.headline || pageName;
             const cardDesc = card.description || payload?.description || "Swipe to see more";
 
+            if (videoMode === "media_fbid") {
+              const cardCta = includeCta ? extBuildCta(card.cta || payload?.cta, cardRawDest, pageId) : undefined;
+              const mediaFbid = card.type === "video" ? pageVideoId : cardPhotoIds[idx];
+              return {
+                link: cardRawDest,
+                name: cardName,
+                description: cardDesc,
+                ...(mediaFbid ? { media_fbid: mediaFbid } : { picture: cardPic }),
+                ...(cardCta ? { call_to_action: cardCta } : {})
+              };
+            }
+
+            const cardCta = includeCta ? extBuildCta(card.cta || payload?.cta, cardOgLink, pageId) : undefined;
             if (card.type === "video" && pageVideoId && videoMode !== "none") {
               if (videoMode === "ad_hash") {
                 return {
                   video_id: pageVideoId,
                   ...(imgHash ? { image_hash: imgHash } : { picture: cardPic }),
-                  link: cardLink,
+                  link: cardOgLink,
                   name: cardName,
                   description: cardDesc,
                   ...(cardCta ? { call_to_action: cardCta } : {})
@@ -2365,7 +2608,7 @@ async function publishAdCreativeInBrowser(payload, senderTabId = null) {
               return {
                 video_id: pageVideoId,
                 picture: cardPic,
-                link: cardLink,
+                link: cardOgLink,
                 name: cardName,
                 description: cardDesc,
                 ...(cardCta ? { call_to_action: cardCta } : {})
@@ -2374,7 +2617,7 @@ async function publishAdCreativeInBrowser(payload, senderTabId = null) {
             if (videoMode === "ad_hash") {
               return {
                 ...(imgHash ? { image_hash: imgHash } : { picture: cardPic }),
-                link: cardLink,
+                link: cardOgLink,
                 name: cardName,
                 description: cardDesc,
                 ...(cardCta ? { call_to_action: cardCta } : {})
@@ -2382,7 +2625,7 @@ async function publishAdCreativeInBrowser(payload, senderTabId = null) {
             }
             return {
               picture: cardPic,
-              link: cardLink,
+              link: cardOgLink,
               name: cardName,
               description: card.description || payload?.description || "",
               ...(cardCta ? { call_to_action: cardCta } : {})
@@ -2392,15 +2635,69 @@ async function publishAdCreativeInBrowser(payload, senderTabId = null) {
         let postedFeed = false;
         let lastFeedErr = null;
 
-        // 1. For Video PE: Create true 3-Card Mixed Video + Image Carousel via /adcreatives, materialize storyId, and promote to Page Timeline
-        if (format === "video_pe" && pageVideoId && actId && adsToken) {
+        // 1. PRIMARY (Exact postService.js + fb.js formula that creates https://web.facebook.com/share/p/19nZWYWqyq/):
+        //    All 3 cards use media_fbid (Card 1: video container ID, Cards 2 & 3: photo container IDs) + link: https://facebook.com/{pageId}
+        const hasAllMediaFbids = cards.every((card, idx) =>
+          card.type === "video" ? Boolean(pageVideoId) : Boolean(cardPhotoIds[idx])
+        );
+        if (hasAllMediaFbids) {
+          const mediaFbidCandidates = [buildFeedCards("media_fbid", true), buildFeedCards("media_fbid", false)];
+          for (const candidateCards of mediaFbidCandidates) {
+            for (const host of ["https://graph.facebook.com", "https://adsmanager-graph.facebook.com"]) {
+              for (const pt of allTokens) {
+                try {
+                  const feedRes = await extGraphPost(
+                    `${host}/v21.0/${encodeURIComponent(pageId)}/feed`,
+                    {
+                      access_token: pt,
+                      published: "true",
+                      message:
+                        payload?.caption && payload.caption.trim().length > 0
+                          ? payload.caption
+                          : "Swipe to see more",
+                      link: rawDestLink,
+                      child_attachments: JSON.stringify(candidateCards)
+                    },
+                    12000
+                  );
+                  if (feedRes?.id) {
+                    const checkFeed = await extVerifyCarouselOnTimeline(String(feedRes.id), [pt, ...allTokens], {
+                      requirePublished: false
+                    });
+                    if (checkFeed.isCarousel) {
+                      results.push({
+                        pageId,
+                        pageName,
+                        storyId: String(feedRes.id),
+                        videoId: pageVideoId,
+                        postUrl: `https://www.facebook.com/${feedRes.id}`,
+                        publishedToTimeline: true
+                      });
+                      postedFeed = true;
+                      break;
+                    } else {
+                      await extDeletePostQuietly(String(feedRes.id), [pt, ...allTokens]);
+                    }
+                  }
+                } catch (e) {
+                  lastFeedErr = e;
+                }
+              }
+              if (postedFeed) break;
+            }
+            if (postedFeed) break;
+          }
+        }
+
+        // 2. Fallback A: Create 3-Card Mixed Video + Image Carousel via /adcreatives, materialize storyId, and promote to Page Timeline
+        if (!postedFeed && format === "video_pe" && pageVideoId && actId && adsToken) {
           try {
             const adChildAttachments = buildFeedCards("ad_hash", true);
             const objectStorySpec = {
               page_id: pageId,
               link_data: {
                 message: payload?.caption || "",
-                link: baseLink,
+                link: rawDestLink,
                 multi_share_optimized: false,
                 multi_share_end_card: false,
                 child_attachments: adChildAttachments
@@ -2468,54 +2765,7 @@ async function publishAdCreativeInBrowser(payload, senderTabId = null) {
           } catch {}
         }
 
-        // 2. Try direct /{pageId}/feed with video_id + image_hash, and strictly verify subattachments >= 2 (auto-delete if flattened to 1 video!)
-        if (!postedFeed && pageVideoId) {
-          const hashCards = buildFeedCards("ad_hash", true);
-          for (const host of ["https://adsmanager-graph.facebook.com", "https://graph.facebook.com"]) {
-            for (const pt of allTokens.slice(0, 2)) {
-              try {
-                const feedRes = await extGraphPost(
-                  `${host}/v21.0/${encodeURIComponent(pageId)}/feed`,
-                  {
-                    access_token: pt,
-                    published: "true",
-                    message: payload?.caption || "",
-                    link: baseLink,
-                    multi_share_optimized: "false",
-                    multi_share_end_card: "false",
-                    child_attachments: JSON.stringify(hashCards)
-                  },
-                  9000
-                );
-                if (feedRes?.id) {
-                  const checkFeed = await extVerifyCarouselOnTimeline(String(feedRes.id), [pt, ...allTokens], {
-                    requirePublished: false
-                  });
-                  if (checkFeed.isCarousel) {
-                    results.push({
-                      pageId,
-                      pageName,
-                      storyId: String(feedRes.id),
-                      videoId: pageVideoId,
-                      postUrl: `https://www.facebook.com/${feedRes.id}`,
-                      publishedToTimeline: true
-                    });
-                    postedFeed = true;
-                    break;
-                  } else {
-                    // Facebook flattened child_attachments into a single video post — delete it immediately so a 1-card video is never left on the Page!
-                    await extDeletePostQuietly(String(feedRes.id), [pt, ...allTokens]);
-                  }
-                }
-              } catch (e) {
-                lastFeedErr = e;
-              }
-            }
-            if (postedFeed) break;
-          }
-        }
-
-        // 3. Guaranteed 3-Card HD Carousel on Public Page Timeline (never a flattened single video)
+        // 3. Fallback B: Guaranteed 3-Card HD Carousel on Public Page Timeline
         if (!postedFeed) {
           const imageFallbackCandidates = [buildFeedCards("none", true), buildFeedCards("none", false)];
           for (const pt of pageTokens) {

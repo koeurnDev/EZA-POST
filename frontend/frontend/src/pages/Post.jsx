@@ -671,7 +671,7 @@ export default function Post() {
     const isExtensionAtLeastV239 = (ver) => {
         const parts = String(ver || "").split(".").map((n) => Number.parseInt(n, 10) || 0);
         const [maj = 0, min = 0, pat = 0] = parts;
-        return maj > 2 || (maj === 2 && (min > 4 || (min === 4 && pat >= 1)));
+        return maj > 2 || (maj === 2 && (min > 4 || (min === 4 && pat >= 2)));
     };
 
     const uploadMediaFileToEdge = async (mediaFile) => {
@@ -784,6 +784,7 @@ export default function Post() {
                         pictureUrl: uploadedThumbUrl,
                         headline: card1Title,
                         description: card1Desc,
+                        rawLink: destBaseLink,
                         link: buildOgCardBridgeLink(uploadedThumbUrl, card1Title, card1Desc, destBaseLink, 0),
                         cta: safeCta
                     },
@@ -793,18 +794,20 @@ export default function Post() {
                         mediaUrl: uploadedRightUrl,
                         pictureUrl: uploadedRightUrl,
                         headline: card2Title,
-                        description: "",
-                        link: buildOgCardBridgeLink(uploadedRightUrl, card2Title, "", destBaseLink, 1),
+                        description: "Swipe to see more",
+                        rawLink: destBaseLink,
+                        link: buildOgCardBridgeLink(uploadedRightUrl, card2Title, "Swipe to see more", destBaseLink, 1),
                         cta: safeCta
                     },
                     {
                         id: "card-destination-final",
                         type: "image",
-                        isPageCard: false,
+                        isPageCard: true,
                         mediaUrl: pageAvatarProxyUrl,
                         pictureUrl: pageAvatarProxyUrl,
                         headline: "មើលច្រើនទៀតនៅ",
                         description: "FACEBOOK.COM",
+                        rawLink: destBaseLink,
                         link: buildOgCardBridgeLink(pageAvatarProxyUrl, "មើលច្រើនទៀតនៅ", "FACEBOOK.COM", destBaseLink, 2),
                         cta: safeCta
                     }
@@ -820,7 +823,8 @@ export default function Post() {
                         mediaUrl: imgUrl,
                         pictureUrl: imgUrl,
                         headline: cardTitle,
-                        description: cardDescription || "",
+                        description: cardDescription || "Swipe to see more",
+                        rawLink: cardDest,
                         link: buildOgCardBridgeLink(imgUrl, cardTitle, cardDescription || "", cardDest, idx),
                         cta: sanitizeCtaValue(img.cta || safeCta)
                     });
@@ -855,8 +859,8 @@ export default function Post() {
                 };
 
                 const timer = setTimeout(() => {
-                    finish({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.4.1 ក្នុង chrome://extensions ហើយ Refresh ទំព័រ!" });
-                }, 90000);
+                    finish({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.4.2 ក្នុង chrome://extensions ហើយ Refresh ទំព័រ!" });
+                }, 110000);
 
                 const listener = (event) => {
                     if (event.source !== window || event.data?.source !== "EZA_EXTENSION") return;
@@ -878,6 +882,7 @@ export default function Post() {
                             caption,
                             headline: headline.trim(),
                             description: cardDescription.trim(),
+                            rawTargetLink: destBaseLink,
                             link: postFormat === "text_link" ? targetLink.trim() : primaryOgLink,
                             cta: safeCta,
                             canvasId,
@@ -1056,12 +1061,12 @@ export default function Post() {
         if (postFormat === "video_pe" && publishMode === "now" && isExtReady && !isExtensionAtLeastV239(currentVer)) {
             const link = document.createElement("a");
             link.href = "/eza-post-fb-extension.zip";
-            link.download = "EZA-POST-FB-Extension-v2.4.1.zip";
+            link.download = "EZA-POST-FB-Extension-v2.4.2.zip";
             document.body.appendChild(link);
             link.click();
             link.remove();
             return toast.error(
-                `កំណែចាស់ (v${currentVer || "2.4.0"}) ត្រូវបានជួសជុលបញ្ហាចេញវីដេអូទោលហើយ! ប្រព័ន្ធបានទាញយក v2.4.1 ឱ្យហើយ — សូមពន្លា (Extract) រួចចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder v2.4.1 ថ្មី!`,
+                `ប្រព័ន្ធបានទាញយក Extension v2.4.2 (ដែលប្រើ media_fbid Video Container សម្រាប់ Card 1) ឱ្យហើយ — សូមពន្លា (Extract) រួចចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder v2.4.2 ថ្មី!`,
                 { duration: 10000 }
             );
         }
@@ -1412,18 +1417,18 @@ export default function Post() {
                             <div className="rounded-2xl p-3.5 sm:p-4 border bg-amber-500/10 border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="space-y-0.5">
                                     <p className="text-xs font-bold text-amber-800 dark:text-amber-300">
-                                        ⚠️ Extension លើ Chrome របស់អ្នកនៅជំនាន់ចាស់ (v{extensionVersion || "2.3.2"}) — ទាញយក v2.4.0 ដើម្បីឱ្យ Card 1 ចាក់វីដេអូ (Playable Video) បាន!
+                                        ⚠️ Extension លើ Chrome របស់អ្នកនៅជំនាន់ចាស់ (v{extensionVersion || "2.4.1"}) — ទាញយក v2.4.2 ដើម្បីឱ្យ Card 1 ចាក់វីដេអូតាម media_fbid Video Container!
                                     </p>
                                     <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90">
-                                        ១. ចុចទាញយក v2.4.0 → ២. ពន្លា (Extract All) → ៣. ចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder ថ្មី រួច Refresh ទំព័រនេះ។
+                                        ១. ចុចទាញយក v2.4.2 → ២. ពន្លា (Extract All) → ៣. ចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder v2.4.2 ថ្មី រួច Refresh ទំព័រនេះ។
                                     </p>
                                 </div>
                                 <a
                                     href="/eza-post-fb-extension.zip"
-                                    download="EZA-POST-FB-Extension-v2.4.0.zip"
+                                    download="EZA-POST-FB-Extension-v2.4.2.zip"
                                     className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shrink-0"
                                 >
-                                    <span>ទាញយក Extension v2.4.0</span>
+                                    <span>ទាញយក Extension v2.4.2</span>
                                     <ExternalLink size={12} />
                                 </a>
                             </div>
