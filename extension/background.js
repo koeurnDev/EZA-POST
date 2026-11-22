@@ -1233,6 +1233,69 @@ async function extUploadAdImage(actId, adsToken, imageUrl) {
   return { hash: null, url: imageUrl };
 }
 
+async function extResolvePageAvatarCdn(pageId, pageTokens) {
+  const tok = pageTokens?.[0];
+  try {
+    const url = `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/picture?type=large&redirect=false${tok ? `&access_token=${encodeURIComponent(tok)}` : ""}`;
+    const res = await fetch(url, { credentials: "include" }).catch(() => null);
+    if (res?.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (typeof data?.data?.url === "string" && data.data.url.startsWith("https://")) {
+        return data.data.url;
+      }
+    }
+  } catch {}
+  return `https://graph.facebook.com/${encodeURIComponent(pageId)}/picture?type=large`;
+}
+
+async function extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, imageUrl) {
+  if (!imageUrl || typeof imageUrl !== "string") return { hash: null, photoId: null, url: imageUrl };
+
+  // 1. Try Ad Account /adimages first (returns Facebook scontent.fbcdn.net URL + image_hash)
+  if (actId && adsToken) {
+    const adImg = await extUploadAdImage(actId, adsToken, imageUrl);
+    if (adImg?.hash && typeof adImg.url === "string" && /fbcdn\.net|facebook\.com/i.test(adImg.url)) {
+      return { hash: adImg.hash, photoId: null, url: adImg.url };
+    }
+  }
+
+  // 2. Fallback: upload binary Blob directly to /{pageId}/photos (published=false) and grab Facebook CDN images[0].source
+  try {
+    const imgRes = await fetch(imageUrl, { redirect: "follow" });
+    if (imgRes.ok) {
+      const blob = await imgRes.blob();
+      if (blob && blob.size > 0) {
+        for (const pt of pageTokens || []) {
+          try {
+            const form = new FormData();
+            form.set("access_token", pt);
+            form.set("published", "false");
+            form.set("source", blob, "card.jpg");
+            const res = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/photos`, {
+              method: "POST",
+              credentials: "include",
+              body: form
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data?.id) {
+              const photoId = String(data.id);
+              const metaRes = await fetch(
+                `https://graph.facebook.com/v21.0/${encodeURIComponent(photoId)}?fields=images&access_token=${encodeURIComponent(pt)}`,
+                { credentials: "include" }
+              ).catch(() => null);
+              const metaData = metaRes?.ok ? await metaRes.json().catch(() => ({})) : {};
+              const cdnUrl = metaData?.images?.[0]?.source || null;
+              return { hash: null, photoId, url: cdnUrl || imageUrl };
+            }
+          } catch {}
+        }
+      }
+    }
+  } catch {}
+
+  return { hash: null, photoId: null, url: imageUrl };
+}
+
 async function publishAdCreativeInBrowser(payload) {
   const adsCtx = await extractAdsContext();
   const adsToken = adsCtx.adsToken;
@@ -1488,7 +1551,8 @@ async function extVerifyStoryPublished(storyId, tokens) {
           }
 
           if (format === "photo_cta" || format === "instant_experience") {
-            const imgUrl = payload?.imageUrl || payload?.thumbnailUrl || pageFallbackPic;
+            const rawImgUrl = payload?.imageUrl || payload?.thumbnailUrl || (await extResolvePageAvatarCdn(pageId, pageTokens));
+            const fbImg = await extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, rawImgUrl);
             const canvasLink =
               format === "instant_experience"
                 ? (typeof payload?.canvasUrl === "string" && /^https?:\/\//i.test(payload.canvasUrl)
@@ -1507,7 +1571,7 @@ async function extVerifyStoryPublished(storyId, tokens) {
                   link: canvasLink,
                   name: payload?.headline || pageName,
                   description: payload?.description || "",
-                  picture: imgUrl,
+                  picture: fbImg.url,
                   ...(resolvedCta ? { call_to_action: JSON.stringify(resolvedCta) } : {})
                 });
                 if (feedRes?.id) {
@@ -1543,62 +1607,99 @@ async function extVerifyStoryPublished(storyId, tokens) {
                   await extWaitForVideoReady(pageVideoId, pv.token);
                 } catch (e) {
                   directPublicErr = `Page /videos: ${e?.message || "failed"}`;
+                  // Fallback immediately to Ad Account /advideos so Card 1 ALWAYS has a real encoded video_id!
+                  await ensureAdAssetsUploaded();
                   pageVideoId = sharedVideoId;
+                }
+                if (!pageVideoId) {
+                  throw new Error("មិនទទួលបាន Video ID សម្រាប់ Video PE ទេ");
                 }
               }
 
-              const feedCards = cards.map((card) => {
-                const cardLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
-                const cardCta = extBuildCta(card.cta || payload?.cta, cardLink, pageId);
+              const resolvedAvatarCdn = await extResolvePageAvatarCdn(pageId, pageTokens);
+              const thumbFbImg = payload?.thumbnailUrl
+                ? await extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, payload.thumbnailUrl)
+                : { hash: null, url: resolvedAvatarCdn };
+
+              const resolvedCardImages = [];
+              for (const card of cards) {
                 if (card.type === "video") {
+                  resolvedCardImages.push(thumbFbImg);
+                } else if (card.isPageCard) {
+                  resolvedCardImages.push({ hash: null, url: resolvedAvatarCdn });
+                } else {
+                  const srcImg = card.mediaUrl || resolvedAvatarCdn;
+                  resolvedCardImages.push(
+                    await extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, srcImg)
+                  );
+                }
+              }
+
+              const buildFeedCards = (includeImageHash) =>
+                cards.map((card, idx) => {
+                  const cardLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
+                  const cardCta = extBuildCta(card.cta || payload?.cta, cardLink, pageId);
+                  const imgAsset = resolvedCardImages[idx];
+                  if (card.type === "video") {
+                    return {
+                      video_id: pageVideoId,
+                      ...(includeImageHash && imgAsset?.hash ? { image_hash: imgAsset.hash } : {}),
+                      picture: imgAsset?.url || resolvedAvatarCdn,
+                      link: cardLink,
+                      name: card.headline || payload?.headline || pageName,
+                      description: card.description || payload?.description || "",
+                      ...(cardCta ? { call_to_action: cardCta } : {})
+                    };
+                  }
                   return {
-                    ...(pageVideoId ? { video_id: pageVideoId } : {}),
-                    picture: payload?.thumbnailUrl || pageFallbackPic,
+                    ...(includeImageHash && imgAsset?.hash ? { image_hash: imgAsset.hash } : {}),
+                    picture: imgAsset?.url || resolvedAvatarCdn,
                     link: cardLink,
                     name: card.headline || payload?.headline || pageName,
                     description: card.description || payload?.description || "",
                     ...(cardCta ? { call_to_action: cardCta } : {})
                   };
-                }
-                return {
-                  picture: card.isPageCard ? pageFallbackPic : (card.mediaUrl || pageFallbackPic),
-                  link: cardLink,
-                  name: card.headline || payload?.headline || pageName,
-                  description: card.description || payload?.description || "",
-                  ...(cardCta ? { call_to_action: cardCta } : {})
-                };
-              });
+                });
 
+              const feedCardsWithHash = buildFeedCards(true);
+              const feedCardsNoHash = buildFeedCards(false);
+
+              let postedFeed = false;
               for (const pt of pageTokens) {
-                try {
-                  const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, {
-                    access_token: pt,
-                    published: "true",
-                    message: payload?.caption || "",
-                    link: baseLink,
-                    multi_share_optimized: "false",
-                    child_attachments: JSON.stringify(feedCards)
-                  });
-                  if (feedRes?.id) {
-                    results.push({
-                      pageId,
-                      pageName,
-                      creativeId: null,
-                      storyId: String(feedRes.id),
-                      postUrl: `https://www.facebook.com/${feedRes.id}`,
-                      adsPostsUrl,
-                      publishedToTimeline: true,
-                      isDarkPost: false,
-                      publishNote: null
+                for (const candidateCards of [feedCardsWithHash, feedCardsNoHash]) {
+                  try {
+                    const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, {
+                      access_token: pt,
+                      published: "true",
+                      message: payload?.caption || "",
+                      link: baseLink,
+                      multi_share_optimized: "false",
+                      child_attachments: JSON.stringify(candidateCards)
                     });
-                    directPublicErr = null;
-                    break;
+                    if (feedRes?.id) {
+                      results.push({
+                        pageId,
+                        pageName,
+                        creativeId: null,
+                        storyId: String(feedRes.id),
+                        videoId: pageVideoId,
+                        postUrl: `https://www.facebook.com/${feedRes.id}`,
+                        adsPostsUrl,
+                        publishedToTimeline: true,
+                        isDarkPost: false,
+                        publishNote: null
+                      });
+                      directPublicErr = null;
+                      postedFeed = true;
+                      break;
+                    }
+                  } catch (e) {
+                    directPublicErr = `Page /feed: ${e?.message || "failed"}`;
                   }
-                } catch (e) {
-                  directPublicErr = `Page /feed: ${e?.message || "failed"}`;
                 }
+                if (postedFeed) break;
               }
-              if (results.some((r) => r.pageId === pageId && r.publishedToTimeline)) continue;
+              if (postedFeed) continue;
             }
           }
         } catch (dpErr) {
