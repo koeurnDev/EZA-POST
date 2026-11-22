@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Extension Popup Script (v2.1.0)
+ * ⚡ EZA-POST Extension Popup Script (v2.2.0)
  * ============================================================
  */
 
@@ -107,6 +107,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           body: JSON.stringify({
             cookieOrToken: payload.accessToken || "active_extension_session",
             accessToken: payload.accessToken || null,
+            adsToken: payload.adsToken || null,
+            adAccounts: Array.isArray(payload.adAccounts) ? payload.adAccounts : [],
             fbUserId: payload.fbUserId || null,
             fbUser: payload.fbUser || null,
             pages: Array.isArray(payload.pages) ? payload.pages : []
@@ -117,9 +119,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (data?.success) {
           const count = data.pagesCount ?? (data.pages ? data.pages.length : 0);
+          const adsCount = data.adAccountsCount ?? (data.adAccounts ? data.adAccounts.length : 0);
           const userName = payload.fbUser?.name || "គណនី Facebook";
           const countText = count > 0
-            ? `បានភ្ជាប់ ${count} គោលដៅ (គណនី និងផេក)`
+            ? `បានភ្ជាប់ ${count} គោលដៅ${adsCount > 0 ? ` + ${adsCount} Ad Accounts` : ""}`
             : `បានភ្ជាប់គណនី ${userName}`;
           showMessage(
             `🎉 ជោគជ័យ! ${countText} ទៅកាន់ EZA-POST រួចរាល់!`,

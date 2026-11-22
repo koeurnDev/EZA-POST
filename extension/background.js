@@ -1,17 +1,90 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Facebook Sync Extension — Background Service Worker (v2.1.0)
+ * ⚡ EZA-POST Facebook Sync Extension — Background Service Worker (v2.2.0)
  * ============================================================
  */
 
 function extractAllTokensFromText(text) {
   if (!text || typeof text !== "string") return [];
   const seen = new Set();
-  const matches = text.match(/EAA[A-Za-z0-9_-]{40,}/g) || [];
+  const normalized = text.replace(/\\\//g, "/");
+  const matches = normalized.match(/EAA[A-Za-z0-9_-]{40,}/g) || [];
   for (const tok of matches) {
     seen.add(tok);
   }
   return Array.from(seen);
+}
+
+async function validateAdsToken(token) {
+  if (!token || typeof token !== "string") return null;
+  try {
+    const url = `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,account_id,name,account_status,currency&limit=50&access_token=${encodeURIComponent(token)}`;
+    const res = await fetch(url).catch(() => null);
+    if (!res?.ok) return null;
+    const data = await res.json().catch(() => ({}));
+    if (!Array.isArray(data?.data)) return null;
+    return data.data.map((acc) => ({
+      id: String(acc.id || `act_${acc.account_id}`),
+      accountId: String(acc.account_id || String(acc.id || "").replace(/^act_/, "")),
+      name: String(acc.name || `Ad Account ${acc.account_id || acc.id}`),
+      currency: acc.currency || "USD",
+      status: Number(acc.account_status || 1)
+    }));
+  } catch {
+    return null;
+  }
+}
+
+async function extractAdsContext(seedTokens = []) {
+  const candidates = [];
+  const seen = new Set();
+  const addCandidate = (tok) => {
+    if (tok && typeof tok === "string" && /^EAA[A-Za-z0-9_-]{40,}$/.test(tok) && !seen.has(tok)) {
+      seen.add(tok);
+      candidates.push(tok);
+    }
+  };
+
+  seedTokens.filter((t) => typeof t === "string" && t.startsWith("EAAB")).forEach(addCandidate);
+  seedTokens.forEach(addCandidate);
+
+  for (const tok of candidates) {
+    const accounts = await validateAdsToken(tok);
+    if (accounts && (accounts.length > 0 || tok.startsWith("EAAB"))) {
+      return { adsToken: tok, adAccounts: accounts };
+    }
+  }
+
+  const adsEndpoints = [
+    "https://adsmanager.facebook.com/adsmanager/manage/campaigns",
+    "https://www.facebook.com/adsmanager/manage/campaigns"
+  ];
+  for (const [idx, url] of adsEndpoints.entries()) {
+    if (idx > 0) await sleep(350);
+    try {
+      const res = await fetch(url, { credentials: "include", redirect: "follow" }).catch(() => null);
+      if (!res) continue;
+      const html = await res.text().catch(() => "");
+      if (!html) continue;
+
+      const tokens = extractAllTokensFromText(html);
+      const ranked = [
+        ...tokens.filter((t) => t.startsWith("EAAB")),
+        ...tokens.filter((t) => !t.startsWith("EAAB"))
+      ].slice(0, 3);
+
+      for (const tok of ranked) {
+        if (seen.has(tok)) continue;
+        seen.add(tok);
+        const accounts = await validateAdsToken(tok);
+        if (accounts) {
+          return { adsToken: tok, adAccounts: accounts };
+        }
+      }
+    } catch {}
+  }
+
+  return { adsToken: null, adAccounts: [] };
 }
 
 function extractTokenFromText(text) {
@@ -238,6 +311,7 @@ async function scoreFacebookToken(token) {
     if (await considerToken(tok)) break;
   }
   result.tokenScore = bestTokenScore;
+  result.tabTokens = tabTokens.slice(0, 6);
 
   // 4. If we have an Access Token, fetch pages from Graph API directly
   if (result.accessToken) {
@@ -373,6 +447,7 @@ async function getFullFacebookSyncPayload() {
     let accessTokenScore = -1;
     let fbUserName = "Facebook User";
     const pagesMap = new Map();
+    const tabSeedTokens = [];
 
     // 1. Try in-tab extraction on active/Business Suite Facebook tabs (local DOM inspect, zero extra navigation)
     try {
@@ -396,6 +471,7 @@ async function getFullFacebookSyncPayload() {
         if (injected?.[0]?.result) {
           const res = injected[0].result;
           if (res.userName && fbUserName === "Facebook User") fbUserName = res.userName;
+          if (Array.isArray(res.tabTokens)) tabSeedTokens.push(...res.tabTokens);
           const resScore = typeof res.tokenScore === "number" ? res.tokenScore : (res.accessToken ? 0 : -1);
           if (res.accessToken && (resScore > accessTokenScore || !accessToken)) {
             accessToken = res.accessToken;
@@ -494,9 +570,13 @@ async function getFullFacebookSyncPayload() {
       picture: `https://graph.facebook.com/${session.fbUserId}/picture?type=large`
     };
 
+    const adsCtx = await extractAdsContext([...tabSeedTokens, ...(accessToken ? [accessToken] : [])]);
+
     const payload = {
       ...session,
       accessToken,
+      adsToken: adsCtx.adsToken || (adsCtx.adAccounts.length > 0 ? accessToken : null),
+      adAccounts: adsCtx.adAccounts || [],
       fbUser,
       pages: Array.from(pagesMap.values())
     };
@@ -769,13 +849,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then((data) => {
         sendResponse({
           installed: true,
-          version: "2.1.0",
+          version: "2.2.0",
           fbLoggedIn: Boolean(data?.fbLoggedIn),
           fbUserId: data?.fbUserId || null
         });
       })
       .catch(() => {
-        sendResponse({ installed: true, version: "2.1.0", fbLoggedIn: false, fbUserId: null });
+        sendResponse({ installed: true, version: "2.2.0", fbLoggedIn: false, fbUserId: null });
       });
     return true;
   }

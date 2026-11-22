@@ -10,6 +10,9 @@ import analytics from "./routes/analytics.js";
 import tools from "./routes/tools.js";
 import bio from "./routes/bio.js";
 import subtitles from "./routes/subtitles.ts";
+import { requireAuth } from "./routes/auth.js";
+import { getPrisma } from "./lib/prisma.js";
+import { createFacebookLiveStream, decryptFacebookToken } from "./lib/facebook.js";
 import { proxyToBackend } from "./lib/proxy.js";
 import { processScheduledPosts } from "./lib/scheduled-posts.js";
 
@@ -70,6 +73,50 @@ app.route("/api/analytics", analytics);
 app.route("/api/tools", tools);
 app.route("/api/bio", bio);
 app.route("/", subtitles);
+
+// Edge Live Stream RTMP key generator fallback when no Node/FFmpeg BACKEND_ORIGIN is configured
+app.get("/api/live-stream/pages", requireAuth, async (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+  const pages = await getPrisma(c.env).facebookPage.findMany({
+    where: { userId: c.get("authUser").id, isConnected: true },
+    select: { id: true, name: true, category: true, picture: true, followersCount: true },
+  });
+  return c.json({ success: true, pages });
+});
+app.get("/api/live-stream/active", requireAuth, (c) => {
+  if (c.env.BACKEND_ORIGIN) return proxyToBackend(c);
+  return c.json({ success: true, activeSessions: [], edgeOnly: true });
+});
+app.post("/api/live-stream/create-rtmp", requireAuth, async (c) => {
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, error: "Invalid JSON body" }, 400);
+  }
+  const pageIds = Array.isArray(body?.pageIds) ? body.pageIds.filter((id) => typeof id === "string" && id) : [];
+  if (pageIds.length === 0) {
+    return c.json({ success: false, error: "សូមជ្រើសរើសផេកយ៉ាងតិច ១!" }, 400);
+  }
+  const pages = await getPrisma(c.env).facebookPage.findMany({
+    where: { userId: c.get("authUser").id, id: { in: pageIds }, isConnected: true },
+  });
+  const streams = [];
+  for (const page of pages) {
+    try {
+      const token = await decryptFacebookToken(page.accessToken, c.env);
+      const created = await createFacebookLiveStream(page.id, token, {
+        title: String(body?.title || "Facebook Live Stream"),
+        description: String(body?.description || ""),
+      });
+      streams.push({ pageId: page.id, pageName: page.name, ...created });
+    } catch (err) {
+      streams.push({ pageId: page.id, pageName: page.name, error: err?.message || "Failed to create live key" });
+    }
+  }
+  return c.json({ success: streams.some((s) => Boolean(s.streamUrl)), streams });
+});
+
 const proxyOrNotFound = (c) =>
   c.env.BACKEND_ORIGIN ? proxyToBackend(c) : c.json({ error: "Not found" }, 404);
 app.all("/api/*", proxyOrNotFound);

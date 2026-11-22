@@ -19,6 +19,7 @@ import {
   ExternalLink,
   ShieldCheck,
   Zap,
+  Copy,
 } from "lucide-react";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
@@ -41,6 +42,9 @@ export default function LiveStreamer() {
   const [activeSessions, setActiveSessions] = useState([]);
   const [loadingActive, setLoadingActive] = useState(false);
   const [stoppingId, setStoppingId] = useState(null);
+  const [isEdgeOnly, setIsEdgeOnly] = useState(false);
+  const [generatedStreams, setGeneratedStreams] = useState([]);
+  const [generatingRtmp, setGeneratingRtmp] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -82,6 +86,7 @@ export default function LiveStreamer() {
       const res = await api.get("/live-stream/active");
       if (res.data?.success) {
         setActiveSessions(res.data.activeSessions || []);
+        setIsEdgeOnly(Boolean(res.data.edgeOnly));
       }
     } catch (err) {
       if (!silent) console.error("Active broadcasts fetch error:", err);
@@ -125,8 +130,37 @@ export default function LiveStreamer() {
     }
   };
 
+  // Generate Edge RTMP Stream Key for OBS / Prism Live
+  const handleCreateRtmpKeys = async (e) => {
+    e.preventDefault();
+    if (selectedPageIds.size === 0) {
+      return toast.error("សូមជ្រើសរើស Facebook Page យ៉ាងហោចណាស់មួយ");
+    }
+    try {
+      setGeneratingRtmp(true);
+      const res = await api.post("/live-stream/create-rtmp", {
+        pageIds: Array.from(selectedPageIds),
+        title: title || "Facebook Live Stream",
+        description: description || "",
+      });
+      if (res.data?.streams) {
+        setGeneratedStreams(res.data.streams);
+        if (res.data.success) {
+          toast.success("🔴 បានបង្កើត RTMP Stream Key រួចរាល់! អាចយកទៅដាក់ OBS / Prism បានភ្លាម។");
+        } else {
+          toast.error("មិនអាចបង្កើត Stream Key បានទេ សូមពិនិត្យសិទ្ធិ Token របស់ផេក!");
+        }
+      }
+    } catch (err) {
+      toast.error("កំហុស: " + (err.response?.data?.error || err.message));
+    } finally {
+      setGeneratingRtmp(false);
+    }
+  };
+
   // Start Live Stream
   const handleStartBroadcast = async (e) => {
+    if (isEdgeOnly) return handleCreateRtmpKeys(e);
     e.preventDefault();
 
     if (!videoFile) {
@@ -346,7 +380,48 @@ export default function LiveStreamer() {
         <form onSubmit={handleStartBroadcast} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left 2 Cols: Video & Stream Info */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Step 1: Video File */}
+            {isEdgeOnly ? (
+              <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                  <AlertCircle size={18} />
+                  <span>Cloudflare Edge RTMP Key Generator (សម្រាប់ OBS / Prism Live)</span>
+                </div>
+                <p className="text-xs opacity-85 leading-relaxed">
+                  ប្រព័ន្ធកំពុងរត់លើ Cloudflare Edge Worker (មិនមាន Node FFmpeg VPS ភ្ជាប់ទេ)។ លោកអ្នកអាចបំពេញ Title &amp; Description រួចចុច <strong>បង្កើត RTMP Stream Key</strong> ដើម្បីទាញយក URL &amp; Key ទៅ Live តាម OBS Studio ឬ Prism Live ផ្ទាល់បានភ្លាមៗ។
+                </p>
+                {generatedStreams.length > 0 && (
+                  <div className="space-y-2.5 pt-2">
+                    {generatedStreams.map((st) => (
+                      <div key={st.pageId} className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-2 text-xs">
+                        <div className="font-bold text-white flex items-center justify-between">
+                          <span>📺 {st.pageName}</span>
+                          {st.streamUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(st.streamUrl);
+                                toast.success("បានចម្លង RTMPS URL រួចរាល់!");
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[11px] flex items-center gap-1 cursor-pointer"
+                            >
+                              <Copy size={12} /> Copy Stream URL
+                            </button>
+                          )}
+                        </div>
+                        {st.streamUrl ? (
+                          <code className="block break-all p-2 rounded-lg bg-black/60 text-emerald-400 text-[11px]">
+                            {st.streamUrl}
+                          </code>
+                        ) : (
+                          <p className="text-rose-400">{st.error || "បរាជ័យ"}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+            /* Step 1: Video File */
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
@@ -404,6 +479,7 @@ export default function LiveStreamer() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Step 2: Stream Info */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
@@ -562,18 +638,20 @@ export default function LiveStreamer() {
 
               <button
                 type="submit"
-                disabled={startingStream || !videoFile || selectedPageIds.size === 0}
+                disabled={isEdgeOnly ? (generatingRtmp || selectedPageIds.size === 0) : (startingStream || !videoFile || selectedPageIds.size === 0)}
                 className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-500 hover:from-red-500 hover:to-rose-500 text-white font-bold text-sm shadow-xl shadow-red-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition transform active:scale-98 flex items-center justify-center gap-2"
               >
-                {startingStream ? (
+                {startingStream || generatingRtmp ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    កំពុងចាប់ផ្តើម Live Stream...
+                    {isEdgeOnly ? "កំពុងបង្កើត Stream Key..." : "កំពុងចាប់ផ្តើម Live Stream..."}
                   </>
                 ) : (
                   <>
                     <Play size={18} className="fill-white" />
-                    ចាប់ផ្តើម Live Stream លើ ({selectedPageIds.size}) Pages
+                    {isEdgeOnly
+                      ? `បង្កើត RTMP Stream Key (${selectedPageIds.size}) Pages`
+                      : `ចាប់ផ្តើម Live Stream លើ (${selectedPageIds.size}) Pages`}
                   </>
                 )}
               </button>

@@ -1,4 +1,4 @@
-import { decryptFacebookToken, publishFacebookPost } from "./facebook.js";
+import { decryptFacebookToken, publishFacebookPost, resolveMetaAdsFromSettings } from "./facebook.js";
 import { getPrisma } from "./prisma.js";
 
 const batchSize = 5;
@@ -94,6 +94,12 @@ async function processOneScheduledPost(prisma, post, env) {
     const pages = await prisma.facebookPage.findMany({
       where: { userId: post.userId, id: { in: accountIds }, isConnected: true },
     });
+    const ownerUser = prisma.user?.findUnique
+      ? await prisma.user.findUnique({ where: { id: post.userId }, select: { pageSettings: true } })
+      : null;
+    if (ownerUser?.pageSettings) {
+      post._adsContext = await resolveMetaAdsFromSettings(ownerUser.pageSettings, env);
+    }
     const pageMap = new Map(pages.map((page) => [page.id, page]));
     let isFirstAccount = true;
     for (const pageId of accountIds) {

@@ -1,5 +1,61 @@
 const graphApiVersion = "v21.0";
 const paceDelay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const META_ADS_SETTINGS_KEY = "__meta_ads__";
+const AD_CREATIVE_FORMATS = new Set([
+  "video_cta",
+  "photo_cta",
+  "video_pe",
+  "photo_pe",
+  "instant_experience",
+]);
+
+function isFbToken(str) {
+  return typeof str === "string" && /^EAA[A-Za-z0-9_-]{30,}$/.test(str.trim());
+}
+
+export async function resolveMetaAdsFromSettings(pageSettings, env) {
+  let list = pageSettings;
+  if (typeof list === "string") {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      list = [];
+    }
+  }
+  const entry = Array.isArray(list)
+    ? list.find((s) => s && s.pageId === META_ADS_SETTINGS_KEY)
+    : null;
+  let adsToken = null;
+  if (entry?.adsAccessToken) {
+    try {
+      const dec = await decryptFacebookToken(entry.adsAccessToken, env);
+      if (isFbToken(dec)) adsToken = dec.trim();
+    } catch {
+      if (isFbToken(entry.adsAccessToken)) adsToken = entry.adsAccessToken.trim();
+    }
+  }
+  return {
+    adsToken,
+    adAccounts: Array.isArray(entry?.adAccounts) ? entry.adAccounts : [],
+  };
+}
+
+export async function createFacebookLiveStream(pageId, pageToken, { title = "Facebook Live Stream", description = "" } = {}) {
+  if (!isFbToken(pageToken)) {
+    throw new Error("ផេកនេះមិនទាន់មាន Access Token ត្រឹមត្រូវសម្រាប់បង្កើត Live Stream ទេ។");
+  }
+  const res = await graphPost(`https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(pageId)}/live_videos`, {
+    access_token: pageToken,
+    status: "LIVE_NOW",
+    title,
+    description,
+  });
+  return {
+    id: String(res.id),
+    streamUrl: res.secure_stream_url || res.stream_url || "",
+    dashIngestUrl: res.dash_ingest_url || "",
+  };
+}
 
 function isFacebookHardStopError(fbErrOrMsg) {
   if (!fbErrOrMsg) return false;
@@ -103,16 +159,23 @@ export async function publishFacebookPost(pageId, pageToken, post, page = {}, en
     ? post.mediaFiles.filter((url) => typeof url === "string" && url)
     : [];
   const videoUrl = post.videoUrl || mediaUrls[0];
-  if (post.postType === "carousel" && Array.isArray(post.carouselCards) &&
-      post.carouselCards.length) {
+  const rawCards = Array.isArray(post.carouselCards) ? post.carouselCards : [];
+  const metaCfg = rawCards.find((card) => card && card.isMetaConfig === true) || {};
+  const realCards = rawCards.filter((card) => card && !card.isMetaConfig);
+
+  if (AD_CREATIVE_FORMATS.has(metaCfg.format)) {
+    return publishAdCreativePost(pageId, pageToken, post, metaCfg, realCards, page, env);
+  }
+
+  if (post.postType === "carousel" && realCards.length > 0) {
     let primaryVideoUrl =
       videoUrl ||
-      post.carouselCards.find((card) => card?.type === "video" && typeof card?.mediaUrl === "string" && card.mediaUrl)?.mediaUrl ||
+      realCards.find((card) => card?.type === "video" && typeof card?.mediaUrl === "string" && card.mediaUrl)?.mediaUrl ||
       null;
 
     try {
       const childAttachments = [];
-      for (const [cardIdx, card] of post.carouselCards.entries()) {
+      for (const [cardIdx, card] of realCards.entries()) {
         if (cardIdx > 0) await paceDelay(350);
         let mediaId;
         if (card.type === "video") {
@@ -197,14 +260,17 @@ export async function publishFacebookPost(pageId, pageToken, post, page = {}, en
   }
 
   if (!mediaUrls.length && !videoUrl) {
-    const result = await graphPost(`${graphUrl}/feed`, {
+    const linkUrl = safeCarouselLink(metaCfg.link || post.link);
+    const feedParams = {
       access_token: pageToken,
       message: post.caption || "",
-    });
+    };
+    if (linkUrl) feedParams.link = linkUrl;
+    const result = await graphPost(`${graphUrl}/feed`, feedParams);
     return result.id;
   }
 
-  if (post.postType === "reels") {
+  if (post.postType === "reels" || metaCfg.format === "reels") {
     assertValidMediaUrl(videoUrl, "video");
     return uploadFacebookReelViaRupload(pageId, pageToken, videoUrl, post.caption || "", env);
   }
@@ -225,26 +291,24 @@ export async function publishFacebookPost(pageId, pageToken, post, page = {}, en
     return result.id;
   }
 
-  if (post.postType === "image") {
-    if (mediaUrls.length !== 1) throw new Error("Image posts require exactly one image.");
-    assertValidMediaUrl(mediaUrls[0], "image");
-    const result = await uploadFacebookMedia(
-      `${graphUrl}/photos`,
-      `${graphUrl}/photos`,
-      mediaUrls[0],
-      {
-        access_token: pageToken,
-        caption: post.caption || "",
-      },
-      "url",
-      env
-    );
-    return result.post_id || result.id;
-  }
-
-  if (post.postType === "carousel") {
+  if (post.postType === "image" || (post.postType === "carousel" && realCards.length === 0)) {
+    if (mediaUrls.length === 1) {
+      assertValidMediaUrl(mediaUrls[0], "image");
+      const result = await uploadFacebookMedia(
+        `${graphUrl}/photos`,
+        `${graphUrl}/photos`,
+        mediaUrls[0],
+        {
+          access_token: pageToken,
+          caption: post.caption || "",
+        },
+        "url",
+        env
+      );
+      return result.post_id || result.id;
+    }
     if (mediaUrls.length < 2 || mediaUrls.length > 10) {
-      throw new Error("Photo carousels require between 2 and 10 images.");
+      throw new Error("Photo carousels require between 1 and 10 images.");
     }
     for (const mediaUrl of mediaUrls) assertValidMediaUrl(mediaUrl, "image");
     const attachments = [];
@@ -275,6 +339,177 @@ export async function publishFacebookPost(pageId, pageToken, post, page = {}, en
   }
 
   throw new Error("Unsupported Facebook post type.");
+}
+
+function buildCallToActionSpec(cta, link, pageId) {
+  if (!cta || cta === "NO_BUTTON") return undefined;
+  if (cta === "SEND_MESSAGE" || cta === "MESSAGE_PAGE") {
+    return { type: "MESSAGE_PAGE", value: { app_destination: "MESSENGER" } };
+  }
+  return {
+    type: cta,
+    value: { link: safeCarouselLink(link) || `https://facebook.com/${pageId}` },
+  };
+}
+
+async function uploadAdAccountVideo(actId, adsToken, videoUrl, env) {
+  assertValidMediaUrl(videoUrl, "video");
+  const endpoint = `https://graph-video.facebook.com/${graphApiVersion}/${encodeURIComponent(actId)}/advideos`;
+  const uploaded = await uploadFacebookMedia(endpoint, endpoint, videoUrl, { access_token: adsToken }, "file_url", env);
+  return String(uploaded.id);
+}
+
+async function uploadAdAccountImage(actId, adsToken, imageUrl, env) {
+  if (env?.MEDIA_BUCKET && typeof imageUrl === "string") {
+    const key = parseR2MediaKey(imageUrl);
+    if (key) {
+      const object = await env.MEDIA_BUCKET.get(key);
+      if (object) {
+        const bytes = await object.arrayBuffer();
+        const contentType = object.httpMetadata?.contentType || "image/jpeg";
+        const filename = key.split("/").pop() || "image.jpg";
+        const form = new FormData();
+        form.set("access_token", adsToken);
+        form.set("filename", new Blob([bytes], { type: contentType }), filename);
+        const res = await fetch(`https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(actId)}/adimages`, {
+          method: "POST",
+          body: form,
+        });
+        const data = await res.json().catch(() => ({}));
+        const firstImg = data?.images ? Object.values(data.images)[0] : null;
+        if (firstImg?.hash) {
+          return { hash: firstImg.hash, url: firstImg.url || imageUrl };
+        }
+      }
+    }
+  }
+  return { hash: null, url: imageUrl };
+}
+
+async function publishAdCreativePost(pageId, pageToken, post, metaCfg, realCards, page, env) {
+  const adsToken = post._adsContext?.adsToken || pageToken;
+  const rawAccountId = metaCfg.adAccountId || post._adsContext?.adAccounts?.[0]?.id;
+  if (!rawAccountId || !isFbToken(adsToken)) {
+    throw new Error(
+      "ទម្រង់ PE / CTA ត្រូវការ Ad Account និង Ads Token (EAAB) — សូមបើក adsmanager.facebook.com លើ Chrome រួចចុច Sync Extension v2.2.0 ឡើងវិញ!"
+    );
+  }
+  const actId = String(rawAccountId).startsWith("act_") ? String(rawAccountId) : `act_${rawAccountId}`;
+  const mediaUrls = Array.isArray(post.mediaFiles)
+    ? post.mediaFiles.filter((url) => typeof url === "string" && url)
+    : [];
+  const defaultPageUrl = `https://facebook.com/${pageId}`;
+  const baseLink = safeCarouselLink(metaCfg.link) || defaultPageUrl;
+  const ctaSpec = buildCallToActionSpec(metaCfg.cta, baseLink, pageId);
+  const pageFallbackPic = `https://graph.facebook.com/${encodeURIComponent(pageId)}/picture?type=large`;
+
+  let objectStorySpec;
+  if (metaCfg.format === "video_cta") {
+    const videoSrc = post.videoUrl || mediaUrls[0];
+    if (!videoSrc) throw new Error("Video CTA តម្រូវឱ្យដាក់វីដេអូ។");
+    const videoId = await uploadAdAccountVideo(actId, adsToken, videoSrc, env);
+    const thumbUrl = post.thumbnailUrl || metaCfg.thumbnailUrl || pageFallbackPic;
+    objectStorySpec = {
+      page_id: String(pageId),
+      video_data: {
+        video_id: videoId,
+        message: post.caption || "",
+        title: metaCfg.headline || page.name || "",
+        link_description: metaCfg.description || "",
+        image_url: thumbUrl,
+        ...(ctaSpec ? { call_to_action: ctaSpec } : {}),
+      },
+    };
+  } else if (metaCfg.format === "photo_cta" || metaCfg.format === "instant_experience") {
+    const imageSrc = mediaUrls[0] || post.thumbnailUrl || pageFallbackPic;
+    const imgAsset = await uploadAdAccountImage(actId, adsToken, imageSrc, env);
+    const canvasLink =
+      metaCfg.format === "instant_experience"
+        ? safeCarouselLink(metaCfg.canvasUrl) ||
+          (metaCfg.canvasId ? `https://fb.com/canvas_doc/${encodeURIComponent(metaCfg.canvasId)}` : baseLink)
+        : baseLink;
+    const resolvedCta = buildCallToActionSpec(metaCfg.cta || "LEARN_MORE", canvasLink, pageId);
+    objectStorySpec = {
+      page_id: String(pageId),
+      link_data: {
+        message: post.caption || "",
+        link: canvasLink,
+        name: metaCfg.headline || page.name || "Facebook Page",
+        description: metaCfg.description || "",
+        ...(imgAsset.hash ? { image_hash: imgAsset.hash } : { picture: imgAsset.url }),
+        ...(resolvedCta ? { call_to_action: resolvedCta } : {}),
+      },
+    };
+  } else {
+    // video_pe or photo_pe (Carousel PE)
+    if (realCards.length < 2) {
+      throw new Error("Carousel PE តម្រូវឱ្យមានយ៉ាងតិច ២ កាត។");
+    }
+    const childAttachments = [];
+    for (const [idx, card] of realCards.slice(0, 10).entries()) {
+      if (idx > 0) await paceDelay(300);
+      const cardLink = safeCarouselLink(card.link) || baseLink;
+      const cardCta = buildCallToActionSpec(card.cta || metaCfg.cta, cardLink, pageId);
+      if (card.type === "video") {
+        const videoId = await uploadAdAccountVideo(actId, adsToken, card.mediaUrl, env);
+        const thumb = post.thumbnailUrl || metaCfg.thumbnailUrl || pageFallbackPic;
+        childAttachments.push({
+          video_id: videoId,
+          picture: thumb,
+          link: cardLink,
+          name: card.headline || metaCfg.headline || page.name || "",
+          description: card.description || metaCfg.description || "",
+          ...(cardCta ? { call_to_action: cardCta } : {}),
+        });
+      } else {
+        const picUrl = card.isPageCard ? pageFallbackPic : card.mediaUrl;
+        const imgAsset = card.isPageCard ? { hash: null, url: picUrl } : await uploadAdAccountImage(actId, adsToken, picUrl, env);
+        childAttachments.push({
+          ...(imgAsset.hash ? { image_hash: imgAsset.hash } : { picture: imgAsset.url }),
+          link: cardLink,
+          name: card.headline || metaCfg.headline || page.name || "",
+          description: card.description || metaCfg.description || "",
+          ...(cardCta ? { call_to_action: cardCta } : {}),
+        });
+      }
+    }
+    objectStorySpec = {
+      page_id: String(pageId),
+      link_data: {
+        message: post.caption || "",
+        link: baseLink,
+        multi_share_optimized: false,
+        child_attachments: childAttachments,
+      },
+    };
+  }
+
+  const creativeRes = await graphPost(`https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(actId)}/adcreatives`, {
+    access_token: adsToken,
+    name: `EZA_${metaCfg.format}_${Date.now()}`,
+    object_story_spec: JSON.stringify(objectStorySpec),
+  });
+
+  const creativeInfo = await graphRequest(creativeRes.id, {
+    access_token: adsToken,
+    fields: "effective_object_story_id",
+  });
+  const storyId = String(creativeInfo.effective_object_story_id || creativeRes.id);
+
+  if (!metaCfg.isDarkPost && creativeInfo.effective_object_story_id) {
+    try {
+      await graphPost(`https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(storyId)}`, {
+        access_token: pageToken,
+        is_published: "true",
+      });
+    } catch (pubErr) {
+      throw new Error(
+        `បានបង្កើត Dark Post (${storyId}) ក្នុង Ads Manager ជោគជ័យ ប៉ុន្តែ Meta មិនអនុញ្ញាតឱ្យបើកឡើង Timeline ដោយផ្ទាល់ទេ (${pubErr?.message}) — សូមជ្រើសរើស 'Dark Post (PE)'។`
+      );
+    }
+  }
+
+  return storyId;
 }
 
 export async function encryptFacebookToken(token, env) {

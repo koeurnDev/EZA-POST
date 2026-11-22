@@ -33,6 +33,7 @@ export default function Connections() {
 
     const [loading, setLoading] = useState(true);
     const [pages, setPages] = useState([]);
+    const [adAccounts, setAdAccounts] = useState([]);
     const [isLoadingPages, setIsLoadingPages] = useState(false);
     const [expandedPageId, setExpandedPageId] = useState(null);
 
@@ -65,7 +66,7 @@ export default function Connections() {
                 return;
             }
 
-            const { action, installed, fbLoggedIn, fbUserId, ok, cookieString, accessToken, fbUser, pages: extPages, error } = event.data;
+            const { action, installed, fbLoggedIn, fbUserId, ok, cookieString, accessToken, adsToken, adAccounts: extAdAccounts, fbUser, pages: extPages, error } = event.data;
 
             if (action === "EXTENSION_STATUS") {
                 if (installed) setExtensionInstalled(true);
@@ -88,13 +89,16 @@ export default function Connections() {
                     const res = await apiUtils.connectFacebookCookie({
                         cookieOrToken: accessToken || "active_extension_session",
                         accessToken: accessToken || null,
+                        adsToken: adsToken || null,
+                        adAccounts: Array.isArray(extAdAccounts) ? extAdAccounts : [],
                         fbUserId: fbUserId || fbUser?.id || null,
                         fbUser: fbUser || null,
                         pages: Array.isArray(extPages) ? extPages : []
                     });
                     if (res.data?.success) {
                         const total = res.data.pagesCount ?? (res.data.pages?.length || 0);
-                        const countText = total > 0 ? `${total} គោលដៅ (គណនី និងផេក)` : "គណនី Facebook";
+                        const adsCount = res.data.adAccountsCount ?? (res.data.adAccounts?.length || 0);
+                        const countText = total > 0 ? `${total} គោលដៅ${adsCount > 0 ? ` និង ${adsCount} Ad Accounts` : ""}` : "គណនី Facebook";
                         if (res.data.hasPublishToken === false) {
                             toast(res.data.message || "ទាញបញ្ជីផេកបាន តែខ្វះ Access Token (EAA...) សម្រាប់ផុស!", {
                                 icon: "⚠️",
@@ -146,6 +150,7 @@ export default function Connections() {
             if (res.data.success) {
                 const uniquePages = Array.from(new Map((res.data.accounts || []).map((p) => [p.id, p])).values());
                 setPages(uniquePages);
+                setAdAccounts(Array.isArray(res.data.adAccounts) ? res.data.adAccounts : []);
                 if (isManual) toast.success("បានធ្វើបច្ចុប្បន្នភាពបញ្ជីផេកជោគជ័យ!", { id: "fetch-pages" });
             }
         } catch (err) {
@@ -254,7 +259,10 @@ export default function Connections() {
                                         </span>
                                     </div>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer">
-                                        មានគោលដៅសរុប <strong className="text-emerald-600 dark:text-emerald-400">{pages.length}</strong> (គណនីផ្ទាល់ខ្លួន និងផេក) អាចជ្រើសរើសដើម្បីផុសបានទាំងអស់។
+                                        មានគោលដៅសរុប <strong className="text-emerald-600 dark:text-emerald-400">{pages.length}</strong>
+                                        {adAccounts.length > 0 && (
+                                            <> • <strong className="text-blue-600 dark:text-blue-400">{adAccounts.length}</strong> Ad Accounts (PE / CTA Ready)</>
+                                        )}
                                     </p>
                                 </div>
                             </div>
@@ -486,7 +494,7 @@ export default function Connections() {
                                         ចុចភ្ជាប់ Facebook
                                     </h3>
                                     <p className="text-xs text-slate-600 dark:text-slate-400 font-khmer leading-relaxed">
-                                        ប្រាកដថាអ្នកបាន Login គណនី Facebook លើ Browser រួចចុចប៊ូតុង <strong>ភ្ជាប់តាម Extension</strong> ខាងក្រោម។
+                                        ប្រាកដថាអ្នកបាន Login គណនី Facebook (និងបើក <code>adsmanager.facebook.com</code> បើត្រូវការផុស PE/CTA) រួចចុច <strong>ភ្ជាប់តាម Extension</strong>។
                                     </p>
                                 </div>
                                 <button

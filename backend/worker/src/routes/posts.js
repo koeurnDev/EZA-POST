@@ -22,14 +22,26 @@ posts.post("/", requireAuth, async (c) => {
       if (thumbnail && !(thumbnail instanceof File)) {
         return c.json({ success: false, error: "Thumbnail upload must be a file." }, 400);
       }
+      const images = form.getAll("images").filter((item) => item instanceof File && item.size > 0);
       payload = {
         caption: form.get("caption"),
         accounts: form.get("accounts"),
         scheduleTime: form.get("scheduleTime"),
         videoUrl: form.get("videoUrl"),
         postType: form.get("postType"),
+        postFormat: form.get("postFormat"),
+        link: form.get("link"),
+        headline: form.get("headline"),
+        cardDescription: form.get("cardDescription"),
+        cta: form.get("cta"),
+        adAccountId: form.get("adAccountId"),
+        isDarkPost: form.get("isDarkPost") === "true",
+        canvasId: form.get("canvasId"),
+        canvasUrl: form.get("canvasUrl"),
+        carouselCards: form.get("carouselCards"),
         videoFile: file,
         thumbnailFile: thumbnail,
+        imageFiles: images,
       };
     } else {
       payload = await c.req.json();
@@ -68,6 +80,7 @@ posts.post("/", requireAuth, async (c) => {
 
   const videoUrl = typeof payload.videoUrl === "string" ? payload.videoUrl.trim() : "";
   const videoFile = payload.videoFile;
+  const imageFiles = Array.isArray(payload.imageFiles) ? payload.imageFiles : [];
   if (videoFile && !videoFile.size) {
     return c.json({ success: false, error: "Video file cannot be empty." }, 400);
   }
@@ -77,6 +90,9 @@ posts.post("/", requireAuth, async (c) => {
   if (videoFile && !isSupportedPostMedia(videoFile)) {
     return c.json({ success: false, error: "Unsupported video or image file type." }, 400);
   }
+  if (imageFiles.length > 10 || imageFiles.some((img) => !isSupportedPostMedia(img) || !img.type.startsWith("image/"))) {
+    return c.json({ success: false, error: "Up to 10 valid JPG, PNG, or WEBP images are allowed." }, 400);
+  }
   if (videoFile && videoUrl) {
     return c.json({ success: false, error: "Provide either a video file or a video URL, not both." }, 400);
   }
@@ -84,17 +100,35 @@ posts.post("/", requireAuth, async (c) => {
     return c.json({ success: false, error: "Video URL must reference an HTTPS media asset." }, 400);
   }
 
+  const postFormat = typeof payload.postFormat === "string" ? payload.postFormat.trim() : "";
   let requestedPostType = payload.postType;
-  if (requestedPostType === "single") {
-    requestedPostType = videoFile?.type?.startsWith("image/") || videoUrl.includes("image") ? "image" : "video";
+  if (postFormat === "text_link") {
+    requestedPostType = "image";
+  } else if (postFormat === "photos" || postFormat === "photo_cta") {
+    requestedPostType = imageFiles.length >= 2 ? "carousel" : "image";
+  } else if (postFormat === "photo_pe" || postFormat === "video_pe" || postFormat === "instant_experience") {
+    requestedPostType = "carousel";
+  } else if (postFormat === "video_cta" || postFormat === "video") {
+    requestedPostType = "video";
+  } else if (postFormat === "reels") {
+    requestedPostType = "reels";
+  } else if (requestedPostType === "single") {
+    requestedPostType = imageFiles.length >= 2
+      ? "carousel"
+      : imageFiles.length === 1 || videoFile?.type?.startsWith("image/") || videoUrl.includes("image")
+        ? "image"
+        : "video";
   } else if (requestedPostType === undefined || requestedPostType === null || requestedPostType === "") {
-    requestedPostType = videoFile?.type?.startsWith("image/") ||
-      videoUrl.includes("/image/upload/") ? "image" : "video";
+    requestedPostType = imageFiles.length >= 2
+      ? "carousel"
+      : imageFiles.length === 1 || videoFile?.type?.startsWith("image/") || videoUrl.includes("/image/upload/")
+        ? "image"
+        : "video";
   }
-  if (!["video", "reels", "image"].includes(requestedPostType)) {
-    return c.json({ success: false, error: "Only single video, reels, and image posts are supported on this route." }, 400);
+  if (!["video", "reels", "image", "carousel"].includes(requestedPostType)) {
+    return c.json({ success: false, error: "Unsupported Facebook post type." }, 400);
   }
-  if (videoFile && ["video", "reels"].includes(requestedPostType) && !videoFile.type.startsWith("video/")) {
+  if (videoFile && ["video", "reels"].includes(requestedPostType) && !videoFile.type.startsWith("video/") && postFormat !== "photo_cta") {
     return c.json({ success: false, error: "Video posts require a video file." }, 400);
   }
   if (videoFile && requestedPostType === "image" && !videoFile.type.startsWith("image/")) {
@@ -109,8 +143,9 @@ posts.post("/", requireAuth, async (c) => {
       }, 400);
     }
   }
-  if (!videoFile && !videoUrl && !caption.trim()) {
-    return c.json({ success: false, error: "Provide a caption or media." }, 400);
+  const targetLink = typeof payload.link === "string" ? payload.link.trim() : "";
+  if (!videoFile && !imageFiles.length && !videoUrl && !caption.trim() && !targetLink) {
+    return c.json({ success: false, error: "Provide a caption, link, or media." }, 400);
   }
   if (payload.thumbnailFile && !["image/jpeg", "image/png", "image/webp"].includes(payload.thumbnailFile.type)) {
     return c.json({ success: false, error: "Thumbnail must be a JPG, PNG, or WEBP image." }, 400);
@@ -136,6 +171,12 @@ posts.post("/", requireAuth, async (c) => {
       uploadedMedia.push(asset);
       uploadedVideoUrl = asset.url;
     }
+    const uploadedImages = [];
+    for (const imgFile of imageFiles) {
+      const imgAsset = await uploadScheduledMedia(imgFile, c.env);
+      uploadedMedia.push(imgAsset);
+      uploadedImages.push(imgAsset.url);
+    }
     let thumbnailUrl = null;
     if (payload.thumbnailFile) {
       const asset = await uploadScheduledMedia(payload.thumbnailFile, c.env);
@@ -143,15 +184,47 @@ posts.post("/", requireAuth, async (c) => {
       thumbnailUrl = asset.url;
     }
 
-    const mediaFiles = uploadedVideoUrl ? [uploadedVideoUrl] : [];
+    const mediaFiles = uploadedImages.length > 0 ? uploadedImages : (uploadedVideoUrl ? [uploadedVideoUrl] : []);
+    let parsedCards = [];
+    if (payload.carouselCards) {
+      try {
+        const raw = typeof payload.carouselCards === "string" ? JSON.parse(payload.carouselCards) : payload.carouselCards;
+        if (Array.isArray(raw)) {
+          parsedCards = raw.map((card, idx) => ({
+            ...card,
+            mediaUrl: card.mediaUrl || uploadedImages[idx] || null,
+          }));
+        }
+      } catch {}
+    }
+
+    const storedCards = [];
+    if (postFormat || targetLink || payload.adAccountId || payload.cta || payload.headline || payload.canvasId || payload.canvasUrl) {
+      storedCards.push({
+        isMetaConfig: true,
+        format: postFormat || requestedPostType,
+        adAccountId: typeof payload.adAccountId === "string" ? payload.adAccountId.trim() : "",
+        link: targetLink,
+        headline: typeof payload.headline === "string" ? payload.headline : "",
+        description: typeof payload.cardDescription === "string" ? payload.cardDescription : "",
+        cta: typeof payload.cta === "string" ? payload.cta : "",
+        isDarkPost: Boolean(payload.isDarkPost),
+        canvasId: typeof payload.canvasId === "string" ? payload.canvasId.trim() : "",
+        canvasUrl: typeof payload.canvasUrl === "string" ? payload.canvasUrl.trim() : "",
+        thumbnailUrl: thumbnailUrl || null,
+      });
+    }
+    storedCards.push(...parsedCards);
+
     const scheduledPost = await prisma.scheduledPost.create({
       data: {
         userId,
         caption,
-        postType: mediaFiles.length ? requestedPostType : "video",
+        postType: requestedPostType,
         videoUrl: uploadedVideoUrl,
         thumbnailUrl,
         mediaFiles,
+        ...(storedCards.length > 0 ? { carouselCards: storedCards } : {}),
         accounts: [...new Set(accounts)],
         scheduleTime,
         status: "scheduled",
@@ -228,8 +301,8 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
   const allowedFields = new Set([
     "caption", "accounts", "scheduleTime", "enableBot", "videoUrl",
     "carouselCards", "aiOptions", "platforms", "staggerDelay",
-    "video", "thumbnail", "rightSideImage", "postType", "publishMode",
-    "headline", "targetLink", "cardDescription", "cta", "subtitles"
+    "video", "thumbnail", "rightSideImage", "postType", "postFormat", "publishMode",
+    "headline", "targetLink", "cardDescription", "cta", "subtitles", "adAccountId", "isDarkPost"
   ]);
   const aiOptionsValue = form.get("aiOptions");
   if (typeof aiOptionsValue === "string" && aiOptionsValue) {
@@ -394,6 +467,18 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
         data: { enableBot: true },
       });
     }
+    const metaConfigEntry = {
+      isMetaConfig: true,
+      format: form.get("adAccountId") ? "video_pe" : "carousel",
+      adAccountId: String(form.get("adAccountId") || "").trim(),
+      isDarkPost: form.get("isDarkPost") === "true",
+      link: String(form.get("targetLink") || "").trim(),
+      cta: String(form.get("cta") || "LEARN_MORE"),
+      headline: String(form.get("headline") || ""),
+      description: String(form.get("cardDescription") || ""),
+      thumbnailUrl: thumbnailAsset?.url ?? null,
+    };
+
     const scheduledPost = await prisma.scheduledPost.create({
       data: {
         userId,
@@ -402,7 +487,7 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
         videoUrl: mainVideoUrl,
         thumbnailUrl: thumbnailAsset?.url ?? null,
         mediaFiles: uploadedMedia.map((asset) => asset.url),
-        carouselCards,
+        carouselCards: [metaConfigEntry, ...carouselCards],
         accounts: uniqueAccounts,
         scheduleTime,
         status: "scheduled",

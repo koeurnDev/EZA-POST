@@ -237,6 +237,7 @@ const apiUtils = {
   handleApiError,
   // Facebook Pages
   getUserPages: () => axios.get(getFullUrl("/user/pages"), { withCredentials: true }),
+  getPageCanvases: (pageId) => axios.get(getFullUrl(`/user/pages/${encodeURIComponent(pageId)}/canvases`), { withCredentials: true }),
   connectFacebookCookie: (payload) => {
     const body = typeof payload === "object" && payload !== null
       ? payload

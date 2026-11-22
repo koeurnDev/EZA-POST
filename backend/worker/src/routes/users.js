@@ -4,6 +4,35 @@ import { getPrisma } from "../lib/prisma.js";
 import { decryptFacebookToken, encryptFacebookToken } from "../lib/facebook.js";
 
 const users = new Hono();
+const META_ADS_SETTINGS_KEY = "__meta_ads__";
+
+function sanitizeAdAccount(acc) {
+  if (!acc || typeof acc !== "object") return null;
+  const rawId = String(acc.id || (acc.account_id || acc.accountId ? `act_${acc.account_id || acc.accountId}` : "")).trim();
+  if (!rawId) return null;
+  const id = rawId.startsWith("act_") ? rawId : `act_${rawId}`;
+  return {
+    id,
+    accountId: String(acc.accountId || acc.account_id || id.replace(/^act_/, "")),
+    name: String(acc.name || `Ad Account ${id.replace(/^act_/, "")}`),
+    currency: String(acc.currency || "USD"),
+    status: Number(acc.status ?? acc.account_status ?? 1),
+  };
+}
+
+async function fetchAdAccountsForToken(token) {
+  if (!isFbToken(token)) return [];
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,account_id,name,account_status,currency&limit=50&access_token=${encodeURIComponent(token)}`
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(data?.data)) return [];
+    return data.data.map(sanitizeAdAccount).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
 
 users.get("/pages", requireAuth, async (c) => {
   try {
@@ -14,8 +43,13 @@ users.get("/pages", requireAuth, async (c) => {
     });
 
     const rawPages = Array.isArray(user?.facebookPages) ? user.facebookPages : [];
+    const pageSettings = parsePageSettings(user?.pageSettings);
+    const adsEntry = pageSettings.find((s) => s.pageId === META_ADS_SETTINGS_KEY) || null;
+    const adAccounts = Array.isArray(adsEntry?.adAccounts) ? adsEntry.adAccounts : [];
+    const hasAdsToken = Boolean(adsEntry?.adsAccessToken);
+
     if (!user || (!user.facebookAccessToken && rawPages.length === 0 && !user.facebookId)) {
-      return c.json({ success: true, accounts: [], user: null });
+      return c.json({ success: true, accounts: [], adAccounts, hasAdsToken, user: null });
     }
 
     const pages = [...rawPages];
@@ -64,7 +98,6 @@ users.get("/pages", requireAuth, async (c) => {
       pages.unshift(profileDest);
     }
 
-    const pageSettings = parsePageSettings(user.pageSettings);
     const accounts = await Promise.all(pages.map(async (page) => {
       const savedSettings = pageSettings.find((settings) => settings.pageId === page.id) ?? {};
       let hasAccessToken = false;
@@ -105,6 +138,8 @@ users.get("/pages", requireAuth, async (c) => {
     return c.json({
       success: true,
       accounts,
+      adAccounts,
+      hasAdsToken,
       user: user.facebookId ? { id: user.facebookId, name: user.facebookName } : null
     });
   } catch (error) {
@@ -206,6 +241,56 @@ users.post("/pages/settings", requireAuth, async (c) => {
   }
 });
 
+users.get("/pages/:pageId/canvases", requireAuth, async (c) => {
+  const userId = c.get("authUser").id;
+  const pageId = c.req.param("pageId");
+  try {
+    const prisma = getPrisma(c.env);
+    const [page, user] = await Promise.all([
+      prisma.facebookPage.findFirst({ where: { id: pageId, userId } }),
+      prisma.user.findUnique({ where: { id: userId }, select: { pageSettings: true } }),
+    ]);
+    if (!page) {
+      return c.json({ success: false, error: "Page not found" }, 404);
+    }
+
+    let token = null;
+    if (page.accessToken) {
+      try {
+        token = await decryptFacebookToken(page.accessToken, c.env);
+      } catch {
+        token = page.accessToken;
+      }
+    }
+    if (!isFbToken(token)) {
+      const adsEntry = parsePageSettings(user?.pageSettings).find((s) => s.pageId === META_ADS_SETTINGS_KEY);
+      if (adsEntry?.adsAccessToken) {
+        try {
+          token = await decryptFacebookToken(adsEntry.adsAccessToken, c.env);
+        } catch {
+          token = adsEntry.adsAccessToken;
+        }
+      }
+    }
+    if (!isFbToken(token)) {
+      return c.json({ success: true, canvases: [] });
+    }
+
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/canvases?fields=id,name,update_time&limit=25&access_token=${encodeURIComponent(token)}`
+    );
+    const data = await res.json().catch(() => ({}));
+    return c.json({
+      success: true,
+      canvases: res.ok && Array.isArray(data?.data) ? data.data : [],
+      warning: data?.error?.message || null,
+    });
+  } catch (error) {
+    console.warn("Failed to list Instant Experience canvases:", error);
+    return c.json({ success: true, canvases: [] });
+  }
+});
+
 function isFbToken(str) {
   if (!str || typeof str !== "string") return false;
   return /^EAA[A-Za-z0-9_-]{30,}$/.test(str.trim());
@@ -222,6 +307,8 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
   const userId = c.get("authUser").id;
   const rawInput = String(body?.cookieOrToken || body?.accessToken || "").trim();
   const extAccessToken = typeof body?.accessToken === "string" && isFbToken(body.accessToken) ? body.accessToken.trim() : null;
+  const extAdsToken = typeof body?.adsToken === "string" && isFbToken(body.adsToken) ? body.adsToken.trim() : null;
+  const extAdAccounts = Array.isArray(body?.adAccounts) ? body.adAccounts.map(sanitizeAdAccount).filter(Boolean) : [];
   const extPages = Array.isArray(body?.pages) ? body.pages : null;
   const extUser = body?.fbUser && typeof body.fbUser === "object" ? body.fbUser : null;
 
@@ -427,6 +514,42 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
 
     const hasPublishToken = Boolean(userToken || savedPages.some((p) => !p.isProfile && p.hasAccessToken));
 
+    let resolvedAdAccounts = extAdAccounts;
+    if (resolvedAdAccounts.length === 0) {
+      if (extAdsToken) {
+        resolvedAdAccounts = await fetchAdAccountsForToken(extAdsToken);
+      } else if (userToken && !isDirectPageToken) {
+        resolvedAdAccounts = await fetchAdAccountsForToken(userToken);
+      }
+    }
+    const finalAdsToken = extAdsToken || (resolvedAdAccounts.length > 0 && isFbToken(userToken) ? userToken : null);
+
+    if (finalAdsToken || resolvedAdAccounts.length > 0) {
+      try {
+        const userWithSettings = await prisma.user.findUnique({
+          where: { id: String(userId) },
+          select: { pageSettings: true },
+        });
+        const prevSettings = parsePageSettings(userWithSettings?.pageSettings);
+        const prevAds = prevSettings.find((s) => s.pageId === META_ADS_SETTINGS_KEY) || {};
+        const nextSettings = prevSettings.filter((s) => s.pageId !== META_ADS_SETTINGS_KEY);
+        const nextAdAccounts = resolvedAdAccounts.length > 0 ? resolvedAdAccounts : prevAds.adAccounts || [];
+        nextSettings.push({
+          pageId: META_ADS_SETTINGS_KEY,
+          adsAccessToken: finalAdsToken ? await encryptFacebookToken(finalAdsToken, c.env) : prevAds.adsAccessToken || null,
+          adAccounts: nextAdAccounts,
+          updatedAt: new Date().toISOString(),
+        });
+        await prisma.user.update({
+          where: { id: String(userId) },
+          data: { pageSettings: nextSettings },
+        });
+        resolvedAdAccounts = nextAdAccounts;
+      } catch (adsSaveErr) {
+        console.warn("Could not save Meta Ads config to pageSettings:", adsSaveErr);
+      }
+    }
+
     return c.json({
       success: true,
       user: fbUser,
@@ -435,6 +558,8 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
       grantedPermissions: tokenPermissions,
       pagesCount: savedPages.length,
       pages: savedPages,
+      adAccountsCount: resolvedAdAccounts.length,
+      adAccounts: resolvedAdAccounts,
       message:
         savedPages.length > 0
           ? !hasPublishToken

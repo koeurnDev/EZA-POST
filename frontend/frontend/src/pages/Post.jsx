@@ -17,17 +17,49 @@ import { generateThumbnailFromVideo, generateGalleryFromVideo, dataURLtoFile } f
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
 
+const POST_FORMATS = [
+    { id: "text_link", label: "📝 Text / Link", accept: "image/*" },
+    { id: "photos", label: "🖼️ Photos (1-10)", multiImage: true, accept: "image/*" },
+    { id: "video", label: "🎥 Videos", accept: "video/*", useBusinessSuite: true },
+    { id: "reels", label: "📱 Reels", accept: "video/*", useBusinessSuite: true },
+    { id: "video_pe", label: "🎠 Video PE", needsAdAccount: true, accept: "video/*" },
+    { id: "photo_pe", label: "🗂️ Photo PE", multiImage: true, needsAdAccount: true, accept: "image/*" },
+    { id: "video_cta", label: "🎬 Video CTA", needsAdAccount: true, accept: "video/*" },
+    { id: "photo_cta", label: "🏷️ Photo CTA", needsAdAccount: true, accept: "image/*" },
+    { id: "instant_experience", label: "⚡ Instant Exp", needsAdAccount: true, accept: "image/*" },
+    { id: "live", label: "🔴 Live Stream", route: "/tools/live-stream" },
+];
+
+const CTA_OPTIONS = [
+    { value: "LEARN_MORE", label: "ស្វែងយល់ (Learn More)" },
+    { value: "SHOP_NOW", label: "ទិញឥឡូវ (Shop Now)" },
+    { value: "SEND_MESSAGE", label: "ផ្ញើសារ (Send Message)" },
+    { value: "SIGN_UP", label: "ចុះឈ្មោះ (Sign Up)" },
+    { value: "BOOK_NOW", label: "កក់ទុក (Book Now)" },
+    { value: "WATCH_MORE", label: "មើលបន្ថែម (Watch More)" },
+    { value: "CALL_NOW", label: "ហៅទូរស័ព្ទ (Call Now)" },
+    { value: "FOLLOW", label: "តាមដាន (Follow)" },
+];
+
+function normalizePostFormat(fmt) {
+    if (fmt === "single") return "video";
+    if (fmt === "carousel") return "video_pe";
+    if (POST_FORMATS.some((f) => f.id === fmt && !f.route)) return fmt;
+    return "video";
+}
+
 export default function Post() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const [postFormat, setPostFormat] = useState("single"); // "single" (default, simpler) or "carousel"
+    const [postFormat, setPostFormat] = useState(() => normalizePostFormat(location.state?.postFormat || "video"));
 
     const [file, setFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [rawVideoUrl, setRawVideoUrl] = useState(null);
     const [tiktokUrl, setTiktokUrl] = useState("");
     const [mediaItems, setMediaItems] = useState([]);
+    const [multiImages, setMultiImages] = useState([]);
     const [thumbnail, setThumbnail] = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
     const [rightSideImage, setRightSideImage] = useState(null);
@@ -37,6 +69,12 @@ export default function Post() {
     const [targetLink, setTargetLink] = useState("");
     const [cardDescription, setCardDescription] = useState("");
     const [cta, setCta] = useState("LEARN_MORE");
+    const [adAccounts, setAdAccounts] = useState([]);
+    const [selectedAdAccount, setSelectedAdAccount] = useState("");
+    const [isDarkPost, setIsDarkPost] = useState(false);
+    const [canvases, setCanvases] = useState([]);
+    const [canvasId, setCanvasId] = useState("");
+    const [loadingCanvases, setLoadingCanvases] = useState(false);
 
     const [caption, setCaption] = useState("");
     const [carouselCtaText, setCarouselCtaText] = useState("ចុច Like Page ដើម្បីបាន\nវីដេអូថ្មីៗ");
@@ -148,7 +186,12 @@ export default function Post() {
                 const pagesRes = await apiUtils.getUserPages();
                 if (pagesRes.data.success) {
                     const accounts = pagesRes.data.accounts || [];
+                    const fetchedAdAccounts = Array.isArray(pagesRes.data.adAccounts) ? pagesRes.data.adAccounts : [];
                     setAvailablePages(accounts);
+                    setAdAccounts(fetchedAdAccounts);
+                    if (fetchedAdAccounts.length > 0) {
+                        setSelectedAdAccount((prev) => prev || fetchedAdAccounts[0].id);
+                    }
                     if (accounts.length > 0) {
                         setSelectedPages(prev => {
                             const validPrev = prev.filter(id => accounts.some(a => a.id === id));
@@ -215,12 +258,26 @@ export default function Post() {
         }
     }, [activeView, fetchQueue]);
 
+    useEffect(() => {
+        if (postFormat !== "instant_experience" || !selectedPages[0]) return;
+        setLoadingCanvases(true);
+        apiUtils.getPageCanvases(selectedPages[0])
+            .then((res) => {
+                const list = Array.isArray(res.data?.canvases) ? res.data.canvases : [];
+                setCanvases(list);
+                if (list.length > 0) setCanvasId((prev) => prev || list[0].id);
+            })
+            .catch(() => setCanvases([]))
+            .finally(() => setLoadingCanvases(false));
+    }, [postFormat, selectedPages]);
+
     const handleClearPreview = async () => {
         setFile(null);
         setPreviewUrl(null);
         setRawVideoUrl(null);
         setTiktokUrl("");
         setMediaItems([]);
+        setMultiImages([]);
         setThumbnail(null);
         setThumbnailPreview(null);
         setRightSideImage(null);
@@ -278,7 +335,7 @@ export default function Post() {
                 }
             ];
 
-            if (postFormat === "carousel") {
+            if (postFormat === "video_pe") {
                 items.push({
                     id: "right-side-image",
                     type: "image",
@@ -299,7 +356,36 @@ export default function Post() {
         });
     }, [postFormat, file, previewUrl, rightSideImage, rightSideImagePreview]);
 
+    const addMultiImages = (fileList) => {
+        const picked = Array.from(fileList || []).filter((f) => f.type?.startsWith("image/"));
+        if (picked.length === 0) {
+            return toast.error("សូមជ្រើសរើសឯកសាររូបភាព (JPG, PNG, WEBP) ប៉ុណ្ណោះ");
+        }
+        const oversized = picked.find((f) => f.size > 90 * 1024 * 1024);
+        if (oversized) return toast.error("រូបភាពមានទំហំធំពេក (អតិបរមា 90MB)");
+        setMultiImages((prev) => {
+            const remaining = Math.max(0, 10 - prev.length);
+            const additions = picked.slice(0, remaining).map((f, i) => ({
+                id: `img-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+                file: f,
+                preview: URL.createObjectURL(f),
+                headline: headline || "",
+                link: targetLink || "",
+                cta: cta || "LEARN_MORE",
+            }));
+            if (picked.length > remaining) {
+                toast("អាចដាក់រូបភាពបានច្រើនបំផុត ១០ សន្លឹក!", { icon: "ℹ️" });
+            }
+            return [...prev, ...additions];
+        });
+    };
+
     const handleFileChange = (e) => {
+        if (e.target.files?.length > 0 && (postFormat === "photos" || postFormat === "photo_pe")) {
+            addMultiImages(e.target.files);
+            e.target.value = "";
+            return;
+        }
         const selectedFile = e.target.files?.[0];
         if (selectedFile) validateAndSetMedia(selectedFile);
         e.target.value = "";
@@ -353,6 +439,10 @@ export default function Post() {
     const handleDrop = (e) => {
         e.preventDefault();
         setIsDragging(false);
+        if (e.dataTransfer?.files?.length > 0 && (postFormat === "photos" || postFormat === "photo_pe")) {
+            addMultiImages(e.dataTransfer.files);
+            return;
+        }
         const dropped = e.dataTransfer?.files?.[0];
         if (dropped) validateAndSetMedia(dropped);
     };
@@ -495,21 +585,49 @@ export default function Post() {
         return maj > 2 || (maj === 2 && (min > 0 || pat >= 5));
     };
 
+    const activeFormatMeta = POST_FORMATS.find((f) => f.id === postFormat) || POST_FORMATS[2];
+
     const handleSubmit = async () => {
         if (selectedPages.length === 0) {
             return toast.error("សូមជ្រើសរើសផេកយ៉ាងតិច ១ ដើម្បីបង្ហោះ!");
         }
-        if (postFormat === "reels" && (!file && !previewUrl || (file && !file.type.startsWith("video/")))) {
+
+        const hasSingleVideo = Boolean((file && file.type.startsWith("video/")) || rawVideoUrl || (previewUrl && !file?.type?.startsWith("image/")));
+        const hasSingleImage = Boolean((file && file.type.startsWith("image/")) || (previewUrl && file?.type?.startsWith("image/")));
+
+        if (postFormat === "reels" && !hasSingleVideo) {
             return toast.error("Facebook Reels តម្រូវឱ្យដាក់ឯកសារវីដេអូ (.mp4)!");
         }
-        if (postFormat === "carousel" && !file && !previewUrl) {
-            return toast.error("ផុសបែប Carousel តម្រូវឱ្យមានវីដេអូ!");
+        if (postFormat === "video" && !hasSingleVideo && !caption.trim()) {
+            return toast.error("សូមដាក់វីដេអូ ឬសរសេរអត្ថបទជាមុនសិន!");
         }
-        if (postFormat === "carousel" && file && !file.type.startsWith("video/")) {
-            return toast.error("ផុសបែប Carousel តម្រូវឱ្យដាក់វីដេអូ (សូមប្ដូរទៅ 'ផុសធម្មតា' សម្រាប់រូបភាព)!");
+        if (postFormat === "video_pe" && !hasSingleVideo) {
+            return toast.error("Video PE Carousel តម្រូវឱ្យដាក់វីដេអូ!");
         }
-        if (postFormat === "single" && !file && !previewUrl && !caption.trim()) {
-            return toast.error("សូមសរសេរអត្ថបទ ឬបន្ថែមវីដេអូ/រូបភាពជាមុនសិន!");
+        if (postFormat === "video_cta" && !hasSingleVideo) {
+            return toast.error("Video CTA តម្រូវឱ្យដាក់វីដេអូ!");
+        }
+        if (postFormat === "photo_cta" && !hasSingleImage) {
+            return toast.error("Photo CTA តម្រូវឱ្យដាក់រូបភាព ១ សន្លឹក!");
+        }
+        if (postFormat === "photos" && multiImages.length === 0 && !hasSingleImage) {
+            return toast.error("សូមដាក់រូបភាពយ៉ាងតិច ១ សន្លឹក!");
+        }
+        if (postFormat === "photo_pe" && multiImages.length < 2) {
+            return toast.error("Photo PE Carousel តម្រូវឱ្យដាក់រូបភាពយ៉ាងតិច ២ សន្លឹក!");
+        }
+        if (postFormat === "instant_experience" && !canvasId && !targetLink.trim()) {
+            return toast.error("សូមជ្រើសរើស Instant Experience (Canvas) ឬដាក់ Link URL!");
+        }
+        if (postFormat === "text_link" && !caption.trim() && !targetLink.trim()) {
+            return toast.error("សូមសរសេរអត្ថបទ ឬបញ្ចូល Link URL ជាមុនសិន!");
+        }
+
+        if (activeFormatMeta.needsAdAccount && !selectedAdAccount) {
+            return toast.error(
+                "ទម្រង់ PE / CTA ត្រូវការ Ad Account — សូមបើក adsmanager.facebook.com លើ Chrome រួច Sync Extension v2.2.0 ក្នុងទំព័រ 'ភ្ជាប់ផេក'!",
+                { duration: 7000 }
+            );
         }
 
         if (publishMode === "schedule") {
@@ -522,14 +640,7 @@ export default function Post() {
             }
         }
 
-        const isVideoPublish =
-            postFormat === "carousel" ||
-            postFormat === "reels" ||
-            Boolean(file?.type?.startsWith("video/")) ||
-            Boolean(rawVideoUrl) ||
-            Boolean(previewUrl && !file?.type?.startsWith("image/"));
-
-        if (isVideoPublish) {
+        if (activeFormatMeta.useBusinessSuite) {
             const isExtReady =
                 extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
             const currentVer =
@@ -539,13 +650,13 @@ export default function Post() {
             }
             if (isExtReady) {
                 toast.error(
-                    `Extension របស់អ្នកជាកំណែចាស់ (${currentVer || "< 2.0.5"}) — សូម Reload/អាប់ដេត Extension v2.1.0 ក្នុង chrome://extensions ជាមុនសិន!`,
+                    `Extension របស់អ្នកជាកំណែចាស់ (${currentVer || "< 2.0.5"}) — សូម Reload/អាប់ដេត Extension v2.2.0 ក្នុង chrome://extensions ជាមុនសិន!`,
                     { duration: 8000 }
                 );
                 return;
             }
             toast.error(
-                "សូមដំឡើង EZA-POST Extension (v2.1.0) នៅក្នុងទំព័រ 'ភ្ជាប់ផេក' ដើម្បីផុសវីដេអូតាម Business Suite ដោយសុវត្ថិភាព!",
+                "សូមដំឡើង EZA-POST Extension (v2.2.0) នៅក្នុងទំព័រ 'ភ្ជាប់ផេក' ដើម្បីផុសវីដេអូតាម Business Suite ដោយសុវត្ថិភាព!",
                 { duration: 8000 }
             );
             return;
@@ -563,22 +674,28 @@ export default function Post() {
             formData.append("caption", caption);
             formData.append("accounts", JSON.stringify(selectedPages));
             formData.append("platforms", JSON.stringify(["facebook"]));
-
-            if (file) formData.append("video", file);
-            else if (rawVideoUrl) formData.append("videoUrl", rawVideoUrl);
-            else if (previewUrl) formData.append("videoUrl", previewUrl);
-
-            if (thumbnail) formData.append("thumbnail", thumbnail);
-            if (postFormat === "carousel" && rightSideImage) formData.append("rightSideImage", rightSideImage);
+            formData.append("postFormat", postFormat);
+            if (targetLink.trim()) formData.append("link", targetLink.trim());
+            if (headline.trim()) formData.append("headline", headline.trim());
+            if (cardDescription.trim()) formData.append("cardDescription", cardDescription.trim());
+            if (cta) formData.append("cta", cta);
+            if (selectedAdAccount) formData.append("adAccountId", selectedAdAccount);
+            if (isDarkPost) formData.append("isDarkPost", "true");
+            if (canvasId) formData.append("canvasId", canvasId);
+            if (postFormat === "instant_experience" && targetLink.trim()) formData.append("canvasUrl", targetLink.trim());
             if (publishMode === "schedule" && scheduleTime) formData.append("scheduleTime", new Date(scheduleTime).toISOString());
             formData.append("aiOptions", JSON.stringify(aiOptions));
             formData.append("enableBot", autoReplyBot);
 
-            let endpoint = `${API_BASE}/api/posts/mixed-carousel`;
-            if (postFormat === "single" || postFormat === "reels") {
-                endpoint = `${API_BASE}/api/posts`;
-                formData.append("postType", postFormat);
-            } else {
+            let endpoint = `${API_BASE}/api/posts`;
+            if (postFormat === "video_pe") {
+                endpoint = `${API_BASE}/api/posts/mixed-carousel`;
+                if (file) formData.append("video", file);
+                else if (rawVideoUrl) formData.append("videoUrl", rawVideoUrl);
+                else if (previewUrl) formData.append("videoUrl", previewUrl);
+                if (thumbnail) formData.append("thumbnail", thumbnail);
+                if (rightSideImage) formData.append("rightSideImage", rightSideImage);
+                if (targetLink.trim()) formData.append("targetLink", targetLink.trim());
                 formData.append("postType", "carousel");
                 const cardsPayload = [
                     ...mediaItems.map(item => ({
@@ -602,6 +719,36 @@ export default function Post() {
                     }
                 ];
                 formData.append("carouselCards", JSON.stringify(cardsPayload));
+            } else if (postFormat === "photos" || postFormat === "photo_pe") {
+                if (multiImages.length > 0) {
+                    multiImages.forEach((img) => {
+                        if (img.file) formData.append("images", img.file);
+                    });
+                    if (postFormat === "photo_pe") {
+                        formData.append(
+                            "carouselCards",
+                            JSON.stringify(
+                                multiImages.map((img, idx) => ({
+                                    id: img.id || `photo-card-${idx}`,
+                                    type: "image",
+                                    headline: img.headline || headline || "",
+                                    description: cardDescription || "",
+                                    link: img.link || targetLink || "",
+                                    cta: img.cta || cta || "LEARN_MORE",
+                                }))
+                            )
+                        );
+                    }
+                } else if (file) {
+                    formData.append("images", file);
+                }
+                formData.append("postType", postFormat === "photo_pe" || multiImages.length >= 2 ? "carousel" : "image");
+            } else {
+                if (file) formData.append("video", file);
+                else if (rawVideoUrl) formData.append("videoUrl", rawVideoUrl);
+                else if (previewUrl && postFormat !== "text_link") formData.append("videoUrl", previewUrl);
+                if (thumbnail) formData.append("thumbnail", thumbnail);
+                formData.append("postType", postFormat);
             }
 
             const response = await axios.post(endpoint, formData, {
@@ -624,6 +771,7 @@ export default function Post() {
                 setTiktokUrl("");
                 setCaption("");
                 setMediaItems([]);
+                setMultiImages([]);
 
                 const isAutoCard2 = rightSideImage?.name?.startsWith("card2-");
                 if (isAutoCard2) {
@@ -670,14 +818,14 @@ export default function Post() {
         const isExtReady =
             extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
         if (!isExtReady) {
-            toast.error("សូមដំឡើង ឬ Reload EZA-POST Extension (v2.1.0) ជាមុនសិន!");
+            toast.error("សូមដំឡើង ឬ Reload EZA-POST Extension (v2.2.0) ជាមុនសិន!");
             return;
         }
         const currentVer =
             extensionVersion || document.documentElement.getAttribute("data-eza-extension-version") || "";
         if (!isExtensionAtLeastV205(currentVer)) {
             toast.error(
-                `សូមអាប់ដេត ឬ Reload Extension v2.1.0 ក្នុង chrome://extensions (បច្ចុប្បន្ន: ${currentVer || "ចាស់"}) ហើយ Refresh ទំព័រនេះ!`,
+                `សូមអាប់ដេត ឬ Reload Extension v2.2.0 ក្នុង chrome://extensions (បច្ចុប្បន្ន: ${currentVer || "ចាស់"}) ហើយ Refresh ទំព័រនេះ!`,
                 { duration: 8000 }
             );
             return;
@@ -783,7 +931,7 @@ export default function Post() {
         }
     };
 
-    const hasMedia = Boolean(file || previewUrl);
+    const hasMedia = Boolean(file || previewUrl || multiImages.length > 0);
     const mainPreviewItem = mediaItems[0];
 
     return (
@@ -824,44 +972,81 @@ export default function Post() {
 
                 {activeView === "create" ? (
                     <div className="space-y-4">
-                        {/* Format Switcher */}
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="grid grid-cols-3 gap-1 p-1 bg-gray-100 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 w-full sm:w-fit">
-                                <button
-                                    type="button"
-                                    onClick={() => setPostFormat("single")}
-                                    className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                        postFormat === "single"
-                                            ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xs"
-                                            : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-                                    }`}
-                                >
-                                    <span>🎥 ផុសធម្មតា</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setPostFormat("reels")}
-                                    className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                        postFormat === "reels"
-                                            ? "bg-white dark:bg-gray-800 text-pink-600 dark:text-pink-400 shadow-xs"
-                                            : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-                                    }`}
-                                >
-                                    <span>📱 Facebook Reels</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setPostFormat("carousel")}
-                                    className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                        postFormat === "carousel"
-                                            ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xs"
-                                            : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-                                    }`}
-                                >
-                                    <span>🎠 កាតផេក (Carousel)</span>
-                                </button>
-                            </div>
+                        {/* 10-Format Switcher (Tube2Post Parity) */}
+                        <div className="flex flex-wrap gap-1.5 p-1.5 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10">
+                            {POST_FORMATS.map((fmt) => {
+                                const isActive = postFormat === fmt.id;
+                                return (
+                                    <button
+                                        key={fmt.id}
+                                        type="button"
+                                        onClick={() => {
+                                            if (fmt.route) {
+                                                navigate(fmt.route);
+                                                return;
+                                            }
+                                            setPostFormat(fmt.id);
+                                        }}
+                                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                            isActive
+                                                ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xs"
+                                                : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
+                                        }`}
+                                    >
+                                        <span>{fmt.label}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
+
+                        {/* Ad Account + Dark Post Selector for PE / CTA / Canvas Formats */}
+                        {activeFormatMeta.needsAdAccount && (
+                            <div className="bg-blue-500/[0.06] dark:bg-blue-500/10 border border-blue-500/20 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex-1 min-w-0 space-y-1">
+                                    <div className="text-xs font-bold text-blue-700 dark:text-blue-300">
+                                        💳 ជ្រើសរើស Ad Account សម្រាប់ {activeFormatMeta.label}
+                                    </div>
+                                    {adAccounts.length > 0 ? (
+                                        <select
+                                            value={selectedAdAccount}
+                                            onChange={(e) => setSelectedAdAccount(e.target.value)}
+                                            className="w-full sm:max-w-sm bg-white dark:bg-gray-900 border border-blue-500/30 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 dark:text-white outline-none"
+                                        >
+                                            {adAccounts.map((acc) => (
+                                                <option key={acc.id} value={acc.id}>
+                                                    {acc.name} ({acc.id} • {acc.currency})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                                            មិនទាន់ឃើញ Ad Account ទេ — សូមបើក <code>adsmanager.facebook.com</code> លើ Chrome រួចចុច Sync Extension v2.2.0 ក្នុង{" "}
+                                            <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link>!
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-1.5 bg-white/80 dark:bg-gray-900 p-1 rounded-xl border border-blue-500/20 shrink-0 w-fit">
+                                    {[
+                                        { dark: false, label: "📢 ផុសឡើង Timeline" },
+                                        { dark: true, label: "🕶️ Dark Post (PE)" },
+                                    ].map((opt) => (
+                                        <button
+                                            key={String(opt.dark)}
+                                            type="button"
+                                            onClick={() => setIsDarkPost(opt.dark)}
+                                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                                                isDarkPost === opt.dark
+                                                    ? "bg-blue-600 text-white shadow-2xs"
+                                                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* STEP 1: Select Destination Pages */}
                         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
@@ -1049,8 +1234,175 @@ export default function Post() {
                                 rows={3}
                             />
 
-                            {/* Media Upload Dropzone OR Preview */}
-                            {!hasMedia ? (
+                            {/* Format-specific CTA / Link / Instant Experience Fields */}
+                            {postFormat === "text_link" && (
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-600 dark:text-gray-300">
+                                        🔗 តំណភ្ជាប់ Link Preview (Optional)
+                                    </label>
+                                    <input
+                                        type="url"
+                                        value={targetLink}
+                                        onChange={(e) => setTargetLink(e.target.value)}
+                                        placeholder="https://moneaa.site/..."
+                                        className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-gray-900 dark:text-white outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                            )}
+
+                            {postFormat === "instant_experience" && (
+                                <div className="p-3.5 rounded-xl bg-purple-500/[0.06] border border-purple-500/20 space-y-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
+                                            ⚡ ជ្រើសរើស Instant Experience (Canvas ID)
+                                        </span>
+                                        {loadingCanvases && <Loader2 size={14} className="animate-spin text-purple-500" />}
+                                    </div>
+                                    {canvases.length > 0 && (
+                                        <select
+                                            value={canvasId}
+                                            onChange={(e) => setCanvasId(e.target.value)}
+                                            className="w-full bg-white dark:bg-gray-900 border border-purple-500/30 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 dark:text-white outline-none"
+                                        >
+                                            <option value="">-- ជ្រើស Canvas របស់ផេក --</option>
+                                            {canvases.map((cv) => (
+                                                <option key={cv.id} value={cv.id}>
+                                                    {cv.name || "Instant Experience"} (ID: {cv.id})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    <input
+                                        type="text"
+                                        value={canvasId}
+                                        onChange={(e) => setCanvasId(e.target.value)}
+                                        placeholder="ឬវាយ Canvas ID ដោយដៃ (ឧទាហរណ៍ 1234567890...)"
+                                        className="w-full bg-white dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-gray-900 dark:text-white outline-none"
+                                    />
+                                </div>
+                            )}
+
+                            {(postFormat === "video_cta" || postFormat === "photo_cta" || postFormat === "instant_experience") && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10">
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-bold text-gray-500">ចំណងជើង (Headline)</label>
+                                        <input
+                                            type="text"
+                                            value={headline}
+                                            onChange={(e) => setHeadline(e.target.value)}
+                                            placeholder="បញ្ចូលចំណងជើងលើកាត..."
+                                            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-bold text-gray-500">ការពិពណ៌នាខ្លី (Description)</label>
+                                        <input
+                                            type="text"
+                                            value={cardDescription}
+                                            onChange={(e) => setCardDescription(e.target.value)}
+                                            placeholder="ព័ត៌មានបន្ថែមខាងក្រោម..."
+                                            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-bold text-gray-500">តំណភ្ជាប់គោលដៅ (Website / Link URL)</label>
+                                        <input
+                                            type="url"
+                                            value={targetLink}
+                                            onChange={(e) => setTargetLink(e.target.value)}
+                                            placeholder="https://..."
+                                            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-bold text-gray-500">ប៊ូតុង CTA (Call To Action)</label>
+                                        <select
+                                            value={cta}
+                                            onChange={(e) => setCta(e.target.value)}
+                                            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-blue-500"
+                                        >
+                                            {CTA_OPTIONS.map((opt) => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Media Upload Dropzone OR Preview (hidden only when text_link without media) */}
+                            {postFormat === "text_link" ? null : (postFormat === "photos" || postFormat === "photo_pe") ? (
+                                <div className="space-y-3">
+                                    {multiImages.length > 0 && (
+                                        <div className={`grid gap-3 ${postFormat === "photo_pe" ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
+                                            {multiImages.map((img, idx) => (
+                                                <div key={img.id} className="relative rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 flex flex-col">
+                                                    <div className="relative aspect-square bg-black">
+                                                        <img src={img.preview} alt={`photo-${idx + 1}`} className="w-full h-full object-cover" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setMultiImages((prev) => prev.filter((item) => item.id !== img.id))}
+                                                            className="absolute top-2 right-2 p-1 rounded-full bg-black/70 text-white hover:bg-rose-600 cursor-pointer"
+                                                        >
+                                                            <X size={13} />
+                                                        </button>
+                                                        <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] font-bold">
+                                                            #{idx + 1}
+                                                        </span>
+                                                    </div>
+                                                    {postFormat === "photo_pe" && (
+                                                        <div className="p-2.5 space-y-1.5 text-xs">
+                                                            <input
+                                                                type="text"
+                                                                value={img.headline}
+                                                                onChange={(e) => setMultiImages((prev) => prev.map((it) => it.id === img.id ? { ...it, headline: e.target.value } : it))}
+                                                                placeholder="ចំណងជើងកាត..."
+                                                                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] outline-none"
+                                                            />
+                                                            <input
+                                                                type="url"
+                                                                value={img.link}
+                                                                onChange={(e) => setMultiImages((prev) => prev.map((it) => it.id === img.id ? { ...it, link: e.target.value } : it))}
+                                                                placeholder="Link URL កាត..."
+                                                                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] outline-none"
+                                                            />
+                                                            <select
+                                                                value={img.cta}
+                                                                onChange={(e) => setMultiImages((prev) => prev.map((it) => it.id === img.id ? { ...it, cta: e.target.value } : it))}
+                                                                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-[11px] font-bold outline-none"
+                                                            >
+                                                                {CTA_OPTIONS.map((opt) => (
+                                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {multiImages.length < 10 && (
+                                        <div
+                                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                            onDragLeave={() => setIsDragging(false)}
+                                            onDrop={handleDrop}
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
+                                                isDragging
+                                                    ? "border-blue-500 bg-blue-500/10"
+                                                    : "border-gray-200 dark:border-white/15 bg-gray-50/70 dark:bg-black/20 hover:border-blue-500/50"
+                                            }`}
+                                        >
+                                            <ImageIcon size={22} className="mx-auto mb-2 text-blue-500" />
+                                            <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
+                                                ចុចដើម្បីជ្រើសរើសរូបភាព ({multiImages.length}/10 សន្លឹក)
+                                            </p>
+                                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                                {postFormat === "photo_pe" ? "ត្រូវការយ៉ាងតិច ២ កាតសម្រាប់ Photo PE Carousel" : "អាចជ្រើស ១ ឬច្រើនសន្លឹកព្រមគ្នា (JPG, PNG, WEBP)"}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : !hasMedia ? (
                                 <div
                                     onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                                     onDragLeave={() => setIsDragging(false)}
@@ -1074,7 +1426,7 @@ export default function Post() {
                                         <span>(អតិបរមា 90MB)</span>
                                     </p>
                                 </div>
-                            ) : postFormat !== "carousel" ? (
+                            ) : postFormat !== "video_pe" ? (
                                 /* Clean Single Media Preview */
                                 <div className="relative rounded-2xl overflow-hidden border border-gray-200 dark:border-white/10 bg-black">
                                     {mainPreviewItem?.type === "video" ? (
@@ -1250,12 +1602,9 @@ export default function Post() {
                                                         onChange={(e) => setCta(e.target.value)}
                                                         className="px-2 py-1 rounded-md bg-white dark:bg-[#3a3b3c] border border-gray-300 dark:border-white/10 text-[10px] font-bold text-gray-900 dark:text-white"
                                                     >
-                                                        <option value="FOLLOW">តាមដាន</option>
-                                                        <option value="LEARN_MORE">ស្វែងយល់</option>
-                                                        <option value="SEND_MESSAGE">ផ្ញើសារ</option>
-                                                        <option value="SIGN_UP">ចុះឈ្មោះ</option>
-                                                        <option value="BOOK_NOW">កក់ទុក</option>
-                                                        <option value="SHOP_NOW">ទិញ</option>
+                                                        {CTA_OPTIONS.map((opt) => (
+                                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                        ))}
                                                     </select>
                                                 )}
                                             </div>
@@ -1264,64 +1613,67 @@ export default function Post() {
                                 </div>
                             )}
 
-                            {/* Inline TikTok Link Bar */}
-                            <div className="pt-2 border-t border-gray-100 dark:border-white/5">
-                                <label className="text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5 mb-2">
-                                    <LinkIcon size={13} className="text-pink-500" />
-                                    <span>ឬទាញយកវីដេអូពី TikTok Link (Optional)</span>
-                                </label>
-                                <div className="flex flex-col sm:flex-row gap-2">
-                                    <input
-                                        type="text"
-                                        value={tiktokUrl || ""}
-                                        onChange={(e) => setTiktokUrl(e.target.value)}
-                                        placeholder="បិទភ្ជាប់ Link វីដេអូ TikTok ទីនេះ..."
-                                        className="flex-1 bg-gray-50 dark:bg-white/5 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 outline-none focus:border-pink-500"
-                                    />
-                                    <Button
-                                        type="button"
-                                        onClick={handleLoadTiktok}
-                                        isLoading={isLoadingVideo}
-                                        className="h-10 px-4 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shrink-0"
-                                    >
-                                        ទាញយកវីដេអូ
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Collapsible Advanced Video Tools */}
-                            <div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAdvanced(v => !v)}
-                                    className="text-xs font-semibold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 flex items-center gap-1 cursor-pointer"
-                                >
-                                    <span>ការកំណត់វីដេអូបន្ថែម (Advanced)</span>
-                                    <ChevronDown size={14} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-                                </button>
-                                {showAdvanced && (
-                                    <div className="grid grid-cols-3 gap-2.5 mt-3">
-                                        {[
-                                            { id: "safeMode", label: "Safe Mode" },
-                                            { id: "pitchShift", label: "កែសំឡេង" },
-                                            { id: "flip", label: "ត្រឡប់វីដេអូ" }
-                                        ].map(opt => (
-                                            <button
-                                                key={opt.id}
+                            {/* Inline TikTok Link Bar + Advanced Video Tools (only on video formats) */}
+                            {activeFormatMeta.accept?.includes("video") && (
+                                <>
+                                    <div className="pt-2 border-t border-gray-100 dark:border-white/5">
+                                        <label className="text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5 mb-2">
+                                            <LinkIcon size={13} className="text-pink-500" />
+                                            <span>ឬទាញយកវីដេអូពី TikTok Link (Optional)</span>
+                                        </label>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <input
+                                                type="text"
+                                                value={tiktokUrl || ""}
+                                                onChange={(e) => setTiktokUrl(e.target.value)}
+                                                placeholder="បិទភ្ជាប់ Link វីដេអូ TikTok ទីនេះ..."
+                                                className="flex-1 bg-gray-50 dark:bg-white/5 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 outline-none focus:border-pink-500"
+                                            />
+                                            <Button
                                                 type="button"
-                                                onClick={() => setAiOptions(prev => ({ ...prev, [opt.id]: !prev[opt.id] }))}
-                                                className={`p-3 rounded-xl border text-xs font-bold transition cursor-pointer ${
-                                                    aiOptions[opt.id]
-                                                        ? "bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400"
-                                                        : "bg-gray-50 dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400"
-                                                }`}
+                                                onClick={handleLoadTiktok}
+                                                isLoading={isLoadingVideo}
+                                                className="h-10 px-4 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shrink-0"
                                             >
-                                                {opt.label}
-                                            </button>
-                                        ))}
+                                                ទាញយកវីដេអូ
+                                            </Button>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
+
+                                    <div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAdvanced(v => !v)}
+                                            className="text-xs font-semibold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 flex items-center gap-1 cursor-pointer"
+                                        >
+                                            <span>ការកំណត់វីដេអូបន្ថែម (Advanced)</span>
+                                            <ChevronDown size={14} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+                                        </button>
+                                        {showAdvanced && (
+                                            <div className="grid grid-cols-3 gap-2.5 mt-3">
+                                                {[
+                                                    { id: "safeMode", label: "Safe Mode" },
+                                                    { id: "pitchShift", label: "កែសំឡេង" },
+                                                    { id: "flip", label: "ត្រឡប់វីដេអូ" }
+                                                ].map(opt => (
+                                                    <button
+                                                        key={opt.id}
+                                                        type="button"
+                                                        onClick={() => setAiOptions(prev => ({ ...prev, [opt.id]: !prev[opt.id] }))}
+                                                        className={`p-3 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                                                            aiOptions[opt.id]
+                                                                ? "bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400"
+                                                                : "bg-gray-50 dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400"
+                                                        }`}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         {/* STEP 3: Schedule & Publish */}
@@ -1379,7 +1731,7 @@ export default function Post() {
                                 </div>
 
                                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-                                    {extensionInstalled && (
+                                    {extensionInstalled && activeFormatMeta.useBusinessSuite && (
                                         <button
                                             type="button"
                                             onClick={handlePublishViaBusinessSuite}
@@ -1410,12 +1762,16 @@ export default function Post() {
                                                 : "bg-blue-600 hover:bg-blue-700 shadow-blue-500/20"
                                         }`}
                                     >
-                                        {publishMode === "schedule" ? "📅 កក់ពេលបង្ហោះ" : "🚀 បង្ហោះទៅ Facebook ឥឡូវ"}
+                                        {publishMode === "schedule"
+                                            ? "📅 កក់ពេលបង្ហោះ"
+                                            : isDarkPost && activeFormatMeta.needsAdAccount
+                                            ? "🕶️ បង្កើត Dark Post (PE)"
+                                            : "🚀 បង្ហោះទៅ Facebook ឥឡូវ"}
                                     </Button>
                                 </div>
                             </div>
 
-                            {extensionInstalled && (
+                            {extensionInstalled && activeFormatMeta.useBusinessSuite && (
                                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                                     <span className="text-emerald-700 dark:text-emerald-300 font-medium">
                                         💡 ប្រើប៊ូតុង <strong>«ផុសតាម Business Suite (Extension)»</strong> ដើម្បីឱ្យ Extension បញ្ចូលវីដេអូ &amp; Caption ផ្ទាល់លើ Browser អ្នក (មិនជាប់ FB #1 និងសុវត្ថិភាព ១០០%)។
@@ -1551,8 +1907,9 @@ export default function Post() {
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
+                multiple={Boolean(activeFormatMeta.multiImage)}
                 onChange={handleFileChange}
-                accept="video/*,image/*"
+                accept={activeFormatMeta.accept || "video/*,image/*"}
             />
         </DashboardLayout>
     );

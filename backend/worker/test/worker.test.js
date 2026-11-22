@@ -2256,3 +2256,280 @@ test("Hono post-media upload stores video/image in MEDIA_BUCKET and returns HTTP
   assert.ok(storedKey.startsWith("scheduled/"));
   assert.ok(body.url.startsWith("https://eza-post-3kv.pages.dev/api/v1/media/"));
 });
+
+test("Facebook publisher creates Video CTA AdCreative and publishes effective_object_story_id to timeline", async () => {
+  const originalFetch = globalThis.fetch;
+  const steps = [];
+  globalThis.fetch = async (url, options) => {
+    const strUrl = String(url);
+    if (strUrl.includes("/act_999111/advideos")) {
+      steps.push("advideos");
+      return Response.json({ id: "ad-vid-101" });
+    }
+    if (strUrl.includes("/act_999111/adcreatives")) {
+      const form = new URLSearchParams(options.body);
+      const spec = JSON.parse(form.get("object_story_spec"));
+      steps.push(`adcreatives:${spec.video_data.call_to_action.type}`);
+      return Response.json({ id: "creative-202" });
+    }
+    if (strUrl.includes("/creative-202")) {
+      steps.push("story-lookup");
+      return Response.json({ effective_object_story_id: "282987781568016_777888" });
+    }
+    if (strUrl.includes("/282987781568016_777888")) {
+      const form = new URLSearchParams(options.body);
+      steps.push(`publish:${form.get("is_published")}`);
+      return Response.json({ id: "282987781568016_777888", success: true });
+    }
+    return Response.json({}, { status: 400 });
+  };
+
+  try {
+    const postId = await publishFacebookPost(
+      "282987781568016",
+      "EAAG-page-token-012345678901234567890123456789",
+      {
+        postType: "video",
+        caption: "Shop now CTA demo",
+        videoUrl: "https://cdn.example/demo.mp4",
+        thumbnailUrl: "https://cdn.example/thumb.jpg",
+        carouselCards: [
+          {
+            isMetaConfig: true,
+            format: "video_cta",
+            adAccountId: "act_999111",
+            headline: "Buy Today",
+            description: "Limited offer",
+            link: "https://moneaa.site/shop",
+            cta: "SHOP_NOW",
+            isDarkPost: false,
+          },
+        ],
+        _adsContext: {
+          adsToken: "EAAB-ads-token-012345678901234567890123456789",
+          adAccounts: [{ id: "act_999111" }],
+        },
+      },
+      { name: "Demo Shop" },
+      {}
+    );
+    assert.equal(postId, "282987781568016_777888");
+    assert.deepEqual(steps, [
+      "advideos",
+      "adcreatives:SHOP_NOW",
+      "story-lookup",
+      "publish:true",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Hono connect-cookie persists Extension EAAB adsToken and adAccounts cleanly", async () => {
+  const originalFetch = globalThis.fetch;
+  const secret = "ads-sync-secret";
+  const encryptionKey = "ads-sync-encryption-key-secret";
+  const token = await createAuthToken(
+    { id: "user-1", email: "owner@example.com" },
+    new TextEncoder().encode(secret)
+  );
+  const userState = {
+    id: "user-1",
+    email: "owner@example.com",
+    name: "Owner",
+    facebookId: null,
+    facebookName: null,
+    facebookAccessToken: null,
+    pageSettings: "[]",
+  };
+  const pageState = new Map();
+
+  globalThis.fetch = async (url) => {
+    const strUrl = String(url);
+    if (strUrl.includes("/me?")) {
+      return Response.json({ id: "fb-u1", name: "Owner FB" });
+    }
+    if (strUrl.includes("/me/permissions")) {
+      return Response.json({ data: [{ permission: "pages_manage_posts", status: "granted" }] });
+    }
+    if (strUrl.includes("/me/accounts")) {
+      return Response.json({
+        data: [{ id: "pg-1", name: "My Page", access_token: "EAAG-page-token-012345678901234567890123456789" }],
+      });
+    }
+    return Response.json({});
+  };
+
+  const env = {
+    JWT_SECRET: secret,
+    ENCRYPTION_KEY: encryptionKey,
+    DB: {
+      prepare: (sql) => ({
+        bind: (...args) => ({
+          first: async () => {
+            if (sql.startsWith("UPDATE users SET")) {
+              const setMatch = sql.match(/UPDATE users SET (.+?) WHERE /);
+              if (setMatch) {
+                setMatch[1].split(",").forEach((part, idx) => {
+                  const col = part.split("=")[0].trim();
+                  if (col) userState[col] = args[idx];
+                });
+              }
+              return { ...userState };
+            }
+            if (sql.startsWith("INSERT INTO facebook_pages")) {
+              const colsMatch = sql.match(/INSERT INTO facebook_pages \(([^)]+)\)/);
+              const row = {
+                isConnected: 1,
+                isSelected: 1,
+                enableSchedule: 1,
+              };
+              if (colsMatch) {
+                colsMatch[1].split(",").forEach((col, idx) => {
+                  const name = col.trim();
+                  if (name) row[name] = args[idx];
+                });
+              }
+              if (row.id) pageState.set(row.id, row);
+              return row;
+            }
+            if (sql.startsWith("UPDATE facebook_pages SET")) {
+              const targetId = args[args.length - 1];
+              const existing = pageState.get(targetId) || { id: targetId };
+              const setMatch = sql.match(/UPDATE facebook_pages SET (.+?) WHERE /);
+              if (setMatch) {
+                setMatch[1].split(",").forEach((part, idx) => {
+                  const col = part.split("=")[0].trim();
+                  if (col) existing[col] = args[idx];
+                });
+              }
+              if (existing.id) pageState.set(existing.id, existing);
+              return { ...existing };
+            }
+            if (sql.includes("FROM users")) return { ...userState };
+            if (sql.includes("FROM facebook_pages")) return pageState.get(args[0]) || null;
+            return null;
+          },
+          all: async () => {
+            if (sql.includes("FROM facebook_pages")) return { results: Array.from(pageState.values()) };
+            return { results: [] };
+          },
+          run: async () => ({ meta: { changes: 1 } }),
+        }),
+      }),
+    },
+  };
+
+  try {
+    const res = await worker.request(
+      "/api/user/pages/connect-cookie",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          accessToken: "EAAG-user-token-012345678901234567890123456789",
+          adsToken: "EAAB-ads-token-0123456789012345678901234567890",
+          adAccounts: [{ id: "act_555666", accountId: "555666", name: "Main Ads", currency: "USD" }],
+        }),
+      },
+      env
+    );
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.adAccountsCount, 1);
+
+    const listRes = await worker.request(
+      "/api/user/pages",
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      env
+    );
+    assert.equal(listRes.status, 200);
+    const listed = await listRes.json();
+    assert.equal(listed.hasAdsToken, true);
+    assert.equal(listed.adAccounts.length, 1);
+    assert.equal(listed.adAccounts[0].id, "act_555666");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Hono edge live-stream creates RTMP stream URL without requiring BACKEND_ORIGIN", async () => {
+  const originalFetch = globalThis.fetch;
+  const secret = "edge-live-secret";
+  const token = await createAuthToken(
+    { id: "user-1", email: "owner@example.com" },
+    new TextEncoder().encode(secret)
+  );
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("/live_videos")) {
+      return Response.json({
+        id: "live-333",
+        secure_stream_url: "rtmps://live-api-s.facebook.com:443/rtmp/FB-333-0-Abc",
+      });
+    }
+    return Response.json({}, { status: 400 });
+  };
+
+  const env = {
+    JWT_SECRET: secret,
+    DB: {
+      prepare: (sql) => ({
+        bind: () => ({
+          first: async () => ({ id: "user-1", email: "owner@example.com", name: "Owner" }),
+          all: async () => {
+            if (sql.includes("FROM facebook_pages")) {
+              return {
+                results: [
+                  {
+                    id: "pg-live-1",
+                    userId: "user-1",
+                    name: "Live Page",
+                    accessToken: "EAAG-live-token-012345678901234567890123456789",
+                    isConnected: 1,
+                  },
+                ],
+              };
+            }
+            return { results: [] };
+          },
+        }),
+      }),
+    },
+  };
+
+  try {
+    const activeRes = await worker.request(
+      "/api/live-stream/active",
+      { method: "GET", headers: { Authorization: `Bearer ${token}` } },
+      env
+    );
+    assert.equal(activeRes.status, 200);
+    const activeBody = await activeRes.json();
+    assert.equal(activeBody.edgeOnly, true);
+
+    const createRes = await worker.request(
+      "/api/live-stream/create-rtmp",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ pageIds: ["pg-live-1"], title: "Night Live" }),
+      },
+      env
+    );
+    assert.equal(createRes.status, 200);
+    const createdBody = await createRes.json();
+    assert.equal(createdBody.success, true);
+    assert.equal(createdBody.streams[0].streamUrl, "rtmps://live-api-s.facebook.com:443/rtmp/FB-333-0-Abc");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
