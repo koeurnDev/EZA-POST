@@ -18,13 +18,6 @@ export default function SocialAuthButtons({ mode = "signup", onSuccess }) {
     }
   }, []);
 
-  // 🔵 Handle Facebook Login
-  const handleFacebook = () => {
-    setLoadingProvider("facebook");
-    toast.loading("កំពុងភ្ជាប់ទៅកាន់ Facebook...", { id: "social-auth" });
-    authAPI.facebookLogin();
-  };
-
   // 🔴 Handle Google Login
   const handleGoogle = () => {
     setLoadingProvider("google");

@@ -73,9 +73,7 @@ export default function Post() {
     const [isPreviewMuted, setIsPreviewMuted] = useState(true);
     const [extensionInstalled, setExtensionInstalled] = useState(false);
     const [extensionVersion, setExtensionVersion] = useState("");
-    const [fbOauthConfigured, setFbOauthConfigured] = useState(false);
     const [isOpeningComposer, setIsOpeningComposer] = useState(false);
-    const [lastPublishError, setLastPublishError] = useState("");
 
     const carouselRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -172,10 +170,6 @@ export default function Post() {
             }
         };
         fetchInitialData();
-        axios
-            .get(`${API_BASE}/api/auth/facebook/status`, { withCredentials: true })
-            .then((res) => setFbOauthConfigured(Boolean(res.data?.configured)))
-            .catch(() => setFbOauthConfigured(false));
 
         const checkExt = () => {
             if (document.documentElement.getAttribute("data-eza-extension") === "installed") {
@@ -535,7 +529,7 @@ export default function Post() {
             Boolean(rawVideoUrl) ||
             Boolean(previewUrl && !file?.type?.startsWith("image/"));
 
-        if (!fbOauthConfigured && isVideoPublish) {
+        if (isVideoPublish) {
             const isExtReady =
                 extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
             const currentVer =
@@ -545,13 +539,13 @@ export default function Post() {
             }
             if (isExtReady) {
                 toast.error(
-                    `Extension របស់អ្នកជាកំណែចាស់ (${currentVer || "< 2.0.5"}) — សូម Reload/អាប់ដេត Extension v2.0.5 ក្នុង chrome://extensions ជាមុនសិន!`,
+                    `Extension របស់អ្នកជាកំណែចាស់ (${currentVer || "< 2.0.5"}) — សូម Reload/អាប់ដេត Extension v2.1.0 ក្នុង chrome://extensions ជាមុនសិន!`,
                     { duration: 8000 }
                 );
                 return;
             }
             toast.error(
-                "Server មិនទាន់មាន Facebook Login OAuth ទេ! សូមដំឡើង EZA-POST Extension v2.0.5 ដើម្បីផុសវីដេអូតាម Business Suite ដោយសុវត្ថិភាព។",
+                "សូមដំឡើង EZA-POST Extension (v2.1.0) នៅក្នុងទំព័រ 'ភ្ជាប់ផេក' ដើម្បីផុសវីដេអូតាម Business Suite ដោយសុវត្ថិភាព!",
                 { duration: 8000 }
             );
             return;
@@ -664,7 +658,6 @@ export default function Post() {
                 errMsg = err.message;
             }
             toast.error(errMsg, { id: toastId, duration: 8000 });
-            setLastPublishError(errMsg);
         } finally {
             setIsSubmitting(false);
         }
@@ -677,14 +670,14 @@ export default function Post() {
         const isExtReady =
             extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
         if (!isExtReady) {
-            toast.error("សូមដំឡើង ឬ Reload EZA-POST Extension (v2.0.5) ជាមុនសិន!");
+            toast.error("សូមដំឡើង ឬ Reload EZA-POST Extension (v2.1.0) ជាមុនសិន!");
             return;
         }
         const currentVer =
             extensionVersion || document.documentElement.getAttribute("data-eza-extension-version") || "";
         if (!isExtensionAtLeastV205(currentVer)) {
             toast.error(
-                `សូមអាប់ដេត ឬ Reload Extension v2.0.5 ក្នុង chrome://extensions (បច្ចុប្បន្ន: ${currentVer || "ចាស់"}) ហើយ Refresh ទំព័រនេះ!`,
+                `សូមអាប់ដេត ឬ Reload Extension v2.1.0 ក្នុង chrome://extensions (បច្ចុប្បន្ន: ${currentVer || "ចាស់"}) ហើយ Refresh ទំព័រនេះ!`,
                 { duration: 8000 }
             );
             return;
@@ -766,7 +759,6 @@ export default function Post() {
             if (!assistResult.ok) {
                 throw new Error(assistResult.error || "មិនអាចបើក Meta Business Suite បានទេ");
             }
-            setLastPublishError("");
             toast.success("បានបើក Meta Business Suite ដោយបញ្ចូលវីដេអូ & Caption រួចរាល់! 🎉", {
                 id: toastId,
                 duration: 6000
@@ -1392,11 +1384,7 @@ export default function Post() {
                                             type="button"
                                             onClick={handlePublishViaBusinessSuite}
                                             disabled={isOpeningComposer || isSubmitting}
-                                            className={`px-4 h-12 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 border ${
-                                                !fbOauthConfigured
-                                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-lg shadow-emerald-500/20"
-                                                    : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-white border-slate-200 dark:border-slate-700"
-                                            }`}
+                                            className="px-4 h-12 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 border bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-lg shadow-emerald-500/20"
                                         >
                                             {isOpeningComposer ? (
                                                 <>
@@ -1427,7 +1415,7 @@ export default function Post() {
                                 </div>
                             </div>
 
-                            {(!fbOauthConfigured || /FB #1|Invalid request/i.test(lastPublishError)) && extensionInstalled && (
+                            {extensionInstalled && (
                                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                                     <span className="text-emerald-700 dark:text-emerald-300 font-medium">
                                         💡 ប្រើប៊ូតុង <strong>«ផុសតាម Business Suite (Extension)»</strong> ដើម្បីឱ្យ Extension បញ្ចូលវីដេអូ &amp; Caption ផ្ទាល់លើ Browser អ្នក (មិនជាប់ FB #1 និងសុវត្ថិភាព ១០០%)។

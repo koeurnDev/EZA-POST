@@ -290,12 +290,11 @@ const AccountSelector = React.memo(function AccountSelector({
                 <p>រកមិនឃើញផេកទេ</p>
                 <button
                   onClick={() => {
-                    const baseURL = import.meta.env.VITE_API_BASE_URL || "/api";
-                    window.location.href = baseURL.endsWith("/") ? `${baseURL}auth/facebook` : `${baseURL}/auth/facebook`;
+                    window.location.href = "/connections";
                   }}
                   className="mt-2 px-4 py-2 bg-[#1877f2] hover:bg-[#166fe5] text-white rounded-lg font-medium text-sm flex items-center gap-2 transition-colors shadow-sm"
                 >
-                  <span>📘</span> ភ្ជាប់ជាមួយ Facebook
+                  <span>⚡</span> ភ្ជាប់ផេកតាម Extension
                 </button>
               </div>
             ) : (
