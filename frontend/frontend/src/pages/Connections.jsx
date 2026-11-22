@@ -18,7 +18,13 @@ import {
     Check,
     ExternalLink,
     FolderOpen,
-    ToggleRight
+    ToggleRight,
+    Smartphone,
+    Laptop,
+    Key,
+    ChevronDown,
+    ChevronUp,
+    Info
 } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -48,6 +54,39 @@ export default function Connections() {
     const syncTimeoutRef = useRef(null);
     const [isGuideOpen, setIsGuideOpen] = useState(false);
     const [fbOauthConfigured, setFbOauthConfigured] = useState(false);
+    const [connectionTab, setConnectionTab] = useState("mobile"); // "mobile" | "pc"
+    const [manualToken, setManualToken] = useState("");
+    const [isConnectingManual, setIsConnectingManual] = useState(false);
+    const [isManualTokenOpen, setIsManualTokenOpen] = useState(false);
+
+    const handleManualTokenSubmit = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        const tokenVal = manualToken.trim();
+        if (!tokenVal) {
+            toast.error("សូមបញ្ចូល Facebook Access Token (EAA...)");
+            return;
+        }
+        setIsConnectingManual(true);
+        try {
+            const res = await apiUtils.connectFacebookCookie({
+                cookieOrToken: tokenVal,
+                accessToken: tokenVal,
+            });
+            if (res.data?.success) {
+                const total = res.data.pagesCount ?? (res.data.pages?.length || 0);
+                toast.success(`🎉 បានភ្ជាប់ ${total} ផេកដោយជោគជ័យ!`);
+                setManualToken("");
+                setIsManualTokenOpen(false);
+                fetchPages(true);
+            } else {
+                toast.error(res.data?.error || "មិនអាចភ្ជាប់ផេកបានទេ");
+            }
+        } catch (err) {
+            toast.error("កំហុសក្នុងការភ្ជាប់: " + (err.response?.data?.error || err.message));
+        } finally {
+            setIsConnectingManual(false);
+        }
+    };
 
     useEffect(() => {
         fetchPages().finally(() => setLoading(false));
@@ -307,100 +346,171 @@ export default function Connections() {
                         </div>
                     </div>
                 ) : (
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs">
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-                            <div className="space-y-2.5 max-w-2xl">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-khmer">
-                                        <Puzzle size={13} />
-                                        <span>វិធីសាស្ត្រភ្ជាប់ផ្លូវការ៖ EZA-POST FB Extension</span>
-                                    </span>
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs space-y-5">
+                        {/* Device Tab Selector */}
+                        <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-xl w-fit">
+                            <button
+                                type="button"
+                                onClick={() => setConnectionTab("mobile")}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition font-khmer cursor-pointer ${
+                                    connectionTab === "mobile"
+                                        ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                }`}
+                            >
+                                <Smartphone size={15} />
+                                <span>📱 ទូរស័ព្ទដៃ (iOS & Android)</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setConnectionTab("pc")}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition font-khmer cursor-pointer ${
+                                    connectionTab === "pc"
+                                        ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                }`}
+                            >
+                                <Laptop size={15} />
+                                <span>💻 កុំព្យូទ័រ (PC / Extension)</span>
+                            </button>
+                        </div>
 
-                                    <span
-                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border font-khmer ${
-                                            extensionInstalled
-                                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
-                                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
-                                        }`}
-                                    >
-                                        <span
-                                            className={`w-2 h-2 rounded-full ${
-                                                extensionInstalled ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
-                                            }`}
-                                        />
-                                        <span>
-                                            {extensionInstalled
-                                                ? "បានដំឡើង Extension រួចរាល់"
-                                                : "មិនទាន់ដំឡើង Extension"}
+                        {connectionTab === "mobile" ? (
+                            <div className="space-y-4">
+                                <div className="space-y-1.5 max-w-2xl">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-khmer">
+                                            <ShieldCheck size={12} />
+                                            <span>គាំទ្រពេញលេញលើ iPhone & Android (មិនបាច់ប្រើ Extension)</span>
                                         </span>
-                                    </span>
-
-                                    {extensionInstalled && (
-                                        <span
-                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border font-khmer ${
-                                                fbBrowserLoggedIn
-                                                    ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25"
-                                                    : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700"
-                                            }`}
-                                        >
-                                            <Facebook size={12} />
-                                            <span>
-                                                {fbBrowserLoggedIn
-                                                    ? `បានភ្ជាប់គណនី FB`
-                                                    : "មិនទាន់ Login FB លើ Browser"}
-                                            </span>
-                                        </span>
-                                    )}
+                                    </div>
+                                    <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-khmer">
+                                        ភ្ជាប់ផេក Facebook លើទូរស័ព្ទដៃ
+                                    </h1>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer leading-relaxed">
+                                        នៅលើ iPhone និង Android លោកអ្នកអាចភ្ជាប់តាមរយៈ <strong>Facebook Login (1-Tap)</strong> ឬ <strong>បញ្ចូល Page Access Token ដោយផ្ទាល់</strong> ដោយមិនចាំបាច់មានកុំព្យូទ័រឡើយ។
+                                    </p>
                                 </div>
 
-                                <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-khmer">
-                                    ភ្ជាប់ផេក <span className="text-blue-600 dark:text-blue-400">Facebook</span> តាមរយៈ Extension
-                                </h1>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer leading-relaxed">
-                                    យើងប្រើប្រាស់តែវិធីសាស្ត្រ <strong>EZA-POST Facebook Extension</strong> តែមួយគត់ — មិនបាច់បញ្ចូល Token ដោយដៃ និងមានសុវត្ថិភាពខ្ពស់បំផុត 100%។
-                                </p>
-                            </div>
-
-                            <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-center gap-2 shrink-0">
-                                <a
-                                    href="/eza-post-fb-extension.zip"
-                                    download="EZA-POST-FB-Extension.zip"
-                                    className="h-10 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center justify-center gap-2 transition-all font-khmer shadow-2xs"
-                                >
-                                    <Download size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                                    <span>ទាញយក Extension</span>
-                                </a>
-
-                                <button
-                                    type="button"
-                                    onClick={handleExtensionOneClickSync}
-                                    disabled={isSyncingViaExt}
-                                    className="h-10 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-sm shadow-blue-600/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 font-khmer cursor-pointer"
-                                >
-                                    {isSyncingViaExt ? (
-                                        <>
-                                            <Loader2 size={15} className="animate-spin shrink-0" />
-                                            <span>កំពុងភ្ជាប់ផេក...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Zap size={15} className="text-yellow-300 fill-yellow-300 shrink-0" />
-                                            <span>ភ្ជាប់ផេកតាម Extension</span>
-                                        </>
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+                                    {fbOauthConfigured && (
+                                        <a
+                                            href={apiUtils.getFullUrl("/auth/facebook")}
+                                            className="h-11 px-5 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white text-xs sm:text-sm font-bold shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all active:scale-95 font-khmer"
+                                        >
+                                            <Facebook size={18} />
+                                            <span>ភ្ជាប់តាម Facebook (1-Tap Login)</span>
+                                        </a>
                                     )}
-                                </button>
 
-                                {fbOauthConfigured && (
-                                    <a
-                                        href={apiUtils.getFullUrl("/auth/facebook")}
-                                        className="h-10 px-4 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white text-xs font-semibold shadow-sm flex items-center justify-center gap-2 transition-all font-khmer"
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsManualTokenOpen((prev) => !prev)}
+                                        className="h-11 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all font-khmer cursor-pointer"
                                     >
-                                        <Facebook size={15} />
-                                        <span>ភ្ជាប់តាម Facebook Login</span>
-                                    </a>
+                                        <Key size={16} className="text-amber-500" />
+                                        <span>បញ្ចូល Page Token ដោយផ្ទាល់</span>
+                                        {isManualTokenOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                    </button>
+                                </div>
+
+                                {isManualTokenOpen && (
+                                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-3 mt-2">
+                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200 font-khmer">
+                                            <Key size={14} className="text-amber-500" />
+                                            <span>បញ្ចូល Facebook Page Access Token (EAA...)</span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-khmer">
+                                            លោកអ្នកអាចចម្លង (Copy) Token ពី Meta Business Suite ឬ Graph API Explorer រួចបិទភ្ជាប់ (Paste) នៅទីនេះដើម្បីភ្ជាប់ផេកភ្លាមៗ៖
+                                        </p>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <input
+                                                type="text"
+                                                value={manualToken}
+                                                onChange={(e) => setManualToken(e.target.value)}
+                                                placeholder="បញ្ចូល Access Token (EAA...)"
+                                                className="flex-1 h-10 px-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleManualTokenSubmit}
+                                                disabled={isConnectingManual}
+                                                className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95 disabled:opacity-60 font-khmer shrink-0 cursor-pointer"
+                                            >
+                                                {isConnectingManual ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                                <span>{isConnectingManual ? "កំពុងភ្ជាប់..." : "រក្សាទុក & ភ្ជាប់"}</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
-                        </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="space-y-2 max-w-2xl">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-khmer">
+                                            <Puzzle size={13} />
+                                            <span>EZA-POST FB Extension (សម្រាប់កុំព្យូទ័រ PC / Mac)</span>
+                                        </span>
+                                        <span
+                                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border font-khmer ${
+                                                extensionInstalled
+                                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                                                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                                            }`}
+                                        >
+                                            <span
+                                                className={`w-2 h-2 rounded-full ${
+                                                    extensionInstalled ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                                                }`}
+                                            />
+                                            <span>
+                                                {extensionInstalled
+                                                    ? "បានដំឡើង Extension រួចរាល់"
+                                                    : "មិនទាន់ដំឡើង Extension"}
+                                            </span>
+                                        </span>
+                                    </div>
+
+                                    <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-khmer">
+                                        Sync ផេក Facebook តាមរយៈ Chrome Extension
+                                    </h1>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer leading-relaxed">
+                                        ទាញយក Extension ដំឡើងលើ Google Chrome រួចចុច <strong>Sync ផេកតាម Extension</strong> ដើម្បីទាញយកផេកទាំងអស់ដោយស្វ័យប្រវត្ត ១០០% មិនបាច់សុំ Meta Review។
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                                    <a
+                                        href="/eza-post-fb-extension.zip"
+                                        download="EZA-POST-FB-Extension.zip"
+                                        className="h-10 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center justify-center gap-2 transition-all font-khmer shadow-2xs"
+                                    >
+                                        <Download size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                                        <span>ទាញយក Extension (.zip)</span>
+                                    </a>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleExtensionOneClickSync}
+                                        disabled={isSyncingViaExt}
+                                        className="h-10 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-sm shadow-blue-600/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 font-khmer cursor-pointer"
+                                    >
+                                        {isSyncingViaExt ? (
+                                            <>
+                                                <Loader2 size={15} className="animate-spin shrink-0" />
+                                                <span>កំពុងភ្ជាប់ផេក...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Zap size={15} className="text-yellow-300 fill-yellow-300 shrink-0" />
+                                                <span>Sync ផេកតាម Extension</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
