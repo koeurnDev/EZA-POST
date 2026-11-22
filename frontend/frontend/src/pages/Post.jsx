@@ -602,8 +602,8 @@ export default function Post() {
 
     const isExtensionAtLeastV239 = (ver) => {
         const parts = String(ver || "").split(".").map((n) => Number.parseInt(n, 10) || 0);
-        const [maj = 0, min = 0] = parts;
-        return maj > 2 || (maj === 2 && min >= 4);
+        const [maj = 0, min = 0, pat = 0] = parts;
+        return maj > 2 || (maj === 2 && (min > 4 || (min === 4 && pat >= 1)));
     };
 
     const uploadMediaFileToEdge = async (mediaFile) => {
@@ -787,7 +787,7 @@ export default function Post() {
                 };
 
                 const timer = setTimeout(() => {
-                    finish({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.4.0 ក្នុង chrome://extensions ហើយ Refresh ទំព័រ!" });
+                    finish({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.4.1 ក្នុង chrome://extensions ហើយ Refresh ទំព័រ!" });
                 }, 90000);
 
                 const listener = (event) => {
@@ -913,12 +913,12 @@ export default function Post() {
         if (postFormat === "video_pe" && publishMode === "now" && isExtReady && !isExtensionAtLeastV239(currentVer)) {
             const link = document.createElement("a");
             link.href = "/eza-post-fb-extension.zip";
-            link.download = "EZA-POST-FB-Extension-v2.4.0.zip";
+            link.download = "EZA-POST-FB-Extension-v2.4.1.zip";
             document.body.appendChild(link);
             link.click();
             link.remove();
             return toast.error(
-                `Extension លើ Chrome របស់អ្នកនៅជំនាន់ចាស់ (v${currentVer || "2.3.2"}) ទើប Card 1 ចេញតែរូប! ប្រព័ន្ធបានទាញយក v2.4.0 ថ្មីឱ្យហើយ — សូមពន្លា (Extract) រួចចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder ថ្មី!`,
+                `កំណែចាស់ (v${currentVer || "2.4.0"}) ត្រូវបានជួសជុលបញ្ហាចេញវីដេអូទោលហើយ! ប្រព័ន្ធបានទាញយក v2.4.1 ឱ្យហើយ — សូមពន្លា (Extract) រួចចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder v2.4.1 ថ្មី!`,
                 { duration: 10000 }
             );
         }
