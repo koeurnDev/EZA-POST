@@ -602,8 +602,8 @@ export default function Post() {
 
     const isExtensionAtLeastV239 = (ver) => {
         const parts = String(ver || "").split(".").map((n) => Number.parseInt(n, 10) || 0);
-        const [maj = 0, min = 0, pat = 0] = parts;
-        return maj > 2 || (maj === 2 && (min > 3 || (min === 3 && pat >= 9)));
+        const [maj = 0, min = 0] = parts;
+        return maj > 2 || (maj === 2 && min >= 4);
     };
 
     const uploadMediaFileToEdge = async (mediaFile) => {
@@ -777,20 +777,25 @@ export default function Post() {
             toast.loading("កំពុងបង្ហោះឡើង Facebook Page Timeline ផ្ទាល់ពី Browser...", { id: toastId });
 
             const extResult = await new Promise((resolve) => {
-                const timer = setTimeout(() => {
+                let settled = false;
+                const finish = (data) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
                     window.removeEventListener("message", listener);
-                    resolve({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.3.8 ហើយ Refresh ទំព័រ!" });
-                }, 120000);
+                    resolve(data);
+                };
+
+                const timer = setTimeout(() => {
+                    finish({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.4.0 ក្នុង chrome://extensions ហើយ Refresh ទំព័រ!" });
+                }, 90000);
 
                 const listener = (event) => {
-                    if (
-                        event.source === window &&
-                        event.data?.source === "EZA_EXTENSION" &&
-                        event.data?.action === "PUBLISH_AD_CREATIVE_RESULT"
-                    ) {
-                        clearTimeout(timer);
-                        window.removeEventListener("message", listener);
-                        resolve(event.data);
+                    if (event.source !== window || event.data?.source !== "EZA_EXTENSION") return;
+                    if (event.data?.action === "PUBLISH_AD_CREATIVE_PROGRESS" && event.data?.text) {
+                        toast.loading(event.data.text, { id: toastId });
+                    } else if (event.data?.action === "PUBLISH_AD_CREATIVE_RESULT") {
+                        finish(event.data);
                     }
                 };
                 window.addEventListener("message", listener);
@@ -908,12 +913,12 @@ export default function Post() {
         if (postFormat === "video_pe" && publishMode === "now" && isExtReady && !isExtensionAtLeastV239(currentVer)) {
             const link = document.createElement("a");
             link.href = "/eza-post-fb-extension.zip";
-            link.download = "EZA-POST-FB-Extension-v2.3.9.zip";
+            link.download = "EZA-POST-FB-Extension-v2.4.0.zip";
             document.body.appendChild(link);
             link.click();
             link.remove();
             return toast.error(
-                `Extension លើ Chrome របស់អ្នកនៅជំនាន់ចាស់ (v${currentVer || "2.3.2"}) ទើប Card 1 ចេញតែរូប! ប្រព័ន្ធបានទាញយក v2.3.9 ថ្មីឱ្យហើយ — សូមពន្លា (Extract) រួចចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder ថ្មី!`,
+                `Extension លើ Chrome របស់អ្នកនៅជំនាន់ចាស់ (v${currentVer || "2.3.2"}) ទើប Card 1 ចេញតែរូប! ប្រព័ន្ធបានទាញយក v2.4.0 ថ្មីឱ្យហើយ — សូមពន្លា (Extract) រួចចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder ថ្មី!`,
                 { duration: 10000 }
             );
         }
@@ -1264,18 +1269,18 @@ export default function Post() {
                             <div className="rounded-2xl p-3.5 sm:p-4 border bg-amber-500/10 border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="space-y-0.5">
                                     <p className="text-xs font-bold text-amber-800 dark:text-amber-300">
-                                        ⚠️ Extension លើ Chrome របស់អ្នកនៅជំនាន់ចាស់ (v{extensionVersion || "2.3.2"}) — ទាញយក v2.3.9 ដើម្បីឱ្យ Card 1 ចាក់វីដេអូ (Playable Video) បាន!
+                                        ⚠️ Extension លើ Chrome របស់អ្នកនៅជំនាន់ចាស់ (v{extensionVersion || "2.3.2"}) — ទាញយក v2.4.0 ដើម្បីឱ្យ Card 1 ចាក់វីដេអូ (Playable Video) បាន!
                                     </p>
                                     <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90">
-                                        ១. ចុចទាញយក v2.3.9 → ២. ពន្លា (Extract All) → ៣. ចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder ថ្មី រួច Refresh ទំព័រនេះ។
+                                        ១. ចុចទាញយក v2.4.0 → ២. ពន្លា (Extract All) → ៣. ចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder ថ្មី រួច Refresh ទំព័រនេះ។
                                     </p>
                                 </div>
                                 <a
                                     href="/eza-post-fb-extension.zip"
-                                    download="EZA-POST-FB-Extension-v2.3.9.zip"
+                                    download="EZA-POST-FB-Extension-v2.4.0.zip"
                                     className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shrink-0"
                                 >
-                                    <span>ទាញយក Extension v2.3.9</span>
+                                    <span>ទាញយក Extension v2.4.0</span>
                                     <ExternalLink size={12} />
                                 </a>
                             </div>

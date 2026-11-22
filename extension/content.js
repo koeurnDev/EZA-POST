@@ -1,13 +1,17 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Facebook Sync Extension — Content Bridge Script (v2.3.4)
+ * ⚡ EZA-POST Facebook Sync Extension — Content Bridge Script (v2.4.0)
  * ============================================================
  */
 
 (function () {
+  // Prevent duplicate listeners if re-injected on extension reload
+  if (window.__ezaContentBridgeVersion === "2.4.0") return;
+  window.__ezaContentBridgeVersion = "2.4.0";
+
   // Mark DOM so the EZA-POST web app immediately knows the extension is installed
   document.documentElement.setAttribute("data-eza-extension", "installed");
-  document.documentElement.setAttribute("data-eza-extension-version", "2.3.9");
+  document.documentElement.setAttribute("data-eza-extension-version", "2.4.0");
 
   function isExtensionValid() {
     return typeof chrome !== "undefined" && Boolean(chrome?.runtime?.id);
@@ -37,7 +41,7 @@
             source: "EZA_EXTENSION",
             action: "EXTENSION_STATUS",
             installed: true,
-            version: response.version || "2.3.9",
+            version: response.version || "2.4.0",
             fbLoggedIn: Boolean(response.fbLoggedIn),
             fbUserId: response.fbUserId || null
           },
@@ -48,7 +52,33 @@
   }
 
   // Initial broadcast after DOM is ready
-  setTimeout(broadcastStatus, 300);
+  setTimeout(broadcastStatus, 200);
+
+  // Listen for push progress and push results from background service worker (immune to MV3 sendResponse timeout)
+  if (isExtensionValid() && chrome.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || !msg.action) return;
+      if (msg.action === "PUBLISH_AD_CREATIVE_PROGRESS") {
+        window.postMessage(
+          {
+            source: "EZA_EXTENSION",
+            action: "PUBLISH_AD_CREATIVE_PROGRESS",
+            text: msg.text || ""
+          },
+          "*"
+        );
+      } else if (msg.action === "PUBLISH_AD_CREATIVE_PUSH_RESULT") {
+        window.postMessage(
+          {
+            source: "EZA_EXTENSION",
+            action: "PUBLISH_AD_CREATIVE_RESULT",
+            ...(msg.result || {})
+          },
+          "*"
+        );
+      }
+    });
+  }
 
   // Listen for requests from the EZA-POST React web app
   window.addEventListener("message", (event) => {

@@ -1165,13 +1165,23 @@ function extBuildCta(cta, link, pageId) {
   return { type: normalizedType, value: { link: safeLink } };
 }
 
-async function extGraphPost(url, bodyParams) {
-  const res = await fetch(url, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(bodyParams)
-  });
+function fetchWithTimeout(url, options = {}, timeoutMs = 18000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+async function extGraphPost(url, bodyParams, timeoutMs = 15000) {
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(bodyParams)
+    },
+    timeoutMs
+  );
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data?.error) {
     const err = data?.error;
@@ -1180,6 +1190,52 @@ async function extGraphPost(url, bodyParams) {
     throw new Error(`${msg}${code}`);
   }
   return data;
+}
+
+async function getQuickAdsContext(preferredActId = "") {
+  try {
+    const stored = await chrome.storage.local
+      .get(["capturedAdsToken", "lastSyncedUserToken"])
+      .catch(() => ({}));
+    const openTokens = await extractAdsTokensFromOpenAdsTabs().catch(() => []);
+    const candidates = Array.from(
+      new Set(
+        [
+          ...Array.from(capturedAdsGraphTokens),
+          ...Array.from(capturedAdsTokens),
+          stored?.capturedAdsToken,
+          ...openTokens,
+          stored?.lastSyncedUserToken
+        ].filter((t) => typeof t === "string" && /^EAA[A-Za-z0-9_-]{30,}$/.test(t))
+      )
+    );
+    for (const tok of candidates.slice(0, 3)) {
+      try {
+        const res = await fetchWithTimeout(
+          `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,account_id,name&limit=10&access_token=${encodeURIComponent(tok)}`,
+          { credentials: "include" },
+          4000
+        ).catch(() => null);
+        if (res?.ok) {
+          const data = await res.json().catch(() => ({}));
+          const accs = Array.isArray(data?.data) ? data.data : [];
+          if (accs.length > 0 || preferredActId) {
+            return {
+              adsToken: tok,
+              adAccounts: accs.map((a) => ({ id: String(a.id || `act_${a.account_id}`) }))
+            };
+          }
+        }
+      } catch {}
+    }
+    if (candidates[0]) {
+      return {
+        adsToken: candidates[0],
+        adAccounts: preferredActId ? [{ id: String(preferredActId) }] : []
+      };
+    }
+  } catch {}
+  return { adsToken: null, adAccounts: [] };
 }
 
 async function extUploadAdVideo(actId, adsToken, videoUrl) {
@@ -1339,12 +1395,13 @@ async function extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, imageU
 
 async function extWaitForVideoReady(videoId, token) {
   if (!videoId || !token) return;
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 5; i++) {
     try {
       for (const host of ["https://adsmanager-graph.facebook.com", "https://graph.facebook.com"]) {
-        const res = await fetch(
+        const res = await fetchWithTimeout(
           `${host}/v21.0/${encodeURIComponent(videoId)}?fields=status&access_token=${encodeURIComponent(token)}`,
-          { credentials: "include" }
+          { credentials: "include" },
+          3500
         ).catch(() => null);
         if (!res?.ok) continue;
         const data = await res.json().catch(() => ({}));
@@ -1354,7 +1411,7 @@ async function extWaitForVideoReady(videoId, token) {
         break;
       }
     } catch {}
-    await sleep(1500);
+    await sleep(1000);
   }
 }
 
@@ -1471,8 +1528,15 @@ async function extUploadPageVideo(pageId, pageTokens, videoUrl, { published = tr
   throw lastErr || new Error("Page video upload failed");
 }
 
-async function publishAdCreativeInBrowser(payload) {
-  const adsCtx = await extractAdsContext().catch(() => ({ adsToken: null, adAccounts: [] }));
+async function publishAdCreativeInBrowser(payload, senderTabId = null) {
+  const sendProgress = (text) => {
+    if (senderTabId && chrome.tabs?.sendMessage) {
+      chrome.tabs.sendMessage(senderTabId, { action: "PUBLISH_AD_CREATIVE_PROGRESS", text }).catch(() => {});
+    }
+  };
+
+  sendProgress("១/៣ កំពុងពិនិត្យសិទ្ធិផេក Facebook...");
+  const adsCtx = await getQuickAdsContext(payload?.adAccountId || "");
   const adsToken = adsCtx?.adsToken || null;
   const rawActId = payload?.adAccountId || adsCtx?.adAccounts?.[0]?.id || "";
   const actId = rawActId ? (String(rawActId).startsWith("act_") ? String(rawActId) : `act_${rawActId}`) : "";
@@ -1751,33 +1815,40 @@ async function publishAdCreativeInBrowser(payload) {
         const allTokens = Array.from(new Set([...pageTokens, ...(adsToken ? [adsToken] : [])].filter(Boolean)));
         let pageVideoId = null;
         if (format === "video_pe" && payload?.videoUrl) {
-          try {
-            const pv = await extUploadPageVideo(pageId, allTokens, payload.videoUrl, { published: false });
-            pageVideoId = pv.id;
-            await extWaitForVideoReady(pageVideoId, pv.token);
-          } catch {
-            pageVideoId = null;
-          }
-          if (!pageVideoId && actId && adsToken) {
+          sendProgress("២/៣ កំពុងបង្ហោះវីដេអូទៅ Facebook (៥-១០ វិនាទី)...");
+          if (actId && adsToken) {
             try {
-              const avId = await extUploadAdVideo(actId, adsToken, payload.videoUrl);
-              await extWaitForVideoReady(avId, adsToken);
-              pageVideoId = avId;
+              const avId = await Promise.race([
+                extUploadAdVideo(actId, adsToken, payload.videoUrl),
+                new Promise((_, rej) => setTimeout(() => rej(new Error("Ad video upload timeout")), 22000))
+              ]);
+              if (avId) {
+                pageVideoId = avId;
+                await extWaitForVideoReady(pageVideoId, adsToken);
+              }
+            } catch {
+              pageVideoId = null;
+            }
+          }
+          if (!pageVideoId) {
+            try {
+              const pv = await Promise.race([
+                extUploadPageVideo(pageId, allTokens.slice(0, 1), payload.videoUrl, { published: false }),
+                new Promise((_, rej) => setTimeout(() => rej(new Error("Page video upload timeout")), 18000))
+              ]);
+              if (pv?.id) {
+                pageVideoId = pv.id;
+                await extWaitForVideoReady(pageVideoId, pv.token);
+              }
             } catch {
               pageVideoId = null;
             }
           }
         }
 
+        sendProgress("៣/៣ កំពុងបង្ហោះ Carousel ឡើង Page Timeline...");
         const pageAvatarProxy = `https://moneaa.site/api/v1/page-avatar/${encodeURIComponent(pageId)}.jpg?name=${encodeURIComponent(pageName)}`;
         const thumbUrl = payload?.thumbnailUrl || pageAvatarProxy;
-
-        let thumbAdAsset = { hash: null, url: thumbUrl };
-        if (format === "video_pe" && actId && adsToken) {
-          try {
-            thumbAdAsset = await extUploadAdImage(actId, adsToken, thumbUrl);
-          } catch {}
-        }
 
         const buildFeedCards = (videoMode = "none", includeCta = true) =>
           cards.map((card) => {
@@ -1788,25 +1859,6 @@ async function publishAdCreativeInBrowser(payload) {
               if (videoMode === "video_only") {
                 return {
                   video_id: pageVideoId,
-                  link: cardLink,
-                  name: card.headline || payload?.headline || pageName,
-                  description: card.description || payload?.description || "",
-                  ...(cardCta ? { call_to_action: cardCta } : {})
-                };
-              }
-              if (videoMode === "video_with_hash" && thumbAdAsset?.hash) {
-                return {
-                  video_id: pageVideoId,
-                  image_hash: thumbAdAsset.hash,
-                  link: cardLink,
-                  name: card.headline || payload?.headline || pageName,
-                  description: card.description || payload?.description || "",
-                  ...(cardCta ? { call_to_action: cardCta } : {})
-                };
-              }
-              if (videoMode === "media_fbid") {
-                return {
-                  media_fbid: pageVideoId,
                   link: cardLink,
                   name: card.headline || payload?.headline || pageName,
                   description: card.description || payload?.description || "",
@@ -1833,53 +1885,49 @@ async function publishAdCreativeInBrowser(payload) {
 
         let postedFeed = false;
         let lastFeedErr = null;
-        const hosts = ["https://graph.facebook.com", "https://adsmanager-graph.facebook.com"];
 
-        // 1. Try publishing directly to /{pageId}/feed WITH playable video_id across all video card modes & tokens FIRST
+        // 1. Try publishing directly to /{pageId}/feed WITH playable video_id FIRST (fast 2 attempts)
         if (pageVideoId) {
-          const videoCandidates = [
-            buildFeedCards("video_with_pic", true),
-            buildFeedCards("video_only", true),
-            ...(thumbAdAsset?.hash ? [buildFeedCards("video_with_hash", true)] : []),
-            buildFeedCards("media_fbid", true)
-          ];
+          const videoCandidates = [buildFeedCards("video_with_pic", true), buildFeedCards("video_only", true)];
           for (const candidateCards of videoCandidates) {
-            for (const host of hosts) {
-              for (const pt of allTokens) {
-                try {
-                  const feedRes = await extGraphPost(`${host}/v21.0/${encodeURIComponent(pageId)}/feed`, {
+            for (const pt of allTokens.slice(0, 2)) {
+              try {
+                const feedRes = await extGraphPost(
+                  `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`,
+                  {
                     access_token: pt,
                     published: "true",
                     message: payload?.caption || "",
                     link: baseLink,
                     multi_share_optimized: "false",
                     child_attachments: JSON.stringify(candidateCards)
+                  },
+                  10000
+                );
+                if (feedRes?.id) {
+                  results.push({
+                    pageId,
+                    pageName,
+                    storyId: String(feedRes.id),
+                    videoId: pageVideoId,
+                    postUrl: `https://www.facebook.com/${feedRes.id}`,
+                    publishedToTimeline: true
                   });
-                  if (feedRes?.id) {
-                    results.push({
-                      pageId,
-                      pageName,
-                      storyId: String(feedRes.id),
-                      videoId: pageVideoId,
-                      postUrl: `https://www.facebook.com/${feedRes.id}`,
-                      publishedToTimeline: true
-                    });
-                    postedFeed = true;
-                    break;
-                  }
-                } catch (e) {
-                  lastFeedErr = e;
+                  postedFeed = true;
+                  break;
                 }
+              } catch (e) {
+                lastFeedErr = e;
               }
-              if (postedFeed) break;
             }
             if (postedFeed) break;
           }
         }
 
-        // 2. If /{pageId}/feed rejected organic video_id, create playable Video PE via /adcreatives, lookup storyId via /{pageId}/ads_posts, and publish to Timeline (is_published=true)
+        // 2. If /{pageId}/feed rejected organic video_id, try creating playable Video PE via /adcreatives and promoting via /{pageId}/ads_posts
         if (!postedFeed && format === "video_pe" && pageVideoId && actId && adsToken) {
           try {
+            const thumbAdAsset = await extUploadAdImage(actId, adsToken, thumbUrl).catch(() => ({ hash: null }));
             const adChildAttachments = [];
             for (const card of cards) {
               const cardLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
@@ -1895,7 +1943,7 @@ async function publishAdCreativeInBrowser(payload) {
                 });
               } else {
                 const cardPic = card.pictureUrl || card.mediaUrl || pageAvatarProxy;
-                const cardImgAsset = await extUploadAdImage(actId, adsToken, cardPic);
+                const cardImgAsset = await extUploadAdImage(actId, adsToken, cardPic).catch(() => ({ hash: null }));
                 adChildAttachments.push({
                   ...(cardImgAsset?.hash ? { image_hash: cardImgAsset.hash } : { picture: cardPic }),
                   link: cardLink,
@@ -1916,47 +1964,40 @@ async function publishAdCreativeInBrowser(payload) {
               }
             };
 
-            let creativeRes = null;
-            for (const host of ["https://adsmanager-graph.facebook.com", "https://graph.facebook.com"]) {
-              try {
-                creativeRes = await extGraphPost(`${host}/v21.0/${encodeURIComponent(actId)}/adcreatives`, {
-                  access_token: adsToken,
-                  name: `EZA_VIDEO_PE_${Date.now()}`,
-                  object_story_spec: JSON.stringify(objectStorySpec)
-                });
-                if (creativeRes?.id) break;
-              } catch {}
-            }
+            const creativeRes = await extGraphPost(
+              `https://adsmanager-graph.facebook.com/v21.0/${encodeURIComponent(actId)}/adcreatives`,
+              {
+                access_token: adsToken,
+                name: `EZA_VIDEO_PE_${Date.now()}`,
+                object_story_spec: JSON.stringify(objectStorySpec)
+              },
+              10000
+            ).catch(() => null);
 
             if (creativeRes?.id) {
               let discoveredStoryId = null;
-              for (let attempt = 0; attempt < 5 && !discoveredStoryId; attempt++) {
-                if (attempt > 0) await sleep(1200);
-                for (const host of ["https://adsmanager-graph.facebook.com", "https://graph.facebook.com"]) {
-                  try {
-                    const crLook = await fetch(
-                      `${host}/v21.0/${encodeURIComponent(creativeRes.id)}?fields=effective_object_story_id,object_story_id&access_token=${encodeURIComponent(adsToken)}`,
-                      { credentials: "include" }
-                    ).catch(() => null);
-                    if (crLook?.ok) {
-                      const crData = await crLook.json().catch(() => ({}));
-                      const sid = crData?.effective_object_story_id || crData?.object_story_id;
-                      if (sid && String(sid).includes("_")) {
-                        discoveredStoryId = String(sid);
-                        break;
-                      }
-                    }
-                  } catch {}
-                }
-                if (discoveredStoryId) break;
+              for (let attempt = 0; attempt < 2 && !discoveredStoryId; attempt++) {
+                if (attempt > 0) await sleep(1000);
+                try {
+                  const crLook = await fetchWithTimeout(
+                    `https://adsmanager-graph.facebook.com/v21.0/${encodeURIComponent(creativeRes.id)}?fields=effective_object_story_id,object_story_id&access_token=${encodeURIComponent(adsToken)}`,
+                    { credentials: "include" },
+                    4000
+                  ).catch(() => null);
+                  if (crLook?.ok) {
+                    const crData = await crLook.json().catch(() => ({}));
+                    const sid = crData?.effective_object_story_id || crData?.object_story_id;
+                    if (sid && String(sid).includes("_")) discoveredStoryId = String(sid);
+                  }
+                } catch {}
 
-                // Query /{pageId}/ads_posts?include_inline_create=true to grab the newly created inline Video PE story ID
-                for (const host of ["https://adsmanager-graph.facebook.com", "https://graph.facebook.com"]) {
-                  for (const tok of allTokens) {
+                if (!discoveredStoryId) {
+                  for (const tok of allTokens.slice(0, 2)) {
                     try {
-                      const apRes = await fetch(
-                        `${host}/v21.0/${encodeURIComponent(pageId)}/ads_posts?include_inline_create=true&fields=id,is_published,message,created_time&limit=5&access_token=${encodeURIComponent(tok)}`,
-                        { credentials: "include" }
+                      const apRes = await fetchWithTimeout(
+                        `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/ads_posts?include_inline_create=true&fields=id,is_published&limit=3&access_token=${encodeURIComponent(tok)}`,
+                        { credentials: "include" },
+                        4000
                       ).catch(() => null);
                       if (apRes?.ok) {
                         const apData = await apRes.json().catch(() => ({}));
@@ -1968,51 +2009,55 @@ async function publishAdCreativeInBrowser(payload) {
                       }
                     } catch {}
                   }
-                  if (discoveredStoryId) break;
                 }
               }
 
               if (discoveredStoryId) {
-                for (const host of ["https://graph.facebook.com", "https://adsmanager-graph.facebook.com"]) {
-                  for (const tok of allTokens) {
-                    try {
-                      await extGraphPost(`${host}/v21.0/${encodeURIComponent(discoveredStoryId)}`, {
+                for (const tok of allTokens.slice(0, 2)) {
+                  try {
+                    await extGraphPost(
+                      `https://graph.facebook.com/v21.0/${encodeURIComponent(discoveredStoryId)}`,
+                      {
                         access_token: tok,
                         is_published: "true"
-                      });
-                      postedFeed = true;
-                      results.push({
-                        pageId,
-                        pageName,
-                        storyId: discoveredStoryId,
-                        videoId: pageVideoId,
-                        postUrl: `https://www.facebook.com/${discoveredStoryId}`,
-                        publishedToTimeline: true
-                      });
-                      break;
-                    } catch {}
-                  }
-                  if (postedFeed) break;
+                      },
+                      6000
+                    );
+                    postedFeed = true;
+                    results.push({
+                      pageId,
+                      pageName,
+                      storyId: discoveredStoryId,
+                      videoId: pageVideoId,
+                      postUrl: `https://www.facebook.com/${discoveredStoryId}`,
+                      publishedToTimeline: true
+                    });
+                    break;
+                  } catch {}
                 }
               }
             }
           } catch {}
         }
 
-        // 3. Fallback: 1-Click Public Page Timeline Carousel with OpenGraph HD Card Images
+        // 3. Fast Fallback: 1-Click Public Page Timeline Carousel with OpenGraph HD Card Images
         if (!postedFeed) {
           const imageFallbackCandidates = [buildFeedCards("none", true), buildFeedCards("none", false)];
           for (const pt of pageTokens) {
             for (const candidateCards of imageFallbackCandidates) {
               try {
-                const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, {
-                  access_token: pt,
-                  published: "true",
-                  message: payload?.caption || "",
-                  link: baseLink,
-                  multi_share_optimized: "false",
-                  child_attachments: JSON.stringify(candidateCards)
-                });
+                const feedRes = await extGraphPost(
+                  `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`,
+                  {
+                    access_token: pt,
+                    published: "true",
+                    message: payload?.caption || "",
+                    link: baseLink,
+                    multi_share_optimized: "false",
+                    child_attachments: JSON.stringify(candidateCards)
+                  },
+                  12000
+                );
                 if (feedRes?.id) {
                   results.push({
                     pageId,
@@ -2098,11 +2143,57 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === "PUBLISH_AD_CREATIVE_IN_BROWSER") {
-    publishAdCreativeInBrowser(message.payload)
-      .then((res) => sendResponse(res))
-      .catch((err) => sendResponse({ ok: false, error: err?.message || "PE/CTA publish error" }));
+    const senderTabId = sender?.tab?.id || null;
+    publishAdCreativeInBrowser(message.payload, senderTabId)
+      .then((res) => {
+        if (senderTabId && chrome.tabs?.sendMessage) {
+          chrome.tabs.sendMessage(senderTabId, { action: "PUBLISH_AD_CREATIVE_PUSH_RESULT", result: res }).catch(() => {});
+        }
+        try {
+          sendResponse(res);
+        } catch {}
+      })
+      .catch((err) => {
+        const failRes = { ok: false, error: err?.message || "PE/CTA publish error" };
+        if (senderTabId && chrome.tabs?.sendMessage) {
+          chrome.tabs.sendMessage(senderTabId, { action: "PUBLISH_AD_CREATIVE_PUSH_RESULT", result: failRes }).catch(() => {});
+        }
+        try {
+          sendResponse(failRes);
+        } catch {}
+      });
     return true;
   }
 
   return false;
 });
+
+// Automatically re-inject content.js into already-open EZA-POST tabs when Extension is installed or reloaded
+function reinjectContentBridgeIntoOpenTabs() {
+  if (!chrome.tabs || !chrome.scripting) return;
+  chrome.tabs.query(
+    {
+      url: [
+        "*://moneaa.site/*",
+        "*://*.moneaa.site/*",
+        "*://*.eza-post-3kv.pages.dev/*",
+        "*://*.eza-post.pages.dev/*",
+        "*://localhost/*"
+      ]
+    },
+    (tabs) => {
+      for (const tab of tabs || []) {
+        if (tab?.id) {
+          chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] }).catch(() => {});
+        }
+      }
+    }
+  );
+}
+
+if (chrome.runtime?.onInstalled) {
+  chrome.runtime.onInstalled.addListener(() => {
+    reinjectContentBridgeIntoOpenTabs();
+  });
+}
+reinjectContentBridgeIntoOpenTabs();
