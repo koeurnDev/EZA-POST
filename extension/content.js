@@ -1,13 +1,13 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Facebook Sync Extension — Content Bridge Script (v2.2.2)
+ * ⚡ EZA-POST Facebook Sync Extension — Content Bridge Script (v2.3.0)
  * ============================================================
  */
 
 (function () {
   // Mark DOM so the EZA-POST web app immediately knows the extension is installed
   document.documentElement.setAttribute("data-eza-extension", "installed");
-  document.documentElement.setAttribute("data-eza-extension-version", "2.2.2");
+  document.documentElement.setAttribute("data-eza-extension-version", "2.3.0");
 
   function isExtensionValid() {
     return typeof chrome !== "undefined" && Boolean(chrome?.runtime?.id);
@@ -37,7 +37,7 @@
             source: "EZA_EXTENSION",
             action: "EXTENSION_STATUS",
             installed: true,
-            version: response.version || "2.2.2",
+            version: response.version || "2.3.0",
             fbLoggedIn: Boolean(response.fbLoggedIn),
             fbUserId: response.fbUserId || null
           },
@@ -99,6 +99,7 @@
               fbUserId: response.fbUserId || null,
               accessToken: response.accessToken || null,
               adsToken: response.adsToken || null,
+              adsTokenVerified: Boolean(response.adsTokenVerified),
               adAccounts: Array.isArray(response.adAccounts) ? response.adAccounts : [],
               fbUser: response.fbUser || null,
               pages: Array.isArray(response.pages) ? response.pages : [],
@@ -112,6 +113,57 @@
           {
             source: "EZA_EXTENSION",
             action: "FB_SYNC_PAYLOAD",
+            ok: false,
+            error: "Extension context invalidated, សូម Refresh ទំព័រ!"
+          },
+          "*"
+        );
+      }
+    } else if (action === "PUBLISH_AD_CREATIVE") {
+      if (!isExtensionValid()) {
+        window.postMessage(
+          {
+            source: "EZA_EXTENSION",
+            action: "PUBLISH_AD_CREATIVE_RESULT",
+            ok: false,
+            error: "Extension ត្រូវបាន Reload — សូម Refresh ទំព័រនេះម្តងទៀត!"
+          },
+          "*"
+        );
+        return;
+      }
+
+      try {
+        chrome.runtime.sendMessage(
+          { action: "PUBLISH_AD_CREATIVE_IN_BROWSER", payload: event.data.payload || {} },
+          (response) => {
+            if (chrome.runtime.lastError || !response) {
+              window.postMessage(
+                {
+                  source: "EZA_EXTENSION",
+                  action: "PUBLISH_AD_CREATIVE_RESULT",
+                  ok: false,
+                  error: chrome.runtime.lastError?.message || "Extension មិនឆ្លើយតបពេលផុស PE/CTA"
+                },
+                "*"
+              );
+              return;
+            }
+            window.postMessage(
+              {
+                source: "EZA_EXTENSION",
+                action: "PUBLISH_AD_CREATIVE_RESULT",
+                ...response
+              },
+              "*"
+            );
+          }
+        );
+      } catch {
+        window.postMessage(
+          {
+            source: "EZA_EXTENSION",
+            action: "PUBLISH_AD_CREATIVE_RESULT",
             ok: false,
             error: "Extension context invalidated, សូម Refresh ទំព័រ!"
           },

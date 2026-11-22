@@ -333,6 +333,7 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
   const rawInput = String(body?.cookieOrToken || body?.accessToken || "").trim();
   const extAccessToken = typeof body?.accessToken === "string" && isFbToken(body.accessToken) ? body.accessToken.trim() : null;
   const extAdsToken = typeof body?.adsToken === "string" && isFbToken(body.adsToken) ? body.adsToken.trim() : null;
+  const extAdsTokenVerified = body?.adsTokenVerified === true;
   const extAdAccounts = Array.isArray(body?.adAccounts) ? body.adAccounts.map(sanitizeAdAccount).filter(Boolean) : [];
   const extPages = Array.isArray(body?.pages) ? body.pages : null;
   const extUser = body?.fbUser && typeof body.fbUser === "object" ? body.fbUser : null;
@@ -548,8 +549,10 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
       }
     }
     let finalAdsToken = null;
-    if (extAdsToken && await tokenHasAdsManagement(extAdsToken)) {
-      finalAdsToken = extAdsToken;
+    if (extAdsToken) {
+      if (extAdsTokenVerified || await tokenHasAdsManagement(extAdsToken)) {
+        finalAdsToken = extAdsToken;
+      }
     } else if (userToken && !isDirectPageToken && await tokenHasAdsManagement(userToken)) {
       finalAdsToken = userToken;
     }

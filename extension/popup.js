@@ -135,6 +135,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             cookieOrToken: payload.accessToken || "active_extension_session",
             accessToken: payload.accessToken || null,
             adsToken: payload.adsToken || null,
+            adsTokenVerified: Boolean(payload.adsTokenVerified),
             adAccounts: Array.isArray(payload.adAccounts) ? payload.adAccounts : [],
             fbUserId: payload.fbUserId || null,
             fbUser: payload.fbUser || null,
@@ -147,9 +148,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (data?.success) {
           const count = data.pagesCount ?? (data.pages ? data.pages.length : 0);
           const adsCount = data.adAccountsCount ?? (data.adAccounts ? data.adAccounts.length : 0);
+          const adsStatus = adsCount > 0 ? (data.hasAdsToken ? ` + ${adsCount} Ad Accounts (PE Ready ✅)` : ` + ${adsCount} Ad Accounts (ខ្វះ Ads Token ⚠️)`) : "";
           const userName = payload.fbUser?.name || "គណនី Facebook";
           const countText = count > 0
-            ? `បានភ្ជាប់ ${count} គោលដៅ${adsCount > 0 ? ` + ${adsCount} Ad Accounts` : ""}`
+            ? `បានភ្ជាប់ ${count} គោលដៅ${adsStatus}`
             : `បានភ្ជាប់គណនី ${userName}`;
           showMessage(
             `🎉 ជោគជ័យ! ${countText} ទៅកាន់ EZA-POST រួចរាល់!`,

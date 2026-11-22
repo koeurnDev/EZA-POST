@@ -70,7 +70,7 @@ export default function Connections() {
                 return;
             }
 
-            const { action, installed, version, fbLoggedIn, fbUserId, ok, cookieString, accessToken, adsToken, adAccounts: extAdAccounts, fbUser, pages: extPages, error } = event.data;
+            const { action, installed, version, fbLoggedIn, fbUserId, ok, cookieString, accessToken, adsToken, adsTokenVerified, adAccounts: extAdAccounts, fbUser, pages: extPages, error } = event.data;
 
             if (action === "EXTENSION_STATUS") {
                 if (installed) setExtensionInstalled(true);
@@ -95,6 +95,7 @@ export default function Connections() {
                         cookieOrToken: accessToken || "active_extension_session",
                         accessToken: accessToken || null,
                         adsToken: adsToken || null,
+                        adsTokenVerified: Boolean(adsTokenVerified),
                         adAccounts: Array.isArray(extAdAccounts) ? extAdAccounts : [],
                         fbUserId: fbUserId || fbUser?.id || null,
                         fbUser: fbUser || null,
@@ -107,21 +108,25 @@ export default function Connections() {
                         const countText = total > 0 ? `${total} គោលដៅ${adsCount > 0 ? ` និង ${adsCount} Ad Accounts` : ""}` : "គណនី Facebook";
                         if (res.data.hasPublishToken === false) {
                             toast(res.data.message || "ទាញបញ្ជីផេកបាន តែខ្វះ Access Token (EAA...) សម្រាប់ផុស!", {
+                                id: "fb-sync-result",
                                 icon: "⚠️",
                                 duration: 7000
                             });
                         } else if (adsCount > 0 && !adsReady) {
-                            toast(`បានភ្ជាប់ ${countText} ប៉ុន្តែមិនទាន់រកឃើញ EAAB Ads Token — សូមប្រើ Extension v2.2.2 ឬបើក adsmanager.facebook.com រួច Sync ម្តងទៀត!`, {
+                            toast(`បានភ្ជាប់ ${countText} ប៉ុន្តែមិនទាន់ចាប់បាន Live Ads Token — សូមដំឡើង Extension v2.3.0 ហើយបើក adsmanager.facebook.com ម្តង រួចចុច Sync ឡើងវិញ!`, {
+                                id: "fb-sync-result",
                                 icon: "⚠️",
                                 duration: 8000
                             });
                         } else if (res.data.hasPublishPermissions === false) {
                             toast(res.data.message || "Token ពី Extension អាចខ្វះសិទ្ធិផុសវីដេអូ — សូមផ្ទុក Extension ថ្មីឡើងវិញ!", {
+                                id: "fb-sync-result",
                                 icon: "⚠️",
                                 duration: 7000
                             });
                         } else {
                             toast.success(`🎉 ភ្ជាប់ជោគជ័យ! បានធ្វើបច្ចុប្បន្នភាព ${countText} រួចរាល់!`, {
+                                id: "fb-sync-result",
                                 duration: 5000
                             });
                         }
@@ -179,7 +184,7 @@ export default function Connections() {
             extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
 
         if (!isDomInstalled) {
-            toast("សូមទាញយក និងដំឡើង EZA-POST Extension v2.2.2 ជាមុនសិន (បើដំឡើងរួច សូមចុច Refresh F5 ម្តង)!", {
+            toast("សូមទាញយក និងដំឡើង EZA-POST Extension v2.3.0 ជាមុនសិន (បើដំឡើងរួច សូមចុច Refresh F5 ម្តង)!", {
                 icon: "🧩",
                 duration: 5500
             });
@@ -283,14 +288,14 @@ export default function Connections() {
                                             </>
                                         )}
                                     </p>
-                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.2") && (
+                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.3.0") && (
                                         <a
                                             href="/eza-post-fb-extension.zip"
                                             download="EZA-POST-FB-Extension.zip"
                                             className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition font-khmer"
                                         >
                                             <Download size={11} />
-                                            <span>Extension កំណែចាស់ — ទាញយក v2.2.2 ថ្មី</span>
+                                            <span>Extension កំណែចាស់ — ទាញយក v2.3.0 ថ្មី</span>
                                         </a>
                                     )}
                                 </div>
@@ -356,14 +361,14 @@ export default function Connections() {
                                         </span>
                                     </span>
 
-                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.2") && (
+                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.3.0") && (
                                         <a
                                             href="/eza-post-fb-extension.zip"
                                             download="EZA-POST-FB-Extension.zip"
                                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition font-khmer"
                                         >
                                             <Download size={12} />
-                                            <span>អាប់ដេតទៅ v2.2.2 (គាំទ្រ Ads & PE/CTA)</span>
+                                            <span>អាប់ដេតទៅ v2.3.0 (បង្ហោះ PE/CTA ផ្ទាល់លើ Browser)</span>
                                         </a>
                                     )}
 

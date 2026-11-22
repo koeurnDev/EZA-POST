@@ -587,6 +587,177 @@ export default function Post() {
         return maj > 2 || (maj === 2 && (min > 0 || pat >= 5));
     };
 
+    const isExtensionAtLeastV230 = (ver) => {
+        const parts = String(ver || "").split(".").map((n) => Number.parseInt(n, 10) || 0);
+        const [maj = 0, min = 0] = parts;
+        return maj > 2 || (maj === 2 && min >= 3);
+    };
+
+    const uploadMediaFileToEdge = async (mediaFile) => {
+        const upForm = new FormData();
+        upForm.append("media", mediaFile);
+        const upRes = await axios.post(`${API_BASE}/api/upload/post-media`, upForm, {
+            headers: { "Content-Type": "multipart/form-data" },
+            withCredentials: true,
+            timeout: 300000
+        });
+        if (!upRes.data?.success || !upRes.data?.url) {
+            throw new Error(upRes.data?.error || "មិនអាចផ្ទុកឯកសារឡើង Edge Storage បានទេ");
+        }
+        return upRes.data.url;
+    };
+
+    const handlePublishAdCreativeViaExtension = async () => {
+        setIsSubmitting(true);
+        const toastId = toast.loading("កំពុងផ្ទុកឯកសារ និងបង្ហោះ PE / CTA ផ្ទាល់តាម Chrome Extension...");
+        try {
+            let uploadedVideoUrl = rawVideoUrl || (previewUrl && previewUrl.startsWith("https://") ? previewUrl : null);
+            let uploadedImageUrl = null;
+            if (file) {
+                const url = await uploadMediaFileToEdge(file);
+                if (file.type?.startsWith("image/")) uploadedImageUrl = url;
+                else uploadedVideoUrl = url;
+            }
+            const uploadedThumbUrl = thumbnail ? await uploadMediaFileToEdge(thumbnail) : null;
+            const uploadedRightUrl = rightSideImage ? await uploadMediaFileToEdge(rightSideImage) : null;
+
+            let cardsPayload = [];
+            if (postFormat === "video_pe") {
+                cardsPayload = [
+                    {
+                        id: "video-main",
+                        type: "video",
+                        mediaUrl: uploadedVideoUrl,
+                        headline: headline || "",
+                        description: cardDescription || "Swipe to see more",
+                        link: targetLink.trim(),
+                        cta
+                    },
+                    ...(uploadedRightUrl
+                        ? [
+                              {
+                                  id: "right-side-image",
+                                  type: "image",
+                                  mediaUrl: uploadedRightUrl,
+                                  headline: carouselCtaText.replace(/\n/g, " "),
+                                  description: "",
+                                  link: targetLink.trim(),
+                                  cta
+                              }
+                          ]
+                        : []),
+                    {
+                        id: "card-destination-final",
+                        type: "image",
+                        isPageCard: true,
+                        headline: "មើលច្រើនទៀតនៅ",
+                        description: "FACEBOOK.COM",
+                        link: targetLink.trim(),
+                        cta: cta || "LEARN_MORE"
+                    }
+                ];
+            } else if (postFormat === "photo_pe") {
+                for (const [idx, img] of multiImages.entries()) {
+                    const imgUrl = img.file ? await uploadMediaFileToEdge(img.file) : img.preview;
+                    cardsPayload.push({
+                        id: img.id || `photo-card-${idx}`,
+                        type: "image",
+                        mediaUrl: imgUrl,
+                        headline: img.headline || headline || "",
+                        description: cardDescription || "",
+                        link: img.link || targetLink.trim() || "",
+                        cta: img.cta || cta || "LEARN_MORE"
+                    });
+                }
+            }
+
+            const targetPages = selectedPages.map((id) => {
+                const found = availablePages.find((p) => p.id === id);
+                return { id, name: found?.name || "Facebook Page" };
+            });
+
+            toast.loading("កំពុងបង្ហោះទៅ Ads Manager / Facebook ផ្ទាល់ពី Browser...", { id: toastId });
+
+            const extResult = await new Promise((resolve) => {
+                const timer = setTimeout(() => {
+                    window.removeEventListener("message", listener);
+                    resolve({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.3.0 ហើយ Refresh ទំព័រ!" });
+                }, 120000);
+
+                const listener = (event) => {
+                    if (
+                        event.source === window &&
+                        event.data?.source === "EZA_EXTENSION" &&
+                        event.data?.action === "PUBLISH_AD_CREATIVE_RESULT"
+                    ) {
+                        clearTimeout(timer);
+                        window.removeEventListener("message", listener);
+                        resolve(event.data);
+                    }
+                };
+                window.addEventListener("message", listener);
+                window.postMessage(
+                    {
+                        source: "EZA_WEB_APP",
+                        action: "PUBLISH_AD_CREATIVE",
+                        payload: {
+                            format: postFormat,
+                            adAccountId: selectedAdAccount || "",
+                            pages: targetPages,
+                            caption,
+                            headline: headline.trim(),
+                            description: cardDescription.trim(),
+                            link: targetLink.trim(),
+                            cta,
+                            isDarkPost,
+                            canvasId,
+                            canvasUrl: postFormat === "instant_experience" ? targetLink.trim() : "",
+                            videoUrl: uploadedVideoUrl,
+                            imageUrl: uploadedImageUrl,
+                            thumbnailUrl: uploadedThumbUrl,
+                            cards: cardsPayload
+                        }
+                    },
+                    "*"
+                );
+            });
+
+            if (!extResult.ok) {
+                throw new Error(extResult.error || "មិនអាចបង្ហោះ PE / CTA តាម Extension បានទេ");
+            }
+
+            toast.success(
+                isDarkPost
+                    ? `🎉 បានបង្កើត Dark Post (PE) ជោគជ័យ! (ID: ${extResult.storyId})`
+                    : `🎉 បានបង្ហោះ PE / CTA ទៅ Facebook ជោគជ័យ!`,
+                { id: toastId, duration: 6000 }
+            );
+            setFile(null);
+            setPreviewUrl(null);
+            setRawVideoUrl(null);
+            setTiktokUrl("");
+            setCaption("");
+            setMediaItems([]);
+            setMultiImages([]);
+            setThumbnail(null);
+            setThumbnailPreview(null);
+            localStorage.removeItem("postDraft");
+            await Promise.all([
+                clearDraftFile("draft_video"),
+                clearDraftFile("draft_thumb"),
+                clearDraftFile("draft_card2")
+            ]);
+        } catch (err) {
+            console.error("❌ In-browser PE/CTA publish error:", err);
+            toast.error(err.response?.data?.error || err.message || "មិនអាចបង្ហោះ PE / CTA បានទេ", {
+                id: toastId,
+                duration: 8500
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const activeFormatMeta = POST_FORMATS.find((f) => f.id === postFormat) || POST_FORMATS[2];
 
     const handleSubmit = async () => {
@@ -625,11 +796,20 @@ export default function Post() {
             return toast.error("សូមសរសេរអត្ថបទ ឬបញ្ចូល Link URL ជាមុនសិន!");
         }
 
+        const isExtReady =
+            extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
+        const currentVer =
+            extensionVersion || document.documentElement.getAttribute("data-eza-extension-version") || "";
+
+        if (activeFormatMeta.needsAdAccount && publishMode === "now" && isExtReady && isExtensionAtLeastV230(currentVer)) {
+            return handlePublishAdCreativeViaExtension();
+        }
+
         if (activeFormatMeta.needsAdAccount && (!selectedAdAccount || !hasAdsToken)) {
             return toast.error(
                 !selectedAdAccount
-                    ? "ទម្រង់ PE / CTA ត្រូវការ Ad Account — សូមទាញយក Extension v2.2.2 ក្នុងទំព័រ 'ភ្ជាប់ផេក' រួចចុច Sync!"
-                    : "ខ្វះ EAAB Ads Token ពី adsmanager.facebook.com — សូមអាប់ដេត Extension v2.2.2 ក្នុងទំព័រ 'ភ្ជាប់ផេក' រួចចុច Sync ឡើងវិញ!",
+                    ? "ទម្រង់ PE / CTA ត្រូវការ Ad Account — សូមទាញយក Extension v2.3.0 ក្នុងទំព័រ 'ភ្ជាប់ផេក' រួចចុច Sync!"
+                    : "ខ្វះ Live Ads Token — សូមអាប់ដេត Extension v2.3.0 ក្នុងទំព័រ 'ភ្ជាប់ផេក' រួចចុច Sync ឡើងវិញ!",
                 { duration: 7500 }
             );
         }
@@ -645,22 +825,18 @@ export default function Post() {
         }
 
         if (activeFormatMeta.useBusinessSuite) {
-            const isExtReady =
-                extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
-            const currentVer =
-                extensionVersion || document.documentElement.getAttribute("data-eza-extension-version") || "";
             if (isExtReady && isExtensionAtLeastV205(currentVer)) {
                 return handlePublishViaBusinessSuite();
             }
             if (isExtReady) {
                 toast.error(
-                    `Extension របស់អ្នកជាកំណែចាស់ (${currentVer || "< 2.0.5"}) — សូម Reload/អាប់ដេត Extension v2.2.0 ក្នុង chrome://extensions ជាមុនសិន!`,
+                    `Extension របស់អ្នកជាកំណែចាស់ (${currentVer || "< 2.0.5"}) — សូម Reload/អាប់ដេត Extension v2.3.0 ក្នុង chrome://extensions ជាមុនសិន!`,
                     { duration: 8000 }
                 );
                 return;
             }
             toast.error(
-                "សូមដំឡើង EZA-POST Extension (v2.2.0) នៅក្នុងទំព័រ 'ភ្ជាប់ផេក' ដើម្បីផុសវីដេអូតាម Business Suite ដោយសុវត្ថិភាព!",
+                "សូមដំឡើង EZA-POST Extension (v2.3.0) នៅក្នុងទំព័រ 'ភ្ជាប់ផេក' ដើម្បីផុសវីដេអូតាម Business Suite ដោយសុវត្ថិភាព!",
                 { duration: 8000 }
             );
             return;
@@ -1023,16 +1199,21 @@ export default function Post() {
                                                     </option>
                                                 ))}
                                             </select>
-                                            {!hasAdsToken && (
+                                            {!hasAdsToken && !isExtensionAtLeastV230(extensionVersion) && (
                                                 <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
-                                                    ⚠️ រកឃើញ Ad Account តែខ្វះ EAAB Ads Token — សូមអាប់ដេត Extension v2.2.2 ក្នុង{" "}
-                                                    <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link> រួចចុច Sync!
+                                                    ⚠️ សូមអាប់ដេត Extension v2.3.0 ក្នុង{" "}
+                                                    <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link> ដើម្បីចាប់ Live Ads Token និងបង្ហោះ PE/CTA ផ្ទាល់លើ Browser!
+                                                </p>
+                                            )}
+                                            {isExtensionAtLeastV230(extensionVersion) && (
+                                                <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">
+                                                    ⚡ Extension v{extensionVersion} រួចរាល់ — នឹងបង្ហោះ PE / CTA ផ្ទាល់លើ Browser របស់អ្នក (គ្មានបញ្ហា Server IP)
                                                 </p>
                                             )}
                                         </div>
                                     ) : (
                                         <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                                            មិនទាន់ឃើញ Ad Account ទេ — សូមអាប់ដេត Extension v2.2.2 ក្នុង{" "}
+                                            មិនទាន់ឃើញ Ad Account ទេ — សូមអាប់ដេត Extension v2.3.0 ក្នុង{" "}
                                             <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link> រួចចុច Sync!
                                         </p>
                                     )}
