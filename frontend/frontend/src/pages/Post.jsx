@@ -113,6 +113,7 @@ export default function Post() {
     const [extensionInstalled, setExtensionInstalled] = useState(false);
     const [extensionVersion, setExtensionVersion] = useState("");
     const [isOpeningComposer, setIsOpeningComposer] = useState(false);
+    const [lastPublishedResult, setLastPublishedResult] = useState(null);
 
     const carouselRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -726,12 +727,34 @@ export default function Post() {
                 throw new Error(extResult.error || "មិនអាចបង្ហោះ PE / CTA តាម Extension បានទេ");
             }
 
-            toast.success(
-                isDarkPost
-                    ? `🎉 បានបង្កើត Dark Post (PE) ជោគជ័យ! (ID: ${extResult.storyId})`
-                    : `🎉 បានបង្ហោះ PE / CTA ទៅ Facebook ជោគជ័យ!`,
-                { id: toastId, duration: 6000 }
-            );
+            setLastPublishedResult({
+                format: postFormat,
+                storyId: extResult.storyId,
+                creativeId: extResult.creativeId,
+                postUrl: extResult.postUrl,
+                adsPostsUrl: extResult.adsPostsUrl,
+                publishedToTimeline: Boolean(extResult.publishedToTimeline),
+                isDarkPost: Boolean(extResult.isDarkPost),
+                publishNote: extResult.publishNote || null,
+                publishedAt: new Date().toLocaleTimeString()
+            });
+
+            if (extResult.publishedToTimeline) {
+                toast.success(`🎉 បានបង្ហោះឡើង Page Timeline ជោគជ័យ! (ID: ${extResult.storyId})`, {
+                    id: toastId,
+                    duration: 7000
+                });
+            } else if (isDarkPost) {
+                toast.success(`🕶️ បានបង្កើត Dark Post (PE) ក្នុង Ads Manager ជោគជ័យ! (ID: ${extResult.storyId})`, {
+                    id: toastId,
+                    duration: 7000
+                });
+            } else {
+                toast(
+                    `បានបង្កើតជា Ads Post / Dark Post (ID: ${extResult.storyId}) ប៉ុន្តែ Meta មិនអនុញ្ញាតបើកលើ Timeline ស្វ័យប្រវត្តិទេ — ចុចបើក Ads Posts ដើម្បី Publish!`,
+                    { id: toastId, icon: "⚠️", duration: 9000 }
+                );
+            }
             setFile(null);
             setPreviewUrl(null);
             setRawVideoUrl(null);
@@ -1152,6 +1175,66 @@ export default function Post() {
 
                 {activeView === "create" ? (
                     <div className="space-y-4">
+                        {/* Last Published Post Status & Direct Links */}
+                        {lastPublishedResult && (
+                            <div
+                                className={`rounded-2xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                                    lastPublishedResult.publishedToTimeline
+                                        ? "bg-emerald-500/10 border-emerald-500/30"
+                                        : "bg-amber-500/10 border-amber-500/30"
+                                }`}
+                            >
+                                <div className="space-y-1 min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs font-bold text-gray-900 dark:text-white">
+                                            {lastPublishedResult.publishedToTimeline
+                                                ? "✅ បានបង្ហោះឡើង Page Timeline ជោគជ័យ!"
+                                                : "🕶️ បានបង្កើតជា Ads Post / Dark Post (ស្ថិតក្នុង Business Suite → Ads Posts)"}
+                                        </span>
+                                        <span className="text-[11px] font-mono text-gray-500">
+                                            ID: {lastPublishedResult.storyId}
+                                        </span>
+                                    </div>
+                                    {lastPublishedResult.publishNote && (
+                                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                                            មូលហេតុពី Meta៖ {lastPublishedResult.publishNote}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                    {lastPublishedResult.postUrl && (
+                                        <a
+                                            href={lastPublishedResult.postUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold inline-flex items-center gap-1.5"
+                                        >
+                                            <span>បើកមើល Post</span>
+                                            <ExternalLink size={12} />
+                                        </a>
+                                    )}
+                                    {lastPublishedResult.adsPostsUrl && (
+                                        <a
+                                            href={lastPublishedResult.adsPostsUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/15 text-gray-800 dark:text-gray-200 text-xs font-bold inline-flex items-center gap-1.5 hover:border-blue-500"
+                                        >
+                                            <span>បើក Ads Posts (Publish)</span>
+                                            <ExternalLink size={12} />
+                                        </a>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setLastPublishedResult(null)}
+                                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* 10-Format Switcher (Tube2Post Parity) */}
                         <div className="flex flex-wrap gap-1.5 p-1.5 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10">
                             {POST_FORMATS.map((fmt) => {

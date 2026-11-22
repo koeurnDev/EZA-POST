@@ -1,13 +1,13 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Facebook Sync Extension — Content Bridge Script (v2.3.0)
+ * ⚡ EZA-POST Facebook Sync Extension — Content Bridge Script (v2.3.1)
  * ============================================================
  */
 
 (function () {
   // Mark DOM so the EZA-POST web app immediately knows the extension is installed
   document.documentElement.setAttribute("data-eza-extension", "installed");
-  document.documentElement.setAttribute("data-eza-extension-version", "2.3.0");
+  document.documentElement.setAttribute("data-eza-extension-version", "2.3.1");
 
   function isExtensionValid() {
     return typeof chrome !== "undefined" && Boolean(chrome?.runtime?.id);
@@ -37,7 +37,7 @@
             source: "EZA_EXTENSION",
             action: "EXTENSION_STATUS",
             installed: true,
-            version: response.version || "2.3.0",
+            version: response.version || "2.3.1",
             fbLoggedIn: Boolean(response.fbLoggedIn),
             fbUserId: response.fbUserId || null
           },
