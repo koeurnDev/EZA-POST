@@ -1227,7 +1227,22 @@ async function extUploadAdImage(actId, adsToken, imageUrl) {
       });
       const data = await res.json().catch(() => ({}));
       const firstImg = data?.images ? Object.values(data.images)[0] : null;
-      if (firstImg?.hash) return { hash: firstImg.hash, url: firstImg.url || imageUrl };
+      if (firstImg?.hash) {
+        let cdnUrl = firstImg.url || firstImg.permalink_url || null;
+        if (!cdnUrl) {
+          try {
+            const hashesParam = encodeURIComponent(JSON.stringify([firstImg.hash]));
+            const lookRes = await fetch(
+              `${host}/v21.0/${encodeURIComponent(actId)}/adimages?hashes=${hashesParam}&fields=hash,url,permalink_url&access_token=${encodeURIComponent(adsToken)}`,
+              { credentials: "include" }
+            ).catch(() => null);
+            const lookData = lookRes?.ok ? await lookRes.json().catch(() => ({})) : {};
+            const item = Array.isArray(lookData?.data) ? lookData.data[0] : null;
+            cdnUrl = item?.url || item?.permalink_url || null;
+          } catch {}
+        }
+        return { hash: firstImg.hash, url: cdnUrl || imageUrl };
+      }
     }
   } catch {}
   return { hash: null, url: imageUrl };
@@ -1251,15 +1266,7 @@ async function extResolvePageAvatarCdn(pageId, pageTokens) {
 async function extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, imageUrl) {
   if (!imageUrl || typeof imageUrl !== "string") return { hash: null, photoId: null, url: imageUrl };
 
-  // 1. Try Ad Account /adimages first (returns Facebook scontent.fbcdn.net URL + image_hash)
-  if (actId && adsToken) {
-    const adImg = await extUploadAdImage(actId, adsToken, imageUrl);
-    if (adImg?.hash && typeof adImg.url === "string" && /fbcdn\.net|facebook\.com/i.test(adImg.url)) {
-      return { hash: adImg.hash, photoId: null, url: adImg.url };
-    }
-  }
-
-  // 2. Fallback: upload binary Blob directly to /{pageId}/photos (published=false) and grab Facebook CDN images[0].source
+  // 1. Upload binary Blob directly to /{pageId}/photos (published=false) FIRST to get a direct scontent.fbcdn.net images[0].source URL
   try {
     const imgRes = await fetch(imageUrl, { redirect: "follow" });
     if (imgRes.ok) {
@@ -1280,18 +1287,28 @@ async function extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, imageU
             if (res.ok && data?.id) {
               const photoId = String(data.id);
               const metaRes = await fetch(
-                `https://graph.facebook.com/v21.0/${encodeURIComponent(photoId)}?fields=images&access_token=${encodeURIComponent(pt)}`,
+                `https://graph.facebook.com/v21.0/${encodeURIComponent(photoId)}?fields=images,picture&access_token=${encodeURIComponent(pt)}`,
                 { credentials: "include" }
               ).catch(() => null);
               const metaData = metaRes?.ok ? await metaRes.json().catch(() => ({})) : {};
-              const cdnUrl = metaData?.images?.[0]?.source || null;
-              return { hash: null, photoId, url: cdnUrl || imageUrl };
+              const cdnUrl = metaData?.images?.[0]?.source || metaData?.picture || null;
+              if (cdnUrl) {
+                return { hash: null, photoId, url: cdnUrl };
+              }
             }
           } catch {}
         }
       }
     }
   } catch {}
+
+  // 2. Fallback: Ad Account /adimages (queries ?hashes=[...]&fields=url,permalink_url for fbcdn.net URL)
+  if (actId && adsToken) {
+    const adImg = await extUploadAdImage(actId, adsToken, imageUrl);
+    if (adImg?.hash) {
+      return { hash: adImg.hash, photoId: null, url: adImg.url || imageUrl };
+    }
+  }
 
   return { hash: null, photoId: null, url: imageUrl };
 }
@@ -1607,12 +1624,7 @@ async function extVerifyStoryPublished(storyId, tokens) {
                   await extWaitForVideoReady(pageVideoId, pv.token);
                 } catch (e) {
                   directPublicErr = `Page /videos: ${e?.message || "failed"}`;
-                  // Fallback immediately to Ad Account /advideos so Card 1 ALWAYS has a real encoded video_id!
-                  await ensureAdAssetsUploaded();
-                  pageVideoId = sharedVideoId;
-                }
-                if (!pageVideoId) {
-                  throw new Error("មិនទទួលបាន Video ID សម្រាប់ Video PE ទេ");
+                  pageVideoId = null;
                 }
               }
 
@@ -1635,15 +1647,14 @@ async function extVerifyStoryPublished(storyId, tokens) {
                 }
               }
 
-              const buildFeedCards = (includeImageHash) =>
+              const buildFeedCards = (includeVideoId) =>
                 cards.map((card, idx) => {
                   const cardLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
                   const cardCta = extBuildCta(card.cta || payload?.cta, cardLink, pageId);
                   const imgAsset = resolvedCardImages[idx];
                   if (card.type === "video") {
                     return {
-                      video_id: pageVideoId,
-                      ...(includeImageHash && imgAsset?.hash ? { image_hash: imgAsset.hash } : {}),
+                      ...(includeVideoId && pageVideoId ? { video_id: pageVideoId } : {}),
                       picture: imgAsset?.url || resolvedAvatarCdn,
                       link: cardLink,
                       name: card.headline || payload?.headline || pageName,
@@ -1652,7 +1663,6 @@ async function extVerifyStoryPublished(storyId, tokens) {
                     };
                   }
                   return {
-                    ...(includeImageHash && imgAsset?.hash ? { image_hash: imgAsset.hash } : {}),
                     picture: imgAsset?.url || resolvedAvatarCdn,
                     link: cardLink,
                     name: card.headline || payload?.headline || pageName,
@@ -1661,12 +1671,13 @@ async function extVerifyStoryPublished(storyId, tokens) {
                   };
                 });
 
-              const feedCardsWithHash = buildFeedCards(true);
-              const feedCardsNoHash = buildFeedCards(false);
+              const candidateLists = pageVideoId
+                ? [buildFeedCards(true), buildFeedCards(false)]
+                : [buildFeedCards(false)];
 
               let postedFeed = false;
               for (const pt of pageTokens) {
-                for (const candidateCards of [feedCardsWithHash, feedCardsNoHash]) {
+                for (const candidateCards of candidateLists) {
                   try {
                     const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, {
                       access_token: pt,
