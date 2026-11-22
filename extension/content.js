@@ -1,17 +1,22 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Facebook Sync Extension — Content Bridge Script (v2.4.2)
+ * ⚡ EZA-POST Facebook Sync Extension — Content Bridge Script (v2.4.3)
  * ============================================================
  */
 
 (function () {
+  const MY_BRIDGE_VERSION = "2.4.3";
   // Prevent duplicate listeners if re-injected on extension reload
-  if (window.__ezaContentBridgeVersion === "2.4.2") return;
-  window.__ezaContentBridgeVersion = "2.4.2";
+  if (window.__ezaContentBridgeVersion === MY_BRIDGE_VERSION) return;
+  window.__ezaContentBridgeVersion = MY_BRIDGE_VERSION;
 
   // Mark DOM so the EZA-POST web app immediately knows the extension is installed
   document.documentElement.setAttribute("data-eza-extension", "installed");
-  document.documentElement.setAttribute("data-eza-extension-version", "2.4.2");
+  document.documentElement.setAttribute("data-eza-extension-version", MY_BRIDGE_VERSION);
+
+  function isCurrentBridge() {
+    return window.__ezaContentBridgeVersion === MY_BRIDGE_VERSION;
+  }
 
   function isExtensionValid() {
     return typeof chrome !== "undefined" && Boolean(chrome?.runtime?.id);
@@ -82,6 +87,7 @@
 
   // Listen for requests from the EZA-POST React web app
   window.addEventListener("message", (event) => {
+    if (!isCurrentBridge()) return;
     if (event.source !== window || !event.data || event.data.source !== "EZA_WEB_APP") {
       return;
     }
