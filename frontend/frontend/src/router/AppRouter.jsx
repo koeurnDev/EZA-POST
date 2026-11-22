@@ -85,9 +85,9 @@ export default function AppRouter() {
           <Route path="/b/:slug" element={<PublicBio />} />
           <Route path="/bio/:slug" element={<PublicBio />} />
 
-          {/* Default entry: Digital Business Card (/bio) */}
-          <Route path="/dashboard" element={<Navigate to="/bio" replace />} />
-          <Route path="/" element={<Navigate to="/bio" replace />} />
+          {/* Default entry: Facebook Post Publisher (/post) */}
+          <Route path="/dashboard" element={<Navigate to="/post" replace />} />
+          <Route path="/" element={<Navigate to="/post" replace />} />
 
           {/* ==================== Active Primary Routes ==================== */}
           {/* 📱 1. Digital Business Card / Bio Builder */}

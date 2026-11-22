@@ -1480,21 +1480,199 @@ async function publishAdCreativeInBrowser(payload) {
         throw new Error(`មិនមាន Page Access Token សម្រាប់ផេក ${pageName} — សូមចូលទំព័រ 'ភ្ជាប់ផេក' រួចចុច Sync តាម Extension!`);
       }
 
-      if (format === "video_cta" && payload?.videoUrl) {
-        const uploaded = await extUploadPageVideo(pageId, pageTokens, payload.videoUrl, {
-          published: true,
-          description: payload?.caption || "",
-          title: payload?.headline || pageName,
-          ctaSpec
-        });
-        results.push({
-          pageId,
-          pageName,
-          storyId: uploaded.id,
-          postUrl: `https://www.facebook.com/${pageId}/videos/${uploaded.id}`,
-          publishedToTimeline: true
-        });
+      if (format === "text_link") {
+        let feedErr = null;
+        let posted = false;
+        const linkVal = typeof payload?.link === "string" && /^https?:\/\//i.test(payload.link) ? payload.link : "";
+        for (const pt of pageTokens) {
+          try {
+            const params = {
+              access_token: pt,
+              published: "true",
+              message: payload?.caption || ""
+            };
+            if (linkVal) params.link = linkVal;
+            const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, params);
+            if (feedRes?.id) {
+              results.push({
+                pageId,
+                pageName,
+                storyId: String(feedRes.id),
+                postUrl: `https://www.facebook.com/${feedRes.id}`,
+                publishedToTimeline: true
+              });
+              posted = true;
+              break;
+            }
+          } catch (e) {
+            feedErr = e;
+          }
+        }
+        if (!posted) throw feedErr || new Error("មិនអាចបង្ហោះអត្ថបទ / Link ឡើង Page Timeline បានទេ");
         continue;
+      }
+
+      if (format === "photos") {
+        const photoUrls = Array.isArray(payload?.imageUrls) && payload.imageUrls.length > 0
+          ? payload.imageUrls
+          : payload?.imageUrl
+            ? [payload.imageUrl]
+            : [];
+        if (photoUrls.length === 0) {
+          throw new Error("សូមដាក់រូបភាពយ៉ាងតិច ១ សន្លឹក!");
+        }
+        if (photoUrls.length === 1) {
+          const imgRes = await fetch(photoUrls[0], { redirect: "follow" });
+          const blob = imgRes.ok ? await imgRes.blob() : null;
+          let photoErr = null;
+          let posted = false;
+          for (const pt of pageTokens) {
+            try {
+              if (blob && blob.size > 0) {
+                const form = new FormData();
+                form.set("access_token", pt);
+                form.set("published", "true");
+                if (payload?.caption) form.set("caption", payload.caption);
+                form.set("source", blob, "photo.jpg");
+                const res = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/photos`, {
+                  method: "POST",
+                  credentials: "include",
+                  body: form
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && (data?.post_id || data?.id)) {
+                  const sid = String(data.post_id || data.id);
+                  results.push({
+                    pageId,
+                    pageName,
+                    storyId: sid,
+                    postUrl: `https://www.facebook.com/${sid}`,
+                    publishedToTimeline: true
+                  });
+                  posted = true;
+                  break;
+                }
+                photoErr = new Error(data?.error?.message || `HTTP ${res.status}`);
+              } else {
+                const data = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/photos`, {
+                  access_token: pt,
+                  published: "true",
+                  url: photoUrls[0],
+                  ...(payload?.caption ? { caption: payload.caption } : {})
+                });
+                if (data?.post_id || data?.id) {
+                  const sid = String(data.post_id || data.id);
+                  results.push({
+                    pageId,
+                    pageName,
+                    storyId: sid,
+                    postUrl: `https://www.facebook.com/${sid}`,
+                    publishedToTimeline: true
+                  });
+                  posted = true;
+                  break;
+                }
+              }
+            } catch (e) {
+              photoErr = e;
+            }
+          }
+          if (!posted) throw photoErr || new Error("មិនអាចបង្ហោះរូបភាពឡើង Page Timeline បានទេ");
+          continue;
+        }
+
+        // Multiple photos (2-10): upload unpublished to /{pageId}/photos then attach via attached_media on /{pageId}/feed
+        const uploadedIds = [];
+        for (const u of photoUrls.slice(0, 10)) {
+          const uploadedAsset = await extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, u);
+          if (uploadedAsset?.photoId) {
+            uploadedIds.push(uploadedAsset.photoId);
+          }
+        }
+        if (uploadedIds.length === 0) {
+          throw new Error("មិនអាច Upload រូបភាពទៅ Facebook Page បានទេ");
+        }
+        let multiErr = null;
+        let postedMulti = false;
+        for (const pt of pageTokens) {
+          try {
+            const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, {
+              access_token: pt,
+              published: "true",
+              message: payload?.caption || "",
+              attached_media: JSON.stringify(uploadedIds.map((id) => ({ media_fbid: id })))
+            });
+            if (feedRes?.id) {
+              results.push({
+                pageId,
+                pageName,
+                storyId: String(feedRes.id),
+                postUrl: `https://www.facebook.com/${feedRes.id}`,
+                publishedToTimeline: true
+              });
+              postedMulti = true;
+              break;
+            }
+          } catch (e) {
+            multiErr = e;
+          }
+        }
+        if (!postedMulti) throw multiErr || new Error("មិនអាចបង្ហោះរូបភាពច្រើនសន្លឹកឡើង Page Timeline បានទេ");
+        continue;
+      }
+
+      if (format === "video_cta" && payload?.videoUrl) {
+        try {
+          const uploaded = await extUploadPageVideo(pageId, pageTokens, payload.videoUrl, {
+            published: true,
+            description: payload?.caption || "",
+            title: payload?.headline || pageName,
+            ctaSpec
+          });
+          results.push({
+            pageId,
+            pageName,
+            storyId: uploaded.id,
+            postUrl: `https://www.facebook.com/${pageId}/videos/${uploaded.id}`,
+            publishedToTimeline: true
+          });
+          continue;
+        } catch {
+          // If /{pageId}/videos is blocked by Meta App Review, fall back to Page /feed post with thumbnail & CTA button
+          const rawImgUrl = payload?.thumbnailUrl || (await extResolvePageAvatarCdn(pageId, pageTokens));
+          const fbImg = await extUploadImageToFbCdn(pageId, pageTokens, actId, adsToken, rawImgUrl);
+          let feedErr = null;
+          let posted = false;
+          for (const pt of pageTokens) {
+            try {
+              const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, {
+                access_token: pt,
+                published: "true",
+                message: payload?.caption || "",
+                link: baseLink,
+                name: payload?.headline || pageName,
+                description: payload?.description || "",
+                picture: fbImg.url,
+                ...(ctaSpec ? { call_to_action: JSON.stringify(ctaSpec) } : {})
+              });
+              if (feedRes?.id) {
+                results.push({
+                  pageId,
+                  pageName,
+                  storyId: String(feedRes.id),
+                  postUrl: `https://www.facebook.com/${feedRes.id}`,
+                  publishedToTimeline: true
+                });
+                posted = true;
+                break;
+              }
+            } catch (e) {
+              feedErr = e;
+            }
+          }
+          if (!posted) throw feedErr || new Error("មិនអាចបង្ហោះ Video CTA ឡើង Page Timeline បានទេ");
+          continue;
+        }
       }
 
       if (format === "photo_cta" || format === "instant_experience") {

@@ -288,14 +288,14 @@ export default function Connections() {
                                             </>
                                         )}
                                     </p>
-                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.3.5") && (
+                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.3.6") && (
                                         <a
                                             href="/eza-post-fb-extension.zip"
                                             download="EZA-POST-FB-Extension.zip"
                                             className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition font-khmer"
                                         >
                                             <Download size={11} />
-                                            <span>Extension កំណែចាស់ — ទាញយក v2.3.5 ថ្មី</span>
+                                            <span>Extension កំណែចាស់ — ទាញយក v2.3.6 ថ្មី</span>
                                         </a>
                                     )}
                                 </div>
@@ -361,14 +361,14 @@ export default function Connections() {
                                         </span>
                                     </span>
 
-                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.3.5") && (
+                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.3.6") && (
                                         <a
                                             href="/eza-post-fb-extension.zip"
                                             download="EZA-POST-FB-Extension.zip"
                                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition font-khmer"
                                         >
                                             <Download size={12} />
-                                            <span>អាប់ដេតទៅ v2.3.5 (Auto Public + បង្ហាញរូបកាត HD)</span>
+                                            <span>អាប់ដេតទៅ v2.3.6 (Auto Public + បង្ហាញរូបកាត HD)</span>
                                         </a>
                                     )}
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
@@ -6,28 +6,26 @@ import NetworkStatus from "../components/NetworkStatus";
 import {
   Send, Clock, HelpCircle, Link as LinkIcon, MessageSquare, Zap, Settings, LogOut, Sun, Moon, Grid, X,
   Download, Video, Instagram, AtSign, Facebook, Images, Scissors, Music, TrendingUp, FileText, Languages,
-  Radio, Trash2, QrCode, Menu, CreditCard
+  Radio, Trash2, QrCode, CreditCard, ChevronDown
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
-const SIDEBAR_SECTIONS = [
+const PRIMARY_NAV_ITEMS = [
+  { label: "បង្កើតផុស", shortLabel: "ផុស", icon: Send, path: "/post" },
+  { label: "ភ្ជាប់ផេក", shortLabel: "ផេក", icon: LinkIcon, path: "/connections" },
+  { label: "កាលវិភាគ", shortLabel: "កក់ម៉ោង", icon: Clock, path: "/posts" },
+  { label: "Bot ឆ្លើយតប", shortLabel: "Bot", icon: MessageSquare, path: "/bot" },
+  { label: "អក្សររត់ AI", shortLabel: "អក្សររត់", icon: Languages, path: "/subtitles", badge: "AI" },
+  { label: "កាត Bio", shortLabel: "កាត Bio", icon: QrCode, path: "/bio" },
+];
+
+const EXTRA_TOOL_SECTIONS = [
   {
-    title: "មុខងារចម្បង",
-    items: [
-      { label: "កាតអាជីវកម្មឌីជីថល", shortLabel: "កាត Bio", icon: QrCode, path: "/bio", badge: "Pro" },
-      { label: "អក្សររត់ AI", shortLabel: "អក្សររត់", icon: Languages, path: "/subtitles", badge: "AI" },
-      { label: "បង្កើតផុសថ្មី", shortLabel: "ផុស", icon: Send, path: "/post" },
-      { label: "កាលវិភាគផុស", shortLabel: "កាលវិភាគ", icon: Clock, path: "/posts" },
-      { label: "ឆ្លើយតបស្វ័យប្រវត្តិ", shortLabel: "ឆ្លើយតប", icon: MessageSquare, path: "/bot" },
-      { label: "ភ្ជាប់ផេក Facebook", shortLabel: "ផេក", icon: LinkIcon, path: "/connections" },
-    ],
-  },
-  {
-    title: "ទាញយកវីដេអូ",
+    title: "ទាញយកវីដេអូ (គ្មាន Watermark)",
     items: [
       { label: "ទាញយកវីដេអូ TikTok", icon: Download, path: "/tools/tiktok" },
-      { label: "ទាញយកវីដេអូ YouTube", icon: Video, path: "/tools/youtube" },
       { label: "ទាញយកវីដេអូ Facebook", icon: Facebook, path: "/tools/facebook" },
+      { label: "ទាញយកវីដេអូ YouTube", icon: Video, path: "/tools/youtube" },
       { label: "ទាញយកវីដេអូ Instagram", icon: Instagram, path: "/tools/instagram" },
       { label: "ទាញយក CapCut", icon: Scissors, path: "/tools/capcut" },
       { label: "ទាញយកវីដេអូ Threads", icon: AtSign, path: "/tools/threads" },
@@ -35,9 +33,9 @@ const SIDEBAR_SECTIONS = [
     ],
   },
   {
-    title: "ឧបករណ៍ផេក និងគណនី",
+    title: "ឧបករណ៍គ្រប់គ្រងផេក និងគណនី",
     items: [
-      { label: "ផ្សាយផ្ទាល់ច្រើនផេក", icon: Radio, path: "/tools/live-stream" },
+      { label: "ផ្សាយផ្ទាល់ច្រើនផេក (Live)", icon: Radio, path: "/tools/live-stream" },
       { label: "សម្អាតផុសក្នុងផេក", icon: Trash2, path: "/tools/page-cleaner" },
       { label: "បម្លែងឯកសារ", icon: FileText, path: "/tools/document-converter" },
       { label: "ស្វែងរកវីដេអូល្បី", icon: TrendingUp, path: "/tools/viral-finder" },
@@ -50,29 +48,32 @@ const SIDEBAR_SECTIONS = [
   },
 ];
 
-const MOBILE_BOTTOM_TABS = [
-  { label: "កាតអាជីវកម្ម", shortLabel: "កាត Bio", icon: QrCode, path: "/bio" },
-  { label: "អក្សររត់ AI", shortLabel: "អក្សររត់", icon: Languages, path: "/subtitles" },
-  { label: "បង្កើតផុស", shortLabel: "ផុស", icon: Send, path: "/post" },
-  { label: "ការកំណត់", shortLabel: "ការកំណត់", icon: Settings, path: "/settings" },
-];
-
 const DashboardLayout = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isToolsOpen, setIsToolsOpen] = useState(false);
+  const toolsMenuRef = useRef(null);
   const isDarkMode = theme === "dark";
 
-  // Find active item label for the top header breadcrumb
-  const activeNavItem =
-    SIDEBAR_SECTIONS.flatMap((s) => s.items).find((i) => i.path === location.pathname) ||
-    SIDEBAR_SECTIONS[0].items[0];
+  const isToolRouteActive = EXTRA_TOOL_SECTIONS.some((sec) =>
+    sec.items.some((item) => item.path === location.pathname)
+  );
 
   useEffect(() => {
-    setIsMobileDrawerOpen(false);
+    setIsToolsOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target)) {
+        setIsToolsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -112,50 +113,56 @@ const DashboardLayout = ({ children }) => {
     navigate("/login");
   };
 
-  const renderSidebarLinks = (onItemClick) => (
-    <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5 no-scrollbar">
-      {SIDEBAR_SECTIONS.map((section, sIdx) => (
-        <div key={sIdx}>
-          <p
-            className={`px-2.5 mb-1.5 text-[11px] font-bold ${
-              isDarkMode ? "text-slate-400" : "text-slate-500"
-            }`}
-          >
-            {section.title}
-          </p>
-          <div className="space-y-0.5">
-            {section.items.map((item) => {
+  return (
+    <div
+      className={`min-h-screen flex flex-col font-khmer ${
+        isDarkMode ? "bg-[#0b0f19] text-slate-100" : "bg-[#f8fafc] text-slate-900"
+      }`}
+    >
+      {/* 1. CLEAN TOP NAVIGATION BAR (NO SIDEBAR) */}
+      <header
+        className={`sticky top-0 z-40 border-b backdrop-blur-md ${
+          isDarkMode
+            ? "bg-[#111827]/95 border-slate-800/80"
+            : "bg-white/95 border-slate-200/80 shadow-2xs"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto h-15 px-3 sm:px-6 flex items-center justify-between gap-3">
+          {/* Brand Logo */}
+          <Link to="/post" className="flex items-center gap-2.5 shrink-0">
+            <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-xs">
+              <Zap className="text-white fill-white" size={16} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-extrabold leading-tight">EZA-POST</span>
+              <span className="text-[10px] text-blue-500 font-semibold leading-none">
+                moneaa.site
+              </span>
+            </div>
+          </Link>
+
+          {/* Horizontal Primary Navigation Tabs (Desktop & Tablet) */}
+          <nav className="hidden md:flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+            {PRIMARY_NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
               return (
                 <Link
                   key={item.path}
                   to={item.path}
-                  onClick={onItemClick}
-                  className={`flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                     isActive
-                      ? "bg-blue-600 text-white shadow-xs font-semibold"
+                      ? "bg-blue-600 text-white shadow-xs"
                       : isDarkMode
-                      ? "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                      ? "text-slate-300 hover:bg-slate-800 hover:text-white"
                       : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Icon
-                      size={16}
-                      className={
-                        isActive
-                          ? "text-white shrink-0"
-                          : isDarkMode
-                          ? "text-slate-400 shrink-0"
-                          : "text-slate-500 shrink-0"
-                      }
-                    />
-                    <span className="truncate">{item.label}</span>
-                  </div>
+                  <Icon size={15} />
+                  <span>{item.label}</span>
                   {item.badge && (
                     <span
-                      className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md shrink-0 ${
+                      className={`px-1.5 py-0.5 text-[9px] font-extrabold rounded-md ${
                         isActive
                           ? "bg-white/20 text-white"
                           : "bg-indigo-500/15 text-indigo-500"
@@ -167,238 +174,156 @@ const DashboardLayout = ({ children }) => {
                 </Link>
               );
             })}
+
+            {/* Dropdown Button for Extra Tools */}
+            <div className="relative" ref={toolsMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsToolsOpen((v) => !v)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  isToolRouteActive || isToolsOpen
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : isDarkMode
+                    ? "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+                }`}
+              >
+                <Grid size={15} />
+                <span>ឧបករណ៍</span>
+                <ChevronDown
+                  size={13}
+                  className={`transition-transform ${isToolsOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+            </div>
+          </nav>
+
+          {/* Right Actions: Network, Theme Toggle, Profile & Logout */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden lg:block">
+              <NetworkStatus />
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={isDarkMode ? "ប្ដូរទៅផ្ទៃភ្លឺ" : "ប្ដូរទៅផ្ទៃងងឹត"}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
+                isDarkMode
+                  ? "bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700"
+                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70"
+              }`}
+            >
+              {isDarkMode ? <Sun size={14} /> : <Moon size={14} className="text-indigo-600" />}
+              <span className="hidden xl:inline">{isDarkMode ? "ផ្ទៃភ្លឺ" : "ផ្ទៃងងឹត"}</span>
+            </button>
+
+            <Link
+              to="/settings"
+              title="ការកំណត់គណនី"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
+                location.pathname === "/settings"
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : isDarkMode
+                  ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70"
+              }`}
+            >
+              <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center text-[10px] font-extrabold">
+                {user?.name?.[0]?.toUpperCase() || "U"}
+              </div>
+              <span className="hidden sm:inline max-w-[90px] truncate">
+                {user?.name || "គណនី"}
+              </span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="ចាកចេញពីគណនី"
+              className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                isDarkMode
+                  ? "bg-slate-800 border-slate-700 text-slate-400 hover:text-red-400 hover:border-red-500/40"
+                  : "bg-slate-100 border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50"
+              }`}
+            >
+              <LogOut size={15} />
+            </button>
           </div>
         </div>
-      ))}
 
-    </div>
-  );
-
-  return (
-    <div
-      className={`min-h-screen flex ${
-        isDarkMode ? "bg-[#0b0f19] text-slate-100" : "bg-[#f8fafc] text-slate-900"
-      }`}
-    >
-      {/* 1. DESKTOP LEFT SIDEBAR (Fixed, Clean, 1-Click Access to Active Features) */}
-      <aside
-        className={`hidden lg:flex flex-col w-60 shrink-0 fixed top-0 bottom-0 left-0 z-40 border-r ${
-          isDarkMode
-            ? "bg-[#111827] border-slate-800/90"
-            : "bg-white border-slate-200/90"
-        }`}
-      >
-        {/* Brand Header */}
-        <div
-          className={`h-14 px-4 flex items-center justify-between border-b shrink-0 ${
-            isDarkMode ? "border-slate-800/80" : "border-slate-200/80"
-          }`}
-        >
-          <Link to="/bio" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-xs">
-              <Zap className="text-white fill-white" size={16} />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-extrabold leading-tight">Moneaa</span>
-              <span className="text-[10px] text-blue-500 font-semibold leading-none">
-                moneaa.site
-              </span>
-            </div>
-          </Link>
-        </div>
-
-        {/* All Navigation Links */}
-        {renderSidebarLinks()}
-
-        {/* Sidebar Footer: User & Logout */}
-        <div
-          className={`p-3 border-t flex items-center justify-between gap-2 shrink-0 ${
-            isDarkMode ? "border-slate-800/80 bg-slate-900/40" : "border-slate-200/80 bg-slate-50/60"
-          }`}
-        >
-          <Link to="/settings" className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-xs text-white shrink-0">
-              {user?.name?.[0]?.toUpperCase() || "U"}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold truncate">{user?.name || "គណនីរបស់ខ្ញុំ"}</p>
-              <p className="text-[10px] opacity-60 truncate">Pro Workspace</p>
-            </div>
-          </Link>
-          <button
-            onClick={handleLogout}
-            title="ចាកចេញពីគណនី"
-            className={`p-2 rounded-lg transition-colors shrink-0 ${
-              isDarkMode
-                ? "hover:bg-red-500/15 text-slate-400 hover:text-red-400"
-                : "hover:bg-red-50 text-slate-500 hover:text-red-600"
-            }`}
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
-      </aside>
-
-      {/* 2. MOBILE SLIDE-OVER DRAWER (For Active Tools & Links on Phone/Tablet) */}
-      {isMobileDrawerOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        {/* Tools Popover Panel (No Sidebar, Clean Full-Width Grid Menu) */}
+        {isToolsOpen && (
           <div
-            className="fixed inset-0 bg-black/50"
-            onClick={() => setIsMobileDrawerOpen(false)}
-          />
-          <div
-            className={`relative w-72 max-w-[82vw] h-full flex flex-col z-10 border-r shadow-2xl ${
+            className={`border-t shadow-2xl ${
               isDarkMode
                 ? "bg-[#111827] border-slate-800 text-slate-100"
                 : "bg-white border-slate-200 text-slate-900"
             }`}
           >
-            <div
-              className={`h-14 px-4 flex items-center justify-between border-b shrink-0 ${
-                isDarkMode ? "border-slate-800" : "border-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <Zap className="text-white fill-white" size={14} />
-                </div>
-                <span className="text-sm font-extrabold">EZA_POST ម៉ឺនុយ</span>
+            <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-blue-500">
+                  មុខងារ និងឧបករណ៍ទាំងអស់
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsToolsOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <button
-                onClick={() => setIsMobileDrawerOpen(false)}
-                className={`p-1.5 rounded-lg ${
-                  isDarkMode ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-100 text-slate-500"
-                }`}
-              >
-                <X size={18} />
-              </button>
-            </div>
 
-            {renderSidebarLinks(() => setIsMobileDrawerOpen(false))}
-
-            <div
-              className={`p-3 border-t flex items-center justify-between ${
-                isDarkMode ? "border-slate-800" : "border-slate-200"
-              }`}
-            >
-              <span className="text-xs font-semibold truncate">{user?.name || "គណនី"}</span>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 text-xs font-bold"
-              >
-                <LogOut size={14} />
-                <span>ចាកចេញ</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. RIGHT WORKSPACE COLUMN (Top Bar + Page Content) */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-60">
-        {/* Sticky Top Bar */}
-        <header
-          className={`sticky top-0 z-30 h-14 px-3 sm:px-6 flex items-center justify-between border-b ${
-            isDarkMode
-              ? "bg-[#111827]/95 border-slate-800/80"
-              : "bg-white/95 border-slate-200/80"
-          }`}
-        >
-          {/* Left: Mobile Menu Button + Current Page Title */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <button
-              type="button"
-              onClick={() => setIsMobileDrawerOpen(true)}
-              className={`lg:hidden p-2 rounded-xl border transition-colors ${
-                isDarkMode
-                  ? "bg-slate-800 border-slate-700 text-slate-200"
-                  : "bg-slate-100 border-slate-200 text-slate-700"
-              }`}
-              title="បើកម៉ឺនុយទាំងអស់"
-            >
-              <Menu size={18} />
-            </button>
-
-            <Link to="/bio" className="lg:hidden flex items-center gap-2 shrink-0">
-              <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Zap className="text-white fill-white" size={14} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {EXTRA_TOOL_SECTIONS.map((section, idx) => (
+                  <div key={idx} className="space-y-2.5">
+                    <p className="text-xs font-bold text-slate-400">{section.title}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {section.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = location.pathname === item.path;
+                        return (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            onClick={() => setIsToolsOpen(false)}
+                            className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-bold transition-all ${
+                              isActive
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : isDarkMode
+                                ? "bg-slate-800/60 border-slate-700/80 text-slate-200 hover:border-blue-500/50"
+                                : "bg-slate-50 border-slate-200/80 text-slate-700 hover:border-blue-500/50 hover:bg-blue-50/30"
+                            }`}
+                          >
+                            <Icon size={16} className={isActive ? "text-white" : "text-blue-500"} />
+                            <span className="truncate">{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <span className="text-sm font-extrabold hidden xs:inline">Moneaa</span>
-            </Link>
-
-            <div className="hidden lg:flex items-center gap-2 min-w-0">
-              <span className="text-sm font-bold truncate">{activeNavItem.label}</span>
             </div>
           </div>
+        )}
+      </header>
 
-          {/* Right: Quick Connections Link, Network Status, Light/Dark Mode Toggle & Profile */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Link
-              to="/connections"
-              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
-                location.pathname === "/connections"
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : isDarkMode
-                  ? "bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-800"
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70"
-              }`}
-            >
-              <LinkIcon size={13} />
-              <span>ភ្ជាប់ផេក</span>
-            </Link>
+      {/* 2. FULL-WIDTH CENTERED WORKSPACE (NO LEFT SIDEBAR OFFSET) */}
+      <main className="flex-1 w-full max-w-6xl mx-auto p-3 sm:p-5 lg:p-6 pb-24 md:pb-10 min-w-0">
+        {children}
+      </main>
 
-            <div className="hidden sm:block">
-              <NetworkStatus />
-            </div>
-
-            {/* Light / Dark Mode Toggle with Clear Label */}
-            <button
-              type="button"
-              onClick={toggleTheme}
-              title={isDarkMode ? "ប្ដូរទៅផ្ទៃភ្លឺ" : "ប្ដូរទៅផ្ទៃងងឹត"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors ${
-                isDarkMode
-                  ? "bg-slate-800 border-slate-700 hover:bg-slate-750 text-amber-400"
-                  : "bg-slate-100 border-slate-200 hover:bg-slate-200/70 text-slate-700"
-              }`}
-            >
-              {isDarkMode ? (
-                <>
-                  <Sun size={14} className="text-amber-400" />
-                  <span className="hidden sm:inline text-slate-200">ផ្ទៃភ្លឺ</span>
-                </>
-              ) : (
-                <>
-                  <Moon size={14} className="text-indigo-600" />
-                  <span className="hidden sm:inline text-slate-700">ផ្ទៃងងឹត</span>
-                </>
-              )}
-            </button>
-
-            <Link
-              to="/settings"
-              className={`lg:hidden flex items-center justify-center w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-xs`}
-            >
-              {user?.name?.[0]?.toUpperCase() || "U"}
-            </Link>
-          </div>
-        </header>
-
-        {/* Main Content Container */}
-        <main className="flex-1 p-3 sm:p-5 lg:p-6 pb-20 lg:pb-8 max-w-[1320px] w-full mx-auto min-w-0">
-          {children}
-        </main>
-      </div>
-
-      {/* 4. MOBILE BOTTOM TAB BAR (< lg, 5 Equal Columns with Khmer Labels) */}
+      {/* 3. MOBILE BOTTOM TAB BAR (< md) */}
       <nav
-        className={`lg:hidden fixed bottom-0 left-0 right-0 h-16 z-40 border-t px-1 grid grid-cols-5 items-center ${
+        className={`md:hidden fixed bottom-0 left-0 right-0 h-16 z-40 border-t px-1 grid grid-cols-5 items-center ${
           isDarkMode
             ? "bg-[#111827] border-slate-800 text-slate-300"
             : "bg-white border-slate-200 text-slate-600 shadow-lg"
         }`}
       >
-        {MOBILE_BOTTOM_TABS.map((tab) => {
+        {PRIMARY_NAV_ITEMS.slice(0, 4).map((tab) => {
           const Icon = tab.icon;
           const isActive = location.pathname === tab.path;
           return (
@@ -423,9 +348,9 @@ const DashboardLayout = ({ children }) => {
 
         <button
           type="button"
-          onClick={() => setIsMobileDrawerOpen(true)}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-colors min-w-0 ${
-            isMobileDrawerOpen ? "text-blue-600 font-bold" : "opacity-75 hover:opacity-100"
+          onClick={() => setIsToolsOpen((v) => !v)}
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-colors min-w-0 cursor-pointer ${
+            isToolsOpen || isToolRouteActive ? "text-blue-600 font-bold" : "opacity-75 hover:opacity-100"
           }`}
         >
           <div className="p-1 rounded-lg">

@@ -609,7 +609,7 @@ export default function Post() {
 
     const handlePublishAdCreativeViaExtension = async () => {
         setIsSubmitting(true);
-        const toastId = toast.loading("កំពុងផ្ទុកឯកសារ និងបង្ហោះ PE / CTA ផ្ទាល់តាម Chrome Extension...");
+        const toastId = toast.loading("កំពុងផ្ទុកឯកសារ និងបង្ហោះទៅ Facebook Page Timeline...");
         try {
             let uploadedVideoUrl = rawVideoUrl || (previewUrl && previewUrl.startsWith("https://") ? previewUrl : null);
             let uploadedImageUrl = null;
@@ -620,6 +620,21 @@ export default function Post() {
             }
             const uploadedThumbUrl = thumbnail ? await uploadMediaFileToEdge(thumbnail) : null;
             const uploadedRightUrl = rightSideImage ? await uploadMediaFileToEdge(rightSideImage) : null;
+
+            const uploadedPhotoUrls = [];
+            if (postFormat === "photos") {
+                if (multiImages.length > 0) {
+                    for (const img of multiImages) {
+                        if (img.file) {
+                            uploadedPhotoUrls.push(await uploadMediaFileToEdge(img.file));
+                        } else if (img.preview?.startsWith("https://")) {
+                            uploadedPhotoUrls.push(img.preview);
+                        }
+                    }
+                } else if (uploadedImageUrl) {
+                    uploadedPhotoUrls.push(uploadedImageUrl);
+                }
+            }
 
             let cardsPayload = [];
             if (postFormat === "video_pe") {
@@ -676,12 +691,12 @@ export default function Post() {
                 return { id, name: found?.name || "Facebook Page" };
             });
 
-            toast.loading("កំពុងបង្ហោះទៅ Ads Manager / Facebook ផ្ទាល់ពី Browser...", { id: toastId });
+            toast.loading("កំពុងបង្ហោះឡើង Facebook Page Timeline ផ្ទាល់ពី Browser...", { id: toastId });
 
             const extResult = await new Promise((resolve) => {
                 const timer = setTimeout(() => {
                     window.removeEventListener("message", listener);
-                    resolve({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.3.0 ហើយ Refresh ទំព័រ!" });
+                    resolve({ ok: false, error: "Extension មិនឆ្លើយតប (Timeout) — សូម Reload Extension v2.3.6 ហើយ Refresh ទំព័រ!" });
                 }, 120000);
 
                 const listener = (event) => {
@@ -713,6 +728,7 @@ export default function Post() {
                             canvasUrl: postFormat === "instant_experience" ? targetLink.trim() : "",
                             videoUrl: uploadedVideoUrl,
                             imageUrl: uploadedImageUrl,
+                            imageUrls: uploadedPhotoUrls,
                             thumbnailUrl: uploadedThumbUrl,
                             cards: cardsPayload
                         }
@@ -806,17 +822,9 @@ export default function Post() {
         const currentVer =
             extensionVersion || document.documentElement.getAttribute("data-eza-extension-version") || "";
 
-        if (activeFormatMeta.needsAdAccount && publishMode === "now" && isExtReady && isExtensionAtLeastV230(currentVer)) {
+        // Direct 1-Click In-Browser Publishing for all Page Feed / Photo / Carousel / CTA formats when Extension >= 2.3.0 is active
+        if (!activeFormatMeta.useBusinessSuite && publishMode === "now" && isExtReady && isExtensionAtLeastV230(currentVer)) {
             return handlePublishAdCreativeViaExtension();
-        }
-
-        if (activeFormatMeta.needsAdAccount && (!selectedAdAccount || !hasAdsToken)) {
-            return toast.error(
-                !selectedAdAccount
-                    ? "ទម្រង់ PE / CTA ត្រូវការ Ad Account — សូមទាញយក Extension v2.3.0 ក្នុងទំព័រ 'ភ្ជាប់ផេក' រួចចុច Sync!"
-                    : "ខ្វះ Live Ads Token — សូមអាប់ដេត Extension v2.3.0 ក្នុងទំព័រ 'ភ្ជាប់ផេក' រួចចុច Sync ឡើងវិញ!",
-                { duration: 7500 }
-            );
         }
 
         if (publishMode === "schedule") {
@@ -1218,48 +1226,6 @@ export default function Post() {
                                 );
                             })}
                         </div>
-
-                        {/* Ad Account Selector for PE / CTA / Canvas Formats (Always Auto-Public to Timeline) */}
-                        {activeFormatMeta.needsAdAccount && (
-                            <div className="bg-blue-500/[0.06] dark:bg-blue-500/10 border border-blue-500/20 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <div className="flex-1 min-w-0 space-y-1">
-                                    <div className="text-xs font-bold text-blue-700 dark:text-blue-300">
-                                        💳 ជ្រើសរើស Ad Account សម្រាប់ {activeFormatMeta.label} (ផុសឡើង Page Timeline ស្វ័យប្រវត្តិ)
-                                    </div>
-                                    {adAccounts.length > 0 ? (
-                                        <div className="space-y-1.5">
-                                            <select
-                                                value={selectedAdAccount}
-                                                onChange={(e) => setSelectedAdAccount(e.target.value)}
-                                                className="w-full sm:max-w-sm bg-white dark:bg-gray-900 border border-blue-500/30 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 dark:text-white outline-none"
-                                            >
-                                                {adAccounts.map((acc) => (
-                                                    <option key={acc.id} value={acc.id}>
-                                                        {acc.name} ({acc.id} • {acc.currency})
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            {!hasAdsToken && !isExtensionAtLeastV230(extensionVersion) && (
-                                                <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
-                                                    ⚠️ សូមអាប់ដេត Extension v2.3.5 ក្នុង{" "}
-                                                    <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link> ដើម្បីបង្ហោះ PE/CTA ឡើង Page Timeline ផ្ទាល់លើ Browser!
-                                                </p>
-                                            )}
-                                            {isExtensionAtLeastV230(extensionVersion) && (
-                                                <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">
-                                                    ⚡ Extension v{extensionVersion} រួចរាល់ — នឹងបង្ហោះឡើង Page Timeline សាធារណៈដោយស្វ័យប្រវត្តិ (គ្មាន Dark Post)
-                                                </p>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                                            មិនទាន់ឃើញ Ad Account ទេ — សូមអាប់ដេត Extension v2.3.5 ក្នុង{" "}
-                                            <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link> រួចចុច Sync!
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
 
                         {/* STEP 1: Select Destination Pages */}
                         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
@@ -1977,8 +1943,6 @@ export default function Post() {
                                     >
                                         {publishMode === "schedule"
                                             ? "📅 កក់ពេលបង្ហោះ"
-                                            : isDarkPost && activeFormatMeta.needsAdAccount
-                                            ? "🕶️ បង្កើត Dark Post (PE)"
                                             : "🚀 បង្ហោះទៅ Facebook ឥឡូវ"}
                                     </Button>
                                 </div>
