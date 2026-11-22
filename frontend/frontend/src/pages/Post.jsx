@@ -600,6 +600,12 @@ export default function Post() {
         return maj > 2 || (maj === 2 && min >= 3);
     };
 
+    const isExtensionAtLeastV239 = (ver) => {
+        const parts = String(ver || "").split(".").map((n) => Number.parseInt(n, 10) || 0);
+        const [maj = 0, min = 0, pat = 0] = parts;
+        return maj > 2 || (maj === 2 && (min > 3 || (min === 3 && pat >= 9)));
+    };
+
     const uploadMediaFileToEdge = async (mediaFile) => {
         const upForm = new FormData();
         upForm.append("media", mediaFile);
@@ -898,6 +904,19 @@ export default function Post() {
             extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
         const currentVer =
             extensionVersion || document.documentElement.getAttribute("data-eza-extension-version") || "";
+
+        if (postFormat === "video_pe" && publishMode === "now" && isExtReady && !isExtensionAtLeastV239(currentVer)) {
+            const link = document.createElement("a");
+            link.href = "/eza-post-fb-extension.zip";
+            link.download = "EZA-POST-FB-Extension-v2.3.9.zip";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            return toast.error(
+                `Extension លើ Chrome របស់អ្នកនៅជំនាន់ចាស់ (v${currentVer || "2.3.2"}) ទើប Card 1 ចេញតែរូប! ប្រព័ន្ធបានទាញយក v2.3.9 ថ្មីឱ្យហើយ — សូមពន្លា (Extract) រួចចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder ថ្មី!`,
+                { duration: 10000 }
+            );
+        }
 
         // Direct 1-Click In-Browser Publishing for all Page Feed / Photo / Carousel / CTA formats when Extension >= 2.3.0 is active
         if (!activeFormatMeta.useBusinessSuite && publishMode === "now" && isExtReady && isExtensionAtLeastV230(currentVer)) {
@@ -1241,6 +1260,27 @@ export default function Post() {
 
                 {activeView === "create" ? (
                     <div className="space-y-4">
+                        {extensionInstalled && !isExtensionAtLeastV239(extensionVersion) && (
+                            <div className="rounded-2xl p-3.5 sm:p-4 border bg-amber-500/10 border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="space-y-0.5">
+                                    <p className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                                        ⚠️ Extension លើ Chrome របស់អ្នកនៅជំនាន់ចាស់ (v{extensionVersion || "2.3.2"}) — ទាញយក v2.3.9 ដើម្បីឱ្យ Card 1 ចាក់វីដេអូ (Playable Video) បាន!
+                                    </p>
+                                    <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90">
+                                        ១. ចុចទាញយក v2.3.9 → ២. ពន្លា (Extract All) → ៣. ចូល chrome://extensions ចុច Load unpacked ជ្រើស Folder ថ្មី រួច Refresh ទំព័រនេះ។
+                                    </p>
+                                </div>
+                                <a
+                                    href="/eza-post-fb-extension.zip"
+                                    download="EZA-POST-FB-Extension-v2.3.9.zip"
+                                    className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shrink-0"
+                                >
+                                    <span>ទាញយក Extension v2.3.9</span>
+                                    <ExternalLink size={12} />
+                                </a>
+                            </div>
+                        )}
+
                         {/* Last Published Post Status & Direct Link */}
                         {lastPublishedResult && (
                             <div className="rounded-2xl p-4 border bg-emerald-500/10 border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

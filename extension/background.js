@@ -1748,10 +1748,11 @@ async function publishAdCreativeInBrowser(payload) {
         const cards = Array.isArray(payload?.cards) ? payload.cards.slice(0, 10) : [];
         if (cards.length < 2) throw new Error("Carousel PE តម្រូវឱ្យមានយ៉ាងតិច ២ កាត");
 
+        const allTokens = Array.from(new Set([...pageTokens, ...(adsToken ? [adsToken] : [])].filter(Boolean)));
         let pageVideoId = null;
         if (format === "video_pe" && payload?.videoUrl) {
           try {
-            const pv = await extUploadPageVideo(pageId, pageTokens, payload.videoUrl, { published: false });
+            const pv = await extUploadPageVideo(pageId, allTokens, payload.videoUrl, { published: false });
             pageVideoId = pv.id;
             await extWaitForVideoReady(pageVideoId, pv.token);
           } catch {
@@ -1771,14 +1772,49 @@ async function publishAdCreativeInBrowser(payload) {
         const pageAvatarProxy = `https://moneaa.site/api/v1/page-avatar/${encodeURIComponent(pageId)}.jpg?name=${encodeURIComponent(pageName)}`;
         const thumbUrl = payload?.thumbnailUrl || pageAvatarProxy;
 
-        const buildFeedCards = (includeVideoId, includeCta = true) =>
+        let thumbAdAsset = { hash: null, url: thumbUrl };
+        if (format === "video_pe" && actId && adsToken) {
+          try {
+            thumbAdAsset = await extUploadAdImage(actId, adsToken, thumbUrl);
+          } catch {}
+        }
+
+        const buildFeedCards = (videoMode = "none", includeCta = true) =>
           cards.map((card) => {
             const cardLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
             const cardCta = includeCta ? extBuildCta(card.cta || payload?.cta, cardLink, pageId) : undefined;
             const cardPic = card.pictureUrl || (card.type === "video" ? thumbUrl : (card.mediaUrl || pageAvatarProxy));
-            if (card.type === "video") {
+            if (card.type === "video" && pageVideoId && videoMode !== "none") {
+              if (videoMode === "video_only") {
+                return {
+                  video_id: pageVideoId,
+                  link: cardLink,
+                  name: card.headline || payload?.headline || pageName,
+                  description: card.description || payload?.description || "",
+                  ...(cardCta ? { call_to_action: cardCta } : {})
+                };
+              }
+              if (videoMode === "video_with_hash" && thumbAdAsset?.hash) {
+                return {
+                  video_id: pageVideoId,
+                  image_hash: thumbAdAsset.hash,
+                  link: cardLink,
+                  name: card.headline || payload?.headline || pageName,
+                  description: card.description || payload?.description || "",
+                  ...(cardCta ? { call_to_action: cardCta } : {})
+                };
+              }
+              if (videoMode === "media_fbid") {
+                return {
+                  media_fbid: pageVideoId,
+                  link: cardLink,
+                  name: card.headline || payload?.headline || pageName,
+                  description: card.description || payload?.description || "",
+                  ...(cardCta ? { call_to_action: cardCta } : {})
+                };
+              }
               return {
-                ...(includeVideoId && pageVideoId ? { video_id: pageVideoId } : {}),
+                video_id: pageVideoId,
                 picture: cardPic,
                 link: cardLink,
                 name: card.headline || payload?.headline || pageName,
@@ -1795,41 +1831,208 @@ async function publishAdCreativeInBrowser(payload) {
             };
           });
 
-        const candidateLists = pageVideoId
-          ? [buildFeedCards(true, true), buildFeedCards(false, true), buildFeedCards(false, false)]
-          : [buildFeedCards(false, true), buildFeedCards(false, false)];
-
         let postedFeed = false;
         let lastFeedErr = null;
-        for (const pt of pageTokens) {
-          for (const candidateCards of candidateLists) {
-            try {
-              const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, {
-                access_token: pt,
-                published: "true",
+        const hosts = ["https://graph.facebook.com", "https://adsmanager-graph.facebook.com"];
+
+        // 1. Try publishing directly to /{pageId}/feed WITH playable video_id across all video card modes & tokens FIRST
+        if (pageVideoId) {
+          const videoCandidates = [
+            buildFeedCards("video_with_pic", true),
+            buildFeedCards("video_only", true),
+            ...(thumbAdAsset?.hash ? [buildFeedCards("video_with_hash", true)] : []),
+            buildFeedCards("media_fbid", true)
+          ];
+          for (const candidateCards of videoCandidates) {
+            for (const host of hosts) {
+              for (const pt of allTokens) {
+                try {
+                  const feedRes = await extGraphPost(`${host}/v21.0/${encodeURIComponent(pageId)}/feed`, {
+                    access_token: pt,
+                    published: "true",
+                    message: payload?.caption || "",
+                    link: baseLink,
+                    multi_share_optimized: "false",
+                    child_attachments: JSON.stringify(candidateCards)
+                  });
+                  if (feedRes?.id) {
+                    results.push({
+                      pageId,
+                      pageName,
+                      storyId: String(feedRes.id),
+                      videoId: pageVideoId,
+                      postUrl: `https://www.facebook.com/${feedRes.id}`,
+                      publishedToTimeline: true
+                    });
+                    postedFeed = true;
+                    break;
+                  }
+                } catch (e) {
+                  lastFeedErr = e;
+                }
+              }
+              if (postedFeed) break;
+            }
+            if (postedFeed) break;
+          }
+        }
+
+        // 2. If /{pageId}/feed rejected organic video_id, create playable Video PE via /adcreatives, lookup storyId via /{pageId}/ads_posts, and publish to Timeline (is_published=true)
+        if (!postedFeed && format === "video_pe" && pageVideoId && actId && adsToken) {
+          try {
+            const adChildAttachments = [];
+            for (const card of cards) {
+              const cardLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
+              const cardCta = extBuildCta(card.cta || payload?.cta, cardLink, pageId);
+              if (card.type === "video") {
+                adChildAttachments.push({
+                  video_id: pageVideoId,
+                  ...(thumbAdAsset?.hash ? { image_hash: thumbAdAsset.hash } : { picture: thumbUrl }),
+                  link: cardLink,
+                  name: card.headline || payload?.headline || pageName,
+                  description: card.description || payload?.description || "",
+                  ...(cardCta ? { call_to_action: cardCta } : {})
+                });
+              } else {
+                const cardPic = card.pictureUrl || card.mediaUrl || pageAvatarProxy;
+                const cardImgAsset = await extUploadAdImage(actId, adsToken, cardPic);
+                adChildAttachments.push({
+                  ...(cardImgAsset?.hash ? { image_hash: cardImgAsset.hash } : { picture: cardPic }),
+                  link: cardLink,
+                  name: card.headline || payload?.headline || pageName,
+                  description: card.description || payload?.description || "",
+                  ...(cardCta ? { call_to_action: cardCta } : {})
+                });
+              }
+            }
+
+            const objectStorySpec = {
+              page_id: pageId,
+              link_data: {
                 message: payload?.caption || "",
                 link: baseLink,
-                multi_share_optimized: "false",
-                child_attachments: JSON.stringify(candidateCards)
-              });
-              if (feedRes?.id) {
-                results.push({
-                  pageId,
-                  pageName,
-                  storyId: String(feedRes.id),
-                  videoId: pageVideoId,
-                  postUrl: `https://www.facebook.com/${feedRes.id}`,
-                  publishedToTimeline: true
-                });
-                postedFeed = true;
-                break;
+                multi_share_optimized: false,
+                child_attachments: adChildAttachments
               }
-            } catch (e) {
-              lastFeedErr = e;
+            };
+
+            let creativeRes = null;
+            for (const host of ["https://adsmanager-graph.facebook.com", "https://graph.facebook.com"]) {
+              try {
+                creativeRes = await extGraphPost(`${host}/v21.0/${encodeURIComponent(actId)}/adcreatives`, {
+                  access_token: adsToken,
+                  name: `EZA_VIDEO_PE_${Date.now()}`,
+                  object_story_spec: JSON.stringify(objectStorySpec)
+                });
+                if (creativeRes?.id) break;
+              } catch {}
             }
-          }
-          if (postedFeed) break;
+
+            if (creativeRes?.id) {
+              let discoveredStoryId = null;
+              for (let attempt = 0; attempt < 5 && !discoveredStoryId; attempt++) {
+                if (attempt > 0) await sleep(1200);
+                for (const host of ["https://adsmanager-graph.facebook.com", "https://graph.facebook.com"]) {
+                  try {
+                    const crLook = await fetch(
+                      `${host}/v21.0/${encodeURIComponent(creativeRes.id)}?fields=effective_object_story_id,object_story_id&access_token=${encodeURIComponent(adsToken)}`,
+                      { credentials: "include" }
+                    ).catch(() => null);
+                    if (crLook?.ok) {
+                      const crData = await crLook.json().catch(() => ({}));
+                      const sid = crData?.effective_object_story_id || crData?.object_story_id;
+                      if (sid && String(sid).includes("_")) {
+                        discoveredStoryId = String(sid);
+                        break;
+                      }
+                    }
+                  } catch {}
+                }
+                if (discoveredStoryId) break;
+
+                // Query /{pageId}/ads_posts?include_inline_create=true to grab the newly created inline Video PE story ID
+                for (const host of ["https://adsmanager-graph.facebook.com", "https://graph.facebook.com"]) {
+                  for (const tok of allTokens) {
+                    try {
+                      const apRes = await fetch(
+                        `${host}/v21.0/${encodeURIComponent(pageId)}/ads_posts?include_inline_create=true&fields=id,is_published,message,created_time&limit=5&access_token=${encodeURIComponent(tok)}`,
+                        { credentials: "include" }
+                      ).catch(() => null);
+                      if (apRes?.ok) {
+                        const apData = await apRes.json().catch(() => ({}));
+                        const latestPost = Array.isArray(apData?.data) ? apData.data[0] : null;
+                        if (latestPost?.id && String(latestPost.id).startsWith(`${pageId}_`)) {
+                          discoveredStoryId = String(latestPost.id);
+                          break;
+                        }
+                      }
+                    } catch {}
+                  }
+                  if (discoveredStoryId) break;
+                }
+              }
+
+              if (discoveredStoryId) {
+                for (const host of ["https://graph.facebook.com", "https://adsmanager-graph.facebook.com"]) {
+                  for (const tok of allTokens) {
+                    try {
+                      await extGraphPost(`${host}/v21.0/${encodeURIComponent(discoveredStoryId)}`, {
+                        access_token: tok,
+                        is_published: "true"
+                      });
+                      postedFeed = true;
+                      results.push({
+                        pageId,
+                        pageName,
+                        storyId: discoveredStoryId,
+                        videoId: pageVideoId,
+                        postUrl: `https://www.facebook.com/${discoveredStoryId}`,
+                        publishedToTimeline: true
+                      });
+                      break;
+                    } catch {}
+                  }
+                  if (postedFeed) break;
+                }
+              }
+            }
+          } catch {}
         }
+
+        // 3. Fallback: 1-Click Public Page Timeline Carousel with OpenGraph HD Card Images
+        if (!postedFeed) {
+          const imageFallbackCandidates = [buildFeedCards("none", true), buildFeedCards("none", false)];
+          for (const pt of pageTokens) {
+            for (const candidateCards of imageFallbackCandidates) {
+              try {
+                const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, {
+                  access_token: pt,
+                  published: "true",
+                  message: payload?.caption || "",
+                  link: baseLink,
+                  multi_share_optimized: "false",
+                  child_attachments: JSON.stringify(candidateCards)
+                });
+                if (feedRes?.id) {
+                  results.push({
+                    pageId,
+                    pageName,
+                    storyId: String(feedRes.id),
+                    videoId: pageVideoId,
+                    postUrl: `https://www.facebook.com/${feedRes.id}`,
+                    publishedToTimeline: true
+                  });
+                  postedFeed = true;
+                  break;
+                }
+              } catch (e) {
+                lastFeedErr = e;
+              }
+            }
+            if (postedFeed) break;
+          }
+        }
+
         if (!postedFeed) {
           throw lastFeedErr || new Error("មិនអាចបង្ហោះ Carousel PE ឡើង Page Timeline បានទេ");
         }
