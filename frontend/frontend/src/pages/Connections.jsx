@@ -110,15 +110,15 @@ export default function Connections() {
                                 icon: "⚠️",
                                 duration: 7000
                             });
-                        } else if (res.data.hasPublishPermissions === false) {
-                            toast(res.data.message || "Token ពី Extension អាចខ្វះសិទ្ធិផុសវីដេអូ — សូមផ្ទុក Extension ថ្មីឡើងវិញ!", {
+                        } else if (adsCount > 0 && !adsReady) {
+                            toast(`បានភ្ជាប់ ${countText} ប៉ុន្តែមិនទាន់រកឃើញ EAAB Ads Token — សូមប្រើ Extension v2.2.2 ឬបើក adsmanager.facebook.com រួច Sync ម្តងទៀត!`, {
                                 icon: "⚠️",
                                 duration: 8000
                             });
-                        } else if (adsCount > 0 && !adsReady) {
-                            toast(`បានភ្ជាប់ ${countText} ប៉ុន្តែមិនទាន់រកឃើញ EAAB Ads Token — សូមបើក adsmanager.facebook.com រួច Sync ម្តងទៀតដើម្បីប្រើ PE/CTA!`, {
+                        } else if (res.data.hasPublishPermissions === false) {
+                            toast(res.data.message || "Token ពី Extension អាចខ្វះសិទ្ធិផុសវីដេអូ — សូមផ្ទុក Extension ថ្មីឡើងវិញ!", {
                                 icon: "⚠️",
-                                duration: 8000
+                                duration: 7000
                             });
                         } else {
                             toast.success(`🎉 ភ្ជាប់ជោគជ័យ! បានធ្វើបច្ចុប្បន្នភាព ${countText} រួចរាល់!`, {
@@ -179,7 +179,7 @@ export default function Connections() {
             extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
 
         if (!isDomInstalled) {
-            toast("សូមទាញយក និងដំឡើង EZA-POST Extension v2.2.1 ជាមុនសិន (បើដំឡើងរួច សូមចុច Refresh F5 ម្តង)!", {
+            toast("សូមទាញយក និងដំឡើង EZA-POST Extension v2.2.2 ជាមុនសិន (បើដំឡើងរួច សូមចុច Refresh F5 ម្តង)!", {
                 icon: "🧩",
                 duration: 5500
             });
@@ -194,7 +194,7 @@ export default function Connections() {
         syncTimeoutRef.current = setTimeout(() => {
             setIsSyncingViaExt(false);
             toast.error("មិនអាចភ្ជាប់ទៅ Extension បានទេ។ សូមចុច Refresh ទំព័រ ឬចុចលើ Icon Extension ⚡ នៅលើ Browser!");
-        }, 25000);
+        }, 35000);
     };
 
     const handleCopyChromeExtensionsUrl = () => {
@@ -283,14 +283,14 @@ export default function Connections() {
                                             </>
                                         )}
                                     </p>
-                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.1") && (
+                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.2") && (
                                         <a
                                             href="/eza-post-fb-extension.zip"
                                             download="EZA-POST-FB-Extension.zip"
                                             className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition font-khmer"
                                         >
                                             <Download size={11} />
-                                            <span>Extension កំណែចាស់ — ទាញយក v2.2.1 ថ្មី</span>
+                                            <span>Extension កំណែចាស់ — ទាញយក v2.2.2 ថ្មី</span>
                                         </a>
                                     )}
                                 </div>
@@ -356,14 +356,14 @@ export default function Connections() {
                                         </span>
                                     </span>
 
-                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.1") && (
+                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.2") && (
                                         <a
                                             href="/eza-post-fb-extension.zip"
                                             download="EZA-POST-FB-Extension.zip"
                                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition font-khmer"
                                         >
                                             <Download size={12} />
-                                            <span>អាប់ដេតទៅ v2.2.1 (គាំទ្រ Ads & PE/CTA)</span>
+                                            <span>អាប់ដេតទៅ v2.2.2 (គាំទ្រ Ads & PE/CTA)</span>
                                         </a>
                                     )}
 

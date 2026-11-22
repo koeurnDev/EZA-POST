@@ -628,8 +628,8 @@ export default function Post() {
         if (activeFormatMeta.needsAdAccount && (!selectedAdAccount || !hasAdsToken)) {
             return toast.error(
                 !selectedAdAccount
-                    ? "ទម្រង់ PE / CTA ត្រូវការ Ad Account — សូមបើក adsmanager.facebook.com លើ Chrome រួច Sync Extension v2.2.1 ក្នុងទំព័រ 'ភ្ជាប់ផេក'!"
-                    : "ខ្វះ EAAB Ads Token ពី adsmanager.facebook.com — សូមបើក adsmanager.facebook.com លើ Chrome រួចចុច Sync Extension v2.2.1 ក្នុងទំព័រ 'ភ្ជាប់ផេក'!",
+                    ? "ទម្រង់ PE / CTA ត្រូវការ Ad Account — សូមទាញយក Extension v2.2.2 ក្នុងទំព័រ 'ភ្ជាប់ផេក' រួចចុច Sync!"
+                    : "ខ្វះ EAAB Ads Token ពី adsmanager.facebook.com — សូមអាប់ដេត Extension v2.2.2 ក្នុងទំព័រ 'ភ្ជាប់ផេក' រួចចុច Sync ឡើងវិញ!",
                 { duration: 7500 }
             );
         }
@@ -1025,15 +1025,15 @@ export default function Post() {
                                             </select>
                                             {!hasAdsToken && (
                                                 <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
-                                                    ⚠️ រកឃើញ Ad Account តែខ្វះ EAAB Ads Token — សូមបើក <code>adsmanager.facebook.com</code> លើ Chrome រួចចុច Sync Extension v2.2.1 ក្នុង{" "}
-                                                    <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link>!
+                                                    ⚠️ រកឃើញ Ad Account តែខ្វះ EAAB Ads Token — សូមអាប់ដេត Extension v2.2.2 ក្នុង{" "}
+                                                    <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link> រួចចុច Sync!
                                                 </p>
                                             )}
                                         </div>
                                     ) : (
                                         <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                                            មិនទាន់ឃើញ Ad Account ទេ — សូមបើក <code>adsmanager.facebook.com</code> លើ Chrome រួចចុច Sync Extension v2.2.1 ក្នុង{" "}
-                                            <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link>!
+                                            មិនទាន់ឃើញ Ad Account ទេ — សូមអាប់ដេត Extension v2.2.2 ក្នុង{" "}
+                                            <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link> រួចចុច Sync!
                                         </p>
                                     )}
                                 </div>

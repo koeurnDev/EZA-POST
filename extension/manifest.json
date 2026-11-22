@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EZA-POST Facebook Sync Extension",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "1-Click Facebook Page & Ads Manager Sync Extension for EZA-POST & Moneaa.",
   "permissions": [
     "cookies",

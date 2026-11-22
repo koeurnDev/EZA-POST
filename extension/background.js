@@ -52,96 +52,148 @@ async function validateAdsToken(token) {
   }
 }
 
+async function collectTokensFromAdsTab(tabId) {
+  if (!tabId || !chrome.scripting) return [];
+  const injected = await chrome.scripting
+    .executeScript({
+      target: { tabId },
+      world: "MAIN",
+      func: () => {
+        const out = [];
+        try {
+          if (typeof window.__accessToken === "string") out.push(window.__accessToken);
+          if (typeof window.__access_token === "string") out.push(window.__access_token);
+          if (typeof window.accessToken === "string") out.push(window.accessToken);
+        } catch {}
+        try {
+          const perf = performance?.getEntriesByType?.("resource") || [];
+          for (const entry of perf) {
+            if (typeof entry?.name === "string" && entry.name.includes("EAA")) {
+              let decoded = entry.name;
+              try {
+                decoded = decodeURIComponent(entry.name);
+              } catch {}
+              const pm = decoded.match(/EAA[A-Za-z0-9_-]{30,}/g) || [];
+              for (const tok of pm) out.push(tok);
+            }
+          }
+        } catch {}
+        try {
+          const scriptText = Array.from(document.scripts || [])
+            .map((s) => s.textContent || "")
+            .join("\n");
+          const html = document.documentElement?.innerHTML || "";
+          const combined = `${scriptText}\n${html}`.replace(/\\\//g, "/");
+          const matches = combined.match(/EAA[A-Za-z0-9_-]{30,}/g) || [];
+          for (const m of matches) out.push(m);
+        } catch {}
+        return Array.from(new Set(out));
+      }
+    })
+    .catch(() => null);
+  return Array.isArray(injected?.[0]?.result) ? injected[0].result : [];
+}
+
 async function extractAdsTokensFromOpenAdsTabs() {
   const found = [];
   try {
     const adsTabs = await chrome.tabs.query({
       url: ["*://adsmanager.facebook.com/*", "*://*.facebook.com/adsmanager/*", "*://*.facebook.com/ads/manager/*"]
     });
-    for (const tab of adsTabs.slice(0, 2)) {
-      if (!tab?.id || !chrome.scripting) continue;
-      const injected = await chrome.scripting
-        .executeScript({
-          target: { tabId: tab.id },
-          func: () => {
-            const out = [];
-            try {
-              if (typeof window.__accessToken === "string") out.push(window.__accessToken);
-            } catch {}
-            const html = document.documentElement?.innerHTML || "";
-            const matches = html.replace(/\\\//g, "/").match(/EAA[A-Za-z0-9_-]{40,}/g) || [];
-            for (const m of matches) out.push(m);
-            return Array.from(new Set(out));
-          }
-        })
-        .catch(() => null);
-      if (Array.isArray(injected?.[0]?.result)) {
-        found.push(...injected[0].result);
-      }
+    for (const tab of adsTabs.slice(0, 3)) {
+      if (!tab?.id) continue;
+      const tokens = await collectTokensFromAdsTab(tab.id);
+      found.push(...tokens);
     }
   } catch {}
-  return found;
+  return Array.from(new Set(found));
+}
+
+async function tryBackgroundAdsTabExtraction(actId) {
+  if (!chrome.tabs || !chrome.scripting) return [];
+  const targetUrl = actId
+    ? `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${encodeURIComponent(actId)}`
+    : "https://adsmanager.facebook.com/adsmanager/manage/campaigns";
+  let tempTab = null;
+  try {
+    tempTab = await chrome.tabs.create({ url: targetUrl, active: false });
+    await waitForTabComplete(tempTab.id, 18000);
+    await sleep(2500);
+    let tokens = await collectTokensFromAdsTab(tempTab.id);
+    if (!tokens.some((t) => t.startsWith("EAAB"))) {
+      await sleep(2000);
+      tokens = Array.from(new Set([...tokens, ...(await collectTokensFromAdsTab(tempTab.id))]));
+    }
+    return tokens;
+  } catch {
+    return [];
+  } finally {
+    if (tempTab?.id) {
+      chrome.tabs.remove(tempTab.id).catch(() => {});
+    }
+  }
 }
 
 async function extractAdsContext(seedTokens = []) {
   let fallbackAccounts = [];
   const seen = new Set();
+  const evaluateCandidates = async (pool) => {
+    const filtered = (pool || []).filter(
+      (t) => typeof t === "string" && /^EAA[A-Za-z0-9_-]{30,}$/.test(t)
+    );
+    const ranked = [
+      ...filtered.filter((t) => t.startsWith("EAAB")),
+      ...filtered.filter((t) => !t.startsWith("EAAB"))
+    ];
+    for (const tok of ranked) {
+      if (seen.has(tok)) continue;
+      seen.add(tok);
+      const info = await validateAdsToken(tok);
+      if (!info) continue;
+      if (info.accounts.length > 0 && fallbackAccounts.length === 0) {
+        fallbackAccounts = info.accounts;
+      }
+      if (info.hasAdsManage) {
+        return { adsToken: tok, adAccounts: info.accounts.length > 0 ? info.accounts : fallbackAccounts };
+      }
+    }
+    return null;
+  };
+
   const openAdsTokens = await extractAdsTokensFromOpenAdsTabs();
-  const initialPool = [...openAdsTokens, ...seedTokens].filter(
-    (t) => typeof t === "string" && /^EAA[A-Za-z0-9_-]{40,}$/.test(t)
-  );
-  const prioritized = [
-    ...initialPool.filter((t) => t.startsWith("EAAB")),
-    ...initialPool.filter((t) => !t.startsWith("EAAB"))
-  ];
+  const hitOpen = await evaluateCandidates([...openAdsTokens, ...seedTokens]);
+  if (hitOpen) return hitOpen;
 
-  for (const tok of prioritized) {
-    if (seen.has(tok)) continue;
-    seen.add(tok);
-    const info = await validateAdsToken(tok);
-    if (!info) continue;
-    if (info.accounts.length > 0 && fallbackAccounts.length === 0) {
-      fallbackAccounts = info.accounts;
-    }
-    if (info.hasAdsManage) {
-      return { adsToken: tok, adAccounts: info.accounts };
-    }
-  }
-
+  const actId = fallbackAccounts[0]?.accountId || "";
   const adsEndpoints = [
+    ...(actId
+      ? [
+          `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${encodeURIComponent(actId)}`,
+          `https://www.facebook.com/adsmanager/manage/campaigns?act=${encodeURIComponent(actId)}`
+        ]
+      : []),
     "https://adsmanager.facebook.com/adsmanager/manage/campaigns",
     "https://www.facebook.com/adsmanager/manage/campaigns",
     "https://www.facebook.com/ads/manager/account_settings/account_billing/",
     "https://adsmanager.facebook.com/adsmanager/"
   ];
   for (const [idx, url] of adsEndpoints.entries()) {
-    if (idx > 0) await sleep(350);
+    if (idx > 0) await sleep(300);
     try {
       const res = await fetch(url, { credentials: "include", redirect: "follow" }).catch(() => null);
       if (!res) continue;
       const html = await res.text().catch(() => "");
       if (!html) continue;
 
-      const tokens = extractAllTokensFromText(html);
-      const ranked = [
-        ...tokens.filter((t) => t.startsWith("EAAB")),
-        ...tokens.filter((t) => !t.startsWith("EAAB"))
-      ].slice(0, 6);
-
-      for (const tok of ranked) {
-        if (seen.has(tok)) continue;
-        seen.add(tok);
-        const info = await validateAdsToken(tok);
-        if (!info) continue;
-        if (info.accounts.length > 0 && fallbackAccounts.length === 0) {
-          fallbackAccounts = info.accounts;
-        }
-        if (info.hasAdsManage) {
-          return { adsToken: tok, adAccounts: info.accounts.length > 0 ? info.accounts : fallbackAccounts };
-        }
-      }
+      const hitFetch = await evaluateCandidates(extractAllTokensFromText(html));
+      if (hitFetch) return hitFetch;
     } catch {}
   }
+
+  // Fallback: render Ads Manager SPA briefly in an inactive background tab so JS globals / network resources populate EAAB
+  const bgTokens = await tryBackgroundAdsTabExtraction(fallbackAccounts[0]?.accountId || "");
+  const hitBg = await evaluateCandidates(bgTokens);
+  if (hitBg) return hitBg;
 
   return { adsToken: null, adAccounts: fallbackAccounts };
 }
@@ -495,7 +547,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function getFullFacebookSyncPayload() {
   try {
     const now = Date.now();
-    if (lastSyncResult && lastSyncResult.ok && now - lastSyncTimestamp < SYNC_COOLDOWN_MS) {
+    if (lastSyncResult && lastSyncResult.ok && lastSyncResult.adsToken && now - lastSyncTimestamp < SYNC_COOLDOWN_MS) {
       return lastSyncResult;
     }
 
