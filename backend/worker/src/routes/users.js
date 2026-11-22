@@ -34,6 +34,20 @@ async function fetchAdAccountsForToken(token) {
   }
 }
 
+async function tokenHasAdsManagement(token) {
+  if (!isFbToken(token)) return false;
+  if (token.trim().startsWith("EAAB")) return true;
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/me/permissions?access_token=${encodeURIComponent(token)}`
+    );
+    const data = await res.json().catch(() => ({}));
+    return Array.isArray(data?.data) && data.data.some((p) => p?.permission === "ads_management" && p?.status === "granted");
+  } catch {
+    return false;
+  }
+}
+
 users.get("/pages", requireAuth, async (c) => {
   try {
     const userId = c.get("authUser").id;
@@ -46,7 +60,18 @@ users.get("/pages", requireAuth, async (c) => {
     const pageSettings = parsePageSettings(user?.pageSettings);
     const adsEntry = pageSettings.find((s) => s.pageId === META_ADS_SETTINGS_KEY) || null;
     const adAccounts = Array.isArray(adsEntry?.adAccounts) ? adsEntry.adAccounts : [];
-    const hasAdsToken = Boolean(adsEntry?.adsAccessToken);
+    let hasAdsToken = false;
+    if (adsEntry?.adsAccessToken) {
+      let decAds = null;
+      try {
+        decAds = await decryptFacebookToken(adsEntry.adsAccessToken, c.env);
+      } catch {
+        decAds = adsEntry.adsAccessToken;
+      }
+      if (isFbToken(decAds) && (decAds.startsWith("EAAB") || adsEntry.adsVerified === true)) {
+        hasAdsToken = true;
+      }
+    }
 
     if (!user || (!user.facebookAccessToken && rawPages.length === 0 && !user.facebookId)) {
       return c.json({ success: true, accounts: [], adAccounts, hasAdsToken, user: null });
@@ -522,7 +547,12 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
         resolvedAdAccounts = await fetchAdAccountsForToken(userToken);
       }
     }
-    const finalAdsToken = extAdsToken || (resolvedAdAccounts.length > 0 && isFbToken(userToken) ? userToken : null);
+    let finalAdsToken = null;
+    if (extAdsToken && await tokenHasAdsManagement(extAdsToken)) {
+      finalAdsToken = extAdsToken;
+    } else if (userToken && !isDirectPageToken && await tokenHasAdsManagement(userToken)) {
+      finalAdsToken = userToken;
+    }
 
     if (finalAdsToken || resolvedAdAccounts.length > 0) {
       try {
@@ -536,7 +566,8 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
         const nextAdAccounts = resolvedAdAccounts.length > 0 ? resolvedAdAccounts : prevAds.adAccounts || [];
         nextSettings.push({
           pageId: META_ADS_SETTINGS_KEY,
-          adsAccessToken: finalAdsToken ? await encryptFacebookToken(finalAdsToken, c.env) : prevAds.adsAccessToken || null,
+          adsAccessToken: finalAdsToken ? await encryptFacebookToken(finalAdsToken, c.env) : null,
+          adsVerified: Boolean(finalAdsToken),
           adAccounts: nextAdAccounts,
           updatedAt: new Date().toISOString(),
         });
@@ -558,6 +589,7 @@ users.post("/pages/connect-cookie", requireAuth, async (c) => {
       grantedPermissions: tokenPermissions,
       pagesCount: savedPages.length,
       pages: savedPages,
+      hasAdsToken: Boolean(finalAdsToken),
       adAccountsCount: resolvedAdAccounts.length,
       adAccounts: resolvedAdAccounts,
       message:

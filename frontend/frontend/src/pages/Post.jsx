@@ -71,6 +71,7 @@ export default function Post() {
     const [cta, setCta] = useState("LEARN_MORE");
     const [adAccounts, setAdAccounts] = useState([]);
     const [selectedAdAccount, setSelectedAdAccount] = useState("");
+    const [hasAdsToken, setHasAdsToken] = useState(false);
     const [isDarkPost, setIsDarkPost] = useState(false);
     const [canvases, setCanvases] = useState([]);
     const [canvasId, setCanvasId] = useState("");
@@ -189,18 +190,19 @@ export default function Post() {
                     const fetchedAdAccounts = Array.isArray(pagesRes.data.adAccounts) ? pagesRes.data.adAccounts : [];
                     setAvailablePages(accounts);
                     setAdAccounts(fetchedAdAccounts);
+                    setHasAdsToken(Boolean(pagesRes.data.hasAdsToken));
                     if (fetchedAdAccounts.length > 0) {
                         setSelectedAdAccount((prev) => prev || fetchedAdAccounts[0].id);
                     }
                     if (accounts.length > 0) {
+                        const enabledPages = accounts.filter(p => p.isSelected !== false && !p.isProfile);
                         setSelectedPages(prev => {
                             const validPrev = prev.filter(id => accounts.some(a => a.id === id));
                             if (validPrev.length > 0) return validPrev;
-                            const enabledPages = accounts.filter(p => p.isSelected !== false && !p.isProfile);
                             if (enabledPages.length > 0) return enabledPages.map(p => p.id);
                             return [accounts[0].id];
                         });
-                        const firstPage = accounts[0];
+                        const firstPage = enabledPages[0] || accounts.find((a) => !a.isProfile) || accounts[0];
                         setHeadline(prev => prev || firstPage.name);
                         setTargetLink(prev => prev || firstPage.link || `https://facebook.com/${firstPage.id}`);
                     }
@@ -623,10 +625,12 @@ export default function Post() {
             return toast.error("សូមសរសេរអត្ថបទ ឬបញ្ចូល Link URL ជាមុនសិន!");
         }
 
-        if (activeFormatMeta.needsAdAccount && !selectedAdAccount) {
+        if (activeFormatMeta.needsAdAccount && (!selectedAdAccount || !hasAdsToken)) {
             return toast.error(
-                "ទម្រង់ PE / CTA ត្រូវការ Ad Account — សូមបើក adsmanager.facebook.com លើ Chrome រួច Sync Extension v2.2.0 ក្នុងទំព័រ 'ភ្ជាប់ផេក'!",
-                { duration: 7000 }
+                !selectedAdAccount
+                    ? "ទម្រង់ PE / CTA ត្រូវការ Ad Account — សូមបើក adsmanager.facebook.com លើ Chrome រួច Sync Extension v2.2.1 ក្នុងទំព័រ 'ភ្ជាប់ផេក'!"
+                    : "ខ្វះ EAAB Ads Token ពី adsmanager.facebook.com — សូមបើក adsmanager.facebook.com លើ Chrome រួចចុច Sync Extension v2.2.1 ក្នុងទំព័រ 'ភ្ជាប់ផេក'!",
+                { duration: 7500 }
             );
         }
 
@@ -1007,20 +1011,28 @@ export default function Post() {
                                         💳 ជ្រើសរើស Ad Account សម្រាប់ {activeFormatMeta.label}
                                     </div>
                                     {adAccounts.length > 0 ? (
-                                        <select
-                                            value={selectedAdAccount}
-                                            onChange={(e) => setSelectedAdAccount(e.target.value)}
-                                            className="w-full sm:max-w-sm bg-white dark:bg-gray-900 border border-blue-500/30 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 dark:text-white outline-none"
-                                        >
-                                            {adAccounts.map((acc) => (
-                                                <option key={acc.id} value={acc.id}>
-                                                    {acc.name} ({acc.id} • {acc.currency})
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <div className="space-y-1.5">
+                                            <select
+                                                value={selectedAdAccount}
+                                                onChange={(e) => setSelectedAdAccount(e.target.value)}
+                                                className="w-full sm:max-w-sm bg-white dark:bg-gray-900 border border-blue-500/30 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 dark:text-white outline-none"
+                                            >
+                                                {adAccounts.map((acc) => (
+                                                    <option key={acc.id} value={acc.id}>
+                                                        {acc.name} ({acc.id} • {acc.currency})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {!hasAdsToken && (
+                                                <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                                                    ⚠️ រកឃើញ Ad Account តែខ្វះ EAAB Ads Token — សូមបើក <code>adsmanager.facebook.com</code> លើ Chrome រួចចុច Sync Extension v2.2.1 ក្នុង{" "}
+                                                    <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link>!
+                                                </p>
+                                            )}
+                                        </div>
                                     ) : (
                                         <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                                            មិនទាន់ឃើញ Ad Account ទេ — សូមបើក <code>adsmanager.facebook.com</code> លើ Chrome រួចចុច Sync Extension v2.2.0 ក្នុង{" "}
+                                            មិនទាន់ឃើញ Ad Account ទេ — សូមបើក <code>adsmanager.facebook.com</code> លើ Chrome រួចចុច Sync Extension v2.2.1 ក្នុង{" "}
                                             <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link>!
                                         </p>
                                     )}

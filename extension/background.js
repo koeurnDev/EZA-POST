@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Facebook Sync Extension — Background Service Worker (v2.2.0)
+ * ⚡ EZA-POST Facebook Sync Extension — Background Service Worker (v2.2.1)
  * ============================================================
  */
 
@@ -18,46 +18,101 @@ function extractAllTokensFromText(text) {
 async function validateAdsToken(token) {
   if (!token || typeof token !== "string") return null;
   try {
-    const url = `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,account_id,name,account_status,currency&limit=50&access_token=${encodeURIComponent(token)}`;
-    const res = await fetch(url).catch(() => null);
-    if (!res?.ok) return null;
-    const data = await res.json().catch(() => ({}));
-    if (!Array.isArray(data?.data)) return null;
-    return data.data.map((acc) => ({
-      id: String(acc.id || `act_${acc.account_id}`),
-      accountId: String(acc.account_id || String(acc.id || "").replace(/^act_/, "")),
-      name: String(acc.name || `Ad Account ${acc.account_id || acc.id}`),
-      currency: acc.currency || "USD",
-      status: Number(acc.account_status || 1)
-    }));
+    const [accRes, permRes] = await Promise.all([
+      fetch(
+        `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,account_id,name,account_status,currency&limit=50&access_token=${encodeURIComponent(token)}`
+      ).catch(() => null),
+      fetch(
+        `https://graph.facebook.com/v21.0/me/permissions?access_token=${encodeURIComponent(token)}`
+      ).catch(() => null)
+    ]);
+    if (!accRes?.ok) return null;
+    const accData = await accRes.json().catch(() => ({}));
+    if (!Array.isArray(accData?.data)) return null;
+
+    const permData = permRes?.ok ? await permRes.json().catch(() => ({})) : {};
+    const granted = Array.isArray(permData?.data)
+      ? permData.data.filter((p) => p?.status === "granted").map((p) => p.permission)
+      : [];
+    const hasAdsManage = token.startsWith("EAAB") || granted.includes("ads_management");
+
+    return {
+      accounts: accData.data.map((acc) => ({
+        id: String(acc.id || `act_${acc.account_id}`),
+        accountId: String(acc.account_id || String(acc.id || "").replace(/^act_/, "")),
+        name: String(acc.name || `Ad Account ${acc.account_id || acc.id}`),
+        currency: acc.currency || "USD",
+        status: Number(acc.account_status || 1)
+      })),
+      hasAdsManage,
+      isEaab: token.startsWith("EAAB")
+    };
   } catch {
     return null;
   }
 }
 
-async function extractAdsContext(seedTokens = []) {
-  const candidates = [];
-  const seen = new Set();
-  const addCandidate = (tok) => {
-    if (tok && typeof tok === "string" && /^EAA[A-Za-z0-9_-]{40,}$/.test(tok) && !seen.has(tok)) {
-      seen.add(tok);
-      candidates.push(tok);
+async function extractAdsTokensFromOpenAdsTabs() {
+  const found = [];
+  try {
+    const adsTabs = await chrome.tabs.query({
+      url: ["*://adsmanager.facebook.com/*", "*://*.facebook.com/adsmanager/*", "*://*.facebook.com/ads/manager/*"]
+    });
+    for (const tab of adsTabs.slice(0, 2)) {
+      if (!tab?.id || !chrome.scripting) continue;
+      const injected = await chrome.scripting
+        .executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            const out = [];
+            try {
+              if (typeof window.__accessToken === "string") out.push(window.__accessToken);
+            } catch {}
+            const html = document.documentElement?.innerHTML || "";
+            const matches = html.replace(/\\\//g, "/").match(/EAA[A-Za-z0-9_-]{40,}/g) || [];
+            for (const m of matches) out.push(m);
+            return Array.from(new Set(out));
+          }
+        })
+        .catch(() => null);
+      if (Array.isArray(injected?.[0]?.result)) {
+        found.push(...injected[0].result);
+      }
     }
-  };
+  } catch {}
+  return found;
+}
 
-  seedTokens.filter((t) => typeof t === "string" && t.startsWith("EAAB")).forEach(addCandidate);
-  seedTokens.forEach(addCandidate);
+async function extractAdsContext(seedTokens = []) {
+  let fallbackAccounts = [];
+  const seen = new Set();
+  const openAdsTokens = await extractAdsTokensFromOpenAdsTabs();
+  const initialPool = [...openAdsTokens, ...seedTokens].filter(
+    (t) => typeof t === "string" && /^EAA[A-Za-z0-9_-]{40,}$/.test(t)
+  );
+  const prioritized = [
+    ...initialPool.filter((t) => t.startsWith("EAAB")),
+    ...initialPool.filter((t) => !t.startsWith("EAAB"))
+  ];
 
-  for (const tok of candidates) {
-    const accounts = await validateAdsToken(tok);
-    if (accounts && (accounts.length > 0 || tok.startsWith("EAAB"))) {
-      return { adsToken: tok, adAccounts: accounts };
+  for (const tok of prioritized) {
+    if (seen.has(tok)) continue;
+    seen.add(tok);
+    const info = await validateAdsToken(tok);
+    if (!info) continue;
+    if (info.accounts.length > 0 && fallbackAccounts.length === 0) {
+      fallbackAccounts = info.accounts;
+    }
+    if (info.hasAdsManage) {
+      return { adsToken: tok, adAccounts: info.accounts };
     }
   }
 
   const adsEndpoints = [
     "https://adsmanager.facebook.com/adsmanager/manage/campaigns",
-    "https://www.facebook.com/adsmanager/manage/campaigns"
+    "https://www.facebook.com/adsmanager/manage/campaigns",
+    "https://www.facebook.com/ads/manager/account_settings/account_billing/",
+    "https://adsmanager.facebook.com/adsmanager/"
   ];
   for (const [idx, url] of adsEndpoints.entries()) {
     if (idx > 0) await sleep(350);
@@ -71,20 +126,24 @@ async function extractAdsContext(seedTokens = []) {
       const ranked = [
         ...tokens.filter((t) => t.startsWith("EAAB")),
         ...tokens.filter((t) => !t.startsWith("EAAB"))
-      ].slice(0, 3);
+      ].slice(0, 6);
 
       for (const tok of ranked) {
         if (seen.has(tok)) continue;
         seen.add(tok);
-        const accounts = await validateAdsToken(tok);
-        if (accounts) {
-          return { adsToken: tok, adAccounts: accounts };
+        const info = await validateAdsToken(tok);
+        if (!info) continue;
+        if (info.accounts.length > 0 && fallbackAccounts.length === 0) {
+          fallbackAccounts = info.accounts;
+        }
+        if (info.hasAdsManage) {
+          return { adsToken: tok, adAccounts: info.accounts.length > 0 ? info.accounts : fallbackAccounts };
         }
       }
     } catch {}
   }
 
-  return { adsToken: null, adAccounts: [] };
+  return { adsToken: null, adAccounts: fallbackAccounts };
 }
 
 function extractTokenFromText(text) {
@@ -575,7 +634,7 @@ async function getFullFacebookSyncPayload() {
     const payload = {
       ...session,
       accessToken,
-      adsToken: adsCtx.adsToken || (adsCtx.adAccounts.length > 0 ? accessToken : null),
+      adsToken: adsCtx.adsToken || null,
       adAccounts: adsCtx.adAccounts || [],
       fbUser,
       pages: Array.from(pagesMap.values())
@@ -845,17 +904,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.action) return false;
 
   if (message.action === "CHECK_FB_STATUS") {
+    const extVer = chrome?.runtime?.getManifest?.()?.version || "2.2.1";
     getFacebookSessionData()
       .then((data) => {
         sendResponse({
           installed: true,
-          version: "2.2.0",
+          version: extVer,
           fbLoggedIn: Boolean(data?.fbLoggedIn),
           fbUserId: data?.fbUserId || null
         });
       })
       .catch(() => {
-        sendResponse({ installed: true, version: "2.2.0", fbLoggedIn: false, fbUserId: null });
+        sendResponse({ installed: true, version: extVer, fbLoggedIn: false, fbUserId: null });
       });
     return true;
   }

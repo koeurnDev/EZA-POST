@@ -29,9 +29,11 @@ export async function resolveMetaAdsFromSettings(pageSettings, env) {
   if (entry?.adsAccessToken) {
     try {
       const dec = await decryptFacebookToken(entry.adsAccessToken, env);
-      if (isFbToken(dec)) adsToken = dec.trim();
+      if (isFbToken(dec) && (dec.startsWith("EAAB") || entry.adsVerified === true)) adsToken = dec.trim();
     } catch {
-      if (isFbToken(entry.adsAccessToken)) adsToken = entry.adsAccessToken.trim();
+      if (isFbToken(entry.adsAccessToken) && (entry.adsAccessToken.startsWith("EAAB") || entry.adsVerified === true)) {
+        adsToken = entry.adsAccessToken.trim();
+      }
     }
   }
   return {
@@ -354,44 +356,78 @@ function buildCallToActionSpec(cta, link, pageId) {
 
 async function uploadAdAccountVideo(actId, adsToken, videoUrl, env) {
   assertValidMediaUrl(videoUrl, "video");
-  const endpoint = `https://graph-video.facebook.com/${graphApiVersion}/${encodeURIComponent(actId)}/advideos`;
-  const uploaded = await uploadFacebookMedia(endpoint, endpoint, videoUrl, { access_token: adsToken }, "file_url", env);
+  const binaryEndpoint = `https://graph-video.facebook.com/${graphApiVersion}/${encodeURIComponent(actId)}/advideos`;
+  const urlEndpoint = `https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(actId)}/advideos`;
+  const uploaded = await uploadFacebookMedia(binaryEndpoint, urlEndpoint, videoUrl, { access_token: adsToken }, "file_url", env);
   return String(uploaded.id);
 }
 
 async function uploadAdAccountImage(actId, adsToken, imageUrl, env) {
+  let bytes = null;
+  let contentType = "image/jpeg";
+  let filename = "image.jpg";
+
   if (env?.MEDIA_BUCKET && typeof imageUrl === "string") {
     const key = parseR2MediaKey(imageUrl);
     if (key) {
       const object = await env.MEDIA_BUCKET.get(key);
       if (object) {
-        const bytes = await object.arrayBuffer();
-        const contentType = object.httpMetadata?.contentType || "image/jpeg";
-        const filename = key.split("/").pop() || "image.jpg";
-        const form = new FormData();
-        form.set("access_token", adsToken);
-        form.set("filename", new Blob([bytes], { type: contentType }), filename);
-        const res = await fetch(`https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(actId)}/adimages`, {
-          method: "POST",
-          body: form,
-        });
-        const data = await res.json().catch(() => ({}));
-        const firstImg = data?.images ? Object.values(data.images)[0] : null;
-        if (firstImg?.hash) {
-          return { hash: firstImg.hash, url: firstImg.url || imageUrl };
-        }
+        bytes = await object.arrayBuffer();
+        contentType = object.httpMetadata?.contentType || "image/jpeg";
+        filename = key.split("/").pop() || "image.jpg";
       }
     }
+  }
+  if (!bytes && typeof imageUrl === "string" && imageUrl.startsWith("https://")) {
+    try {
+      const imgRes = await fetch(imageUrl, { redirect: "follow" });
+      if (imgRes.ok) {
+        const fetchedType = imgRes.headers.get("Content-Type") || "";
+        if (fetchedType.startsWith("image/")) {
+          bytes = await imgRes.arrayBuffer();
+          contentType = fetchedType.split(";")[0];
+        }
+      }
+    } catch {}
+  }
+
+  if (bytes && bytes.byteLength > 0) {
+    try {
+      const form = new FormData();
+      form.set("access_token", adsToken);
+      form.set("filename", new Blob([bytes], { type: contentType }), filename);
+      const res = await fetch(`https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(actId)}/adimages`, {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json().catch(() => ({}));
+      const firstImg = data?.images ? Object.values(data.images)[0] : null;
+      if (firstImg?.hash) {
+        return { hash: firstImg.hash, url: firstImg.url || imageUrl };
+      }
+    } catch {}
   }
   return { hash: null, url: imageUrl };
 }
 
+async function resolvePageTokenViaAdsToken(pageId, adsToken) {
+  try {
+    const res = await graphRequest(encodeURIComponent(pageId), {
+      fields: "access_token",
+      access_token: adsToken,
+    });
+    return isFbToken(res?.access_token) ? res.access_token.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 async function publishAdCreativePost(pageId, pageToken, post, metaCfg, realCards, page, env) {
-  const adsToken = post._adsContext?.adsToken || pageToken;
+  const adsToken = post._adsContext?.adsToken;
   const rawAccountId = metaCfg.adAccountId || post._adsContext?.adAccounts?.[0]?.id;
   if (!rawAccountId || !isFbToken(adsToken)) {
     throw new Error(
-      "ទម្រង់ PE / CTA ត្រូវការ Ad Account និង Ads Token (EAAB) — សូមបើក adsmanager.facebook.com លើ Chrome រួចចុច Sync Extension v2.2.0 ឡើងវិញ!"
+      "ទម្រង់ PE / CTA ត្រូវការ EAAB Ads Token និង Ad Account — សូមបើក adsmanager.facebook.com លើ Chrome រួចចុច Sync Extension v2.2.1 ឡើងវិញ!"
     );
   }
   const actId = String(rawAccountId).startsWith("act_") ? String(rawAccountId) : `act_${rawAccountId}`;
@@ -409,6 +445,7 @@ async function publishAdCreativePost(pageId, pageToken, post, metaCfg, realCards
     if (!videoSrc) throw new Error("Video CTA តម្រូវឱ្យដាក់វីដេអូ។");
     const videoId = await uploadAdAccountVideo(actId, adsToken, videoSrc, env);
     const thumbUrl = post.thumbnailUrl || metaCfg.thumbnailUrl || pageFallbackPic;
+    const thumbAsset = await uploadAdAccountImage(actId, adsToken, thumbUrl, env);
     objectStorySpec = {
       page_id: String(pageId),
       video_data: {
@@ -416,7 +453,7 @@ async function publishAdCreativePost(pageId, pageToken, post, metaCfg, realCards
         message: post.caption || "",
         title: metaCfg.headline || page.name || "",
         link_description: metaCfg.description || "",
-        image_url: thumbUrl,
+        ...(thumbAsset.hash ? { image_hash: thumbAsset.hash } : { image_url: thumbAsset.url }),
         ...(ctaSpec ? { call_to_action: ctaSpec } : {}),
       },
     };
@@ -453,9 +490,10 @@ async function publishAdCreativePost(pageId, pageToken, post, metaCfg, realCards
       if (card.type === "video") {
         const videoId = await uploadAdAccountVideo(actId, adsToken, card.mediaUrl, env);
         const thumb = post.thumbnailUrl || metaCfg.thumbnailUrl || pageFallbackPic;
+        const thumbAsset = await uploadAdAccountImage(actId, adsToken, thumb, env);
         childAttachments.push({
           video_id: videoId,
-          picture: thumb,
+          ...(thumbAsset.hash ? { image_hash: thumbAsset.hash } : { picture: thumbAsset.url }),
           link: cardLink,
           name: card.headline || metaCfg.headline || page.name || "",
           description: card.description || metaCfg.description || "",
@@ -463,7 +501,7 @@ async function publishAdCreativePost(pageId, pageToken, post, metaCfg, realCards
         });
       } else {
         const picUrl = card.isPageCard ? pageFallbackPic : card.mediaUrl;
-        const imgAsset = card.isPageCard ? { hash: null, url: picUrl } : await uploadAdAccountImage(actId, adsToken, picUrl, env);
+        const imgAsset = await uploadAdAccountImage(actId, adsToken, picUrl, env);
         childAttachments.push({
           ...(imgAsset.hash ? { image_hash: imgAsset.hash } : { picture: imgAsset.url }),
           link: cardLink,
@@ -497,14 +535,29 @@ async function publishAdCreativePost(pageId, pageToken, post, metaCfg, realCards
   const storyId = String(creativeInfo.effective_object_story_id || creativeRes.id);
 
   if (!metaCfg.isDarkPost && creativeInfo.effective_object_story_id) {
-    try {
-      await graphPost(`https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(storyId)}`, {
-        access_token: pageToken,
-        is_published: "true",
-      });
-    } catch (pubErr) {
+    const tokensToTry = [pageToken];
+    const adsScopedPageToken = await resolvePageTokenViaAdsToken(pageId, adsToken);
+    if (adsScopedPageToken && adsScopedPageToken !== pageToken) tokensToTry.push(adsScopedPageToken);
+    if (adsToken !== pageToken) tokensToTry.push(adsToken);
+
+    let publishedOk = false;
+    let lastPubErr = null;
+    for (const tok of tokensToTry) {
+      if (!isFbToken(tok)) continue;
+      try {
+        await graphPost(`https://graph.facebook.com/${graphApiVersion}/${encodeURIComponent(storyId)}`, {
+          access_token: tok,
+          is_published: "true",
+        });
+        publishedOk = true;
+        break;
+      } catch (pubErr) {
+        lastPubErr = pubErr;
+      }
+    }
+    if (!publishedOk) {
       throw new Error(
-        `បានបង្កើត Dark Post (${storyId}) ក្នុង Ads Manager ជោគជ័យ ប៉ុន្តែ Meta មិនអនុញ្ញាតឱ្យបើកឡើង Timeline ដោយផ្ទាល់ទេ (${pubErr?.message}) — សូមជ្រើសរើស 'Dark Post (PE)'។`
+        `បានបង្កើត Dark Post (${storyId}) ក្នុង Ads Manager ជោគជ័យ ប៉ុន្តែ Meta មិនអនុញ្ញាតឱ្យបើកឡើង Timeline ដោយផ្ទាល់ទេ (${lastPubErr?.message || "Unknown"}) — សូមជ្រើសរើស 'Dark Post (PE)'។`
       );
     }
   }
@@ -756,7 +809,8 @@ async function uploadFacebookMedia(binaryEndpoint, urlEndpoint, mediaUrl, fields
             subcode: binErr?.error_subcode,
             message: binErr?.message,
           });
-          if (isFacebookHardStopError(binErr) && !(fields?.published === "false" && Number(binErr?.code) === 100)) {
+          const isAdVideoUpload = String(binaryEndpoint).includes("/advideos");
+          if (isFacebookHardStopError(binErr) && !(fields?.published === "false" && Number(binErr?.code) === 100) && !isAdVideoUpload) {
             const code = Number(binErr?.code);
             let hint;
             if (code === 190 || code === 368 || code === 459) {
@@ -768,6 +822,9 @@ async function uploadFacebookMedia(binaryEndpoint, urlEndpoint, mediaUrl, fields
             }
             throw new Error(`${binErrSummary}${hint}`);
           }
+          if (isAdVideoUpload && [190, 368, 459].includes(Number(binErr?.code))) {
+            throw new Error(`${binErrSummary} — សម័យ Ads Manager ផុតកំណត់ សូមបើក adsmanager.facebook.com ហើយ Sync Extension ថ្មី!`);
+          }
           // Try URL-based upload on binaryEndpoint (e.g. graph-video.facebook.com file_url) then urlEndpoint
           if (binaryEndpoint !== urlEndpoint) {
             try {
@@ -776,7 +833,9 @@ async function uploadFacebookMedia(binaryEndpoint, urlEndpoint, mediaUrl, fields
                 [urlFieldName]: mediaUrl,
               });
             } catch (videoUrlErr) {
-              if (isFacebookHardStopError(videoUrlErr)) throw videoUrlErr;
+              if (isFacebookHardStopError(videoUrlErr) && (!isAdVideoUpload || /FB #(190|368|459)\b/i.test(videoUrlErr?.message))) {
+                throw videoUrlErr;
+              }
               console.warn("Facebook binaryEndpoint file_url fallback failed:", videoUrlErr?.message);
             }
           }
@@ -786,7 +845,9 @@ async function uploadFacebookMedia(binaryEndpoint, urlEndpoint, mediaUrl, fields
               [urlFieldName]: mediaUrl,
             });
           } catch (urlErr) {
-            if (isFacebookHardStopError(urlErr)) throw urlErr;
+            if (isFacebookHardStopError(urlErr) && (!isAdVideoUpload || /FB #(190|368|459)\b/i.test(urlErr?.message))) {
+              throw urlErr;
+            }
             // Last-resort 3-phase Resumable Video Upload on graph-video.facebook.com
             let resumableSummary = "";
             if (urlFieldName === "file_url" && fields?.published !== "false" && bytes?.byteLength > 0) {
@@ -798,8 +859,11 @@ async function uploadFacebookMedia(binaryEndpoint, urlEndpoint, mediaUrl, fields
               }
             }
             const combined = `${urlErr?.message || "Facebook upload failed."} [binary: ${binErrSummary}]${resumableSummary}`;
+            const isAdvideos = String(binaryEndpoint).includes("/advideos");
             const hint = /FB #(190|368|459)\b/i.test(combined)
               ? " — សម័យ Facebook ផុតកំណត់ ឬជាប់ការពារសុវត្ថិភាព (សូមឈប់ផុសមួយរយៈ ហើយ Sync Extension ថ្មី)"
+              : isAdvideos && /FB #(1|200)\b|Invalid request/i.test(combined)
+              ? " — Meta បដិសេធ Ad Account Video upload (/advideos): ត្រូវការ EAAB Ads Token ពី adsmanager.facebook.com និង Ad Account ដែលដំណើរការធម្មតា។ សូមបើក adsmanager.facebook.com លើ Chrome រួចចុច Sync Extension v2.2.1!"
               : /FB #(1|200)\b|Invalid request/i.test(combined)
               ? " — Meta Graph API បដិសេធ Token នេះដោយសារខ្វះសិទ្ធិផុសផ្លូវការ (publish_video / pages_manage_posts) — ត្រូវការ Facebook Login (OAuth App)"
               : "";

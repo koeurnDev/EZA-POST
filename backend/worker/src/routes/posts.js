@@ -469,7 +469,7 @@ posts.post("/mixed-carousel", requireAuth, async (c) => {
     }
     const metaConfigEntry = {
       isMetaConfig: true,
-      format: form.get("adAccountId") ? "video_pe" : "carousel",
+      format: form.get("postFormat") === "video_pe" || form.get("adAccountId") ? "video_pe" : "carousel",
       adAccountId: String(form.get("adAccountId") || "").trim(),
       isDarkPost: form.get("isDarkPost") === "true",
       link: String(form.get("targetLink") || "").trim(),

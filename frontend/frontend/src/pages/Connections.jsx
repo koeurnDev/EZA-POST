@@ -34,6 +34,7 @@ export default function Connections() {
     const [loading, setLoading] = useState(true);
     const [pages, setPages] = useState([]);
     const [adAccounts, setAdAccounts] = useState([]);
+    const [hasAdsToken, setHasAdsToken] = useState(false);
     const [isLoadingPages, setIsLoadingPages] = useState(false);
     const [expandedPageId, setExpandedPageId] = useState(null);
 
@@ -102,6 +103,7 @@ export default function Connections() {
                     if (res.data?.success) {
                         const total = res.data.pagesCount ?? (res.data.pages?.length || 0);
                         const adsCount = res.data.adAccountsCount ?? (res.data.adAccounts?.length || 0);
+                        const adsReady = Boolean(res.data.hasAdsToken);
                         const countText = total > 0 ? `${total} គោលដៅ${adsCount > 0 ? ` និង ${adsCount} Ad Accounts` : ""}` : "គណនី Facebook";
                         if (res.data.hasPublishToken === false) {
                             toast(res.data.message || "ទាញបញ្ជីផេកបាន តែខ្វះ Access Token (EAA...) សម្រាប់ផុស!", {
@@ -110,6 +112,11 @@ export default function Connections() {
                             });
                         } else if (res.data.hasPublishPermissions === false) {
                             toast(res.data.message || "Token ពី Extension អាចខ្វះសិទ្ធិផុសវីដេអូ — សូមផ្ទុក Extension ថ្មីឡើងវិញ!", {
+                                icon: "⚠️",
+                                duration: 8000
+                            });
+                        } else if (adsCount > 0 && !adsReady) {
+                            toast(`បានភ្ជាប់ ${countText} ប៉ុន្តែមិនទាន់រកឃើញ EAAB Ads Token — សូមបើក adsmanager.facebook.com រួច Sync ម្តងទៀតដើម្បីប្រើ PE/CTA!`, {
                                 icon: "⚠️",
                                 duration: 8000
                             });
@@ -155,6 +162,7 @@ export default function Connections() {
                 const uniquePages = Array.from(new Map((res.data.accounts || []).map((p) => [p.id, p])).values());
                 setPages(uniquePages);
                 setAdAccounts(Array.isArray(res.data.adAccounts) ? res.data.adAccounts : []);
+                setHasAdsToken(Boolean(res.data.hasAdsToken));
                 if (isManual) toast.success("បានធ្វើបច្ចុប្បន្នភាពបញ្ជីផេកជោគជ័យ!", { id: "fetch-pages" });
             }
         } catch (err) {
@@ -171,7 +179,7 @@ export default function Connections() {
             extensionInstalled || document.documentElement.getAttribute("data-eza-extension") === "installed";
 
         if (!isDomInstalled) {
-            toast("សូមទាញយក និងដំឡើង EZA-POST Extension v2.2.0 ជាមុនសិន (បើដំឡើងរួច សូមចុច Refresh F5 ម្តង)!", {
+            toast("សូមទាញយក និងដំឡើង EZA-POST Extension v2.2.1 ជាមុនសិន (បើដំឡើងរួច សូមចុច Refresh F5 ម្តង)!", {
                 icon: "🧩",
                 duration: 5500
             });
@@ -265,17 +273,24 @@ export default function Connections() {
                                     <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer">
                                         មានគោលដៅសរុប <strong className="text-emerald-600 dark:text-emerald-400">{pages.length}</strong>
                                         {adAccounts.length > 0 && (
-                                            <> • <strong className="text-blue-600 dark:text-blue-400">{adAccounts.length}</strong> Ad Accounts (PE / CTA Ready)</>
+                                            <>
+                                                {" "}• <strong className="text-blue-600 dark:text-blue-400">{adAccounts.length}</strong> Ad Accounts{" "}
+                                                {hasAdsToken ? (
+                                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">(PE / CTA Ready)</span>
+                                                ) : (
+                                                    <span className="text-amber-600 dark:text-amber-400 font-bold">(ខ្វះ EAAB Ads Token — បើក adsmanager.facebook.com រួច Sync ឡើងវិញ!)</span>
+                                                )}
+                                            </>
                                         )}
                                     </p>
-                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.0") && (
+                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.1") && (
                                         <a
                                             href="/eza-post-fb-extension.zip"
                                             download="EZA-POST-FB-Extension.zip"
                                             className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition font-khmer"
                                         >
                                             <Download size={11} />
-                                            <span>Extension កំណែចាស់ — ទាញយក v2.2.0 ថ្មី</span>
+                                            <span>Extension កំណែចាស់ — ទាញយក v2.2.1 ថ្មី</span>
                                         </a>
                                     )}
                                 </div>
@@ -341,14 +356,14 @@ export default function Connections() {
                                         </span>
                                     </span>
 
-                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.0") && (
+                                    {extensionInstalled && (!extensionVersion || extensionVersion !== "2.2.1") && (
                                         <a
                                             href="/eza-post-fb-extension.zip"
                                             download="EZA-POST-FB-Extension.zip"
                                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition font-khmer"
                                         >
                                             <Download size={12} />
-                                            <span>អាប់ដេតទៅ v2.2.0 (គាំទ្រ Ads & PE/CTA)</span>
+                                            <span>អាប់ដេតទៅ v2.2.1 (គាំទ្រ Ads & PE/CTA)</span>
                                         </a>
                                     )}
 

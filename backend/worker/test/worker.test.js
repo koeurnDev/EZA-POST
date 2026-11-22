@@ -2533,3 +2533,88 @@ test("Hono edge live-stream creates RTMP stream URL without requiring BACKEND_OR
     globalThis.fetch = originalFetch;
   }
 });
+
+test("Facebook publisher Video PE rejects missing EAAB adsToken and succeeds with advideos file_url fallback", async () => {
+  await assert.rejects(
+    publishFacebookPost(
+      "282987781568016",
+      "EAAG-page-token-012345678901234567890123456789",
+      {
+        postType: "carousel",
+        videoUrl: "https://moneaa.site/api/v1/media/demo.mp4",
+        carouselCards: [
+          { isMetaConfig: true, format: "video_pe", adAccountId: "act_999111" },
+          { id: "video-main", type: "video", mediaUrl: "https://moneaa.site/api/v1/media/demo.mp4" },
+          { id: "card-destination-final", type: "image", isPageCard: true },
+        ],
+      },
+      { name: "Demo Page" },
+      {}
+    ),
+    /EAAB Ads Token/i
+  );
+
+  const originalFetch = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, options) => {
+    const strUrl = String(url);
+    if (strUrl.includes("graph-video.facebook.com") && strUrl.includes("/advideos")) {
+      if (options?.body instanceof FormData) {
+        seen.push("advideos:binary-fail");
+        return Response.json({ error: { code: 100, message: "Invalid parameter" } }, { status: 400 });
+      }
+      seen.push("advideos:file_url");
+      return Response.json({ id: "ad-vid-pe-1" });
+    }
+    if (strUrl.includes("/adimages")) {
+      seen.push("adimages");
+      return Response.json({ images: { "thumb.jpg": { hash: "hash-thumb-1" } } });
+    }
+    if (strUrl.includes("/adcreatives")) {
+      const form = new URLSearchParams(options.body);
+      const spec = JSON.parse(form.get("object_story_spec"));
+      seen.push(`adcreatives:${spec.link_data.child_attachments.length}`);
+      return Response.json({ id: "creative-pe-2" });
+    }
+    if (strUrl.includes("/creative-pe-2")) {
+      return Response.json({ effective_object_story_id: "282987781568016_999001" });
+    }
+    if (strUrl.includes("/282987781568016_999001")) {
+      return Response.json({ id: "282987781568016_999001", success: true });
+    }
+    return Response.json({ ok: true }, { status: 200 });
+  };
+
+  try {
+    const fakeBucket = {
+      get: async (key) => ({
+        arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+        httpMetadata: { contentType: key.endsWith(".mp4") ? "video/mp4" : "image/jpeg" },
+      }),
+    };
+    const storyId = await publishFacebookPost(
+      "282987781568016",
+      "EAAG-page-token-012345678901234567890123456789",
+      {
+        postType: "carousel",
+        caption: "PE test",
+        thumbnailUrl: "https://moneaa.site/api/v1/media/scheduled%2Fthumb.jpg",
+        carouselCards: [
+          { isMetaConfig: true, format: "video_pe", adAccountId: "act_999111", cta: "LEARN_MORE" },
+          { id: "video-main", type: "video", mediaUrl: "https://moneaa.site/api/v1/media/scheduled%2Fvid.mp4" },
+          { id: "card-destination-final", type: "image", isPageCard: true },
+        ],
+        _adsContext: {
+          adsToken: "EAAB-ads-token-012345678901234567890123456789",
+          adAccounts: [{ id: "act_999111" }],
+        },
+      },
+      { name: "Demo Page" },
+      { MEDIA_BUCKET: fakeBucket }
+    );
+    assert.equal(storyId, "282987781568016_999001");
+    assert.deepEqual(seen, ["advideos:binary-fail", "advideos:file_url", "adimages", "adcreatives:2"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
