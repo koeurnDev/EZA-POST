@@ -18,12 +18,12 @@ import { generateThumbnailFromVideo, generateGalleryFromVideo, dataURLtoFile } f
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/api$/, "");
 
 const POST_FORMATS = [
-    { id: "text_link", label: "📝 Text / Link", accept: "image/*" },
-    { id: "photos", label: "🖼️ Photos (1-10)", multiImage: true, accept: "image/*" },
-    { id: "video", label: "🎥 Videos", accept: "video/*", useBusinessSuite: true },
-    { id: "reels", label: "📱 Reels", accept: "video/*", useBusinessSuite: true },
     { id: "video_pe", label: "🎠 Video PE", needsAdAccount: true, accept: "video/*" },
+    { id: "video", label: "🎥 វីដេអូ", accept: "video/*", useBusinessSuite: true },
+    { id: "reels", label: "📱 Reels", accept: "video/*", useBusinessSuite: true },
+    { id: "photos", label: "🖼️ រូបភាព (1-10)", multiImage: true, accept: "image/*" },
     { id: "photo_pe", label: "🗂️ Photo PE", multiImage: true, needsAdAccount: true, accept: "image/*" },
+    { id: "text_link", label: "📝 អត្ថបទ / Link", accept: "image/*" },
     { id: "video_cta", label: "🎬 Video CTA", needsAdAccount: true, accept: "video/*" },
     { id: "photo_cta", label: "🏷️ Photo CTA", needsAdAccount: true, accept: "image/*" },
     { id: "instant_experience", label: "⚡ Instant Exp", needsAdAccount: true, accept: "image/*" },
@@ -45,14 +45,14 @@ function normalizePostFormat(fmt) {
     if (fmt === "single") return "video";
     if (fmt === "carousel") return "video_pe";
     if (POST_FORMATS.some((f) => f.id === fmt && !f.route)) return fmt;
-    return "video";
+    return "video_pe";
 }
 
 export default function Post() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const [postFormat, setPostFormat] = useState(() => normalizePostFormat(location.state?.postFormat || "video"));
+    const [postFormat, setPostFormat] = useState(() => normalizePostFormat(location.state?.postFormat || "video_pe"));
 
     const [file, setFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
@@ -1200,8 +1200,8 @@ export default function Post() {
                             </div>
                         )}
 
-                        {/* 10-Format Switcher (Tube2Post Parity) */}
-                        <div className="flex flex-wrap gap-1.5 p-1.5 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10">
+                        {/* 10-Format Smooth Horizontal Pill Switcher */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar p-1.5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-white/10 shadow-xs">
                             {POST_FORMATS.map((fmt) => {
                                 const isActive = postFormat === fmt.id;
                                 return (
@@ -1215,10 +1215,10 @@ export default function Post() {
                                             }
                                             setPostFormat(fmt.id);
                                         }}
-                                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                                             isActive
-                                                ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xs"
-                                                : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
+                                                ? "bg-blue-600 text-white shadow-sm"
+                                                : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
                                         }`}
                                     >
                                         <span>{fmt.label}</span>
@@ -1227,24 +1227,32 @@ export default function Post() {
                             })}
                         </div>
 
-                        {/* STEP 1: Select Destination Pages */}
-                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+                        {/* STEP 1: Instant 1-Tap Page Chips (No Clunky Dropdown Overlay) */}
+                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
                             <div className="flex items-center justify-between gap-2">
-                                <div>
+                                <div className="flex items-center gap-2">
                                     <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                                        ជំហានទី ១៖ ជ្រើសរើសផេក Facebook
+                                        ១. ជ្រើសរើសផេក Facebook
                                     </h3>
-                                    <p className="text-xs text-gray-500">រើសផេក ១ ឬច្រើនដែលអ្នកចង់ផុសចូល</p>
+                                    {availablePages.length > 0 && (
+                                        <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-bold">
+                                            {selectedPages.length}/{availablePages.length}
+                                        </span>
+                                    )}
                                 </div>
-                                {availablePages.length > 0 && (
-                                    <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-bold">
-                                        បានរើស {selectedPages.length}/{availablePages.length}
-                                    </span>
+                                {availablePages.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={toggleAllPages}
+                                        className="px-3 py-1 rounded-xl bg-blue-500/10 hover:bg-blue-600 text-blue-600 hover:text-white text-xs font-bold transition cursor-pointer"
+                                    >
+                                        {selectedPages.length === availablePages.length ? "រើសតែ ១" : "រើសទាំងអស់"}
+                                    </button>
                                 )}
                             </div>
 
                             {isLoadingPages ? (
-                                <div className="py-4 flex items-center gap-2 text-xs text-gray-400">
+                                <div className="py-3 flex items-center gap-2 text-xs text-gray-400">
                                     <Loader2 size={15} className="animate-spin" />
                                     <span>កំពុងទាញយកបញ្ជីផេក...</span>
                                 </div>
@@ -1262,112 +1270,58 @@ export default function Post() {
                                     </Link>
                                 </div>
                             ) : (
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsPageSelectorOpen(!isPageSelectorOpen)}
-                                        className="w-full bg-gray-50 dark:bg-black/60 border border-gray-200 dark:border-white/10 rounded-xl p-3.5 flex items-center justify-between hover:border-blue-500/40 transition cursor-pointer"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0">
-                                                {selectedPages.length}
-                                            </div>
-                                            <div className="text-left min-w-0">
-                                                <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">
-                                                    {selectedPages.length === 0
-                                                        ? "ចុចទីនេះដើម្បីជ្រើសរើសផេក..."
-                                                        : selectedPages.length === availablePages.length
-                                                            ? `បានជ្រើសរើសទាំងអស់ (${availablePages.length} ផេក)`
-                                                            : availablePages
-                                                                .filter(p => selectedPages.includes(p.id))
-                                                                .map(p => p.name)
-                                                                .join(", ")}
-                                                </p>
-                                            </div>
+                                <div className="space-y-2.5">
+                                    {availablePages.length > 6 && (
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                            <input
+                                                type="text"
+                                                placeholder="ស្វែងរកឈ្មោះផេក..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs font-medium outline-none focus:border-blue-500"
+                                            />
                                         </div>
-                                        <ChevronDown size={18} className={`text-gray-400 transition-transform shrink-0 ${isPageSelectorOpen ? "rotate-180" : ""}`} />
-                                    </button>
-
-                                    <AnimatePresence>
-                                        {isPageSelectorOpen && (
-                                            <motion.div
-                                                initial={{ opacity: 0, y: 6 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: 6 }}
-                                                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                                            >
-                                                <div className="p-3 border-b border-gray-100 dark:border-white/5 flex items-center gap-2">
-                                                    <div className="relative flex-1">
-                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                                                        <input
-                                                            type="text"
-                                                            placeholder="ស្វែងរកឈ្មោះផេក..."
-                                                            value={searchQuery}
-                                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                                            className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs font-medium outline-none focus:border-blue-500"
-                                                            autoFocus
+                                    )}
+                                    <div className="flex flex-wrap gap-2">
+                                        {availablePages
+                                            .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                                            .map((page) => {
+                                                const isSelected = selectedPages.includes(page.id);
+                                                return (
+                                                    <button
+                                                        key={page.id}
+                                                        type="button"
+                                                        onClick={() => handlePageSelection(page.id)}
+                                                        className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all cursor-pointer ${
+                                                            isSelected
+                                                                ? "bg-blue-600/10 border-blue-600 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600/30"
+                                                                : "bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-blue-500/40"
+                                                        }`}
+                                                    >
+                                                        <img
+                                                            src={page.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(page.name)}`}
+                                                            alt={page.name}
+                                                            className="w-7 h-7 rounded-full object-cover shrink-0 border border-white/20"
                                                         />
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={toggleAllPages}
-                                                        className="px-3 py-2 bg-blue-600/10 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-600 hover:text-white transition whitespace-nowrap cursor-pointer"
-                                                    >
-                                                        {selectedPages.length === availablePages.length ? "រើសតែ ១" : "រើសទាំងអស់"}
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs font-bold truncate max-w-[150px] sm:max-w-[180px]">
+                                                                {page.name}
+                                                            </p>
+                                                        </div>
+                                                        <div
+                                                            className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                                                isSelected
+                                                                    ? "bg-blue-600 text-white"
+                                                                    : "border border-gray-300 dark:border-gray-600 text-transparent"
+                                                            }`}
+                                                        >
+                                                            ✓
+                                                        </div>
                                                     </button>
-                                                </div>
-
-                                                <div className="max-h-72 overflow-y-auto p-2 space-y-1">
-                                                    {availablePages
-                                                        .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                                                        .map(page => {
-                                                            const isSelected = selectedPages.includes(page.id);
-                                                            return (
-                                                                <div
-                                                                    key={page.id}
-                                                                    onClick={() => handlePageSelection(page.id)}
-                                                                    className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition ${
-                                                                        isSelected ? "bg-blue-500/10" : "hover:bg-gray-50 dark:hover:bg-white/5"
-                                                                    }`}
-                                                                >
-                                                                    <div className="flex items-center gap-2.5 min-w-0">
-                                                                        <img
-                                                                            src={page.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(page.name)}`}
-                                                                            alt={page.name}
-                                                                            className="w-8 h-8 rounded-full object-cover shrink-0"
-                                                                        />
-                                                                        <div className="min-w-0">
-                                                                            <p className={`text-xs sm:text-sm font-bold truncate ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-white"}`}>
-                                                                                {page.name}
-                                                                            </p>
-                                                                            <span className={`text-[10px] font-semibold ${page.isProfile || page.category === "គណនីផ្ទាល់ខ្លួន" ? "text-purple-500" : "text-gray-400"}`}>
-                                                                                {page.isProfile || page.category === "គណនីផ្ទាល់ខ្លួន" ? "គណនីផ្ទាល់ខ្លួន" : "ផេក Facebook"}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={isSelected}
-                                                                        onChange={() => {}}
-                                                                        className="w-4 h-4 rounded text-blue-600 pointer-events-none"
-                                                                    />
-                                                                </div>
-                                                            );
-                                                        })}
-                                                </div>
-
-                                                <div className="p-2.5 border-t border-gray-100 dark:border-white/5">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setIsPageSelectorOpen(false)}
-                                                        className="w-full py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold text-xs cursor-pointer"
-                                                    >
-                                                        រួចរាល់
-                                                    </button>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
+                                                );
+                                            })}
+                                    </div>
                                 </div>
                             )}
                         </div>

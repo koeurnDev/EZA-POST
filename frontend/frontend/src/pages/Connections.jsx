@@ -103,33 +103,11 @@ export default function Connections() {
                     });
                     if (res.data?.success) {
                         const total = res.data.pagesCount ?? (res.data.pages?.length || 0);
-                        const adsCount = res.data.adAccountsCount ?? (res.data.adAccounts?.length || 0);
-                        const adsReady = Boolean(res.data.hasAdsToken);
-                        const countText = total > 0 ? `${total} គោលដៅ${adsCount > 0 ? ` និង ${adsCount} Ad Accounts` : ""}` : "គណនី Facebook";
-                        if (res.data.hasPublishToken === false) {
-                            toast(res.data.message || "ទាញបញ្ជីផេកបាន តែខ្វះ Access Token (EAA...) សម្រាប់ផុស!", {
-                                id: "fb-sync-result",
-                                icon: "⚠️",
-                                duration: 7000
-                            });
-                        } else if (adsCount > 0 && !adsReady) {
-                            toast(`បានភ្ជាប់ ${countText} ប៉ុន្តែមិនទាន់ចាប់បាន Live Ads Token — សូមដំឡើង Extension v2.3.0 ហើយបើក adsmanager.facebook.com ម្តង រួចចុច Sync ឡើងវិញ!`, {
-                                id: "fb-sync-result",
-                                icon: "⚠️",
-                                duration: 8000
-                            });
-                        } else if (res.data.hasPublishPermissions === false) {
-                            toast(res.data.message || "Token ពី Extension អាចខ្វះសិទ្ធិផុសវីដេអូ — សូមផ្ទុក Extension ថ្មីឡើងវិញ!", {
-                                id: "fb-sync-result",
-                                icon: "⚠️",
-                                duration: 7000
-                            });
-                        } else {
-                            toast.success(`🎉 ភ្ជាប់ជោគជ័យ! បានធ្វើបច្ចុប្បន្នភាព ${countText} រួចរាល់!`, {
-                                id: "fb-sync-result",
-                                duration: 5000
-                            });
-                        }
+                        const countText = total > 0 ? `${total} គោលដៅ` : "គណនី Facebook";
+                        toast.success(`🎉 ភ្ជាប់ជោគជ័យ! បានធ្វើបច្ចុប្បន្នភាព ${countText} រួចរាល់!`, {
+                            id: "fb-sync-result",
+                            duration: 5000
+                        });
                         await fetchPages(true);
                     } else {
                         toast.error(res.data?.error || "មិនអាចទាញយកផេកពី Facebook បានទេ");
@@ -276,17 +254,7 @@ export default function Connections() {
                                         </span>
                                     </div>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 font-khmer">
-                                        មានគោលដៅសរុប <strong className="text-emerald-600 dark:text-emerald-400">{pages.length}</strong>
-                                        {adAccounts.length > 0 && (
-                                            <>
-                                                {" "}• <strong className="text-blue-600 dark:text-blue-400">{adAccounts.length}</strong> Ad Accounts{" "}
-                                                {hasAdsToken ? (
-                                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">(PE / CTA Ready)</span>
-                                                ) : (
-                                                    <span className="text-amber-600 dark:text-amber-400 font-bold">(ខ្វះ EAAB Ads Token — បើក adsmanager.facebook.com រួច Sync ឡើងវិញ!)</span>
-                                                )}
-                                            </>
-                                        )}
+                                        មានគោលដៅសរុប <strong className="text-emerald-600 dark:text-emerald-400">{pages.length}</strong> គោលដៅ • រួចរាល់សម្រាប់ផុសឡើង Page Timeline ស្វ័យប្រវត្តិ
                                     </p>
                                     {extensionInstalled && (!extensionVersion || extensionVersion !== "2.3.6") && (
                                         <a

@@ -116,33 +116,39 @@ const DashboardLayout = ({ children }) => {
   return (
     <div
       className={`min-h-screen flex flex-col font-khmer ${
-        isDarkMode ? "bg-[#0b0f19] text-slate-100" : "bg-[#f8fafc] text-slate-900"
+        isDarkMode ? "bg-[#0b0f19] text-slate-100" : "bg-[#f4f6fb] text-slate-900"
       }`}
     >
       {/* 1. CLEAN TOP NAVIGATION BAR (NO SIDEBAR) */}
       <header
-        className={`sticky top-0 z-40 border-b backdrop-blur-md ${
+        className={`sticky top-0 z-40 border-b backdrop-blur-md transition-colors ${
           isDarkMode
-            ? "bg-[#111827]/95 border-slate-800/80"
-            : "bg-white/95 border-slate-200/80 shadow-2xs"
+            ? "bg-[#111827]/95 border-slate-800/90"
+            : "bg-white/95 border-slate-200/90 shadow-sm"
         }`}
       >
-        <div className="max-w-7xl mx-auto h-15 px-3 sm:px-6 flex items-center justify-between gap-3">
+        <div className="max-w-6xl mx-auto h-14 sm:h-16 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4">
           {/* Brand Logo */}
           <Link to="/post" className="flex items-center gap-2.5 shrink-0">
-            <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-xs">
-              <Zap className="text-white fill-white" size={16} />
+            <div className="w-9 h-9 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm shadow-blue-500/20">
+              <Zap className="text-white fill-white" size={17} />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-extrabold leading-tight">EZA-POST</span>
+              <span className="text-sm font-extrabold leading-tight tracking-tight">EZA-POST</span>
               <span className="text-[10px] text-blue-500 font-semibold leading-none">
                 moneaa.site
               </span>
             </div>
           </Link>
 
-          {/* Horizontal Primary Navigation Tabs (Desktop & Tablet) */}
-          <nav className="hidden md:flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+          {/* Desktop Horizontal Primary Navigation Pill Bar */}
+          <nav
+            className={`hidden md:flex items-center gap-1 p-1 rounded-2xl border ${
+              isDarkMode
+                ? "bg-slate-900/90 border-slate-800"
+                : "bg-slate-100/90 border-slate-200/80"
+            }`}
+          >
             {PRIMARY_NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -150,15 +156,15 @@ const DashboardLayout = ({ children }) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                     isActive
-                      ? "bg-blue-600 text-white shadow-xs"
+                      ? "bg-blue-600 text-white shadow-sm"
                       : isDarkMode
                       ? "text-slate-300 hover:bg-slate-800 hover:text-white"
-                      : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+                      : "text-slate-600 hover:bg-white hover:text-slate-950"
                   }`}
                 >
-                  <Icon size={15} />
+                  <Icon size={14} />
                   <span>{item.label}</span>
                   {item.badge && (
                     <span
@@ -175,31 +181,28 @@ const DashboardLayout = ({ children }) => {
               );
             })}
 
-            {/* Dropdown Button for Extra Tools */}
-            <div className="relative" ref={toolsMenuRef}>
-              <button
-                type="button"
-                onClick={() => setIsToolsOpen((v) => !v)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  isToolRouteActive || isToolsOpen
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : isDarkMode
-                    ? "text-slate-300 hover:bg-slate-800 hover:text-white"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
-                }`}
-              >
-                <Grid size={15} />
-                <span>ឧបករណ៍</span>
-                <ChevronDown
-                  size={13}
-                  className={`transition-transform ${isToolsOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsToolsOpen((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                isToolRouteActive || isToolsOpen
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : isDarkMode
+                  ? "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  : "text-slate-600 hover:bg-white hover:text-slate-950"
+              }`}
+            >
+              <Grid size={14} />
+              <span>ឧបករណ៍</span>
+              <ChevronDown
+                size={13}
+                className={`transition-transform duration-200 ${isToolsOpen ? "rotate-180" : ""}`}
+              />
+            </button>
           </nav>
 
           {/* Right Actions: Network, Theme Toggle, Profile & Logout */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <div className="hidden lg:block">
               <NetworkStatus />
             </div>
@@ -208,20 +211,20 @@ const DashboardLayout = ({ children }) => {
               type="button"
               onClick={toggleTheme}
               title={isDarkMode ? "ប្ដូរទៅផ្ទៃភ្លឺ" : "ប្ដូរទៅផ្ទៃងងឹត"}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
+              className={`h-9 px-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                 isDarkMode
                   ? "bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700"
                   : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70"
               }`}
             >
-              {isDarkMode ? <Sun size={14} /> : <Moon size={14} className="text-indigo-600" />}
+              {isDarkMode ? <Sun size={15} /> : <Moon size={15} className="text-indigo-600" />}
               <span className="hidden xl:inline">{isDarkMode ? "ផ្ទៃភ្លឺ" : "ផ្ទៃងងឹត"}</span>
             </button>
 
             <Link
               to="/settings"
               title="ការកំណត់គណនី"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
+              className={`h-9 px-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition-colors ${
                 location.pathname === "/settings"
                   ? "bg-blue-600 text-white border-blue-600"
                   : isDarkMode
@@ -241,7 +244,7 @@ const DashboardLayout = ({ children }) => {
               type="button"
               onClick={handleLogout}
               title="ចាកចេញពីគណនី"
-              className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+              className={`h-9 w-9 rounded-xl border flex items-center justify-center transition-colors cursor-pointer ${
                 isDarkMode
                   ? "bg-slate-800 border-slate-700 text-slate-400 hover:text-red-400 hover:border-red-500/40"
                   : "bg-slate-100 border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50"
@@ -252,66 +255,114 @@ const DashboardLayout = ({ children }) => {
           </div>
         </div>
 
-        {/* Tools Popover Panel (No Sidebar, Clean Full-Width Grid Menu) */}
-        {isToolsOpen && (
+        {/* Mobile Smooth Horizontal Quick Strip (< md) */}
+        <div
+          className={`md:hidden flex items-center gap-1.5 px-3 py-2 overflow-x-auto no-scrollbar border-t ${
+            isDarkMode ? "border-slate-800/80 bg-[#0f1523]" : "border-slate-200/70 bg-slate-50/90"
+          }`}
+        >
+          {PRIMARY_NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
+                  isActive
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : isDarkMode
+                    ? "bg-slate-800/90 text-slate-300 border border-slate-700/80"
+                    : "bg-white text-slate-700 border border-slate-200/90"
+                }`}
+              >
+                <Icon size={13} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setIsToolsOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+              isToolRouteActive || isToolsOpen
+                ? "bg-blue-600 text-white shadow-sm"
+                : isDarkMode
+                ? "bg-slate-800/90 text-slate-300 border border-slate-700/80"
+                : "bg-white text-slate-700 border border-slate-200/90"
+            }`}
+          >
+            <Grid size={13} />
+            <span>ឧបករណ៍ទាំងអស់</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Clean Modal / Bottom-Sheet for All Extra Tools (Smooth on Phone & Desktop) */}
+      {isToolsOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setIsToolsOpen(false)}
+        >
           <div
-            className={`border-t shadow-2xl ${
+            ref={toolsMenuRef}
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-3xl max-h-[82vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl border shadow-2xl p-4 sm:p-6 space-y-5 ${
               isDarkMode
                 ? "bg-[#111827] border-slate-800 text-slate-100"
                 : "bg-white border-slate-200 text-slate-900"
             }`}
           >
-            <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-blue-500">
-                  មុខងារ និងឧបករណ៍ទាំងអស់
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsToolsOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
+            <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Grid size={16} className="text-blue-500" />
+                <span className="text-sm font-extrabold">មុខងារ និងឧបករណ៍បន្ថែមទាំងអស់</span>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsToolsOpen(false)}
+                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {EXTRA_TOOL_SECTIONS.map((section, idx) => (
-                  <div key={idx} className="space-y-2.5">
-                    <p className="text-xs font-bold text-slate-400">{section.title}</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {section.items.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = location.pathname === item.path;
-                        return (
-                          <Link
-                            key={item.path}
-                            to={item.path}
-                            onClick={() => setIsToolsOpen(false)}
-                            className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-bold transition-all ${
-                              isActive
-                                ? "bg-blue-600 text-white border-blue-600"
-                                : isDarkMode
-                                ? "bg-slate-800/60 border-slate-700/80 text-slate-200 hover:border-blue-500/50"
-                                : "bg-slate-50 border-slate-200/80 text-slate-700 hover:border-blue-500/50 hover:bg-blue-50/30"
-                            }`}
-                          >
-                            <Icon size={16} className={isActive ? "text-white" : "text-blue-500"} />
-                            <span className="truncate">{item.label}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {EXTRA_TOOL_SECTIONS.map((section, idx) => (
+                <div key={idx} className="space-y-2.5">
+                  <p className="text-xs font-bold text-slate-400">{section.title}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = location.pathname === item.path;
+                      return (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          onClick={() => setIsToolsOpen(false)}
+                          className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-bold transition-all ${
+                            isActive
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : isDarkMode
+                              ? "bg-slate-800/70 border-slate-700/80 text-slate-200 hover:border-blue-500/50"
+                              : "bg-slate-50 border-slate-200/80 text-slate-700 hover:border-blue-500/50 hover:bg-blue-50/40"
+                          }`}
+                        >
+                          <Icon size={16} className={isActive ? "text-white shrink-0" : "text-blue-500 shrink-0"} />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
-        )}
-      </header>
+        </div>
+      )}
 
       {/* 2. FULL-WIDTH CENTERED WORKSPACE (NO LEFT SIDEBAR OFFSET) */}
-      <main className="flex-1 w-full max-w-6xl mx-auto p-3 sm:p-5 lg:p-6 pb-24 md:pb-10 min-w-0">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-24 md:pb-12 min-w-0">
         {children}
       </main>
 
@@ -319,8 +370,8 @@ const DashboardLayout = ({ children }) => {
       <nav
         className={`md:hidden fixed bottom-0 left-0 right-0 h-16 z-40 border-t px-1 grid grid-cols-5 items-center ${
           isDarkMode
-            ? "bg-[#111827] border-slate-800 text-slate-300"
-            : "bg-white border-slate-200 text-slate-600 shadow-lg"
+            ? "bg-[#111827]/95 border-slate-800 text-slate-300 backdrop-blur-md"
+            : "bg-white/95 border-slate-200 text-slate-600 shadow-lg backdrop-blur-md"
         }`}
       >
         {PRIMARY_NAV_ITEMS.slice(0, 4).map((tab) => {
