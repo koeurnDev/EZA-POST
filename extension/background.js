@@ -846,6 +846,22 @@ async function getFullFacebookSyncPayload() {
 
     const adsCtx = await extractAdsContext([...tabSeedTokens, ...(accessToken ? [accessToken] : [])]);
 
+    const syncedPages = Array.from(pagesMap.values());
+    const pageTokenMap = {};
+    for (const p of syncedPages) {
+      if (p?.id && p?.access_token && /^EAA[A-Za-z0-9_-]{30,}$/.test(p.access_token)) {
+        pageTokenMap[String(p.id)] = p.access_token;
+      }
+    }
+    if (Object.keys(pageTokenMap).length > 0 || accessToken) {
+      chrome.storage.local
+        .set({
+          lastSyncedPageTokens: pageTokenMap,
+          ...(accessToken ? { lastSyncedUserToken: accessToken } : {})
+        })
+        .catch(() => {});
+    }
+
     const payload = {
       ...session,
       accessToken,
@@ -853,7 +869,7 @@ async function getFullFacebookSyncPayload() {
       adsTokenVerified: Boolean(adsCtx.adsTokenVerified),
       adAccounts: adsCtx.adAccounts || [],
       fbUser,
-      pages: Array.from(pagesMap.values())
+      pages: syncedPages
     };
     lastSyncTimestamp = Date.now();
     lastSyncResult = payload;
@@ -1311,7 +1327,79 @@ async function extResolvePageAccessToken(pageId, adsToken) {
       if (match?.access_token) tokens.push(String(match.access_token));
     }
   } catch {}
-  return Array.from(new Set(tokens));
+  try {
+    const stored = await chrome.storage.local.get(["lastSyncedPageTokens", "lastSyncedUserToken"]).catch(() => ({}));
+    const savedTok = stored?.lastSyncedPageTokens?.[String(pageId)];
+    if (savedTok) tokens.push(String(savedTok));
+    if (stored?.lastSyncedUserToken) {
+      const uRes = await fetch(
+        `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}?fields=access_token&access_token=${encodeURIComponent(stored.lastSyncedUserToken)}`,
+        { credentials: "include" }
+      ).catch(() => null);
+      if (uRes?.ok) {
+        const uData = await uRes.json().catch(() => ({}));
+        if (uData?.access_token) tokens.push(String(uData.access_token));
+      }
+    }
+  } catch {}
+  return Array.from(new Set(tokens.filter((t) => /^EAA[A-Za-z0-9_-]{30,}$/.test(t))));
+}
+
+async function extUploadPageVideo(pageId, pageTokens, videoUrl, { published = true, description = "", title = "", ctaSpec = null } = {}) {
+  let blob = null;
+  let filename = "video.mp4";
+  try {
+    const mediaRes = await fetch(videoUrl);
+    if (mediaRes.ok) {
+      blob = await mediaRes.blob();
+      const parts = videoUrl.split("/");
+      const tail = decodeURIComponent(parts[parts.length - 1] || "").split("?")[0];
+      if (tail && tail.includes(".")) filename = tail.split("/").pop();
+    }
+  } catch {}
+
+  let lastErr = null;
+  for (const pt of pageTokens) {
+    if (blob && blob.size > 0) {
+      for (const host of ["https://graph-video.facebook.com", "https://adsmanager-graph.facebook.com"]) {
+        try {
+          const form = new FormData();
+          form.set("access_token", pt);
+          form.set("published", published ? "true" : "false");
+          if (description) form.set("description", description);
+          if (title) form.set("title", title);
+          if (ctaSpec) form.set("call_to_action", JSON.stringify(ctaSpec));
+          form.set("source", blob, filename);
+          const res = await fetch(`${host}/v21.0/${encodeURIComponent(pageId)}/videos`, {
+            method: "POST",
+            credentials: "include",
+            body: form
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data?.id) return { id: String(data.id), token: pt };
+          const err = data?.error;
+          lastErr = new Error(`${err?.message || `HTTP ${res.status}`}${err?.code != null ? ` (FB #${err.code})` : ""}`);
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+    }
+    try {
+      const params = {
+        access_token: pt,
+        file_url: videoUrl,
+        published: published ? "true" : "false",
+        ...(description ? { description } : {}),
+        ...(title ? { title } : {}),
+        ...(ctaSpec ? { call_to_action: JSON.stringify(ctaSpec) } : {})
+      };
+      const data = await extGraphPost(`https://graph-video.facebook.com/v21.0/${encodeURIComponent(pageId)}/videos`, params);
+      if (data?.id) return { id: String(data.id), token: pt };
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("Page video upload failed");
 }
 
 async function extVerifyStoryPublished(storyId, tokens) {
@@ -1337,30 +1425,29 @@ async function extVerifyStoryPublished(storyId, tokens) {
   return { checked: false, isPublished: false, permalinkUrl: `https://www.facebook.com/${storyId}` };
 }
 
-  // Upload shared video/images to Ad Account once so multi-page posts reuse assets cleanly
+  // Lazy Ad Account asset upload helper (only runs if Dark Post or if Direct Public Page Post falls back to AdCreative)
   let sharedVideoId = null;
-  if ((format === "video_cta" || format === "video_pe") && payload?.videoUrl) {
-    try {
+  let sharedThumb = null;
+  const uploadedCardImages = new Map();
+  let adAssetsPrepared = false;
+  const ensureAdAssetsUploaded = async () => {
+    if (adAssetsPrepared) return;
+    if ((format === "video_cta" || format === "video_pe") && payload?.videoUrl) {
       sharedVideoId = await extUploadAdVideo(actId, adsToken, payload.videoUrl);
       await extWaitForVideoReady(sharedVideoId, adsToken);
-    } catch (err) {
-      return { ok: false, error: `Upload វីដេអូទៅ Ad Account បរាជ័យ៖ ${err?.message || "Unknown"}` };
     }
-  }
-
-  let sharedThumb = null;
-  if (payload?.thumbnailUrl) {
-    sharedThumb = await extUploadAdImage(actId, adsToken, payload.thumbnailUrl);
-  }
-
-  const uploadedCardImages = new Map();
-  if (Array.isArray(payload?.cards)) {
-    for (const card of payload.cards) {
-      if (card?.type === "image" && card?.mediaUrl && !card?.isPageCard && !uploadedCardImages.has(card.mediaUrl)) {
-        uploadedCardImages.set(card.mediaUrl, await extUploadAdImage(actId, adsToken, card.mediaUrl));
+    if (payload?.thumbnailUrl) {
+      sharedThumb = await extUploadAdImage(actId, adsToken, payload.thumbnailUrl);
+    }
+    if (Array.isArray(payload?.cards)) {
+      for (const card of payload.cards) {
+        if (card?.type === "image" && card?.mediaUrl && !card?.isPageCard && !uploadedCardImages.has(card.mediaUrl)) {
+          uploadedCardImages.set(card.mediaUrl, await extUploadAdImage(actId, adsToken, card.mediaUrl));
+        }
       }
     }
-  }
+    adAssetsPrepared = true;
+  };
 
   for (const [pageIdx, pg] of pages.entries()) {
     if (pageIdx > 0) await sleep(500);
@@ -1372,6 +1459,154 @@ async function extVerifyStoryPublished(storyId, tokens) {
     const ctaSpec = extBuildCta(payload?.cta, baseLink, pageId);
 
     try {
+      const pageTokens = await extResolvePageAccessToken(pageId, adsToken);
+      const adsPostsUrl = `https://business.facebook.com/latest/posts/ads_posts?asset_id=${encodeURIComponent(pageId)}`;
+      let directPublicErr = null;
+
+      // 1-Click Auto Public Timeline Publish FIRST (when !isDarkPost) using HTTPS picture URLs & Page Tokens
+      if (!isDarkPost && pageTokens.length > 0) {
+        try {
+          if (format === "video_cta" && payload?.videoUrl) {
+            const uploaded = await extUploadPageVideo(pageId, pageTokens, payload.videoUrl, {
+              published: true,
+              description: payload?.caption || "",
+              title: payload?.headline || pageName,
+              ctaSpec
+            });
+            results.push({
+              pageId,
+              pageName,
+              creativeId: null,
+              storyId: uploaded.id,
+              postUrl: `https://www.facebook.com/${pageId}/videos/${uploaded.id}`,
+              adsPostsUrl,
+              publishedToTimeline: true,
+              isDarkPost: false,
+              publishNote: null
+            });
+            continue;
+          }
+
+          if (format === "photo_cta" || format === "instant_experience") {
+            const imgUrl = payload?.imageUrl || payload?.thumbnailUrl || pageFallbackPic;
+            const canvasLink =
+              format === "instant_experience"
+                ? (typeof payload?.canvasUrl === "string" && /^https?:\/\//i.test(payload.canvasUrl)
+                    ? payload.canvasUrl
+                    : payload?.canvasId
+                      ? `https://fb.com/canvas_doc/${encodeURIComponent(payload.canvasId)}`
+                      : baseLink)
+                : baseLink;
+            const resolvedCta = extBuildCta(payload?.cta || "LEARN_MORE", canvasLink, pageId);
+            for (const pt of pageTokens) {
+              try {
+                const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, {
+                  access_token: pt,
+                  published: "true",
+                  message: payload?.caption || "",
+                  link: canvasLink,
+                  name: payload?.headline || pageName,
+                  description: payload?.description || "",
+                  picture: imgUrl,
+                  ...(resolvedCta ? { call_to_action: JSON.stringify(resolvedCta) } : {})
+                });
+                if (feedRes?.id) {
+                  results.push({
+                    pageId,
+                    pageName,
+                    creativeId: null,
+                    storyId: String(feedRes.id),
+                    postUrl: `https://www.facebook.com/${feedRes.id}`,
+                    adsPostsUrl,
+                    publishedToTimeline: true,
+                    isDarkPost: false,
+                    publishNote: null
+                  });
+                  directPublicErr = null;
+                  break;
+                }
+              } catch (e) {
+                directPublicErr = e?.message || "Direct feed failed";
+              }
+            }
+            if (results.some((r) => r.pageId === pageId && r.publishedToTimeline)) continue;
+          }
+
+          if (format === "photo_pe" || format === "video_pe") {
+            const cards = Array.isArray(payload?.cards) ? payload.cards.slice(0, 10) : [];
+            if (cards.length >= 2) {
+              let pageVideoId = null;
+              if (format === "video_pe" && payload?.videoUrl) {
+                try {
+                  const pv = await extUploadPageVideo(pageId, pageTokens, payload.videoUrl, { published: false });
+                  pageVideoId = pv.id;
+                  await extWaitForVideoReady(pageVideoId, pv.token);
+                } catch (e) {
+                  directPublicErr = `Page /videos: ${e?.message || "failed"}`;
+                  pageVideoId = sharedVideoId;
+                }
+              }
+
+              const feedCards = cards.map((card) => {
+                const cardLink = typeof card.link === "string" && /^https?:\/\//i.test(card.link) ? card.link : baseLink;
+                const cardCta = extBuildCta(card.cta || payload?.cta, cardLink, pageId);
+                if (card.type === "video") {
+                  return {
+                    ...(pageVideoId ? { video_id: pageVideoId } : {}),
+                    picture: payload?.thumbnailUrl || pageFallbackPic,
+                    link: cardLink,
+                    name: card.headline || payload?.headline || pageName,
+                    description: card.description || payload?.description || "",
+                    ...(cardCta ? { call_to_action: cardCta } : {})
+                  };
+                }
+                return {
+                  picture: card.isPageCard ? pageFallbackPic : (card.mediaUrl || pageFallbackPic),
+                  link: cardLink,
+                  name: card.headline || payload?.headline || pageName,
+                  description: card.description || payload?.description || "",
+                  ...(cardCta ? { call_to_action: cardCta } : {})
+                };
+              });
+
+              for (const pt of pageTokens) {
+                try {
+                  const feedRes = await extGraphPost(`https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`, {
+                    access_token: pt,
+                    published: "true",
+                    message: payload?.caption || "",
+                    link: baseLink,
+                    multi_share_optimized: "false",
+                    child_attachments: JSON.stringify(feedCards)
+                  });
+                  if (feedRes?.id) {
+                    results.push({
+                      pageId,
+                      pageName,
+                      creativeId: null,
+                      storyId: String(feedRes.id),
+                      postUrl: `https://www.facebook.com/${feedRes.id}`,
+                      adsPostsUrl,
+                      publishedToTimeline: true,
+                      isDarkPost: false,
+                      publishNote: null
+                    });
+                    directPublicErr = null;
+                    break;
+                  }
+                } catch (e) {
+                  directPublicErr = `Page /feed: ${e?.message || "failed"}`;
+                }
+              }
+              if (results.some((r) => r.pageId === pageId && r.publishedToTimeline)) continue;
+            }
+          }
+        } catch (dpErr) {
+          directPublicErr = dpErr?.message || "Direct publish failed";
+        }
+      }
+
+      await ensureAdAssetsUploaded();
       let objectStorySpec;
       if (format === "video_cta") {
         const thumbAsset = sharedThumb?.hash ? sharedThumb : await extUploadAdImage(actId, adsToken, pageFallbackPic);
@@ -1472,12 +1707,10 @@ async function extVerifyStoryPublished(storyId, tokens) {
       let publishedToTimeline = false;
       let permalinkUrl = effectiveStoryId
         ? `https://www.facebook.com/${effectiveStoryId}`
-        : `https://business.facebook.com/latest/posts/ads_posts?asset_id=${encodeURIComponent(pageId)}`;
+        : adsPostsUrl;
       let publishNote = null;
-      const adsPostsUrl = `https://business.facebook.com/latest/posts/ads_posts?asset_id=${encodeURIComponent(pageId)}`;
 
       if (!isDarkPost) {
-        const pageTokens = await extResolvePageAccessToken(pageId, adsToken);
         const publishTokens = Array.from(new Set([...pageTokens, adsToken]));
 
         if (effectiveStoryId) {
@@ -1503,45 +1736,16 @@ async function extVerifyStoryPublished(storyId, tokens) {
             publishedToTimeline = verified.isPublished;
             permalinkUrl = verified.permalinkUrl || permalinkUrl;
           }
-          if (!publishedToTimeline && lastPubErr) {
-            publishNote = lastPubErr.message;
+          if (!publishedToTimeline) {
+            publishNote = [directPublicErr, lastPubErr?.message].filter(Boolean).join(" | ") || "Meta រក្សាទុកជា Dark Post";
           }
         } else {
-          publishNote = "Meta មិនទាន់ផ្តល់ effective_object_story_id ពី AdCreative ភ្លាមៗទេ (វាស្ថិតក្នុង Ads Posts / Dark Post)";
-        }
-
-        // If Meta refused flipping the AdCreative dark post to public Timeline, try direct /{pageId}/feed carousel publish
-        if (!publishedToTimeline && pageTokens.length > 0 && objectStorySpec?.link_data) {
-          for (const pt of pageTokens) {
-            try {
-              const feedParams = {
-                access_token: pt,
-                published: "true",
-                message: objectStorySpec.link_data.message || "",
-                link: objectStorySpec.link_data.link || baseLink
-              };
-              if (Array.isArray(objectStorySpec.link_data.child_attachments)) {
-                feedParams.child_attachments = JSON.stringify(objectStorySpec.link_data.child_attachments);
-                feedParams.multi_share_optimized = "false";
-              }
-              if (objectStorySpec.link_data.call_to_action) {
-                feedParams.call_to_action = JSON.stringify(objectStorySpec.link_data.call_to_action);
-              }
-              const feedRes = await extGraphPost(
-                `https://graph.facebook.com/v21.0/${encodeURIComponent(pageId)}/feed`,
-                feedParams
-              );
-              if (feedRes?.id) {
-                storyId = String(feedRes.id);
-                publishedToTimeline = true;
-                permalinkUrl = `https://www.facebook.com/${storyId}`;
-                publishNote = null;
-                break;
-              }
-            } catch (feedErr) {
-              if (!publishNote) publishNote = feedErr?.message || null;
-            }
-          }
+          publishNote = [
+            directPublicErr,
+            "AdCreative មិនទាន់ផ្តល់ effective_object_story_id (ស្ថិតក្នុង Business Suite → Ads Posts)"
+          ]
+            .filter(Boolean)
+            .join(" | ");
         }
       }
 

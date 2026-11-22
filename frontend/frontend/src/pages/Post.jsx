@@ -1302,25 +1302,15 @@ export default function Post() {
                                     )}
                                 </div>
 
-                                <div className="flex items-center gap-1.5 bg-white/80 dark:bg-gray-900 p-1 rounded-xl border border-blue-500/20 shrink-0 w-fit">
-                                    {[
-                                        { dark: false, label: "📢 ផុសឡើង Timeline" },
-                                        { dark: true, label: "🕶️ Dark Post (PE)" },
-                                    ].map((opt) => (
-                                        <button
-                                            key={String(opt.dark)}
-                                            type="button"
-                                            onClick={() => setIsDarkPost(opt.dark)}
-                                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                                                isDarkPost === opt.dark
-                                                    ? "bg-blue-600 text-white shadow-2xs"
-                                                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                                            }`}
-                                        >
-                                            {opt.label}
-                                        </button>
-                                    ))}
-                                </div>
+                                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/80 dark:bg-gray-900 border border-blue-500/20 text-[11px] font-bold text-gray-700 dark:text-gray-300 cursor-pointer shrink-0 select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={isDarkPost}
+                                        onChange={(e) => setIsDarkPost(e.target.checked)}
+                                        className="w-3.5 h-3.5 rounded text-blue-600 cursor-pointer"
+                                    />
+                                    <span>🕶️ លាក់ជា Dark Post (សម្រាប់រត់ Ads ប៉ុណ្ណោះ)</span>
+                                </label>
                             </div>
                         )}
 
