@@ -72,7 +72,6 @@ export default function Post() {
     const [adAccounts, setAdAccounts] = useState([]);
     const [selectedAdAccount, setSelectedAdAccount] = useState("");
     const [hasAdsToken, setHasAdsToken] = useState(false);
-    const [isDarkPost, setIsDarkPost] = useState(false);
     const [canvases, setCanvases] = useState([]);
     const [canvasId, setCanvasId] = useState("");
     const [loadingCanvases, setLoadingCanvases] = useState(false);
@@ -710,7 +709,6 @@ export default function Post() {
                             description: cardDescription.trim(),
                             link: targetLink.trim(),
                             cta,
-                            isDarkPost,
                             canvasId,
                             canvasUrl: postFormat === "instant_experience" ? targetLink.trim() : "",
                             videoUrl: uploadedVideoUrl,
@@ -730,31 +728,15 @@ export default function Post() {
             setLastPublishedResult({
                 format: postFormat,
                 storyId: extResult.storyId,
-                creativeId: extResult.creativeId,
                 postUrl: extResult.postUrl,
-                adsPostsUrl: extResult.adsPostsUrl,
-                publishedToTimeline: Boolean(extResult.publishedToTimeline),
-                isDarkPost: Boolean(extResult.isDarkPost),
-                publishNote: extResult.publishNote || null,
+                publishedToTimeline: true,
                 publishedAt: new Date().toLocaleTimeString()
             });
 
-            if (extResult.publishedToTimeline) {
-                toast.success(`🎉 បានបង្ហោះឡើង Page Timeline ជោគជ័យ! (ID: ${extResult.storyId})`, {
-                    id: toastId,
-                    duration: 7000
-                });
-            } else if (isDarkPost) {
-                toast.success(`🕶️ បានបង្កើត Dark Post (PE) ក្នុង Ads Manager ជោគជ័យ! (ID: ${extResult.storyId})`, {
-                    id: toastId,
-                    duration: 7000
-                });
-            } else {
-                toast(
-                    `បានបង្កើតជា Ads Post / Dark Post (ID: ${extResult.storyId}) ប៉ុន្តែ Meta មិនអនុញ្ញាតបើកលើ Timeline ស្វ័យប្រវត្តិទេ — ចុចបើក Ads Posts ដើម្បី Publish!`,
-                    { id: toastId, icon: "⚠️", duration: 9000 }
-                );
-            }
+            toast.success(`🎉 បានបង្ហោះឡើង Page Timeline ជោគជ័យ! (ID: ${extResult.storyId})`, {
+                id: toastId,
+                duration: 7000
+            });
             setFile(null);
             setPreviewUrl(null);
             setRawVideoUrl(null);
@@ -883,7 +865,6 @@ export default function Post() {
             if (cardDescription.trim()) formData.append("cardDescription", cardDescription.trim());
             if (cta) formData.append("cta", cta);
             if (selectedAdAccount) formData.append("adAccountId", selectedAdAccount);
-            if (isDarkPost) formData.append("isDarkPost", "true");
             if (canvasId) formData.append("canvasId", canvasId);
             if (postFormat === "instant_experience" && targetLink.trim()) formData.append("canvasUrl", targetLink.trim());
             if (publishMode === "schedule" && scheduleTime) formData.append("scheduleTime", new Date(scheduleTime).toISOString());
@@ -1175,31 +1156,18 @@ export default function Post() {
 
                 {activeView === "create" ? (
                     <div className="space-y-4">
-                        {/* Last Published Post Status & Direct Links */}
+                        {/* Last Published Post Status & Direct Link */}
                         {lastPublishedResult && (
-                            <div
-                                className={`rounded-2xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                                    lastPublishedResult.publishedToTimeline
-                                        ? "bg-emerald-500/10 border-emerald-500/30"
-                                        : "bg-amber-500/10 border-amber-500/30"
-                                }`}
-                            >
+                            <div className="rounded-2xl p-4 border bg-emerald-500/10 border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="space-y-1 min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="text-xs font-bold text-gray-900 dark:text-white">
-                                            {lastPublishedResult.publishedToTimeline
-                                                ? "✅ បានបង្ហោះឡើង Page Timeline ជោគជ័យ!"
-                                                : "🕶️ បានបង្កើតជា Ads Post / Dark Post (ស្ថិតក្នុង Business Suite → Ads Posts)"}
+                                            ✅ បានបង្ហោះឡើង Page Timeline ជោគជ័យ!
                                         </span>
                                         <span className="text-[11px] font-mono text-gray-500">
                                             ID: {lastPublishedResult.storyId}
                                         </span>
                                     </div>
-                                    {lastPublishedResult.publishNote && (
-                                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                                            មូលហេតុពី Meta៖ {lastPublishedResult.publishNote}
-                                        </p>
-                                    )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 shrink-0">
                                     {lastPublishedResult.postUrl && (
@@ -1209,18 +1177,7 @@ export default function Post() {
                                             rel="noopener noreferrer"
                                             className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold inline-flex items-center gap-1.5"
                                         >
-                                            <span>បើកមើល Post</span>
-                                            <ExternalLink size={12} />
-                                        </a>
-                                    )}
-                                    {lastPublishedResult.adsPostsUrl && (
-                                        <a
-                                            href={lastPublishedResult.adsPostsUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="px-3 py-1.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/15 text-gray-800 dark:text-gray-200 text-xs font-bold inline-flex items-center gap-1.5 hover:border-blue-500"
-                                        >
-                                            <span>បើក Ads Posts (Publish)</span>
+                                            <span>បើកមើល Post លើ Timeline</span>
                                             <ExternalLink size={12} />
                                         </a>
                                     )}
@@ -1262,12 +1219,12 @@ export default function Post() {
                             })}
                         </div>
 
-                        {/* Ad Account + Dark Post Selector for PE / CTA / Canvas Formats */}
+                        {/* Ad Account Selector for PE / CTA / Canvas Formats (Always Auto-Public to Timeline) */}
                         {activeFormatMeta.needsAdAccount && (
                             <div className="bg-blue-500/[0.06] dark:bg-blue-500/10 border border-blue-500/20 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="flex-1 min-w-0 space-y-1">
                                     <div className="text-xs font-bold text-blue-700 dark:text-blue-300">
-                                        💳 ជ្រើសរើស Ad Account សម្រាប់ {activeFormatMeta.label}
+                                        💳 ជ្រើសរើស Ad Account សម្រាប់ {activeFormatMeta.label} (ផុសឡើង Page Timeline ស្វ័យប្រវត្តិ)
                                     </div>
                                     {adAccounts.length > 0 ? (
                                         <div className="space-y-1.5">
@@ -1284,33 +1241,23 @@ export default function Post() {
                                             </select>
                                             {!hasAdsToken && !isExtensionAtLeastV230(extensionVersion) && (
                                                 <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
-                                                    ⚠️ សូមអាប់ដេត Extension v2.3.0 ក្នុង{" "}
-                                                    <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link> ដើម្បីចាប់ Live Ads Token និងបង្ហោះ PE/CTA ផ្ទាល់លើ Browser!
+                                                    ⚠️ សូមអាប់ដេត Extension v2.3.5 ក្នុង{" "}
+                                                    <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link> ដើម្បីបង្ហោះ PE/CTA ឡើង Page Timeline ផ្ទាល់លើ Browser!
                                                 </p>
                                             )}
                                             {isExtensionAtLeastV230(extensionVersion) && (
                                                 <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">
-                                                    ⚡ Extension v{extensionVersion} រួចរាល់ — នឹងបង្ហោះ PE / CTA ផ្ទាល់លើ Browser របស់អ្នក (គ្មានបញ្ហា Server IP)
+                                                    ⚡ Extension v{extensionVersion} រួចរាល់ — នឹងបង្ហោះឡើង Page Timeline សាធារណៈដោយស្វ័យប្រវត្តិ (គ្មាន Dark Post)
                                                 </p>
                                             )}
                                         </div>
                                     ) : (
                                         <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                                            មិនទាន់ឃើញ Ad Account ទេ — សូមអាប់ដេត Extension v2.3.0 ក្នុង{" "}
+                                            មិនទាន់ឃើញ Ad Account ទេ — សូមអាប់ដេត Extension v2.3.5 ក្នុង{" "}
                                             <Link to="/connections" className="underline font-bold">ទំព័រភ្ជាប់ផេក</Link> រួចចុច Sync!
                                         </p>
                                     )}
                                 </div>
-
-                                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/80 dark:bg-gray-900 border border-blue-500/20 text-[11px] font-bold text-gray-700 dark:text-gray-300 cursor-pointer shrink-0 select-none">
-                                    <input
-                                        type="checkbox"
-                                        checked={isDarkPost}
-                                        onChange={(e) => setIsDarkPost(e.target.checked)}
-                                        className="w-3.5 h-3.5 rounded text-blue-600 cursor-pointer"
-                                    />
-                                    <span>🕶️ លាក់ជា Dark Post (សម្រាប់រត់ Ads ប៉ុណ្ណោះ)</span>
-                                </label>
                             </div>
                         )}
 
