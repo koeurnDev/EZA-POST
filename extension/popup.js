@@ -1,10 +1,10 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Extension Popup Script (v2.0.5)
+ * ⚡ EZA-POST Extension Popup Script (v2.1.0)
  * ============================================================
  */
 
-const DEFAULT_SERVER_URL = "https://eza-post-3kv.pages.dev";
+const DEFAULT_SERVER_URL = "https://moneaa.site";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const fbStatusBadge = document.getElementById("fbStatusBadge");
@@ -25,7 +25,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
       const tabs = await chrome.tabs.query({
-        url: ["https://*.pages.dev/*", "http://localhost:*/*", "http://127.0.0.1:*/*"]
+        url: [
+          "https://moneaa.site/*",
+          "https://*.moneaa.site/*",
+          "https://*.pages.dev/*",
+          "http://localhost:*/*",
+          "http://127.0.0.1:*/*"
+        ]
       });
       if (tabs && tabs.length > 0 && tabs[0].url) {
         const u = new URL(tabs[0].url);

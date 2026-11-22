@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * ⚡ EZA-POST Facebook Sync Extension — Background Service Worker (v2.0.5)
+ * ⚡ EZA-POST Facebook Sync Extension — Background Service Worker (v2.1.0)
  * ============================================================
  */
 
@@ -769,13 +769,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then((data) => {
         sendResponse({
           installed: true,
-          version: "2.0.5",
+          version: "2.1.0",
           fbLoggedIn: Boolean(data?.fbLoggedIn),
           fbUserId: data?.fbUserId || null
         });
       })
       .catch(() => {
-        sendResponse({ installed: true, version: "2.0.5", fbLoggedIn: false, fbUserId: null });
+        sendResponse({ installed: true, version: "2.1.0", fbLoggedIn: false, fbUserId: null });
       });
     return true;
   }

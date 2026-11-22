@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "EZA-POST Facebook Sync Extension",
-  "version": "2.0.5",
-  "description": "1-Click Facebook Page Sync Extension for EZA-POST. Safe, instant, and automated.",
+  "version": "2.1.0",
+  "description": "1-Click Facebook Page Sync Extension for EZA-POST & Moneaa. Safe, instant, and automated.",
   "permissions": [
     "cookies",
     "storage",
@@ -13,6 +13,8 @@
     "*://*.facebook.com/*",
     "*://facebook.com/*",
     "*://*.messenger.com/*",
+    "https://moneaa.site/*",
+    "https://*.moneaa.site/*",
     "https://*.pages.dev/*",
     "https://*.workers.dev/*",
     "http://localhost:*/*",
@@ -24,6 +26,8 @@
   "content_scripts": [
     {
       "matches": [
+        "https://moneaa.site/*",
+        "https://*.moneaa.site/*",
         "https://*.pages.dev/*",
         "http://localhost:*/*",
         "http://127.0.0.1:*/*"
